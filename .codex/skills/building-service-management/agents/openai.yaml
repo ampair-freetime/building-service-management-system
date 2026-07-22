@@ -1,0 +1,4 @@
+interface:
+  display_name: "Building Service Management"
+  short_description: "Develop the FastAPI and Vue service platform"
+  default_prompt: "Use $building-service-management to implement a feature in this FastAPI and Vue application."
