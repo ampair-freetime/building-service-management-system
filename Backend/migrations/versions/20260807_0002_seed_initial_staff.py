@@ -1,0 +1,70 @@
+"""เพิ่มบัญชีผู้ดูแลระบบเริ่มต้นสำหรับ development.
+
+Revision ID: 20260807_0002
+Revises: 20260806_0001
+Create Date: 2026-08-07
+"""
+
+from collections.abc import Sequence
+from uuid import UUID
+
+import sqlalchemy as sa
+from alembic import op
+from sqlalchemy.dialects import postgresql
+
+revision: str = "20260807_0002"
+down_revision: str | None = "20260806_0001"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
+
+# บัญชีนี้ใช้สำหรับเริ่มต้นระบบใน development เท่านั้น
+INITIAL_ADMIN_ID = UUID("8e4d62bf-dfc0-4c18-9286-85d15a36952b")
+INITIAL_ADMIN_EMPLOYEE_CODE = "ADMIN001"
+INITIAL_ADMIN_EMAIL = "admin@example.com"
+INITIAL_ADMIN_PASSWORD_HASH = (
+    "$argon2id$v=19$m=65536,t=3,p=4$IJvI9XWfaCSd4TQ7AP1ptg"
+    "$MTBmqF9UCbta25c41ylq9yG0PS/2NRYGEzBi7vCsAfs"
+)
+
+staff_role = postgresql.ENUM(
+    "housekeeper",
+    "technician",
+    "coordinator",
+    "admin",
+    name="staff_role",
+    create_type=False,
+)
+staff_accounts = sa.table(
+    "staff_accounts",
+    sa.column("id", sa.Uuid()),
+    sa.column("employee_code", sa.String(length=32)),
+    sa.column("email", sa.String(length=320)),
+    sa.column("full_name", sa.String(length=200)),
+    sa.column("password_hash", sa.String(length=255)),
+    sa.column("role", staff_role),
+    sa.column("is_active", sa.Boolean()),
+)
+
+
+def upgrade() -> None:
+    """สร้าง initial admin เมื่อยังไม่มี id, employee code หรือ email เดียวกัน."""
+    op.execute(
+        postgresql.insert(staff_accounts)
+        .values(
+            {
+                "id": INITIAL_ADMIN_ID,
+                "employee_code": INITIAL_ADMIN_EMPLOYEE_CODE,
+                "email": INITIAL_ADMIN_EMAIL,
+                "full_name": "System Admin",
+                "password_hash": INITIAL_ADMIN_PASSWORD_HASH,
+                "role": "admin",
+                "is_active": True,
+            }
+        )
+        .on_conflict_do_nothing()
+    )
+
+
+def downgrade() -> None:
+    """ลบเฉพาะบัญชีที่ migration นี้สร้างโดยอ้างอิง UUID คงที่."""
+    op.execute(sa.delete(staff_accounts).where(staff_accounts.c.id == INITIAL_ADMIN_ID))

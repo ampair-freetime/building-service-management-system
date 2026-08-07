@@ -5,8 +5,8 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-building_service}
       POSTGRES_USER: ${POSTGRES_USER:-building_service}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-building_service}
-    ports:
-      - "5432:5432"
+    expose:
+      - "5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -19,10 +19,11 @@ services:
 
   backend:
     build: ./Backend
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    command: sh -c "alembic upgrade head && exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
     environment:
       BACKEND_CORS_ORIGINS: '["http://localhost:5173"]'
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-building_service}:${POSTGRES_PASSWORD:-building_service}@database:5432/${POSTGRES_DB:-building_service}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-development-only-change-this-secret}
     ports:
       - "8000:8000"
     volumes:
