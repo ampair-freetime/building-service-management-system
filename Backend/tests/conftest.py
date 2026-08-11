@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import (
 from app.db.base import Base
 from app.db.session import get_db_session
 from app.main import create_application
-from app.models.staff_account import StaffAccount
+from app.models.staff import Staff
 from app.schemas.staff import StaffCreate
 from app.services.staff import create_staff
 
@@ -49,24 +49,24 @@ def test_context(
 def seed_staff(
     session_factory: async_sessionmaker[AsyncSession],
     *,
-    employee_code: str,
+    staff_code: str,
     email: str,
     password: str,
     role: str,
     full_name: str = "Test Staff",
-    is_active: bool = True,
-) -> StaffAccount:
-    async def seed() -> StaffAccount:
+    status: str = "active",
+) -> Staff:
+    async def seed() -> Staff:
         async with session_factory() as session:
             return await create_staff(
                 session,
                 StaffCreate(
-                    employee_code=employee_code,
+                    staff_code=staff_code,
                     email=email,
                     full_name=full_name,
                     password=password,
                     role=role,
-                    is_active=is_active,
+                    status=status,
                 ),
             )
 

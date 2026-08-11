@@ -9,7 +9,7 @@ def test_login_by_email_and_read_current_staff(
     client, session_factory = test_context
     seed_staff(
         session_factory,
-        employee_code="TECH001",
+        staff_code="TECH001",
         email="tech@example.com",
         password="correct-password",
         role="technician",
@@ -24,7 +24,7 @@ def test_login_by_email_and_read_current_staff(
     assert response.status_code == 200
     body = response.json()
     assert body["token_type"] == "bearer"
-    assert body["staff"]["employee_code"] == "TECH001"
+    assert body["staff"]["staff_code"] == "TECH001"
     assert body["staff"]["role"] == "technician"
     assert "password" not in body["staff"]
     assert "password_hash" not in body["staff"]
@@ -37,13 +37,13 @@ def test_login_by_email_and_read_current_staff(
     assert me_response.json()["email"] == "tech@example.com"
 
 
-def test_login_by_employee_code_and_reject_invalid_credentials(
+def test_login_by_staff_code_and_reject_invalid_credentials(
     test_context: tuple[TestClient, async_sessionmaker[AsyncSession]],
 ) -> None:
     client, session_factory = test_context
     seed_staff(
         session_factory,
-        employee_code="HK001",
+        staff_code="HK001",
         email="housekeeper@example.com",
         password="correct-password",
         role="housekeeper",
@@ -66,22 +66,22 @@ def test_login_by_employee_code_and_reject_invalid_credentials(
     assert missing_token.status_code == 401
 
 
-def test_inactive_staff_cannot_login(
+def test_suspended_staff_cannot_login(
     test_context: tuple[TestClient, async_sessionmaker[AsyncSession]],
 ) -> None:
     client, session_factory = test_context
     seed_staff(
         session_factory,
-        employee_code="COORD001",
-        email="coordinator@example.com",
+        staff_code="CLERK001",
+        email="clerk@example.com",
         password="correct-password",
-        role="coordinator",
-        is_active=False,
+        role="clerk",
+        status="suspended",
     )
 
     response = client.post(
         "/api/v1/auth/login",
-        json={"identifier": "COORD001", "password": "correct-password"},
+        json={"identifier": "CLERK001", "password": "correct-password"},
     )
 
     assert response.status_code == 401
@@ -93,7 +93,7 @@ def test_admin_can_create_and_list_all_staff_roles(
     client, session_factory = test_context
     seed_staff(
         session_factory,
-        employee_code="ADMIN001",
+        staff_code="ADMIN001",
         email="admin@example.com",
         password="admin-password",
         role="admin",
@@ -108,14 +108,14 @@ def test_admin_can_create_and_list_all_staff_roles(
     new_staff = [
         ("HK001", "housekeeper@example.com", "House Keeper", "housekeeper"),
         ("TECH001", "technician@example.com", "Technician", "technician"),
-        ("COORD001", "coordinator@example.com", "Coordinator", "coordinator"),
+        ("CLERK001", "clerk@example.com", "Clerk", "clerk"),
     ]
-    for employee_code, email, full_name, role in new_staff:
+    for staff_code, email, full_name, role in new_staff:
         response = client.post(
             "/api/v1/staff",
             headers=headers,
             json={
-                "employee_code": employee_code,
+                "staff_code": staff_code,
                 "email": email,
                 "full_name": full_name,
                 "password": "staff-password",
@@ -129,7 +129,7 @@ def test_admin_can_create_and_list_all_staff_roles(
     assert {staff["role"] for staff in list_response.json()} == {
         "housekeeper",
         "technician",
-        "coordinator",
+        "clerk",
         "admin",
     }
 
@@ -137,7 +137,7 @@ def test_admin_can_create_and_list_all_staff_roles(
         "/api/v1/staff",
         headers=headers,
         json={
-            "employee_code": "HK001",
+            "staff_code": "HK001",
             "email": "another@example.com",
             "full_name": "Duplicate Staff",
             "password": "staff-password",
@@ -153,7 +153,7 @@ def test_non_admin_cannot_manage_staff(
     client, session_factory = test_context
     seed_staff(
         session_factory,
-        employee_code="TECH001",
+        staff_code="TECH001",
         email="tech@example.com",
         password="staff-password",
         role="technician",

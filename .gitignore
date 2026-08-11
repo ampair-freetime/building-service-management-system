@@ -11,4 +11,4 @@ dist/
 .idea/
 .vscode/
 .DS_Store
-
+.codex/

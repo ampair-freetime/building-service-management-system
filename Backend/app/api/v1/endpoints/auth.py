@@ -4,7 +4,7 @@ from fastapi import APIRouter, HTTPException, status
 
 from app.api.dependencies import CurrentStaff, DbSession
 from app.core.security import create_access_token
-from app.models.staff_account import StaffAccount
+from app.models.staff import Staff
 from app.schemas.auth import LoginRequest, LoginResponse
 from app.schemas.staff import StaffResponse
 from app.services.auth import authenticate_staff
@@ -29,6 +29,6 @@ async def login(payload: LoginRequest, session: DbSession) -> LoginResponse:
 
 
 @router.get("/me", response_model=StaffResponse)
-async def read_current_staff(current_staff: CurrentStaff) -> StaffAccount:
+async def read_current_staff(current_staff: CurrentStaff) -> Staff:
     """คืนโปรไฟล์ของเจ้าของ Bearer token ที่ผ่านการตรวจสอบแล้ว."""
     return current_staff

@@ -7,9 +7,9 @@ from alembic import context
 from sqlalchemy import pool
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
+import app.models  # noqa: F401
 from app.core.config import settings
 from app.db.base import Base
-from app.models import StaffAccount  # noqa: F401
 
 config = context.config
 # ใช้ DATABASE_URL จาก Settings แทนค่าที่เขียนค้างไว้ใน alembic.ini
