@@ -1,17 +1,10 @@
 import { createRouter, createWebHistory } from "vue-router";
 
-import PortalView from "../views/portal.vue";
 import HomeView from "../views/index.vue";
 import StaffLogin from "../views/staff-login.vue";
 import StaffDashboard from "../views/staff-dashboard.vue";
 
 const routes = [
-  // หน้าแรก -> Portal
-  {
-    path: "/",
-    name: "portal",
-    component: PortalView,
-  },
 
   // ผู้ใช้งานทั่วไป -> ไม่ต้อง Login
   {
@@ -31,10 +24,13 @@ const routes = [
   {
     path: "/staff-dashboard",
     name: "staff-dashboard",
-    component: StaffDashboard
-    // meta: {
-    //   requiresAuth: true,
-    // },
+    component: StaffDashboard,
+  },
+  
+  {
+    path: "/admin-dashboard",
+    name: "admin-dashboard",
+    component: StaffDashboard,
   },
 ];
 

@@ -1,159 +1,107 @@
 <script setup>
-import { onMounted, onUnmounted } from "vue";
+import { ref, onMounted } from "vue";
 import { useRouter } from "vue-router";
 
 const router = useRouter();
-let cleanup = [];
+
+const identifier = ref("");
+const password = ref("");
+const rememberMe = ref(false);
+const showPassword = ref(false);
+const loading = ref(false);
+
+const forgotModalOpen = ref(false);
+const resetEmail = ref("");
+const toastMessage = ref("");
+const toastVisible = ref(false);
 
 onMounted(() => {
-  document.title = "เข้าสู่ระบบเจ้าหน้าที่ · Building Care";
 
-  const roleInput = document.getElementById("demo-role");
-  const roleCards = document.querySelectorAll(".role-card");
-  const modal = document.getElementById("forgotModal");
-  let lastModalTrigger = null;
-  let toastTimer = 0;
-  function selectRole(role) {
-    roleInput.value = role;
-    roleCards.forEach((card) => {
-      const selected = card.dataset.role === role;
-      card.classList.toggle("selected", selected);
-      card.setAttribute("aria-pressed", String(selected));
-    });
-  }
-  function showToast(message) {
-    const toast = document.getElementById("toast");
-    clearTimeout(toastTimer);
-    toast.textContent = message;
-    toast.classList.add("show");
-    toastTimer = setTimeout(() => toast.classList.remove("show"), 2400);
-  }
-  function openModal(trigger) {
-    lastModalTrigger = trigger;
-    modal.classList.add("open");
-    modal.removeAttribute("aria-hidden");
-    document.body.classList.add("modal-open");
-    requestAnimationFrame(() => document.getElementById("resetEmail").focus());
-  }
-  function closeModal() {
-    modal.classList.remove("open");
-    modal.setAttribute("aria-hidden", "true");
-    document.body.classList.remove("modal-open");
-    lastModalTrigger?.focus();
-  }
-  roleCards.forEach((card) =>
-    card.addEventListener("click", () => selectRole(card.dataset.role))
-  );
-  document
-    .getElementById("passwordToggle")
-    .addEventListener("click", (event) => {
-      const input = document.getElementById("password");
-      const visible = input.type === "text";
-      input.type = visible ? "password" : "text";
-      event.currentTarget.setAttribute(
-        "aria-label",
-        visible ? "แสดงรหัสผ่าน" : "ซ่อนรหัสผ่าน"
-      );
-      event.currentTarget
-        .querySelector("use")
-        .setAttribute("href", visible ? "#i-eye" : "#i-eye-off");
-    });
-  document
-    .getElementById("forgotPassword")
-    .addEventListener("click", (event) => openModal(event.currentTarget));
-  document
-    .querySelectorAll('[data-close="forgotModal"]')
-    .forEach((button) => button.addEventListener("click", closeModal));
-  modal.addEventListener("click", (event) => {
-    if (event.target === modal) closeModal();
-  });
-  document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape" && modal.classList.contains("open"))
-      closeModal();
-  });
-  document.getElementById("forgotForm").addEventListener("submit", (event) => {
-    event.preventDefault();
-    if (!event.currentTarget.checkValidity()) {
-      event.currentTarget.reportValidity();
-      return;
-    }
-    closeModal();
-    event.currentTarget.reset();
-    showToast("ส่งลิงก์ตั้งรหัสผ่านใหม่แล้ว");
-  });
-  document
-    .getElementById("googleLogin")
-    .addEventListener("click", () =>
-      showToast("ระบบจริงจะเชื่อมต่อ Google Sign-In จาก Backend")
-    );
-  function validateLoginField(input, errorId, message) {
-    const error = document.getElementById(errorId);
-    const invalid = !input.value.trim();
-    input.setAttribute("aria-invalid", String(invalid));
-    error.textContent = invalid ? message : "";
-    return !invalid;
-  }
-  function validateLogin() {
-    const validId = validateLoginField(
-      document.getElementById("staff-id"),
-      "staffIdError",
-      "กรุณากรอกอีเมลหรือรหัสเจ้าหน้าที่"
-    );
-    const validPassword = validateLoginField(
-      document.getElementById("password"),
-      "passwordError",
-      "กรุณากรอกรหัสผ่าน"
-    );
-    return validId && validPassword;
-  }
-  [
-    ["staff-id", "staffIdError", "กรุณากรอกอีเมลหรือรหัสเจ้าหน้าที่"],
-    ["password", "passwordError", "กรุณากรอกรหัสผ่าน"],
-  ].forEach(([id, error, message]) => {
-    const input = document.getElementById(id);
-    input.addEventListener("blur", () =>
-      validateLoginField(input, error, message)
-    );
-    input.addEventListener("input", () => {
-      if (input.getAttribute("aria-invalid") === "true")
-        validateLoginField(input, error, message);
-    });
-  });
-  document.getElementById("login-form").addEventListener("submit", (event) => {
-    event.preventDefault();
-    if (!validateLogin()) {
-      document.querySelector('[aria-invalid="true"]')?.focus();
-      return;
-    }
-    localStorage.setItem("buildingCareRole", roleInput.value);
-    if (document.getElementById("rememberMe").checked)
-      localStorage.setItem(
-        "buildingCareStaffId",
-        document.getElementById("staff-id").value.trim()
-      );
-    const button = document.getElementById("loginButton");
-    button.disabled = true;
-    button.textContent = "กำลังเข้าสู่ระบบ…";
-    showToast("เข้าสู่ระบบสำเร็จ");
-    setTimeout(() => {
-      router.push("/staff-dashboard");
-    }, 350);
-  });
-  const savedRole = localStorage.getItem("buildingCareRole");
-  selectRole(
-    ["technician", "housekeeper", "clerk", "admin"].includes(savedRole)
-      ? savedRole
-      : "technician"
-  );
+  //เคยมี remember account รึป่าว
   const savedId = localStorage.getItem("buildingCareStaffId");
-  if (savedId) document.getElementById("staff-id").value = savedId;
+  if (savedId) {
+    identifier.value = savedId;
+    rememberMe.value = true;
+  }
 });
 
-onUnmounted(() => {
-  document.body.classList.remove("modal-open");
-  cleanup.forEach((fn) => fn());
-  cleanup = [];
-});
+const togglePassword = () => {showPassword.value = !showPassword.value;};
+const openForgotModal = () => {forgotModalOpen.value = true;};
+const closeForgotModal = () => {forgotModalOpen.value = false;};
+
+const handleForgotPassword = () => {
+  if (!resetEmail.value.trim()) {
+    showToast("กรุณากรอกอีเมลเจ้าหน้าที่ของคุณ");
+    return;
+  }
+  closeForgotModal();
+  resetEmail.value = "";
+  showToast("ส่งรหัสผ่านใหม่ไปยังอีเมลของคุณแล้ว");
+};
+
+const handleLogin = async () => {
+  if (!identifier.value.trim() || !password.value) {
+    showToast("กรุณากรอกอีเมลหรือรหัสเจ้าหน้าที่ และรหัสผ่าน");
+    return;
+  }
+
+  loading.value = true;
+
+  try {
+    const response = await fetch("http://localhost:8000/api/v1/auth/login",{
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        identifier: identifier.value.trim(),
+        password: password.value,
+      }),
+    });
+
+    let data = {};
+
+    try {
+      data = await response.json();
+    } catch {
+      data = {};
+    }
+
+    if (!response.ok) {
+      showToast(data.detail || "อีเมล/รหัสเจ้าหน้าที่ หรือรหัสผ่านไม่ถูกต้อง");
+      return;
+    }
+
+    localStorage.setItem("buildingCareAccessToken",data.access_token);
+    localStorage.setItem("buildingCareStaff",JSON.stringify(data.staff));
+    localStorage.setItem("buildingCareRole",data.staff.role);
+
+    if (rememberMe.value) {
+      localStorage.setItem("buildingCareStaffId" ,identifier.value.trim());
+    } else {
+      localStorage.removeItem("buildingCareStaffId");
+    }
+
+    const role = data.staff?.role?.toLowerCase();
+
+    if (role === "admin") {
+      router.push("/admin-dashboard");
+    } else {
+      router.push("/staff-dashboard");
+    }
+
+  } catch (error) {
+    console.error("Login failed:", error);
+    showToast("ไม่สามารถเชื่อมต่อข้อมูลได้");
+  } finally {
+    loading.value = false;
+  }
+};
+
+// const loginWithGoogle = () => {
+
+// };
+
 </script>
 
 <template>
@@ -229,11 +177,12 @@ onUnmounted(() => {
             <h2>เข้าสู่ระบบเจ้าหน้าที่</h2>
             <p>ใช้บัญชีเจ้าหน้าที่ของคุณเพื่อดำเนินการต่อ</p>
           </header>
-          <form id="login-form" class="login-form">
+          <form id="login-form" class="login-form" @submit.prevent="handleLogin">
             <div class="field">
               <label for="staff-id">อีเมลหรือรหัสเจ้าหน้าที่</label
               ><input
                 id="staff-id"
+                v-model="identifier"
                 autocomplete="username"
                 placeholder="name@cmu.ac.th"
                 required
@@ -249,7 +198,8 @@ onUnmounted(() => {
               <div class="password-wrap">
                 <input
                   id="password"
-                  type="password"
+                  v-model="password"
+                  :type="showPassword ? 'text' : 'password'"
                   autocomplete="current-password"
                   placeholder="กรอกรหัสผ่าน"
                   required
@@ -258,9 +208,12 @@ onUnmounted(() => {
                   type="button"
                   class="password-toggle"
                   id="passwordToggle"
-                  aria-label="แสดงรหัสผ่าน"
+                  :aria-label="showPassword ? 'ซ่อนรหัสผ่าน' : 'แสดงรหัสผ่าน'"
+                  @click="togglePassword"
                 >
-                  <svg class="icon"><use href="#i-eye" /></svg>
+                  <svg class="icon">
+                    <use :href="showPassword ? '#i-eye-off' : '#i-eye'" />
+                  </svg>
                 </button>
               </div>
               <small
@@ -269,69 +222,35 @@ onUnmounted(() => {
                 aria-live="polite"
               ></small>
             </div>
-            <fieldset style="border: 0; padding: 0; margin: 0">
-              <legend class="field-label" style="margin-bottom: 8px">
-                เลือกบทบาทสำหรับ Demo
-              </legend>
-              <div class="role-grid" id="roleGrid">
-                <button type="button" class="role-card" data-role="technician">
-                  <span class="role-icon"
-                    ><svg class="icon"><use href="#i-tools" /></svg></span
-                  ><span><strong>ช่าง</strong><small>จัดการงานซ่อม</small></span
-                  ><span class="selected-mark"
-                    ><svg class="icon"><use href="#i-check" /></svg
-                  ></span>
-                </button>
-                <button type="button" class="role-card" data-role="housekeeper">
-                  <span class="role-icon"
-                    ><svg class="icon"><use href="#i-broom" /></svg></span
-                  ><span
-                    ><strong>แม่บ้าน</strong
-                    ><small>จัดการงานทำความสะอาด</small></span
-                  ><span class="selected-mark"
-                    ><svg class="icon"><use href="#i-check" /></svg
-                  ></span>
-                </button>
-                <button type="button" class="role-card" data-role="clerk">
-                  <span class="role-icon"
-                    ><svg class="icon"><use href="#i-box" /></svg></span
-                  ><span
-                    ><strong>ธุรการ</strong
-                    ><small>ดูแลของหาย–ของได้คืน</small></span
-                  ><span class="selected-mark"
-                    ><svg class="icon"><use href="#i-check" /></svg
-                  ></span>
-                </button>
-                <button type="button" class="role-card" data-role="admin">
-                  <span class="role-icon"
-                    ><svg class="icon"><use href="#i-shield" /></svg></span
-                  ><span
-                    ><strong>แอดมิน</strong><small>ดูแลภาพรวมระบบ</small></span
-                  ><span class="selected-mark"
-                    ><svg class="icon"><use href="#i-check" /></svg
-                  ></span>
-                </button>
-              </div>
-            </fieldset>
-            <input type="hidden" id="demo-role" value="technician" />
             <div class="form-options">
               <label class="remember"
-                ><input type="checkbox" id="rememberMe" /> จดจำฉัน</label
-              ><button type="button" class="link-button" id="forgotPassword">
+                ><input v-model="rememberMe" type="checkbox" id="rememberMe" /> จดจำฉัน</label
+              ><button
+                type="button"
+                class="link-button"
+                id="forgotPassword"
+                @click="openForgotModal"
+              >
                 ลืมรหัสผ่าน?
               </button>
             </div>
-            <button class="login-button" id="loginButton" type="submit">
-              เข้าสู่ระบบ
+            <button
+              class="login-button"
+              id="loginButton"
+              type="submit"
+              :disabled="loading"
+            >
+              {{ loading ? "กำลังเข้าสู่ระบบ…" : "เข้าสู่ระบบ" }}
             </button>
             <div class="divider">หรือ</div>
-            <button class="google-button" id="googleLogin" type="button">
+            <button
+              class="google-button"
+              id="googleLogin"
+              type="button"
+              @click="loginWithGoogle"
+            >
               <span class="google-logo">G</span> เข้าสู่ระบบด้วย Google
             </button>
-            <div class="demo-note">
-              การเลือกบทบาทใช้สำหรับสาธิต UI เท่านั้น ระบบจริงกำหนด Role จาก
-              Backend
-            </div>
           </form>
           <p class="user-link">
             <RouterLink to="/">กลับหน้าเลือกพื้นที่ใช้งาน</RouterLink>
@@ -342,11 +261,12 @@ onUnmounted(() => {
 
     <div
       class="modal"
+      :class="{ open: forgotModalOpen }"
       id="forgotModal"
       role="dialog"
       aria-modal="true"
       aria-labelledby="forgotModalTitle"
-      aria-hidden="true"
+      :aria-hidden="String(!forgotModalOpen)"
     >
       <section class="modal-card">
         <header class="modal-head">
@@ -356,6 +276,7 @@ onUnmounted(() => {
             class="modal-close"
             data-close="forgotModal"
             aria-label="ปิด"
+            @click="closeForgotModal"
           >
             <svg class="icon"><use href="#i-close" /></svg>
           </button>
@@ -363,25 +284,31 @@ onUnmounted(() => {
         <p class="modal-copy">
           กรอกอีเมลเจ้าหน้าที่เพื่อรับลิงก์ตั้งรหัสผ่านใหม่
         </p>
-        <form id="forgotForm">
+        <form id="forgotForm" @submit.prevent="handleForgotPassword">
           <div class="field">
             <label for="resetEmail">อีเมลเจ้าหน้าที่</label
             ><input
               id="resetEmail"
+              v-model="resetEmail"
               type="email"
               required
               placeholder="name@cmu.ac.th"
             />
           </div>
           <div class="modal-actions">
-            <button type="button" class="secondary" data-close="forgotModal">
+            <button
+              type="button"
+              class="secondary"
+              data-close="forgotModal"
+              @click="closeForgotModal"
+            >
               ยกเลิก</button
             ><button type="submit" class="primary">ส่งลิงก์</button>
           </div>
         </form>
       </section>
     </div>
-    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <div class="toast" id="toast" :class="{ show: toastVisible }">{{ toastMessage }}</div>
   </div>
 </template>
 
