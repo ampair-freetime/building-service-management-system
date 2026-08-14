@@ -146,11 +146,21 @@ const { activeRole } = useStaffDashboard();
           </button>
           <button
             class="nav-item"
+            data-page="clerk-center"
+            data-roles="clerk"
+          >
+            <span class="nav-icon">02</span>ศูนย์รับงาน
+          </button>
+          <button
+            class="nav-item"
             data-page="jobs"
             data-roles="housekeeper,technician,admin"
           >
             <span class="nav-icon">02</span
             ><span id="jobsNavLabel">ศูนย์รับงานรวม</span>
+          </button>
+          <button class="nav-item" data-page="lost" data-roles="clerk,admin">
+            <span class="nav-icon">03</span>ของหายและรับฝาก
           </button>
           <button
             class="nav-item"
@@ -158,9 +168,6 @@ const { activeRole } = useStaffDashboard();
             data-roles="housekeeper,technician,clerk"
           >
             <span class="nav-icon">H</span>ประวัติงานของฉัน
-          </button>
-          <button class="nav-item" data-page="lost" data-roles="clerk,admin">
-            <span class="nav-icon">03</span>ของหายและรับฝาก
           </button>
           <button
             class="nav-item"

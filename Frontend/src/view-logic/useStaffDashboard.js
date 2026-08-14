@@ -45,6 +45,8 @@ export function useStaffDashboard() {
     } = createStaffDashboardData();
     let currentRole = activeRole.value;
     let currentLostTab = "inventory";
+    let currentClerkCenterView = "approvals";
+    const readClaimNotifications = new Set();
     let currentBoardView = "unassigned";
     let selectedJobId = "";
     let pendingConfirmAction = null;
@@ -178,6 +180,7 @@ export function useStaffDashboard() {
       renderActivities();
       renderJobs();
       renderNotifications();
+      renderClerkCenter();
       renderLost();
       renderMyHistory();
       renderStaffOverview();
@@ -207,6 +210,7 @@ export function useStaffDashboard() {
       );
       const titles = {
         dashboard: "ภาพรวมการปฏิบัติงาน",
+        "clerk-center": "ศูนย์รับงาน",
         jobs: roleConfig[currentRole].jobTitle,
         "my-history": "ประวัติงานของฉัน",
         lost: "ศูนย์ของหายและรับฝาก",
@@ -217,6 +221,7 @@ export function useStaffDashboard() {
         announcements: "ประกาศอาคาร",
       };
       $("#pageTitle").textContent = titles[page] || "Staff Operations";
+      if (page === "clerk-center") renderClerkCenter();
       if (page === "my-history") renderMyHistory();
       if (page === "staff-overview") renderStaffOverview();
       if (page === "history") renderHistory();
@@ -662,13 +667,58 @@ export function useStaffDashboard() {
         .join("");
     }
     function decisionButtons(tab, item) {
-      const approveLabel =
-        tab === "inventory" ? "อนุมัติรับฝาก" : "อนุมัติเผยแพร่";
-      return `<div class="approval-actions"><button class="approve-btn" type="button" data-lost-action="approve" data-tab="${tab}" data-item-id="${item.id}">${approveLabel}</button><button class="reject-btn" type="button" data-lost-action="reject" data-tab="${tab}" data-item-id="${item.id}">ไม่อนุมัติ</button></div>`;
+      if (tab === "claims") return "";
+      const approved = approvalGroup(item.status) === "approved";
+      return `<div class="decision-strip"><button class="approve-btn" type="button" data-lost-action="approve" data-tab="${tab}" data-item-id="${item.id}">${approved ? "อนุมัติอยู่แล้ว" : "อนุมัติ"}</button><button class="reject-btn" type="button" data-lost-action="reject" data-tab="${tab}" data-item-id="${item.id}">ไม่อนุมัติ</button></div>`;
+    }
+    function approvalGroup(status = "") {
+      if (status.includes("ไม่อนุมัติ") || status.includes("ไม่ผ่าน")) return "rejected";
+      if (status.includes("รออนุมัติ")) return "pending";
+      return "approved";
+    }
+    function approvalTypeLabel(tab) {
+      return tab === "inventory" ? "ของที่รับฝาก" : tab === "lostposts" ? "ประกาศตามหา" : "คำขอรับของ";
+    }
+    function findLostItem(tab, id) {
+      return lostSets[tab]?.find((item) => item.id === id);
+    }
+    function pendingApprovalRequests() {
+      return ["inventory", "lostposts"].flatMap((tab) =>
+        lostSets[tab]
+          .filter((item) => approvalGroup(item.status) === "pending")
+          .map((item) => ({ approvalId: item.id, tab, title: item.title, text: item.place }))
+      );
+    }
+    function activeClaimNotifications() {
+      return lostSets.claims
+        .filter((item) => item.status !== "คืนของแล้ว")
+        .map((item) => ({ ...item, unread: !readClaimNotifications.has(item.id) }));
+    }
+    function setClerkCenterView(view) {
+      currentClerkCenterView = view === "claims" ? "claims" : "approvals";
+      $$("#clerkCenterTabs [data-clerk-center-view]").forEach((tab) => tab.classList.toggle("active", tab.dataset.clerkCenterView === currentClerkCenterView));
+      $$('[data-clerk-center-panel]').forEach((panel) => panel.classList.toggle("active", panel.dataset.clerkCenterPanel === currentClerkCenterView));
+    }
+    function renderClerkCenter() {
+      const pendingList = $("#pendingApprovalList"), claimList = $("#activeClaimList");
+      if (!pendingList || !claimList) return;
+      const approvals = pendingApprovalRequests();
+      const claims = lostSets.claims.filter((item) => item.status !== "คืนของแล้ว");
+      ["#pendingApprovalCount", "#pendingApprovalTabCount"].forEach((id) => $(id).textContent = approvals.length);
+      ["#activeClaimCount", "#activeClaimTabCount"].forEach((id) => $(id).textContent = claims.length);
+      pendingList.innerHTML = approvals.length ? approvals.map((item) => {
+        const record = findLostItem(item.tab, item.approvalId);
+        return `<article class="clerk-request-card"><div class="clerk-request-top"><div><span class="approval-type ${item.tab}">${approvalTypeLabel(item.tab)}</span><h4>${item.approvalId} · ${escapeHtml(item.title)}</h4></div><span class="badge wait">รออนุมัติ</span></div><p>${escapeHtml(item.text)}</p><div class="clerk-request-meta"><span>${escapeHtml(record?.custody || "รอการตรวจสอบ")}</span></div><div class="clerk-request-actions"><button class="small-btn" type="button" data-center-action="detail" data-tab="${item.tab}" data-item-id="${item.approvalId}">ดูรายละเอียด</button><button class="approve-btn" type="button" data-center-action="approve" data-tab="${item.tab}" data-item-id="${item.approvalId}">อนุมัติ</button><button class="reject-btn" type="button" data-center-action="reject" data-tab="${item.tab}" data-item-id="${item.approvalId}">ไม่อนุมัติ</button></div></article>`;
+      }).join("") : '<div class="empty">ไม่มีคำขอที่รออนุมัติ</div>';
+      claimList.innerHTML = claims.length ? claims.map((item) => `<article class="clerk-request-card"><div class="clerk-request-top"><div><span class="approval-type claims">คำขอรับของ</span><h4>${item.id} · ${escapeHtml(item.title)}</h4></div><span class="badge ${badgeClass(item.status)}">${item.status}</span></div><p>${escapeHtml(item.place)}</p><div class="clerk-request-meta"><span>${escapeHtml(item.custody || "คำขอใหม่")}</span></div><div class="clerk-request-actions"><button class="small-btn" type="button" data-center-action="claim-detail" data-item-id="${item.id}">ดูรายละเอียดคำขอ</button></div></article>`).join("") : '<div class="empty">ไม่มีคำขอรับของที่กำลังดำเนินการ</div>';
+      setClerkCenterView(currentClerkCenterView);
     }
     function renderLost() {
       if (!$("#lostGrid")) return;
-      const data = lostSets[currentLostTab];
+      const data = currentLostTab === "claims"
+        ? lostSets.claims.filter((item) => item.status !== "คืนของแล้ว")
+        : lostSets[currentLostTab].filter((item) => approvalGroup(item.status) === "approved");
+      renderClerkCenter();
       $("#lostGrid").innerHTML = data.length
         ? data
             .map((i) => {
@@ -687,13 +737,14 @@ export function useStaffDashboard() {
                 currentLostTab === "claims"
                   ? `<div class="claim-controls"><button type="button" class="primary" data-lost-action="claim-detail" data-tab="claims" data-item-id="${i.id}">ดูรายละเอียดคำขอ</button></div>`
                   : `${note}<div class="lost-foot"><span class="custody">${i.custody}</span><button class="small-btn" type="button" data-lost-action="detail" data-tab="${currentLostTab}" data-item-id="${i.id}">ดูรายละเอียด</button></div>`;
+              const claimHint = currentLostTab === "claims" ? '<div class="approval-note"><strong>รับคำขออัตโนมัติ:</strong> ธุรการไม่ต้องกดอนุมัติ สามารถตรวจรายละเอียด นัดหมาย และยืนยันการส่งคืนได้</div>' : "";
               return `<article class="lost-card" tabindex="0" data-lost-card="${
                 i.id
               }"><div class="lost-image"><svg class="icon"><use href="#i-box"/></svg></div><div class="lost-content"><span class="badge ${badgeClass(
                 i.status
               )}">${i.status}</span><h3>${i.id} · ${i.title}</h3><p>${
                 i.place
-              }</p>${controls}${adminDelete}</div></article>`;
+              }</p>${claimHint}${controls}${currentLostTab === "claims" ? "" : decisionButtons(currentLostTab, i)}${adminDelete}</div></article>`;
             })
             .join("")
         : '<div class="empty" style="grid-column:1/-1">ไม่มีรายการในหมวดนี้</div>';
@@ -750,6 +801,7 @@ export function useStaffDashboard() {
         );
       toast(`อนุมัติ ${id} แล้ว`);
       renderLost();
+      renderClerkCenter();
       renderMetrics();
       renderQueue();
     }
@@ -810,6 +862,7 @@ export function useStaffDashboard() {
       });
       toast(`เปลี่ยน ${item.id} เป็น “${item.status}” แล้ว`);
       renderLost();
+      renderClerkCenter();
       renderMetrics();
       addNotification(
         "clerk",
@@ -1237,28 +1290,31 @@ export function useStaffDashboard() {
       );
     }
     function renderNotifications() {
-      const list = notificationSets[currentRole] || [],
-        unread = list.filter((n) => n.unread).length;
-      $(
-        "#notificationTitle"
-      ).textContent = `การแจ้งเตือนของ${roleConfig[currentRole].label}`;
+      const list = notificationSets[currentRole] || [];
+      const approvals = currentRole === "clerk" ? pendingApprovalRequests() : [];
+      const claims = currentRole === "clerk" ? activeClaimNotifications() : [];
+      const unread = list.filter((n) => n.unread).length + approvals.length + claims.filter((n) => n.unread).length;
+      $("#notificationTitle").textContent = currentRole === "clerk" ? "การแจ้งเตือนของธุรการ" : `การแจ้งเตือนของ${roleConfig[currentRole].label}`;
       [$("#notificationCount"), $("#mobileNotificationCount")].forEach(
         (badge) => {
           badge.textContent = unread;
           badge.style.display = unread ? "grid" : "none";
         }
       );
-      if (!list.length) {
+      if (!list.length && !approvals.length && !claims.length) {
         $("#notificationList").innerHTML =
           '<div class="notification-empty">ไม่มีการแจ้งเตือน</div>';
         return;
       }
+      let clerkHtml = "";
+      if (approvals.length) clerkHtml += `<div class="notification-group-label">คำร้องใหม่ · ${approvals.length}</div>` + approvals.map((item) => `<button type="button" class="notification-item unread" data-clerk-notification-target="approval" data-item-id="${item.approvalId}"><div class="notification-symbol"><svg class="icon"><use href="#i-box"/></svg></div><div><span class="approval-type ${item.tab}">${approvalTypeLabel(item.tab)}</span><strong>${item.approvalId} · ${escapeHtml(item.title)}</strong><p>${escapeHtml(item.text)}</p><small>กดเพื่อไปที่ศูนย์รับงาน</small></div></button>`).join("");
+      if (claims.length) clerkHtml += `<div class="notification-group-label">คำขอรับของ · ${claims.length}</div>` + claims.map((item) => `<button type="button" class="notification-item ${item.unread ? "unread" : ""}" data-clerk-notification-target="claim" data-item-id="${item.id}"><div class="notification-symbol"><svg class="icon"><use href="#i-user"/></svg></div><div><span class="approval-type claims">คำขอรับของ</span><strong>${item.id} · ${escapeHtml(item.title)}</strong><p>${escapeHtml(item.place)}</p><small>กดเพื่อไปที่ศูนย์รับงาน</small></div></button>`).join("");
       const groups = [
         ["วันนี้", list.filter((_, index) => index < 2)],
         ["เมื่อวาน", list.filter((_, index) => index === 2)],
         ["ก่อนหน้านี้", list.filter((_, index) => index > 2)],
       ];
-      $("#notificationList").innerHTML = groups
+      $("#notificationList").innerHTML = clerkHtml + groups
         .filter((group) => group[1].length)
         .map(
           (group) =>
@@ -1296,6 +1352,7 @@ export function useStaffDashboard() {
     }
     function markNotificationsRead() {
       notificationSets[currentRole].forEach((n) => (n.unread = false));
+      if (currentRole === "clerk") lostSets.claims.filter((item) => item.status !== "คืนของแล้ว").forEach((item) => readClaimNotifications.add(item.id));
       renderNotifications();
       toast("ทำเครื่องหมายว่าอ่านทั้งหมดแล้ว");
     }
@@ -2025,7 +2082,9 @@ export function useStaffDashboard() {
       button.addEventListener("click", () => navigate(button.dataset.page))
     );
     $$("[data-go]").forEach((button) =>
-      button.addEventListener("click", () => navigate(button.dataset.go))
+      button.addEventListener("click", () =>
+        navigate(currentRole === "clerk" && button.dataset.go === "jobs" ? "clerk-center" : button.dataset.go)
+      )
     );
     $$("[data-role-switch]").forEach((button) =>
       button.addEventListener("click", () => {
@@ -2050,12 +2109,9 @@ export function useStaffDashboard() {
       if (!button) return;
       const index = Number(button.dataset.dashboardAction);
       if (currentRole === "clerk") {
-        navigate("lost");
-        currentLostTab = index < 2 ? "inventory" : "claims";
-        $$("#lostTabs .tab").forEach((tab) =>
-          tab.classList.toggle("active", tab.dataset.tab === currentLostTab)
-        );
-        renderLost();
+        navigate("clerk-center");
+        setClerkCenterView(index === 4 ? "claims" : "approvals");
+        renderClerkCenter();
         if (index === 4 && lostSets.claims[0])
           openAppointment(lostSets.claims[0].id, button);
         return;
@@ -2106,7 +2162,7 @@ export function useStaffDashboard() {
       button.addEventListener("click", () =>
         navigate(
           currentRole === "clerk" && button.dataset.mobilePage === "jobs"
-            ? "lost"
+            ? "clerk-center"
             : button.dataset.mobilePage
         )
       )
@@ -2482,6 +2538,23 @@ export function useStaffDashboard() {
       currentLostTab = button.dataset.tab;
       renderLost();
     });
+    $("#clerkCenterTabs")?.addEventListener("click", (event) => {
+      const tab = event.target.closest("[data-clerk-center-view]");
+      if (tab) setClerkCenterView(tab.dataset.clerkCenterView);
+    });
+    $("#pendingApprovalList")?.addEventListener("click", (event) => {
+      const button = event.target.closest("[data-center-action]");
+      if (!button) return;
+      const { centerAction: action, tab, itemId: id } = button.dataset;
+      if (action === "approve") approveLostItem(tab, id);
+      else if (action === "reject") openReject(tab, id);
+      else openLostDetail(tab, id, button);
+    });
+    $("#activeClaimList")?.addEventListener("click", (event) => {
+      const button = event.target.closest("[data-center-action]");
+      if (button?.dataset.centerAction === "claim-detail")
+        openClaimDetail(button.dataset.itemId, button);
+    });
     $("#lostGrid")?.addEventListener("click", (event) => {
       const button = event.target.closest("[data-lost-action]");
       if (!button) return;
@@ -2513,6 +2586,16 @@ export function useStaffDashboard() {
     });
     $("#notificationPanel")?.addEventListener("click", (event) => {
       event.stopPropagation();
+      const clerkTarget = event.target.closest("[data-clerk-notification-target]");
+      if (clerkTarget) {
+        if (clerkTarget.dataset.clerkNotificationTarget === "claim")
+          readClaimNotifications.add(clerkTarget.dataset.itemId);
+        currentClerkCenterView = clerkTarget.dataset.clerkNotificationTarget === "claim" ? "claims" : "approvals";
+        $("#notificationPanel").classList.remove("open");
+        navigate("clerk-center");
+        renderClerkCenter();
+        return;
+      }
       const hide = event.target.closest("[data-hide-notification]");
       if (hide) {
         const list = notificationSets[currentRole],
@@ -2535,7 +2618,7 @@ export function useStaffDashboard() {
       $("#notificationPanel").classList.remove("open");
       const match = item.text.match(/(?:CL|RP)-\d+/);
       if (match) openJobDetail(match[0], itemButton);
-      else if (currentRole === "clerk") navigate("lost");
+      else if (currentRole === "clerk") navigate("clerk-center");
       else toast(item.title);
     });
     document.addEventListener("click", () => {
@@ -2910,7 +2993,7 @@ export function useStaffDashboard() {
         );
     });
     $("#heroPrimary")?.addEventListener("click", () =>
-      navigate(currentRole === "clerk" ? "lost" : "jobs")
+      navigate(currentRole === "clerk" ? "clerk-center" : "jobs")
     );
     const date = new Intl.DateTimeFormat("th-TH", { dateStyle: "medium" }).format(
       new Date()
