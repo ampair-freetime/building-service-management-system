@@ -12,7 +12,7 @@ from app.models.enums import AccountStatus, StaffRole
 
 
 class Staff(Base):
-    """บัญชี Technician, Housekeeper, Clerk และ Admin."""
+    """บัญชี Technician, Housekeeper, Adminnistrative และ Admin."""
 
     __tablename__ = "staff"
 
