@@ -93,16 +93,6 @@ const { activeRole } = useStaffDashboard();
         >
           <svg class="icon"><use href="#i-chevron" /></svg>
         </button>
-        <section class="shift-card">
-          <div class="shift-top">
-            <div class="avatar" id="avatar">AD</div>
-            <div>
-              <strong id="staffName">พิมพ์ชนก แอดมิน</strong
-              ><small id="staffRoleLabel">แอดมิน</small>
-            </div>
-          </div>
-          
-        </section>
         <div class="nav-label">Operations</div>
         <nav class="nav-list" aria-label="เมนูเจ้าหน้าที่">
           <button
@@ -115,7 +105,7 @@ const { activeRole } = useStaffDashboard();
           <button
             class="nav-item"
             data-page="clerk-center"
-            data-roles="clerk"
+            data-roles="administrative"
           >
             <span class="nav-icon">02</span>ศูนย์รับงาน
           </button>
@@ -127,13 +117,13 @@ const { activeRole } = useStaffDashboard();
             <span class="nav-icon">02</span
             ><span id="jobsNavLabel">ศูนย์รับงานรวม</span>
           </button>
-          <button class="nav-item" data-page="lost" data-roles="clerk,admin">
+          <button class="nav-item" data-page="lost" data-roles="administrative,admin">
             <span class="nav-icon">03</span>ของหายและรับฝาก
           </button>
           <button
             class="nav-item"
             data-page="my-history"
-            data-roles="housekeeper,technician,clerk"
+            data-roles="housekeeper,technician,administrative"
           >
             <span class="nav-icon">H</span>ประวัติงานของฉัน
           </button>
@@ -158,10 +148,6 @@ const { activeRole } = useStaffDashboard();
           </button>
         </nav>
         <div class="sidebar-foot">
-          <div class="security-note">
-            <strong>Demo role switcher</strong><br />ระบบจริงต้องรับ Role และ
-            Staff ID จาก Server หลังตรวจ Session ห้ามให้ผู้ใช้เลือก Role เอง
-          </div>
           <button class="logout" id="logoutBtn">ออกจากระบบ</button>
         </div>
       </aside>
@@ -242,7 +228,7 @@ const { activeRole } = useStaffDashboard();
 
         <HousekeeperPages v-if="activeRole === 'housekeeper'" />
         <TechnicianPages v-else-if="activeRole === 'technician'" />
-        <ClerkPages v-else-if="activeRole === 'clerk'" />
+        <ClerkPages v-else-if="activeRole === 'administrative'" />
         <AdminPages v-else />
       </main>
     </div>

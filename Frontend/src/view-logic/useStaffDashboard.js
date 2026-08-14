@@ -16,7 +16,7 @@ import {
 
 export function useStaffDashboard() {
   const router = useRouter();
-  const allowedRoles = ["housekeeper", "technician", "clerk", "admin"];
+  const allowedRoles = ["housekeeper", "technician", "administrative", "admin"];
   const savedRole = localStorage.getItem("buildingCareRole");
   const activeRole = ref(allowedRoles.includes(savedRole) ? savedRole : "admin");
 
@@ -203,7 +203,7 @@ export function useStaffDashboard() {
             ? "งานอาคารและซ่อมบำรุง"
             : role === "housekeeper"
             ? "งานดูแลความสะอาด"
-            : role === "clerk"
+            : role === "administrative"
             ? "ธุรการและของหาย"
             : "บริหารระบบ";
       }
@@ -310,7 +310,7 @@ export function useStaffDashboard() {
       const completed = jobs.filter((j) => j.status === "เสร็จสิ้น").length,
         waitingParts = jobs.filter((j) => j.status === "รออะไหล่").length;
       let values;
-      if (currentRole === "clerk")
+      if (currentRole === "administrative")
         values = [
           [
             "ของที่พบใหม่",
@@ -380,7 +380,7 @@ export function useStaffDashboard() {
     }
     function renderQueue() {
       let items;
-      if (currentRole === "clerk")
+      if (currentRole === "administrative")
         items = lostSets.claims
           .slice(0, 3)
           .map((x) => [x.id, x.title, x.custody, x.status]);
@@ -411,7 +411,7 @@ export function useStaffDashboard() {
     }
     function renderActivities() {
       const content =
-        currentRole === "clerk"
+        currentRole === "administrative"
           ? [
               [
                 "เปลี่ยนสถานะคำขอได้จากการ์ด",
@@ -477,7 +477,7 @@ export function useStaffDashboard() {
     }
     function renderJobs() {
       if (!$("#jobList")) return;
-      if (currentRole === "clerk") return;
+      if (currentRole === "administrative") return;
       const query = $("#jobSearch").value.trim().toLowerCase(),
         category = $("#categoryFilter").value || "all",
         status = $("#jobStatusFilter").value || "all";
@@ -850,7 +850,7 @@ export function useStaffDashboard() {
         detail: item.decisionReason,
       });
       addNotification(
-        "clerk",
+        "administrative",
         `${id} อนุมัติแล้ว`,
         `${item.title} เปลี่ยนเป็น ${nextStatus}`,
         false
@@ -928,7 +928,7 @@ export function useStaffDashboard() {
       renderClerkCenter();
       renderMetrics();
       addNotification(
-        "clerk",
+        "administrative",
         `อัปเดต ${item.id} แล้ว`,
         `สถานะคำขอเปลี่ยนเป็น ${item.status}`,
         false
@@ -960,7 +960,7 @@ export function useStaffDashboard() {
       const select = $("#myHistoryType");
       if (!select) return;
       const base =
-        currentRole === "clerk"
+        currentRole === "administrative"
           ? [
               "all",
               "อนุมัติ",
@@ -1354,10 +1354,10 @@ export function useStaffDashboard() {
     }
     function renderNotifications() {
       const list = notificationSets[currentRole] || [];
-      const approvals = currentRole === "clerk" ? pendingApprovalRequests() : [];
-      const claims = currentRole === "clerk" ? activeClaimNotifications() : [];
+      const approvals = currentRole === "administrative" ? pendingApprovalRequests() : [];
+      const claims = currentRole === "administrative" ? activeClaimNotifications() : [];
       const unread = list.filter((n) => n.unread).length + approvals.length + claims.filter((n) => n.unread).length;
-      $("#notificationTitle").textContent = currentRole === "clerk" ? "การแจ้งเตือนของธุรการ" : `การแจ้งเตือนของ${roleConfig[currentRole].label}`;
+      $("#notificationTitle").textContent = currentRole === "administrative" ? "การแจ้งเตือนของธุรการ" : `การแจ้งเตือนของ${roleConfig[currentRole].label}`;
       [$("#notificationCount"), $("#mobileNotificationCount")].forEach(
         (badge) => {
           badge.textContent = unread;
@@ -1415,7 +1415,7 @@ export function useStaffDashboard() {
     }
     function markNotificationsRead() {
       notificationSets[currentRole].forEach((n) => (n.unread = false));
-      if (currentRole === "clerk") lostSets.claims.filter((item) => item.status !== "คืนของแล้ว").forEach((item) => readClaimNotifications.add(item.id));
+      if (currentRole === "administrative") lostSets.claims.filter((item) => item.status !== "คืนของแล้ว").forEach((item) => readClaimNotifications.add(item.id));
       renderNotifications();
       toast("ทำเครื่องหมายว่าอ่านทั้งหมดแล้ว");
     }
@@ -1748,7 +1748,7 @@ export function useStaffDashboard() {
           ? ["กำลังดำเนินการ", "รอข้อมูลเพิ่มเติม", "รออะไหล่", "เสร็จสิ้น"]
           : currentRole === "housekeeper"
           ? ["กำลังดำเนินการ", "พักงาน", "รอข้อมูลเพิ่มเติม", "เสร็จสิ้น"]
-          : currentRole === "clerk"
+          : currentRole === "administrative"
           ? [
               "กำลังตรวจสอบ",
               "ขอข้อมูลเพิ่มเติม",
@@ -2076,7 +2076,7 @@ export function useStaffDashboard() {
               ["mine", "งานของฉัน"],
               ["schedule", "ดูตารางงาน"],
             ]
-          : currentRole === "clerk"
+          : currentRole === "administrative"
           ? [
               ["found", "ของที่พบใหม่"],
               ["claims", "คำขอรับคืน"],
@@ -2115,7 +2115,7 @@ export function useStaffDashboard() {
               "เสร็จสิ้น",
               "คืนงานเข้าคิวกลาง",
             ]
-          : currentRole === "clerk"
+          : currentRole === "administrative"
           ? [
               "รับเคส",
               "ตรวจสอบข้อมูล",
@@ -2146,7 +2146,7 @@ export function useStaffDashboard() {
     );
     $$("[data-go]").forEach((button) =>
       button.addEventListener("click", () =>
-        navigate(currentRole === "clerk" && button.dataset.go === "jobs" ? "clerk-center" : button.dataset.go)
+        navigate(currentRole === "administrative" && button.dataset.go === "jobs" ? "clerk-center" : button.dataset.go)
       )
     );
     $$("[data-role-switch]").forEach((button) =>
@@ -2171,7 +2171,7 @@ export function useStaffDashboard() {
       const button = event.target.closest("[data-dashboard-action]");
       if (!button) return;
       const index = Number(button.dataset.dashboardAction);
-      if (currentRole === "clerk") {
+      if (currentRole === "administrative") {
         navigate("clerk-center");
         setClerkCenterView(index === 4 ? "claims" : "approvals");
         renderClerkCenter();
@@ -2230,7 +2230,7 @@ export function useStaffDashboard() {
     $$("[data-mobile-page]").forEach((button) =>
       button.addEventListener("click", () =>
         navigate(
-          currentRole === "clerk" && button.dataset.mobilePage === "jobs"
+          currentRole === "administrative" && button.dataset.mobilePage === "jobs"
             ? "clerk-center"
             : button.dataset.mobilePage
         )
@@ -2687,7 +2687,7 @@ export function useStaffDashboard() {
       $("#notificationPanel").classList.remove("open");
       const match = item.text.match(/(?:CL|RP)-\d+/);
       if (match) openJobDetail(match[0], itemButton);
-      else if (currentRole === "clerk") navigate("clerk-center");
+      else if (currentRole === "administrative") navigate("clerk-center");
       else toast(item.title);
     });
     document.addEventListener("click", () => {
@@ -3088,7 +3088,7 @@ export function useStaffDashboard() {
         );
     });
     $("#heroPrimary")?.addEventListener("click", () =>
-      navigate(currentRole === "clerk" ? "clerk-center" : "jobs")
+      navigate(currentRole === "administrative" ? "clerk-center" : "jobs")
     );
     const date = new Intl.DateTimeFormat("th-TH", { dateStyle: "medium" }).format(
       new Date()
@@ -3096,7 +3096,7 @@ export function useStaffDashboard() {
     $("#today").textContent = date;
     renderStaff();
     setRole(
-      ["housekeeper", "technician", "clerk", "admin"].includes(currentRole)
+      ["housekeeper", "technician", "administrative", "admin"].includes(currentRole)
         ? currentRole
         : "admin"
     );

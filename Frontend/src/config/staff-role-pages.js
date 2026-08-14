@@ -13,7 +13,7 @@ export const STAFF_ROLE_PAGES = {
     { id: "jobs", label: "คิวงานแจ้งซ่อม" },
     { id: "my-history", label: "ประวัติงานของฉัน" },
   ],
-  clerk: [
+  administrative: [
     { id: "dashboard", label: "ภาพรวมงาน" },
     { id: "clerk-center", label: "ศูนย์รับงาน" },
     { id: "lost", label: "ของหาย จุดรับฝาก และคำขอรับคืน" },
