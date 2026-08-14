@@ -1,4 +1,5 @@
 import { onMounted, ref } from "vue";
+import { useRouter } from "vue-router";
 import { createStaffDashboardData } from "./staff-dashboard/data.js";
 import { canRoleOpenPage } from "../config/staff-role-pages.js";
 import {
@@ -14,6 +15,7 @@ import {
 } from "./staff-dashboard/utils.js";
 
 export function useStaffDashboard() {
+  const router = useRouter();
   const allowedRoles = ["housekeeper", "technician", "clerk", "admin"];
   const savedRole = localStorage.getItem("buildingCareRole");
   const activeRole = ref(allowedRoles.includes(savedRole) ? savedRole : "admin");
@@ -118,61 +120,123 @@ export function useStaffDashboard() {
       currentRole = role;
       activeRole.value = role;
       localStorage.setItem("buildingCareRole", role);
+
       const c = roleConfig[role];
+      if (!c) return;
+
       document.documentElement.style.setProperty("--role", c.color);
       document.documentElement.style.setProperty("--role-soft", c.soft);
-      $("#roleSwitcher").value = role;
-      $("#staffName").textContent = c.name;
-      $("#staffRoleLabel").textContent = c.label;
-      $("#avatar").textContent = c.avatar;
-      $("#eyebrow").textContent = c.eyebrow;
-      $("#heroEyebrow").textContent = c.eyebrow;
-      $("#heroTitle").textContent = c.hero;
-      $("#heroText").textContent = c.text;
-      $("#queueTitle").textContent = c.queue;
+
+      const roleSwitcher = $("#roleSwitcher");
+      if (roleSwitcher) roleSwitcher.value = role;
+
+      const staffName = $("#staffName");
+      if (staffName) staffName.textContent = c.name;
+
+      const staffRoleLabel = $("#staffRoleLabel");
+      if (staffRoleLabel) staffRoleLabel.textContent = c.label;
+
+      const avatar = $("#avatar");
+      if (avatar) avatar.textContent = c.avatar;
+
+      const eyebrow = $("#eyebrow");
+      if (eyebrow) eyebrow.textContent = c.eyebrow;
+
+      const heroEyebrow = $("#heroEyebrow");
+      if (heroEyebrow) heroEyebrow.textContent = c.eyebrow;
+
+      const heroTitle = $("#heroTitle");
+      if (heroTitle) heroTitle.textContent = c.hero;
+
+      const heroText = $("#heroText");
+      if (heroText) heroText.textContent = c.text;
+
+      const queueTitle = $("#queueTitle");
+      if (queueTitle) queueTitle.textContent = c.queue;
+
       const jobsTitle = $("#jobsTitle");
+      if (jobsTitle) {
+        jobsTitle.textContent = c.jobTitle || "ศูนย์รับงานรวม";
+      }
+
       const jobsSubtitle = $("#jobsSubtitle");
-      if (jobsTitle) jobsTitle.textContent = c.jobTitle || "ศูนย์รับงานรวม";
-      if (jobsSubtitle) jobsSubtitle.textContent = c.jobSubtitle || "";
-      $("#heroPrimary").textContent = c.primary;
+      if (jobsSubtitle) {
+        jobsSubtitle.textContent = c.jobSubtitle || "";
+      }
+
+      const heroPrimary = $("#heroPrimary");
+      if (heroPrimary) heroPrimary.textContent = c.primary;
+
       $$(".role-demo-btn").forEach((button) => {
         const active = button.dataset.roleSwitch === role;
         button.classList.toggle("active", active);
         button.setAttribute("aria-pressed", String(active));
       });
-      $("#headerAvatar").textContent = c.avatar;
-      $("#headerName").textContent = currentUserName[role].split(" ")[0];
-      $("#headerRole").textContent = c.label;
-      $("#profileAvatar").textContent = c.avatar;
-      $("#profileName").textContent = currentUserName[role];
-      $("#profileStaffId").textContent = c.staffId;
-      $("#profileRole").textContent = c.label;
-      $("#profileDepartment").textContent =
-        role === "technician"
-          ? "งานอาคารและซ่อมบำรุง"
-          : role === "housekeeper"
-          ? "งานดูแลความสะอาด"
-          : role === "clerk"
-          ? "ธุรการและของหาย"
-          : "บริหารระบบ";
-      $("#jobsNavLabel").textContent =
-        role === "housekeeper"
-          ? "รับงานแม่บ้าน"
-          : role === "technician"
-          ? "รับงานช่าง"
-          : "ศูนย์งานทั้งหมด";
+
+      const headerAvatar = $("#headerAvatar");
+      if (headerAvatar) headerAvatar.textContent = c.avatar;
+
+      const headerName = $("#headerName");
+      if (headerName) {
+        headerName.textContent = currentUserName[role].split(" ")[0];
+      }
+
+      const headerRole = $("#headerRole");
+      if (headerRole) headerRole.textContent = c.label;
+
+      const profileAvatar = $("#profileAvatar");
+      if (profileAvatar) profileAvatar.textContent = c.avatar;
+
+      const profileName = $("#profileName");
+      if (profileName) profileName.textContent = currentUserName[role];
+
+      const profileStaffId = $("#profileStaffId");
+      if (profileStaffId) profileStaffId.textContent = c.staffId;
+
+      const profileRole = $("#profileRole");
+      if (profileRole) profileRole.textContent = c.label;
+
+      const profileDepartment = $("#profileDepartment");
+      if (profileDepartment) {
+        profileDepartment.textContent =
+          role === "technician"
+            ? "งานอาคารและซ่อมบำรุง"
+            : role === "housekeeper"
+            ? "งานดูแลความสะอาด"
+            : role === "clerk"
+            ? "ธุรการและของหาย"
+            : "บริหารระบบ";
+      }
+
+      const jobsNavLabel = $("#jobsNavLabel");
+      if (jobsNavLabel) {
+        jobsNavLabel.textContent =
+          role === "housekeeper"
+            ? "รับงานแม่บ้าน"
+            : role === "technician"
+            ? "รับงานช่าง"
+            : "ศูนย์งานทั้งหมด";
+      }
+
       const queueExplainerTitle = $("#queueExplainerTitle");
+
       if (queueExplainerTitle) {
         queueExplainerTitle.textContent =
           role === "admin"
             ? "คิวรวมของแม่บ้านและช่าง"
             : `คิวนี้เป็นคิวร่วมของ${c.label}`;
       }
+
       $$(".nav-item").forEach((n) =>
         n.classList.toggle("role-hidden", !roleAllows(n, role))
       );
+
       const active = $(".nav-item.active");
-      if (active && !roleAllows(active, role)) navigate("dashboard");
+
+      if (active && !roleAllows(active, role)) {
+        navigate("dashboard");
+      }
+
       populateCategoryFilter();
       populateMyHistoryTypes();
       renderMetrics();
@@ -180,7 +244,6 @@ export function useStaffDashboard() {
       renderActivities();
       renderJobs();
       renderNotifications();
-      renderClerkCenter();
       renderLost();
       renderMyHistory();
       renderStaffOverview();
@@ -2139,7 +2202,13 @@ export function useStaffDashboard() {
         "ต้องการออกจากระบบเจ้าหน้าที่บนอุปกรณ์นี้หรือไม่?",
         () => {
           localStorage.removeItem("buildingCareRole");
-          location.href = "staff-login.html";
+          localStorage.removeItem("token");
+          localStorage.removeItem("accessToken");
+          localStorage.removeItem("refreshToken");
+
+          sessionStorage.clear();
+
+          router.push("/staff-login");
         },
         "ออกจากระบบ"
       );
@@ -2622,8 +2691,8 @@ export function useStaffDashboard() {
       else toast(item.title);
     });
     document.addEventListener("click", () => {
-      $("#notificationPanel").classList.remove("open");
-      $("#notificationButton").setAttribute("aria-expanded", "false");
+      $("#notificationPanel")?.classList.remove("open");
+      $("#notificationButton")?.setAttribute("aria-expanded", "false");
     });
     $("#markAllRead")?.addEventListener("click", markNotificationsRead);
     $("#openStaffModal")?.addEventListener("click", (event) =>

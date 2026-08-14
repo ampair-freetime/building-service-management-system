@@ -101,39 +101,7 @@ const { activeRole } = useStaffDashboard();
               ><small id="staffRoleLabel">แอดมิน</small>
             </div>
           </div>
-          <div class="role-demo">
-            <input type="hidden" id="roleSwitcher" value="admin" />
-            <div class="role-demo-grid">
-              <button
-                type="button"
-                class="role-demo-btn"
-                data-role-switch="technician"
-              >
-                ช่าง</button
-              ><button
-                type="button"
-                class="role-demo-btn"
-                data-role-switch="housekeeper"
-              >
-                แม่บ้าน</button
-              ><button
-                type="button"
-                class="role-demo-btn"
-                data-role-switch="clerk"
-              >
-                ธุรการ</button
-              ><button
-                type="button"
-                class="role-demo-btn"
-                data-role-switch="admin"
-              >
-                แอดมิน
-              </button>
-            </div>
-            <small class="demo-caption"
-              >การสลับบทบาทใช้สำหรับสาธิต UI เท่านั้น</small
-            >
-          </div>
+          
         </section>
         <div class="nav-label">Operations</div>
         <nav class="nav-list" aria-label="เมนูเจ้าหน้าที่">
