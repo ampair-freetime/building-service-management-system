@@ -2191,7 +2191,7 @@ export function useStaffDashboard() {
         navigate("lost");
         currentLostTab = "inventory";
         renderLost();
-        openModal("foundModal", button);
+        openFoundForm(button);
       } else if (action === "claims" || action === "appointments") {
         navigate("lost");
         currentLostTab = "claims";
@@ -2629,8 +2629,16 @@ export function useStaffDashboard() {
     $("#openStaffModal")?.addEventListener("click", (event) =>
       openModal("staffModal", event.currentTarget)
     );
+    function openFoundForm(trigger) {
+      const form = $("#foundForm");
+      form?.reset();
+      if ($("#custodyPoint")) $("#custodyPoint").value = "ประชาสัมพันธ์ชั้น 1";
+      if ($("#foundDate")) $("#foundDate").value = todayISO();
+      if ($("#foundTime")) $("#foundTime").value = currentTimeHM();
+      openModal("foundModal", trigger);
+    }
     $("#addFoundBtn")?.addEventListener("click", (event) =>
-      openModal("foundModal", event.currentTarget)
+      openFoundForm(event.currentTarget)
     );
     $("#openAnnouncementModal")?.addEventListener("click", (event) =>
       openAnnouncementEditor(null, event.currentTarget)
@@ -2739,11 +2747,26 @@ export function useStaffDashboard() {
         event.currentTarget.reportValidity();
         return;
       }
+      const photo = $("#foundPhoto")?.files?.[0];
+      if (photo && photo.size > 5 * 1024 * 1024) {
+        toast("รูปสิ่งของต้องมีขนาดไม่เกิน 5 MB");
+        $("#foundPhoto").focus();
+        return;
+      }
+      const nextFoundNumber = Math.max(81, ...lostSets.inventory.map((item) => Number(item.id.replace("FD-", "")) || 0)) + 1;
       const record = {
-        id: `FD-${82 + lostSets.inventory.length}`,
-        title: $("#foundName").value,
-        place: `พบที่ ${$("#foundLocation").value}`,
-        custody: $("#custodyPoint").value,
+        id: `FD-${String(nextFoundNumber).padStart(3, "0")}`,
+        title: $("#foundName").value.trim(),
+        category: $("#foundCategory").value,
+        place: `พบที่ ${$("#foundLocation").value.trim()}`,
+        foundDate: $("#foundDate").value,
+        foundTime: $("#foundTime").value,
+        custody: $("#custodyPoint").value.trim(),
+        finder: $("#foundFinder").value.trim(),
+        finderContact: $("#foundContact").value.trim(),
+        description: $("#foundDescription").value.trim(),
+        privateDetail: $("#privateDetail").value.trim(),
+        photoName: photo?.name || "",
         status: "รออนุมัติรับฝาก",
         decisionReason: "",
         assignee: activeStaffName(),
@@ -2762,13 +2785,16 @@ export function useStaffDashboard() {
         category: "ของที่รับฝาก",
         action: "รับฝากรายการใหม่",
         status: record.status,
-        detail: `${record.place} · จุดเก็บ ${record.custody}`,
+        detail: `${record.category} · ${record.place} · พบวันที่ ${record.foundDate} ${record.foundTime} · จุดเก็บ ${record.custody}`,
       });
       currentLostTab = "inventory";
       renderLost();
+      renderClerkCenter();
+      renderNotifications();
+      renderMetrics();
       closeModal("foundModal", false);
       event.currentTarget.reset();
-      showSuccess("บันทึกรับฝากของแล้ว");
+      showSuccess("ส่งคำขอรับฝากแล้ว · รายการอยู่ในศูนย์รับงานเพื่อรออนุมัติ");
     });
     $("#rejectForm")?.addEventListener("submit", (event) => {
       event.preventDefault();

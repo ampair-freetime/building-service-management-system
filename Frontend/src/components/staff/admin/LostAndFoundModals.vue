@@ -14,28 +14,41 @@
           </button>
         </div>
         <form id="foundForm">
+          <p class="form-intro">บันทึกข้อมูลสิ่งของที่พบ ข้อมูลลับจะใช้ตรวจสอบเจ้าของและไม่แสดงต่อสาธารณะ</p>
           <div class="field">
             <label for="foundName">ชื่อสิ่งของ</label
-            ><input id="foundName" placeholder="เช่น กระเป๋าผ้าสีดำ" required />
+            ><input id="foundName" placeholder="เช่น กระเป๋าผ้าสีดำ" maxlength="120" autocomplete="off" required />
           </div>
           <div class="form-row">
+            <div class="field"><label for="foundCategory">ประเภทสิ่งของ</label><select id="foundCategory" required><option value="">เลือกประเภท</option><option>อุปกรณ์อิเล็กทรอนิกส์</option><option>กระเป๋าและของใช้ส่วนตัว</option><option>บัตรและเอกสาร</option><option>กุญแจ</option><option>เสื้อผ้าและเครื่องแต่งกาย</option><option>อื่น ๆ</option></select></div>
             <div class="field">
               <label for="foundLocation">สถานที่พบ</label
-              ><input id="foundLocation" required />
+              ><input id="foundLocation" placeholder="เช่น CSB ชั้น 3" maxlength="160" required />
             </div>
+          </div>
+          <div class="form-row">
+            <div class="field"><label for="foundDate">วันที่พบ</label><input id="foundDate" type="date" required /></div>
+            <div class="field"><label for="foundTime">เวลาที่พบ</label><input id="foundTime" type="time" required /></div>
+          </div>
+          <div class="form-row">
             <div class="field">
               <label for="custodyPoint">จุดรับฝาก</label
               ><input id="custodyPoint" value="ประชาสัมพันธ์ชั้น 1" required />
             </div>
+            <div class="field"><label for="foundFinder">ชื่อผู้ส่งมอบ <span class="optional-label">(ไม่บังคับ)</span></label><input id="foundFinder" maxlength="120" /></div>
           </div>
+          <div class="field"><label for="foundContact">ช่องทางติดต่อผู้ส่งมอบ <span class="optional-label">(ไม่บังคับ)</span></label><input id="foundContact" placeholder="เบอร์โทรหรืออีเมล" maxlength="120" /></div>
+          <div class="field"><label for="foundDescription">ลักษณะสิ่งของ</label><textarea id="foundDescription" placeholder="สี ยี่ห้อ รอยตำหนิ หรือสภาพตอนพบ" maxlength="600" required></textarea></div>
+          <div class="field"><label for="foundPhoto">รูปสิ่งของ <span class="optional-label">(JPG, PNG หรือ WebP ไม่เกิน 5 MB)</span></label><input id="foundPhoto" type="file" accept="image/jpeg,image/png,image/webp" /></div>
           <div class="field">
             <label for="privateDetail">รายละเอียดลับสำหรับยืนยันเจ้าของ</label
             ><textarea
               id="privateDetail"
-              placeholder="ข้อมูลที่ไม่แสดงต่อสาธารณะ"
+              placeholder="เช่น สิ่งของภายใน หมายเลขเฉพาะ หรือข้อมูลที่เจ้าของควรทราบ"
+              maxlength="600"
             ></textarea>
           </div>
-          <button class="primary" style="width: 100%">บันทึกรับฝาก</button>
+          <div class="form-actions"><button class="secondary" type="button" data-close="foundModal">ยกเลิก</button><button class="primary" type="submit">บันทึกรับฝาก</button></div>
         </form>
       </div>
     </div>
