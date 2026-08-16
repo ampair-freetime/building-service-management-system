@@ -2,10 +2,17 @@
 
 from fastapi import APIRouter
 
-from app.api.v1.endpoints import auth, staff
+from app.api.v1.endpoints import auth, staff, lost_found_administrative
 
 api_router = APIRouter()
 
 # auth และ staff แยก namespace ตามหน้าที่
 api_router.include_router(auth.router, prefix="/auth", tags=["authentication"])
 api_router.include_router(staff.router, prefix="/staff", tags=["staff"])
+
+# lost and found สำหรับเจ้าหน้าที่ธุรการ
+api_router.include_router(
+    lost_found_administrative.router,
+    prefix = "/lost-found",
+    tags = ["lost-found"],
+)
