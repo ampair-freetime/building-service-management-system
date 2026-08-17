@@ -47,43 +47,4 @@
           </div>
         </section>
       </div>
-
-<div
-        class="ui-modal"
-        id="successModal"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="successModalTitle"
-      >
-        <section class="ui-modal-card compact">
-          <header class="ui-modal-head">
-            <h2 id="successModalTitle">ส่งคำขอสำเร็จ</h2>
-            <button
-              type="button"
-              class="modal-close"
-              data-modal-close="successModal"
-              aria-label="ปิด"
-            >
-              <svg class="icon"><use href="#i-close" /></svg>
-            </button>
-          </header>
-          <div class="success-wrap">
-            <div class="success-icon">
-              <svg class="icon"><use href="#i-check" /></svg>
-            </div>
-            <p id="successType">รอรับเรื่อง</p>
-            <strong class="request-code" id="successCode">BC-0000</strong
-            ><small class="success-email" id="successEmail"
-              >ใช้รหัสนี้ร่วมกับอีเมลเพื่อติดตามสถานะ</small
-            >
-            <div class="modal-actions">
-              <button type="button" class="secondary" id="viewStatusButton">
-                ดูสถานะ</button
-              ><button type="button" class="primary-btn" id="backHomeButton">
-                กลับหน้าหลัก
-              </button>
-            </div>
-          </div>
-        </section>
-      </div>
 </template>
