@@ -6,7 +6,7 @@ from app.models.enums import LostStatus, LostType
 from app.models.lost_found import LostItem
 
 
-def test_administrative_can_list_pending_found_items(test_context):
+def test_administrative_can_view_found_item_detail(test_context):
     client, session_factory = test_context
 
     seed_staff(
@@ -32,25 +32,27 @@ def test_administrative_can_list_pending_found_items(test_context):
     async def seed_item():
         async with session_factory() as session:
             item = LostItem(
-                item_code="FOUND001",
+                item_code="FOUND002",
                 report_type=LostType.FOUND,
                 item_category="Electronics",
-                item_name="Phone",
-                description="Black phone",
+                item_name="Laptop",
+                description="Silver laptop",
                 event_datetime=datetime.now(timezone.utc),
                 location_id=None,
-                location_detail="Building A",
+                location_detail="Building B",
                 custody_location="Administrative Office",
                 reporter_email="user@example.com",
                 status=LostStatus.PENDING,
             )
             session.add(item)
             await session.commit()
+            await session.refresh(item)
+            return item.id
 
-    asyncio.run(seed_item())
+    item_id = asyncio.run(seed_item())
 
     response = client.get(
-        "/api/v1/lost-found/pending-found-items",
+        f"/api/v1/lost-found/found-items/{item_id}",
         headers=headers,
     )
 
@@ -58,7 +60,11 @@ def test_administrative_can_list_pending_found_items(test_context):
 
     data = response.json()
 
-    assert len(data) == 1
-    assert data[0]["item_code"] == "FOUND001"
-    assert data[0]["report_type"] == "found"
-    assert data[0]["status"] == "pending"
+    assert data["item_code"] == "FOUND002"
+    assert data["report_type"] == "found"
+    assert data["item_name"] == "Laptop"
+    assert data["item_category"] == "Electronics"
+    assert data["description"] == "Silver laptop"
+    assert data["location_detail"] == "Building B"
+    assert data["custody_location"] == "Administrative Office"
+    assert data["status"] == "pending"
