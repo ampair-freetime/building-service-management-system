@@ -1611,6 +1611,30 @@ textarea:focus-visible {
 .form-panel .submit-btn {
   margin-top: 2px;
 }
+.form-panel .form-helper {
+  margin: 0 0 14px;
+  padding: 12px 14px;
+  border: 1px solid #eee8ca;
+  border-radius: 14px;
+  background: var(--lost-soft);
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.65;
+}
+.public-found-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.public-found-row .field { min-width: 0; }
+.form-panel .optional-label {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 500;
+}
+@media (max-width: 640px) {
+  .public-found-row { grid-template-columns: 1fr; }
+}
 .sidebar-backdrop {
   position: fixed;
   inset: 0;

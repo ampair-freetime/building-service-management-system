@@ -353,50 +353,61 @@
 
             <div class="lost-view" id="lost-view-report-found">
               <div class="two-form-layout">
-                <form class="form-panel" data-submit-type="แจ้งพบของ">
+                <form id="publicFoundForm" class="form-panel" data-submit-type="ส่งรายการพบของเพื่อรอเจ้าหน้าที่ตรวจสอบ">
                   <h3>แจ้งพบของ</h3>
+                  <p class="form-helper">กรอกข้อมูลสิ่งของและจุดรับฝาก รายการจะส่งให้เจ้าหน้าที่ตรวจสอบก่อนแสดงในประกาศ</p>
                   <div class="field">
-                    <label>ประเภทสิ่งของ</label
-                    ><select required>
+                    <label for="publicFoundCategory">ประเภทสิ่งของ</label
+                    ><select id="publicFoundCategory" required>
                       <option value="">เลือกประเภท</option>
-                      <option>กระเป๋า</option>
-                      <option>บัตรหรือเอกสาร</option>
                       <option>อุปกรณ์อิเล็กทรอนิกส์</option>
+                      <option>กระเป๋าและของใช้ส่วนตัว</option>
+                      <option>บัตรและเอกสาร</option>
                       <option>กุญแจ</option>
+                      <option>เสื้อผ้าและเครื่องแต่งกาย</option>
                       <option>อื่น ๆ</option>
                     </select>
                   </div>
                   <div class="field">
-                    <label>ชื่อสิ่งของ</label
+                    <label for="publicFoundName">ชื่อสิ่งของ</label
                     ><input
+                      id="publicFoundName"
                       type="text"
                       required
+                      maxlength="120"
                       placeholder="เช่น กุญแจพร้อมพวงกุญแจสีแดง"
                     />
                   </div>
-                  <div class="field">
-                    <label>วันที่และเวลาที่พบ</label
-                    ><input type="datetime-local" required />
+                  <div class="public-found-row">
+                    <div class="field"><label for="publicFoundDate">วันที่พบ</label><input id="publicFoundDate" type="date" required /></div>
+                    <div class="field"><label for="publicFoundTime">เวลาที่พบ</label><input id="publicFoundTime" type="time" required /></div>
                   </div>
                   <div class="field">
-                    <label>สถานที่พบ</label
+                    <label for="publicFoundLocation">สถานที่พบ</label
                     ><input
+                      id="publicFoundLocation"
                       type="text"
                       required
+                      maxlength="160"
                       placeholder="อาคาร / ชั้น / ห้อง"
                     />
                   </div>
                   <div class="field">
-                    <label>นำของไปฝากไว้ที่ใด</label
+                    <label for="publicFoundCustody">นำของไปฝากไว้ที่ใด</label
                     ><input
+                      id="publicFoundCustody"
                       type="text"
                       required
+                      maxlength="160"
                       placeholder="เช่น ห้องประชาสัมพันธ์ชั้น 1"
                     />
                   </div>
                   <div class="field">
-                    <label>รายละเอียดทั่วไป</label
+                    <label for="publicFoundDescription">รายละเอียดทั่วไป</label
                     ><textarea
+                      id="publicFoundDescription"
+                      required
+                      maxlength="600"
                       placeholder="อธิบายเฉพาะข้อมูลที่เปิดเผยต่อสาธารณะได้"
                     ></textarea>
                   </div>
@@ -425,15 +436,19 @@
                     </div>
                   </div>
                   <div class="field">
-                    <label>รายละเอียดลับสำหรับยืนยันเจ้าของ</label
+                    <label for="publicFoundPrivateDetail">รายละเอียดลับสำหรับยืนยันเจ้าของ</label
                     ><textarea
+                      id="publicFoundPrivateDetail"
                       required
+                      maxlength="600"
                       placeholder="เช่น ของภายใน ตำหนิ หรือข้อมูลที่ไม่ควรแสดงสาธารณะ"
                     ></textarea>
                   </div>
+                  <div class="field"><label for="publicFinderName">ชื่อผู้พบหรือผู้ส่งมอบ <span class="optional-label">(ไม่บังคับ)</span></label><input id="publicFinderName" type="text" maxlength="120" /></div>
                   <div class="field">
-                    <label>อีเมลสำหรับติดตามสถานะ</label
+                    <label for="publicFoundEmail">อีเมลสำหรับติดตามสถานะ</label
                     ><input
+                      id="publicFoundEmail"
                       type="email"
                       name="recipient_email"
                       required
@@ -442,7 +457,7 @@
                     />
                   </div>
                   <button type="submit" class="submit-btn">
-                    เผยแพร่ประกาศพบของ
+                    ส่งให้เจ้าหน้าที่ตรวจสอบ
                   </button>
                 </form>
                 <div class="list-panel">

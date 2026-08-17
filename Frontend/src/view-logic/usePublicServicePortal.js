@@ -109,6 +109,14 @@ export function usePublicServicePortal() {
         .forEach((tab) =>
           tab.classList.toggle("active", tab.dataset.lostView === viewName)
         );
+      if (viewName === "report-found") {
+        const now = new Date();
+        const offsetDate = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
+        const dateInput = document.getElementById("publicFoundDate");
+        const timeInput = document.getElementById("publicFoundTime");
+        if (dateInput && !dateInput.value) dateInput.value = offsetDate.toISOString().slice(0, 10);
+        if (timeInput && !timeInput.value) timeInput.value = offsetDate.toISOString().slice(11, 16);
+      }
     }
 
     document
