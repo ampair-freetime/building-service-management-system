@@ -11,4 +11,9 @@ dist/
 .idea/
 .vscode/
 .DS_Store
+AGENTS.md
+AGENTS.override.md
+**/AGENTS.md
+**/AGENTS.override.md
+.agents/
 .codex/

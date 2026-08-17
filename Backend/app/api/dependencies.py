@@ -10,6 +10,11 @@ from app.core.security import decode_access_token
 from app.db.session import get_db_session
 from app.models.enums import AccountStatus, StaffRole
 from app.models.staff import Staff
+from app.services.object_storage import (
+    ObjectStorage,
+    StorageConfigurationError,
+    get_object_storage,
+)
 from app.services.staff import get_staff_by_id
 
 # ปิด auto_error เพื่อให้ทุกกรณี token ผิดตอบด้วยข้อความ 401 รูปแบบเดียวกัน
@@ -60,3 +65,17 @@ async def require_admin(current_staff: CurrentStaff) -> Staff:
 
 # ใช้กับ endpoint จัดการพนักงานเพื่อบังคับตรวจทั้ง token และบทบาท admin
 AdminStaff = Annotated[Staff, Depends(require_admin)]
+
+
+def provide_object_storage() -> ObjectStorage:
+    """คืน R2 client หรือแจ้ง 503 แบบชัดเจนเมื่อ environment ยังไม่พร้อม."""
+    try:
+        return get_object_storage()
+    except StorageConfigurationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="ระบบจัดเก็บรูปภาพยังไม่ได้ตั้งค่า",
+        ) from exc
+
+
+ObjectStorageClient = Annotated[ObjectStorage, Depends(provide_object_storage)]

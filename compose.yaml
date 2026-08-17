@@ -24,6 +24,11 @@ services:
       BACKEND_CORS_ORIGINS: '["http://localhost:5173"]'
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-building_service}:${POSTGRES_PASSWORD:-building_service}@database:5432/${POSTGRES_DB:-building_service}
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:-development-only-change-this-secret}
+      R2_ACCOUNT_ID: ${R2_ACCOUNT_ID:-}
+      R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID:-}
+      R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY:-}
+      R2_BUCKET_NAME: ${R2_BUCKET_NAME:-building-service-images}
+      R2_PRESIGNED_URL_EXPIRE_SECONDS: ${R2_PRESIGNED_URL_EXPIRE_SECONDS:-900}
     ports:
       - "8000:8000"
     volumes:

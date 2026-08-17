@@ -29,11 +29,10 @@ class LostItem(Base):
     item_name: Mapped[str] = mapped_column(String(200))
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     event_datetime: Mapped[datetime] = mapped_column(DateTime(timezone=True))
-    location_id: Mapped[int | None] = mapped_column(
-        ForeignKey("locations.id"), nullable=True
-    )
+    location_id: Mapped[int | None] = mapped_column(ForeignKey("locations.id"), nullable=True)
     location_detail: Mapped[str | None] = mapped_column(String(255), nullable=True)
     custody_location: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    private_verification_detail: Mapped[str | None] = mapped_column(Text, nullable=True)
     reporter_email: Mapped[str] = mapped_column(String(255), index=True)
     status: Mapped[LostStatus] = mapped_column(
         SqlEnum(
@@ -45,9 +44,7 @@ class LostItem(Base):
         server_default=LostStatus.PENDING.value,
         index=True,
     )
-    reviewed_by: Mapped[UUID | None] = mapped_column(
-        ForeignKey("staff.id"), nullable=True
-    )
+    reviewed_by: Mapped[UUID | None] = mapped_column(ForeignKey("staff.id"), nullable=True)
     review_note: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), index=True
@@ -55,6 +52,12 @@ class LostItem(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
+    # ช่องสำหรับ retention policy ในอนาคต รอบนี้ยังไม่มี job เปลี่ยนค่าอัตโนมัติ
+    expires_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, index=True
+    )
+    archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class LostItemHistory(Base):
@@ -83,18 +86,14 @@ class LostItemHistory(Base):
         )
     )
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
 class LostClaim(Base):
     __tablename__ = "lost_claims"
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
-    found_item_id: Mapped[UUID] = mapped_column(
-        ForeignKey("lost_items.id"), index=True
-    )
+    found_item_id: Mapped[UUID] = mapped_column(ForeignKey("lost_items.id"), index=True)
     claimant_name: Mapped[str] = mapped_column(String(150))
     claimant_email: Mapped[str] = mapped_column(String(255), index=True)
     proof_detail: Mapped[str] = mapped_column(Text)
@@ -108,13 +107,9 @@ class LostClaim(Base):
         server_default=ClaimStatus.PENDING.value,
         index=True,
     )
-    reviewed_by: Mapped[UUID | None] = mapped_column(
-        ForeignKey("staff.id"), nullable=True
-    )
+    reviewed_by: Mapped[UUID | None] = mapped_column(ForeignKey("staff.id"), nullable=True)
     review_note: Mapped[str | None] = mapped_column(Text, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
