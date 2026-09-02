@@ -1,14 +1,20 @@
 """Models สำหรับของหาย ของที่พบ ประวัติ และคำขอรับคืน."""
 
 from datetime import datetime
+from typing import TYPE_CHECKING
 from uuid import UUID, uuid4
 
 from sqlalchemy import DateTime, ForeignKey, Index, Integer, String, Text, Uuid, func
 from sqlalchemy import Enum as SqlEnum
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
 from app.models.enums import ClaimStatus, LostStatus, LostType
+
+if TYPE_CHECKING:
+    from app.models.image import Image
+    from app.models.location import Location
+    from app.models.staff import Staff
 
 
 class LostItem(Base):
@@ -59,6 +65,24 @@ class LostItem(Base):
     archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
+    location: Mapped["Location | None"] = relationship(
+        back_populates="lost_items"
+    )
+    reviewer: Mapped["Staff | None"] = relationship(
+        back_populates="reviewed_lost_items",
+        foreign_keys=[reviewed_by],
+    )
+    history_entries: Mapped[list["LostItemHistory"]] = relationship(
+        back_populates="lost_item"
+    )
+    claims: Mapped[list["LostClaim"]] = relationship(
+        back_populates="found_item",
+        foreign_keys="LostClaim.found_item_id",
+    )
+    images: Mapped[list["Image"]] = relationship(
+        back_populates="lost_item"
+    )
+
 
 class LostItemHistory(Base):
     __tablename__ = "lost_item_history"
@@ -88,6 +112,14 @@ class LostItemHistory(Base):
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
+    lost_item: Mapped["LostItem"] = relationship(
+        back_populates="history_entries"
+    )
+    staff: Mapped["Staff | None"] = relationship(
+        back_populates="lost_item_history_entries",
+        foreign_keys=[staff_id],
+    )
+
 
 class LostClaim(Base):
     __tablename__ = "lost_claims"
@@ -112,4 +144,13 @@ class LostClaim(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    found_item: Mapped["LostItem"] = relationship(
+        back_populates="claims",
+        foreign_keys=[found_item_id],
+    )
+    reviewer: Mapped["Staff | None"] = relationship(
+        back_populates="reviewed_lost_claims",
+        foreign_keys=[reviewed_by],
     )

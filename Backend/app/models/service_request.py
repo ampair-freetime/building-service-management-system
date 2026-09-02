@@ -1,6 +1,7 @@
 """Models สำหรับหมวดงาน คำร้องบริการ และประวัติการดำเนินงาน."""
 
 from datetime import datetime
+from typing import TYPE_CHECKING
 from uuid import UUID, uuid4
 
 from sqlalchemy import (
@@ -15,10 +16,15 @@ from sqlalchemy import (
     func,
 )
 from sqlalchemy import Enum as SqlEnum
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
 from app.models.enums import PriorityLevel, RequestAction, RequestStatus, RequestType
+
+if TYPE_CHECKING:
+    from app.models.image import Image
+    from app.models.location import Location
+    from app.models.staff import Staff
 
 
 class ServiceCategory(Base):
@@ -42,6 +48,10 @@ class ServiceCategory(Base):
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    service_requests: Mapped[list["ServiceRequest"]] = relationship(
+        back_populates="category"
     )
 
 
@@ -94,6 +104,23 @@ class ServiceRequest(Base):
         DateTime(timezone=True), nullable=True
     )
 
+    category: Mapped["ServiceCategory"] = relationship(
+        back_populates="service_requests"
+    )
+    location: Mapped["Location | None"] = relationship(
+        back_populates="service_requests"
+    )
+    assigned_staff: Mapped["Staff | None"] = relationship(
+        back_populates="assigned_service_requests",
+        foreign_keys=[assigned_staff_id],
+    )
+    history_entries: Mapped[list["RequestHistory"]] = relationship(
+        back_populates="service_request"
+    )
+    images: Mapped[list["Image"]] = relationship(
+        back_populates="service_request"
+    )
+
 
 class RequestHistory(Base):
     __tablename__ = "request_history"
@@ -132,4 +159,16 @@ class RequestHistory(Base):
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
+    )
+
+    service_request: Mapped["ServiceRequest"] = relationship(
+        back_populates="history_entries"
+    )
+    performed_by_staff: Mapped["Staff | None"] = relationship(
+        back_populates="performed_request_histories",
+        foreign_keys=[performed_by],
+    )
+    target_staff: Mapped["Staff | None"] = relationship(
+        back_populates="targeted_request_histories",
+        foreign_keys=[target_staff_id],
     )

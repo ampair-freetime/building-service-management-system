@@ -92,38 +92,37 @@ async def create_guest_item(
         custody_location=custody_location,
         private_verification_detail=private_verification_detail,
         reporter_email=str(payload.reporter_email),
-        status=LostStatus.PENDING,
+        status=LostStatus.APPROVED,
     )
-    session.add(item)
-    session.add(
-        LostItemHistory(
-            lost_item_id=item_id,
-            old_status=None,
-            new_status=LostStatus.PENDING,
-            note="Guest submitted report",
-        )
-    )
-
-    if stored is not None and processed is not None and image_id is not None:
+    try:
+        session.add(item)
+        await session.flush()
         session.add(
-            Image(
-                id=image_id,
+            LostItemHistory(
                 lost_item_id=item_id,
-                request_id=None,
-                object_key=stored.object_key,
-                storage_provider="r2",
-                bucket_name=stored.bucket_name,
-                content_type=processed.content_type,
-                size_bytes=len(processed.data),
-                etag=stored.etag,
-                width=processed.width,
-                height=processed.height,
-                image_type=None,
-                uploaded_by_staff_id=None,
+                old_status=None,
+                new_status=LostStatus.APPROVED,
+                note="Guest submitted report",
             )
         )
-
-    try:
+        if stored is not None and processed is not None and image_id is not None:
+            session.add(
+                Image(
+                    id=image_id,
+                    lost_item_id=item_id,
+                    request_id=None,
+                    object_key=stored.object_key,
+                    storage_provider="r2",
+                    bucket_name=stored.bucket_name,
+                    content_type=processed.content_type,
+                    size_bytes=len(processed.data),
+                    etag=stored.etag,
+                    width=processed.width,
+                    height=processed.height,
+                    image_type=None,
+                    uploaded_by_staff_id=None,
+                )
+            )
         await session.commit()
         await session.refresh(item)
     except SQLAlchemyError as exc:

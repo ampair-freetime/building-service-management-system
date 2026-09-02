@@ -11,6 +11,7 @@ dist/
 .idea/
 .vscode/
 .DS_Store
+PROJECT_AGENT_HANDOFF.md
 AGENTS.md
 AGENTS.override.md
 **/AGENTS.md

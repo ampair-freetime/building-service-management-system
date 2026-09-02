@@ -1,6 +1,7 @@
 """Model สำหรับ URL รูปภาพของ Service Request หรือ Lost Item."""
 
 from datetime import datetime
+from typing import TYPE_CHECKING
 from uuid import UUID, uuid4
 
 from sqlalchemy import (
@@ -15,10 +16,15 @@ from sqlalchemy import (
     func,
 )
 from sqlalchemy import Enum as SqlEnum
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
 from app.models.enums import ImageType
+
+if TYPE_CHECKING:
+    from app.models.lost_found import LostItem
+    from app.models.service_request import ServiceRequest
+    from app.models.staff import Staff
 
 
 class Image(Base):
@@ -62,3 +68,14 @@ class Image(Base):
         DateTime(timezone=True), nullable=True, index=True
     )
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    service_request: Mapped["ServiceRequest | None"] = relationship(
+        back_populates="images"
+    )
+    lost_item: Mapped["LostItem | None"] = relationship(
+        back_populates="images"
+    )
+    uploader: Mapped["Staff | None"] = relationship(
+        back_populates="uploaded_images",
+        foreign_keys=[uploaded_by_staff_id],
+    )
