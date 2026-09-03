@@ -1,6 +1,6 @@
 import { createRouter, createWebHistory } from "vue-router";
 
-import HomeView from "../views/index.vue";
+import PublicServicePortal from "../views/PublicServicePortal.vue";
 import StaffLogin from "../views/staff-login.vue";
 import StaffDashboard from "../views/staff-dashboard.vue";
 
@@ -10,7 +10,7 @@ const routes = [
   {
     path: "/user",
     name: "user",
-    component: HomeView,
+    component: PublicServicePortal,
   },
 
   // เจ้าหน้าที่ -> Login
