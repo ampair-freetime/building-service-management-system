@@ -1,6 +1,6 @@
 <script setup>
 import AdminPages from "../components/staff/admin/AdminPages.vue";
-import ClerkPages from "../components/staff/clerk/ClerkPages.vue";
+import AdministrativePages from "../components/staff/administrative/AdministrativePages.vue";
 import HousekeeperPages from "../components/staff/housekeeper/HousekeeperPages.vue";
 import TechnicianPages from "../components/staff/technician/TechnicianPages.vue";
 import { useStaffDashboard } from "../view-logic/useStaffDashboard.js";
@@ -85,14 +85,6 @@ const { activeRole } = useStaffDashboard();
             <strong>Building Care</strong><span>Staff operations portal</span>
           </div>
         </div>
-        <button
-          class="sidebar-collapse"
-          id="sidebarCollapse"
-          type="button"
-          aria-label="ยุบแถบเมนู"
-        >
-          <svg class="icon"><use href="#i-chevron" /></svg>
-        </button>
         <div class="nav-label">Operations</div>
         <nav class="nav-list" aria-label="เมนูเจ้าหน้าที่">
           <button
@@ -104,7 +96,7 @@ const { activeRole } = useStaffDashboard();
           </button>
           <button
             class="nav-item"
-            data-page="clerk-center"
+            data-page="administrative-center"
             data-roles="administrative"
           >
             <span class="nav-icon">02</span>ศูนย์รับงาน
@@ -152,6 +144,15 @@ const { activeRole } = useStaffDashboard();
         </div>
       </aside>
       <button
+        class="icon-btn menu-toggle"
+        id="menuToggle"
+        type="button"
+        aria-label="เปิดเมนู"
+        aria-expanded="false"
+      >
+        <svg class="icon"><use href="#i-menu" /></svg>
+      </button>
+      <button
         type="button"
         class="sidebar-backdrop"
         id="sidebarBackdrop"
@@ -167,14 +168,6 @@ const { activeRole } = useStaffDashboard();
           </div>
           <div class="top-actions">
             <span class="ready-pill">พร้อมปฏิบัติงาน</span>
-            <button
-              class="icon-btn menu-toggle"
-              id="menuToggle"
-              aria-label="เปิดเมนู"
-              aria-expanded="false"
-            >
-              <svg class="icon"><use href="#i-menu" /></svg>
-            </button>
             <div class="notification-wrap">
               <button
                 class="icon-btn"
@@ -210,7 +203,6 @@ const { activeRole } = useStaffDashboard();
                 <div class="notification-list" id="notificationList"></div>
               </section>
             </div>
-            <div class="date-chip" id="today"></div>
             <button
               class="header-profile"
               id="profileButton"
@@ -228,7 +220,7 @@ const { activeRole } = useStaffDashboard();
 
         <HousekeeperPages v-if="activeRole === 'housekeeper'" />
         <TechnicianPages v-else-if="activeRole === 'technician'" />
-        <ClerkPages v-else-if="activeRole === 'administrative'" />
+        <AdministrativePages v-else-if="activeRole === 'administrative'" />
         <AdminPages v-else />
       </main>
     </div>

@@ -15,7 +15,7 @@ export const STAFF_ROLE_PAGES = {
   ],
   administrative: [
     { id: "dashboard", label: "ภาพรวมงาน" },
-    { id: "clerk-center", label: "ศูนย์รับงาน" },
+    { id: "administrative-center", label: "ศูนย์รับงาน" },
     { id: "lost", label: "ของหาย จุดรับฝาก และคำขอรับคืน" },
     { id: "my-history", label: "ประวัติงานของฉัน" },
   ],
