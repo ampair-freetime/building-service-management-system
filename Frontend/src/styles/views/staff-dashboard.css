@@ -24,7 +24,7 @@
   --font: "Inter", "Noto Sans Thai", system-ui, sans-serif;
 }
 
-/* Clerk approval center and approved-only Lost & Found flow */
+/* Administrative approval center and approved-only Lost & Found flow */
 .notification-panel { width: min(470px, calc(100vw - 28px)); }
 .approval-type { display:inline-flex;align-items:center;min-height:24px;padding:3px 9px;border-radius:999px;font-size:9px;font-weight:900;margin-bottom:5px; }
 .approval-type.inventory { background:#e8f0ff;color:#2563eb; }
@@ -34,31 +34,31 @@
 .decision-strip button { flex:1;min-width:110px; }
 .approval-flow-note { display:flex;gap:10px;align-items:flex-start;padding:13px 15px;margin-bottom:14px;border:1px solid #e8e3ff;border-radius:18px;background:#f8f6ff;color:var(--muted);font-size:10px; }
 .approval-flow-note strong { color:var(--ink); }
-.clerk-center-grid { display:grid;grid-template-columns:1fr 1fr;gap:18px;align-items:start; }
-.clerk-center-grid.single-view { grid-template-columns:1fr; }
-.clerk-center-view { display:none; }
-.clerk-center-view.active { display:block; }
-.clerk-center-tabs .tab span { display:inline-grid;place-items:center;min-width:22px;height:22px;margin-left:5px;padding:0 6px;border-radius:999px;background:rgba(255,255,255,.55);font-size:9px; }
-.clerk-center-tabs .tab:not(.active) span { background:#f0eff4;color:var(--muted); }
-.clerk-center-box { background:#fff;border:1px solid rgba(255,255,255,.9);border-radius:24px;box-shadow:0 10px 32px rgba(42,35,85,.075);overflow:hidden; }
-.clerk-center-head { display:flex;align-items:flex-start;justify-content:space-between;gap:14px;padding:21px;border-bottom:1px solid var(--line); }
-.clerk-center-head h3 { font-size:18px;margin:5px 0 3px; }
-.clerk-center-head p { font-size:10px;margin:0; }
+.administrative-center-grid { display:grid;grid-template-columns:1fr 1fr;gap:18px;align-items:start; }
+.administrative-center-grid.single-view { grid-template-columns:1fr; }
+.administrative-center-view { display:none; }
+.administrative-center-view.active { display:block; }
+.administrative-center-tabs .tab span { display:inline-grid;place-items:center;min-width:22px;height:22px;margin-left:5px;padding:0 6px;border-radius:999px;background:rgba(255,255,255,.55);font-size:9px; }
+.administrative-center-tabs .tab:not(.active) span { background:#f0eff4;color:var(--muted); }
+.administrative-center-box { background:#fff;border:1px solid rgba(255,255,255,.9);border-radius:24px;box-shadow:0 10px 32px rgba(42,35,85,.075);overflow:hidden; }
+.administrative-center-head { display:flex;align-items:flex-start;justify-content:space-between;gap:14px;padding:21px;border-bottom:1px solid var(--line); }
+.administrative-center-head h3 { font-size:18px;margin:5px 0 3px; }
+.administrative-center-head p { font-size:10px;margin:0; }
 .center-kicker { display:inline-flex;align-items:center;min-height:26px;padding:3px 9px;border-radius:999px;font-size:9px;font-weight:900; }
 .center-kicker.approval { background:#fff3d6;color:#9a6500; }
 .center-kicker.claim { background:#eaf2ff;color:#286bc5; }
 .center-count { min-width:38px;height:38px;padding:0 10px;border-radius:13px;background:var(--primary-soft);color:var(--primary);display:grid;place-items:center;font-weight:900; }
-.clerk-request-list { display:grid;padding:12px;gap:10px; }
-.clerk-request-card { border:1px solid var(--line);border-radius:18px;padding:14px;background:#fff;display:grid;gap:10px; }
-.clerk-request-card:hover { border-color:#d6cffd;box-shadow:0 8px 22px rgba(42,35,85,.06); }
-.clerk-request-top { display:flex;justify-content:space-between;gap:10px;align-items:flex-start; }
-.clerk-request-card h4 { margin:2px 0 0;font-size:13px; }
-.clerk-request-card p { margin:0;font-size:10px; }
-.clerk-request-meta { display:flex;gap:7px;flex-wrap:wrap;align-items:center;color:var(--muted);font-size:9px; }
-.clerk-request-actions { display:flex;gap:7px;flex-wrap:wrap; }
-.clerk-request-actions button { flex:1;min-width:92px; }
+.administrative-request-list { display:grid;padding:12px;gap:10px; }
+.administrative-request-card { border:1px solid var(--line);border-radius:18px;padding:14px;background:#fff;display:grid;gap:10px; }
+.administrative-request-card:hover { border-color:#d6cffd;box-shadow:0 8px 22px rgba(42,35,85,.06); }
+.administrative-request-top { display:flex;justify-content:space-between;gap:10px;align-items:flex-start; }
+.administrative-request-card h4 { margin:2px 0 0;font-size:13px; }
+.administrative-request-card p { margin:0;font-size:10px; }
+.administrative-request-meta { display:flex;gap:7px;flex-wrap:wrap;align-items:center;color:var(--muted);font-size:9px; }
+.administrative-request-actions { display:flex;gap:7px;flex-wrap:wrap; }
+.administrative-request-actions button { flex:1;min-width:92px; }
 .notification-item { cursor:pointer; }
-@media (max-width:900px) { .clerk-center-grid { grid-template-columns:1fr; } }
+@media (max-width:900px) { .administrative-center-grid { grid-template-columns:1fr; } }
 @media (max-width:720px) { .notification-panel { width:auto; } .decision-strip { display:grid;grid-template-columns:1fr 1fr; } }
 
 #foundModal .modal-card { width:min(720px, calc(100vw - 28px)); max-height:min(880px, calc(100vh - 28px)); overflow:auto; }
@@ -332,15 +332,15 @@ p {
 .staff-dashboard-page .quick-action { min-width: 0; min-height: 48px; padding: 10px 12px; font-size: 13px; white-space: normal; }
 .staff-dashboard-page .row-actions,
 .staff-dashboard-page .job-actions,
-.staff-dashboard-page .clerk-request-actions,
+.staff-dashboard-page .administrative-request-actions,
 .staff-dashboard-page .decision-strip,
 .staff-dashboard-page .form-actions { gap: 9px; }
 .staff-dashboard-page .row-actions { display:grid; grid-template-columns:repeat(auto-fit, minmax(120px, 1fr)); width:100%; }
 .staff-dashboard-page .row-actions button,
 .staff-dashboard-page .job-actions button,
-.staff-dashboard-page .clerk-request-actions button,
+.staff-dashboard-page .administrative-request-actions button,
 .staff-dashboard-page .decision-strip button { min-width: 0; min-height: 42px; white-space: normal; }
-.staff-dashboard-page .clerk-request-actions { display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); }
+.staff-dashboard-page .administrative-request-actions { display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); }
 .staff-dashboard-page .decision-strip { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); }
 .staff-dashboard-page .form-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .staff-dashboard-page .field { min-width: 0; }
@@ -376,7 +376,7 @@ p {
   .staff-dashboard-page .metrics,
   .staff-dashboard-page .history-summary { grid-template-columns:repeat(2, minmax(0, 1fr)); }
   .staff-dashboard-page .quick-action-grid { grid-template-columns:repeat(2, minmax(0, 1fr)); }
-  .staff-dashboard-page .clerk-request-actions { grid-template-columns:1fr; }
+  .staff-dashboard-page .administrative-request-actions { grid-template-columns:1fr; }
   .staff-dashboard-page .form-row { grid-template-columns:1fr; }
   .staff-dashboard-page #foundModal .form-actions { grid-template-columns:1fr 1fr; }
 }
@@ -2335,6 +2335,449 @@ textarea:focus-visible,
   }
 }
 
+/* Readability and layout pass: keep staff tasks easy to scan and controls easy to tap. */
+.staff-dashboard-page {
+  font-size: 16px;
+  line-height: 1.55;
+}
+
+.staff-dashboard-page p {
+  font-size: 14px;
+  line-height: 1.65;
+}
+
+.staff-dashboard-page small,
+.staff-dashboard-page .metric span,
+.staff-dashboard-page .metric small,
+.staff-dashboard-page .job-meta,
+.staff-dashboard-page .work-history-meta,
+.staff-dashboard-page .lost-foot,
+.staff-dashboard-page .assignee {
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.staff-dashboard-page .sidebar {
+  width: 272px;
+  padding: 22px;
+}
+
+.staff-dashboard-page .brand strong {
+  font-size: 17px;
+}
+
+.staff-dashboard-page .brand span,
+.staff-dashboard-page .nav-label {
+  font-size: 11px;
+}
+
+.staff-dashboard-page .nav-list {
+  gap: 7px;
+}
+
+.staff-dashboard-page .nav-item {
+  min-height: 50px;
+  padding: 0 14px;
+  border-radius: 16px;
+  font-size: 14px;
+  gap: 12px;
+}
+
+.staff-dashboard-page .nav-icon {
+  width: 28px;
+  font-size: 10px;
+}
+
+.staff-dashboard-page .logout {
+  min-height: 48px;
+  border-radius: 15px;
+  font-size: 14px;
+}
+
+.staff-dashboard-page .app main,
+.staff-dashboard-page .app.sidebar-collapsed main {
+  margin-left: 320px;
+  padding: 0 32px 80px;
+}
+
+.staff-dashboard-page .app main > .page,
+.staff-dashboard-page .topbar {
+  max-width: 1240px;
+}
+
+.staff-dashboard-page .topbar {
+  min-height: 96px;
+  gap: 20px;
+}
+
+.staff-dashboard-page .topbar h1 {
+  font-size: clamp(26px, 2.1vw, 34px);
+}
+
+.staff-dashboard-page .eyebrow {
+  font-size: 12px;
+}
+
+.staff-dashboard-page .ready-pill,
+.staff-dashboard-page .date-chip {
+  min-height: 40px;
+  padding: 0 14px;
+  font-size: 12px;
+}
+
+.staff-dashboard-page .icon-btn {
+  width: 48px;
+  height: 48px;
+  border-radius: 16px;
+}
+
+.staff-dashboard-page .header-profile {
+  min-height: 50px;
+  padding-right: 14px;
+}
+
+.staff-dashboard-page .header-profile strong {
+  font-size: 13px;
+}
+
+.staff-dashboard-page .header-profile small {
+  font-size: 11px;
+}
+
+.staff-dashboard-page .hero {
+  gap: 22px;
+  margin: 16px 0 24px;
+}
+
+.staff-dashboard-page .hero-main,
+.staff-dashboard-page .hero-side {
+  border-radius: 28px;
+}
+
+.staff-dashboard-page .hero-main {
+  padding: clamp(28px, 3vw, 42px);
+}
+
+.staff-dashboard-page .hero-main h2 {
+  max-width: 760px;
+  font-size: clamp(28px, 2.6vw, 40px);
+  line-height: 1.22;
+}
+
+.staff-dashboard-page .hero-main p {
+  max-width: 720px;
+  font-size: 15px;
+}
+
+.staff-dashboard-page .hero-side {
+  padding: 28px;
+}
+
+.staff-dashboard-page .hero-side h3,
+.staff-dashboard-page .panel-head h3 {
+  font-size: 18px;
+}
+
+.staff-dashboard-page .metrics,
+.staff-dashboard-page .history-summary {
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.staff-dashboard-page .metric {
+  min-height: 148px;
+  padding: 22px;
+  border-radius: 22px;
+}
+
+.staff-dashboard-page .metric strong {
+  font-size: 34px;
+  line-height: 1.15;
+  margin: 8px 0;
+}
+
+.staff-dashboard-page .panel-head {
+  padding: 24px 24px 18px;
+}
+
+.staff-dashboard-page .panel-head p,
+.staff-dashboard-page .section-title p {
+  font-size: 13px;
+}
+
+.staff-dashboard-page .panel-body {
+  padding: 0 24px 24px;
+}
+
+.staff-dashboard-page .section-title h2 {
+  font-size: clamp(25px, 2vw, 30px);
+}
+
+.staff-dashboard-page button,
+.staff-dashboard-page input,
+.staff-dashboard-page select,
+.staff-dashboard-page textarea {
+  font-size: 14px;
+}
+
+.staff-dashboard-page .primary-btn,
+.staff-dashboard-page .primary,
+.staff-dashboard-page .submit-btn,
+.staff-dashboard-page .ghost-btn,
+.staff-dashboard-page .secondary,
+.staff-dashboard-page .text-btn,
+.staff-dashboard-page .small-btn,
+.staff-dashboard-page .accept-btn,
+.staff-dashboard-page .update-btn,
+.staff-dashboard-page .approve-btn,
+.staff-dashboard-page .reject-btn,
+.staff-dashboard-page .return-btn,
+.staff-dashboard-page .danger,
+.staff-dashboard-page .permanent-btn,
+.staff-dashboard-page .restore-btn {
+  min-height: 46px;
+  padding: 0 16px;
+  font-size: 14px;
+  line-height: 1.2;
+}
+
+.staff-dashboard-page .quick-action-grid {
+  gap: 12px;
+}
+
+.staff-dashboard-page .quick-action {
+  min-height: 54px;
+  padding: 12px 14px;
+  border-radius: 15px;
+  font-size: 14px;
+  line-height: 1.3;
+}
+
+.staff-dashboard-page .job-list,
+.staff-dashboard-page .work-history-list,
+.staff-dashboard-page .lost-grid {
+  gap: 16px;
+}
+
+.staff-dashboard-page .job-card,
+.staff-dashboard-page .work-history-card,
+.staff-dashboard-page .lost-card {
+  padding: 22px;
+}
+
+.staff-dashboard-page .job-card {
+  grid-template-columns: 64px minmax(0, 1fr) minmax(190px, auto);
+  gap: 18px;
+}
+
+.staff-dashboard-page .job-photo {
+  width: 64px;
+  height: 64px;
+}
+
+.staff-dashboard-page .job-detail h3,
+.staff-dashboard-page .lost-content h3 {
+  font-size: 17px;
+}
+
+.staff-dashboard-page .job-actions,
+.staff-dashboard-page .row-actions,
+.staff-dashboard-page .administrative-request-actions,
+.staff-dashboard-page .decision-strip {
+  gap: 10px;
+}
+
+.staff-dashboard-page .job-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  max-width: 360px;
+}
+
+.staff-dashboard-page .job-actions button,
+.staff-dashboard-page .row-actions button,
+.staff-dashboard-page .administrative-request-actions button,
+.staff-dashboard-page .decision-strip button {
+  min-width: 0;
+  width: 100%;
+  white-space: normal;
+}
+
+.staff-dashboard-page .field {
+  gap: 8px;
+}
+
+.staff-dashboard-page .field label {
+  font-size: 14px;
+}
+
+.staff-dashboard-page .field input,
+.staff-dashboard-page .field select,
+.staff-dashboard-page .field textarea,
+.staff-dashboard-page .field-compact {
+  min-height: 50px;
+  padding: 12px 15px;
+  font-size: 14px;
+}
+
+.staff-dashboard-page .field textarea {
+  min-height: 128px;
+}
+
+.staff-dashboard-page .tab,
+.staff-dashboard-page .board-tab {
+  min-height: 46px;
+  padding: 0 18px;
+  font-size: 13px;
+}
+
+.staff-dashboard-page .administrative-center-head {
+  padding: 24px;
+}
+
+.staff-dashboard-page .administrative-center-head h3 {
+  font-size: 20px;
+}
+
+.staff-dashboard-page .administrative-center-head p,
+.staff-dashboard-page .administrative-request-card p,
+.staff-dashboard-page .administrative-request-meta {
+  font-size: 13px;
+}
+
+.staff-dashboard-page .administrative-request-card {
+  padding: 18px;
+  gap: 12px;
+}
+
+.staff-dashboard-page .administrative-request-card h4 {
+  font-size: 16px;
+}
+
+.staff-dashboard-page .badge,
+.staff-dashboard-page .status,
+.staff-dashboard-page .post-type,
+.staff-dashboard-page .approval-type,
+.staff-dashboard-page .center-kicker {
+  min-height: 28px;
+  padding: 4px 10px;
+  font-size: 12px;
+}
+
+@media (max-width: 1180px) {
+  .staff-dashboard-page .sidebar {
+    left: -300px;
+  }
+
+  .staff-dashboard-page .sidebar.open {
+    left: 16px;
+  }
+
+  .staff-dashboard-page .app main,
+  .staff-dashboard-page .app.sidebar-collapsed main {
+    margin-left: 0;
+    padding-left: 24px;
+    padding-right: 24px;
+  }
+
+  .staff-dashboard-page .menu-toggle {
+    display: grid;
+  }
+
+  .staff-dashboard-page .sidebar-collapse {
+    display: none;
+  }
+}
+
+@media (max-width: 840px) {
+  .staff-dashboard-page .topbar {
+    align-items: flex-start;
+  }
+
+  .staff-dashboard-page .date-chip,
+  .staff-dashboard-page .ready-pill,
+  .staff-dashboard-page .header-profile {
+    display: none;
+  }
+
+  .staff-dashboard-page .hero {
+    grid-template-columns: 1fr;
+  }
+
+  .staff-dashboard-page .hero-side {
+    display: none;
+  }
+
+  .staff-dashboard-page .job-card {
+    grid-template-columns: 60px minmax(0, 1fr);
+  }
+
+  .staff-dashboard-page .job-actions {
+    grid-column: 1 / -1;
+    max-width: none;
+  }
+}
+
+@media (max-width: 620px) {
+  .staff-dashboard-page .app main,
+  .staff-dashboard-page .app.sidebar-collapsed main {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .staff-dashboard-page .topbar {
+    min-height: 76px;
+  }
+
+  .staff-dashboard-page .topbar h1 {
+    font-size: 22px;
+  }
+
+  .staff-dashboard-page .hero-main {
+    padding: 24px;
+  }
+
+  .staff-dashboard-page .hero-main h2 {
+    font-size: 28px;
+  }
+
+  .staff-dashboard-page .hero-main p {
+    font-size: 14px;
+  }
+
+  .staff-dashboard-page .metrics,
+  .staff-dashboard-page .history-summary,
+  .staff-dashboard-page .quick-action-grid,
+  .staff-dashboard-page .job-actions,
+  .staff-dashboard-page .row-actions,
+  .staff-dashboard-page .administrative-request-actions,
+  .staff-dashboard-page .decision-strip {
+    grid-template-columns: 1fr;
+  }
+
+  .staff-dashboard-page .metric {
+    min-height: 128px;
+  }
+
+  .staff-dashboard-page .metric strong {
+    font-size: 30px;
+  }
+
+  .staff-dashboard-page .panel-head,
+  .staff-dashboard-page .panel-body,
+  .staff-dashboard-page .administrative-center-head {
+    padding-left: 18px;
+    padding-right: 18px;
+  }
+
+  .staff-dashboard-page .job-card,
+  .staff-dashboard-page .work-history-card,
+  .staff-dashboard-page .lost-card,
+  .staff-dashboard-page .administrative-request-card {
+    padding: 18px;
+  }
+}
+
 .metrics,
 .history-summary {
   grid-template-columns: repeat(auto-fit, minmax(145px, 1fr));
@@ -3085,4 +3528,264 @@ body {
     animation: none !important;
     transition: none !important;
   }
+}
+
+/* Desktop navigation: the control sits beside the brand and can hide the bar completely. */
+@media (min-width: 1181px) {
+  .staff-dashboard-page .sidebar-collapse {
+    position: fixed;
+    z-index: 45;
+    left: 244px;
+    top: 38px;
+    width: 38px;
+    height: 38px;
+    min-height: 38px;
+    padding: 0;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: #f7f5ff;
+    color: var(--primary);
+    box-shadow: none;
+    transition: left 0.24s ease, background-color 0.2s ease,
+      color 0.2s ease, transform 0.2s ease;
+  }
+
+  .staff-dashboard-page .sidebar-collapse:hover {
+    background: var(--primary);
+    color: #fff;
+  }
+
+  .staff-dashboard-page .sidebar-collapse .icon {
+    width: 20px;
+    height: 20px;
+    transform: rotate(180deg);
+    transition: transform 0.2s ease;
+  }
+
+  .staff-dashboard-page .app.sidebar-collapsed .sidebar {
+    left: -320px;
+    pointer-events: none;
+  }
+
+  .staff-dashboard-page .app.sidebar-collapsed main {
+    width: 100%;
+    margin-left: 0;
+    padding-left: clamp(84px, 7vw, 112px);
+    padding-right: clamp(24px, 3vw, 48px);
+  }
+
+  .staff-dashboard-page .app.sidebar-collapsed main > .page,
+  .staff-dashboard-page .app.sidebar-collapsed .topbar {
+    max-width: 1440px;
+  }
+
+  .staff-dashboard-page .app.sidebar-collapsed > .sidebar + .sidebar-collapse {
+    left: 24px;
+    top: 24px;
+    border-radius: 14px;
+    background: #fff;
+    box-shadow: var(--shadow-sm);
+  }
+
+  .staff-dashboard-page .app.sidebar-collapsed > .sidebar + .sidebar-collapse .icon {
+    transform: none;
+  }
+}
+
+@media (max-width: 1180px) {
+  .staff-dashboard-page .sidebar-collapse {
+    display: none;
+  }
+}
+
+/* Small-screen navigation: preserve workspace while making the menu easy to open and close. */
+@media (max-width: 1023px) {
+  .staff-dashboard-page .sidebar {
+    left: calc(-100vw - 24px);
+    width: calc(100vw - 28px);
+    max-width: none;
+    padding: 22px;
+    transition: left 0.26s ease;
+  }
+
+  .staff-dashboard-page .sidebar.open {
+    left: 14px;
+  }
+
+  .staff-dashboard-page .app.sidebar-collapsed .sidebar {
+    left: calc(-100vw - 24px);
+    width: calc(100vw - 28px);
+    pointer-events: auto;
+  }
+
+  .staff-dashboard-page .app.sidebar-collapsed main {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .staff-dashboard-page .menu-toggle {
+    position: fixed;
+    z-index: 50;
+    left: 16px;
+    top: 16px;
+    display: grid;
+    width: 48px;
+    height: 48px;
+    min-height: 48px;
+    border-radius: 16px;
+    background: #fff;
+    box-shadow: var(--shadow-sm);
+  }
+
+  .staff-dashboard-page #sidebar.open ~ .menu-toggle {
+    left: auto;
+    right: 30px;
+    background: var(--primary);
+    color: #fff;
+  }
+
+  .staff-dashboard-page .topbar > div:first-child {
+    padding-left: 64px;
+  }
+
+  .staff-dashboard-page .header-profile {
+    display: flex !important;
+    min-width: 48px;
+    max-width: 48px;
+    min-height: 48px;
+    padding: 5px;
+  }
+
+  .staff-dashboard-page .header-profile > span:first-child {
+    display: grid !important;
+    width: 38px;
+    height: 38px;
+    margin: 0;
+  }
+
+  .staff-dashboard-page .header-profile > span:last-child {
+    display: none !important;
+  }
+}
+
+@media (max-width: 820px) {
+  .staff-dashboard-page .sidebar {
+    left: calc(-100vw - 24px);
+    width: calc(100vw - 28px);
+    max-width: none;
+    top: 14px;
+    bottom: 14px;
+    border-radius: 24px;
+  }
+
+  .staff-dashboard-page .sidebar.open {
+    left: 14px;
+  }
+
+  .staff-dashboard-page .topbar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 10px;
+  }
+
+  .staff-dashboard-page .top-actions {
+    gap: 8px;
+  }
+
+  .staff-dashboard-page .topbar h1 {
+    font-size: 20px;
+    line-height: 1.25;
+  }
+}
+
+/* One menu trigger for every screen size. */
+@media (min-width: 1024px) {
+  .staff-dashboard-page .menu-toggle {
+    display: none;
+  }
+
+  .staff-dashboard-page .sidebar {
+    width: 300px;
+    left: 24px;
+    top: 24px;
+    bottom: 24px;
+  }
+
+  .staff-dashboard-page .app main,
+  .staff-dashboard-page .app.sidebar-collapsed main {
+    margin-left: 348px;
+    padding-left: 32px;
+    padding-right: 32px;
+  }
+
+  .staff-dashboard-page .menu-toggle {
+    position: fixed;
+    z-index: 50;
+    left: 270px;
+    top: 38px;
+    display: none;
+    width: 38px;
+    height: 38px;
+    min-height: 38px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: #f7f5ff;
+    color: var(--primary);
+    box-shadow: none;
+    transition: left 0.24s ease, background-color 0.2s ease,
+      color 0.2s ease, transform 0.2s ease;
+  }
+
+  .staff-dashboard-page .menu-toggle:hover {
+    background: var(--primary);
+    color: #fff;
+  }
+
+  .staff-dashboard-page .menu-toggle .icon {
+    width: 19px;
+    height: 19px;
+  }
+
+  .staff-dashboard-page .app.sidebar-collapsed .sidebar {
+    left: -340px;
+    width: 300px;
+    pointer-events: none;
+  }
+
+  .staff-dashboard-page .app.sidebar-collapsed main {
+    width: 100%;
+    margin-left: 0;
+    padding-left: clamp(84px, 7vw, 112px);
+    padding-right: clamp(24px, 3vw, 48px);
+  }
+
+  .staff-dashboard-page .app.sidebar-collapsed main > .page,
+  .staff-dashboard-page .app.sidebar-collapsed .topbar {
+    max-width: 1440px;
+  }
+
+  .staff-dashboard-page .app.sidebar-collapsed #sidebar ~ .menu-toggle {
+    left: 24px;
+    top: 24px;
+    border-radius: 14px;
+    background: #fff;
+    box-shadow: var(--shadow-sm);
+  }
+}
+
+/* Mobile already provides notification and profile actions in the bottom navigation. */
+@media (max-width: 720px) {
+  .staff-dashboard-page .top-actions .notification-wrap,
+  .staff-dashboard-page .top-actions .header-profile {
+    display: none !important;
+  }
+}
+
+/* Keep sidebar navigation focused on the page names. */
+.staff-dashboard-page .nav-item .nav-icon {
+  display: none;
+}
+
+.staff-dashboard-page .nav-item {
+  gap: 0;
 }
