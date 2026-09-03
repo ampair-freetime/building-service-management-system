@@ -54,6 +54,30 @@ export function useStaffDashboard() {
       categories,
     } = createStaffDashboardData();
     let currentRole = activeRole.value;
+    try {
+      const signedInStaff = JSON.parse(
+        localStorage.getItem("buildingCareStaff") || "null"
+      );
+      if (
+        signedInStaff?.full_name &&
+        signedInStaff?.staff_code &&
+        allowedRoles.includes(signedInStaff.role)
+      ) {
+        const signedInRole = signedInStaff.role;
+        const initials = signedInStaff.full_name
+          .split(/\s+/)
+          .filter(Boolean)
+          .slice(0, 2)
+          .map((part) => part.charAt(0).toUpperCase())
+          .join("");
+        currentUserName[signedInRole] = signedInStaff.full_name;
+        roleConfig[signedInRole].name = signedInStaff.full_name;
+        roleConfig[signedInRole].staffId = signedInStaff.staff_code;
+        roleConfig[signedInRole].avatar = initials || roleConfig[signedInRole].avatar;
+      }
+    } catch (error) {
+      console.warn("Stored staff profile is invalid:", error);
+    }
     let currentLostTab = "inventory";
     let currentAdministrativeCenterView = "approvals";
     const readClaimNotifications = new Set();
@@ -235,6 +259,20 @@ export function useStaffDashboard() {
 
       const profileStaffId = $("#profileStaffId");
       if (profileStaffId) profileStaffId.textContent = c.staffId;
+
+      const profileEmail = $("#profileEmail");
+      if (profileEmail) {
+        try {
+          const signedInStaff = JSON.parse(
+            localStorage.getItem("buildingCareStaff") || "null"
+          );
+          if (signedInStaff?.role === role && signedInStaff?.email) {
+            profileEmail.textContent = signedInStaff.email;
+          }
+        } catch (error) {
+          console.warn("Stored staff email is invalid:", error);
+        }
+      }
 
       const profileRole = $("#profileRole");
       if (profileRole) profileRole.textContent = c.label;
