@@ -14,6 +14,14 @@ import {
   validImage,
 } from "./staff-dashboard/utils.js";
 
+const STAFF_ENDPOINT = "http://localhost:8000/api/v1/staff";
+const STAFF_ROLE_LABELS = {
+  housekeeper: "แม่บ้าน",
+  technician: "ช่าง",
+  administrative: "ธุรการ",
+  admin: "แอดมิน",
+};
+
 export function useStaffDashboard() {
   const router = useRouter();
   const allowedRoles = ["housekeeper", "technician", "administrative", "admin"];
@@ -55,8 +63,43 @@ export function useStaffDashboard() {
     let lastModalTrigger = null;
     const $ = (s) => document.querySelector(s),
       $$ = (s) => [...document.querySelectorAll(s)];
+    function authHeaders(includeJson = false) {
+      const headers = {
+        Authorization: `Bearer ${localStorage.getItem("buildingCareAccessToken") || ""}`,
+      };
+      if (includeJson) headers["Content-Type"] = "application/json";
+      return headers;
+    }
+    function apiStaffToDashboardStaff(account) {
+      return {
+        name: account.full_name,
+        id: account.staff_code,
+        email: account.email,
+        role: STAFF_ROLE_LABELS[account.role] || account.role,
+        zone: "-",
+        status: account.status === "active" ? "ใช้งาน" : "พักงาน",
+      };
+    }
+    async function loadStaffAccounts() {
+      if (currentRole !== "admin") return;
+      try {
+        const response = await fetch(STAFF_ENDPOINT, { headers: authHeaders() });
+        if (!response.ok) throw new Error(`Unable to load staff (${response.status})`);
+        staffData = (await response.json()).map(apiStaffToDashboardStaff);
+        renderStaff();
+        renderMetrics();
+        renderStaffOverview();
+      } catch (error) {
+        console.error("Loading staff accounts failed:", error);
+        toast("ไม่สามารถโหลดบัญชีเจ้าหน้าที่จากระบบได้");
+      }
+    }
     function toast(message) {
       const el = $("#toast");
+      if (!el) {
+        console.warn(message);
+        return;
+      }
       el.textContent = message;
       el.classList.add("show");
       clearTimeout(window.toastTimer);
@@ -2764,19 +2807,45 @@ export function useStaffDashboard() {
       closeModal("confirmModal", false);
       if (typeof action === "function") action();
     });
-    $("#staffForm")?.addEventListener("submit", (event) => {
+    $("#staffForm")?.addEventListener("submit", async (event) => {
       event.preventDefault();
-      if (!event.currentTarget.checkValidity()) {
-        event.currentTarget.reportValidity();
+      const form = event.currentTarget;
+      if (!form.checkValidity()) {
+        form.reportValidity();
         return;
       }
-      const record = {
-        name: $("#newName").value,
-        id: $("#newId").value,
+      const submitButton = $("#createStaffButton");
+      submitButton.disabled = true;
+      const payload = {
+        full_name: $("#newName").value.trim(),
+        staff_code: $("#newId").value.trim(),
+        email: $("#newEmail").value.trim(),
+        password: $("#newPassword").value,
         role: $("#newRole").value,
-        zone: $("#newZone").value,
-        status: "ใช้งาน",
       };
+      let account;
+      try {
+        const response = await fetch(STAFF_ENDPOINT, {
+          method: "POST",
+          headers: authHeaders(true),
+          body: JSON.stringify(payload),
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          const detail = Array.isArray(data.detail)
+            ? data.detail.map((item) => item.msg).join(", ")
+            : data.detail;
+          throw new Error(detail || "สร้างบัญชีไม่สำเร็จ");
+        }
+        account = data;
+      } catch (error) {
+        console.error("Creating staff account failed:", error);
+        toast(error.message || "ไม่สามารถสร้างบัญชีได้");
+        submitButton.disabled = false;
+        return;
+      }
+      const record = apiStaffToDashboardStaff(account);
+      record.zone = $("#newZone").value.trim() || "-";
       staffData.push(record);
       addAudit(
         "staff",
@@ -2787,7 +2856,8 @@ export function useStaffDashboard() {
       );
       renderStaff();
       closeModal("staffModal", false);
-      event.currentTarget.reset();
+      form.reset();
+      submitButton.disabled = false;
       showSuccess("สร้างบัญชี Staff แล้ว");
     });
     $("#editStaffForm")?.addEventListener("submit", (event) => {
@@ -3103,6 +3173,7 @@ export function useStaffDashboard() {
       navigate(currentRole === "administrative" ? "administrative-center" : "jobs")
     );
     renderStaff();
+    await loadStaffAccounts();
     setRole(
       ["housekeeper", "technician", "administrative", "admin"].includes(currentRole)
         ? currentRole

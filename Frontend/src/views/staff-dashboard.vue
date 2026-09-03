@@ -10,6 +10,7 @@ const { activeRole } = useStaffDashboard();
 
 <template>
   <div class="staff-dashboard-page">
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
     <svg
       aria-hidden="true"
       width="0"
