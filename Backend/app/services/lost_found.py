@@ -20,6 +20,8 @@ from app.schemas.lost_found_item import (
     GuestItemCreatedResponse,
     GuestItemListResponse,
     GuestItemPublicResponse,
+    Guest_Tracking_Request,
+    Guest_Tracking_Response
 )
 from app.services.images import prepare_guest_image
 from app.services.object_storage import (
@@ -268,7 +270,9 @@ def _to_public_response(
             for image in images
         ],
     )
+def track_guest_item(session: AsyncSession,item_id: str ,reporter_email: str) -> LostItem:
 
+    return
 
 def _make_item_code(report_type: LostType, item_id: UUID) -> str:
     """สร้าง tracking code ที่อ่านง่ายและแทบไม่มีโอกาสชนกัน."""
