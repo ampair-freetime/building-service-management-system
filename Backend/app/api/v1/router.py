@@ -1,12 +1,8 @@
 """รวม endpoint เวอร์ชัน 1 เพื่อให้ main application ลงทะเบียนในจุดเดียว."""
 
 from fastapi import APIRouter
+from app.api.v1.endpoints import auth, found_item, lost_item, staff,lost_found_administrative
 
-<<<<<<< HEAD
-from app.api.v1.endpoints import auth, found_item, lost_item, staff
-=======
-from app.api.v1.endpoints import auth, staff, lost_found_administrative
->>>>>>> e1fdb1b113efd7d260e765c73bb5928dc814307e
 
 api_router = APIRouter()
 
