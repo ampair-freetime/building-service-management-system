@@ -8,6 +8,7 @@ from app.schemas.lost_found_administrative import (
     PendingFoundItemResponse,
 )
 from app.services.lost_found_administrative import (
+    approve_found_item,
     get_found_item_detail,
     list_pending_found_items,
 )
@@ -43,6 +44,32 @@ async def get_found_item(
         raise HTTPException(
             status_code=404,
             detail="Found item not found",
+        )
+
+    return item
+
+
+@router.post(
+    "/found-items/{item_id}/approve",
+    response_model=FoundItemDetailResponse,
+)
+async def approve_found_item_report(
+    item_id: UUID,
+    session: DbSession,
+    current_staff: AdministrativeStaff,
+) -> FoundItemDetailResponse:
+    """ อนุมัติรายการของที่พบโดยเจ้าหน้าที่ธุรการ"""
+
+    item = await approve_found_item(
+        session,
+        item_id,
+        current_staff.id,
+    )
+    
+    if item is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Pending found item not found",
         )
 
     return item
