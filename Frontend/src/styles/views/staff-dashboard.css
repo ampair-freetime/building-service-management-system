@@ -24,7 +24,7 @@
   --font: "Inter", "Noto Sans Thai", system-ui, sans-serif;
 }
 
-/* Administrative approval center and approved-only Lost & Found flow */
+/* Clerk approval center and approved-only Lost & Found flow */
 .notification-panel { width: min(470px, calc(100vw - 28px)); }
 .approval-type { display:inline-flex;align-items:center;min-height:24px;padding:3px 9px;border-radius:999px;font-size:9px;font-weight:900;margin-bottom:5px; }
 .approval-type.inventory { background:#e8f0ff;color:#2563eb; }
@@ -34,31 +34,31 @@
 .decision-strip button { flex:1;min-width:110px; }
 .approval-flow-note { display:flex;gap:10px;align-items:flex-start;padding:13px 15px;margin-bottom:14px;border:1px solid #e8e3ff;border-radius:18px;background:#f8f6ff;color:var(--muted);font-size:10px; }
 .approval-flow-note strong { color:var(--ink); }
-.administrative-center-grid { display:grid;grid-template-columns:1fr 1fr;gap:18px;align-items:start; }
-.administrative-center-grid.single-view { grid-template-columns:1fr; }
-.administrative-center-view { display:none; }
-.administrative-center-view.active { display:block; }
-.administrative-center-tabs .tab span { display:inline-grid;place-items:center;min-width:22px;height:22px;margin-left:5px;padding:0 6px;border-radius:999px;background:rgba(255,255,255,.55);font-size:9px; }
-.administrative-center-tabs .tab:not(.active) span { background:#f0eff4;color:var(--muted); }
-.administrative-center-box { background:#fff;border:1px solid rgba(255,255,255,.9);border-radius:24px;box-shadow:0 10px 32px rgba(42,35,85,.075);overflow:hidden; }
-.administrative-center-head { display:flex;align-items:flex-start;justify-content:space-between;gap:14px;padding:21px;border-bottom:1px solid var(--line); }
-.administrative-center-head h3 { font-size:18px;margin:5px 0 3px; }
-.administrative-center-head p { font-size:10px;margin:0; }
+.clerk-center-grid { display:grid;grid-template-columns:1fr 1fr;gap:18px;align-items:start; }
+.clerk-center-grid.single-view { grid-template-columns:1fr; }
+.clerk-center-view { display:none; }
+.clerk-center-view.active { display:block; }
+.clerk-center-tabs .tab span { display:inline-grid;place-items:center;min-width:22px;height:22px;margin-left:5px;padding:0 6px;border-radius:999px;background:rgba(255,255,255,.55);font-size:9px; }
+.clerk-center-tabs .tab:not(.active) span { background:#f0eff4;color:var(--muted); }
+.clerk-center-box { background:#fff;border:1px solid rgba(255,255,255,.9);border-radius:24px;box-shadow:0 10px 32px rgba(42,35,85,.075);overflow:hidden; }
+.clerk-center-head { display:flex;align-items:flex-start;justify-content:space-between;gap:14px;padding:21px;border-bottom:1px solid var(--line); }
+.clerk-center-head h3 { font-size:18px;margin:5px 0 3px; }
+.clerk-center-head p { font-size:10px;margin:0; }
 .center-kicker { display:inline-flex;align-items:center;min-height:26px;padding:3px 9px;border-radius:999px;font-size:9px;font-weight:900; }
 .center-kicker.approval { background:#fff3d6;color:#9a6500; }
 .center-kicker.claim { background:#eaf2ff;color:#286bc5; }
 .center-count { min-width:38px;height:38px;padding:0 10px;border-radius:13px;background:var(--primary-soft);color:var(--primary);display:grid;place-items:center;font-weight:900; }
-.administrative-request-list { display:grid;padding:12px;gap:10px; }
-.administrative-request-card { border:1px solid var(--line);border-radius:18px;padding:14px;background:#fff;display:grid;gap:10px; }
-.administrative-request-card:hover { border-color:#d6cffd;box-shadow:0 8px 22px rgba(42,35,85,.06); }
-.administrative-request-top { display:flex;justify-content:space-between;gap:10px;align-items:flex-start; }
-.administrative-request-card h4 { margin:2px 0 0;font-size:13px; }
-.administrative-request-card p { margin:0;font-size:10px; }
-.administrative-request-meta { display:flex;gap:7px;flex-wrap:wrap;align-items:center;color:var(--muted);font-size:9px; }
-.administrative-request-actions { display:flex;gap:7px;flex-wrap:wrap; }
-.administrative-request-actions button { flex:1;min-width:92px; }
+.clerk-request-list { display:grid;padding:12px;gap:10px; }
+.clerk-request-card { border:1px solid var(--line);border-radius:18px;padding:14px;background:#fff;display:grid;gap:10px; }
+.clerk-request-card:hover { border-color:#d6cffd;box-shadow:0 8px 22px rgba(42,35,85,.06); }
+.clerk-request-top { display:flex;justify-content:space-between;gap:10px;align-items:flex-start; }
+.clerk-request-card h4 { margin:2px 0 0;font-size:13px; }
+.clerk-request-card p { margin:0;font-size:10px; }
+.clerk-request-meta { display:flex;gap:7px;flex-wrap:wrap;align-items:center;color:var(--muted);font-size:9px; }
+.clerk-request-actions { display:flex;gap:7px;flex-wrap:wrap; }
+.clerk-request-actions button { flex:1;min-width:92px; }
 .notification-item { cursor:pointer; }
-@media (max-width:900px) { .administrative-center-grid { grid-template-columns:1fr; } }
+@media (max-width:900px) { .clerk-center-grid { grid-template-columns:1fr; } }
 @media (max-width:720px) { .notification-panel { width:auto; } .decision-strip { display:grid;grid-template-columns:1fr 1fr; } }
 
 #foundModal .modal-card { width:min(720px, calc(100vw - 28px)); max-height:min(880px, calc(100vh - 28px)); overflow:auto; }
@@ -332,15 +332,15 @@ p {
 .staff-dashboard-page .quick-action { min-width: 0; min-height: 48px; padding: 10px 12px; font-size: 13px; white-space: normal; }
 .staff-dashboard-page .row-actions,
 .staff-dashboard-page .job-actions,
-.staff-dashboard-page .administrative-request-actions,
+.staff-dashboard-page .clerk-request-actions,
 .staff-dashboard-page .decision-strip,
 .staff-dashboard-page .form-actions { gap: 9px; }
 .staff-dashboard-page .row-actions { display:grid; grid-template-columns:repeat(auto-fit, minmax(120px, 1fr)); width:100%; }
 .staff-dashboard-page .row-actions button,
 .staff-dashboard-page .job-actions button,
-.staff-dashboard-page .administrative-request-actions button,
+.staff-dashboard-page .clerk-request-actions button,
 .staff-dashboard-page .decision-strip button { min-width: 0; min-height: 42px; white-space: normal; }
-.staff-dashboard-page .administrative-request-actions { display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); }
+.staff-dashboard-page .clerk-request-actions { display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); }
 .staff-dashboard-page .decision-strip { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); }
 .staff-dashboard-page .form-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .staff-dashboard-page .field { min-width: 0; }
@@ -376,7 +376,7 @@ p {
   .staff-dashboard-page .metrics,
   .staff-dashboard-page .history-summary { grid-template-columns:repeat(2, minmax(0, 1fr)); }
   .staff-dashboard-page .quick-action-grid { grid-template-columns:repeat(2, minmax(0, 1fr)); }
-  .staff-dashboard-page .administrative-request-actions { grid-template-columns:1fr; }
+  .staff-dashboard-page .clerk-request-actions { grid-template-columns:1fr; }
   .staff-dashboard-page .form-row { grid-template-columns:1fr; }
   .staff-dashboard-page #foundModal .form-actions { grid-template-columns:1fr 1fr; }
 }
@@ -2583,7 +2583,7 @@ textarea:focus-visible,
 
 .staff-dashboard-page .job-actions,
 .staff-dashboard-page .row-actions,
-.staff-dashboard-page .administrative-request-actions,
+.staff-dashboard-page .clerk-request-actions,
 .staff-dashboard-page .decision-strip {
   gap: 10px;
 }
@@ -2596,7 +2596,7 @@ textarea:focus-visible,
 
 .staff-dashboard-page .job-actions button,
 .staff-dashboard-page .row-actions button,
-.staff-dashboard-page .administrative-request-actions button,
+.staff-dashboard-page .clerk-request-actions button,
 .staff-dashboard-page .decision-strip button {
   min-width: 0;
   width: 100%;
@@ -2631,26 +2631,26 @@ textarea:focus-visible,
   font-size: 13px;
 }
 
-.staff-dashboard-page .administrative-center-head {
+.staff-dashboard-page .clerk-center-head {
   padding: 24px;
 }
 
-.staff-dashboard-page .administrative-center-head h3 {
+.staff-dashboard-page .clerk-center-head h3 {
   font-size: 20px;
 }
 
-.staff-dashboard-page .administrative-center-head p,
-.staff-dashboard-page .administrative-request-card p,
-.staff-dashboard-page .administrative-request-meta {
+.staff-dashboard-page .clerk-center-head p,
+.staff-dashboard-page .clerk-request-card p,
+.staff-dashboard-page .clerk-request-meta {
   font-size: 13px;
 }
 
-.staff-dashboard-page .administrative-request-card {
+.staff-dashboard-page .clerk-request-card {
   padding: 18px;
   gap: 12px;
 }
 
-.staff-dashboard-page .administrative-request-card h4 {
+.staff-dashboard-page .clerk-request-card h4 {
   font-size: 16px;
 }
 
@@ -2750,7 +2750,7 @@ textarea:focus-visible,
   .staff-dashboard-page .quick-action-grid,
   .staff-dashboard-page .job-actions,
   .staff-dashboard-page .row-actions,
-  .staff-dashboard-page .administrative-request-actions,
+  .staff-dashboard-page .clerk-request-actions,
   .staff-dashboard-page .decision-strip {
     grid-template-columns: 1fr;
   }
@@ -2765,7 +2765,7 @@ textarea:focus-visible,
 
   .staff-dashboard-page .panel-head,
   .staff-dashboard-page .panel-body,
-  .staff-dashboard-page .administrative-center-head {
+  .staff-dashboard-page .clerk-center-head {
     padding-left: 18px;
     padding-right: 18px;
   }
@@ -2773,7 +2773,7 @@ textarea:focus-visible,
   .staff-dashboard-page .job-card,
   .staff-dashboard-page .work-history-card,
   .staff-dashboard-page .lost-card,
-  .staff-dashboard-page .administrative-request-card {
+  .staff-dashboard-page .clerk-request-card {
     padding: 18px;
   }
 }

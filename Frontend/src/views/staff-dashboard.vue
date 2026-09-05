@@ -1,6 +1,6 @@
 <script setup>
 import AdminPages from "../components/staff/admin/AdminPages.vue";
-import AdministrativePages from "../components/staff/administrative/AdministrativePages.vue";
+import ClerkPages from "../components/staff/clerk/ClerkPages.vue";
 import HousekeeperPages from "../components/staff/housekeeper/HousekeeperPages.vue";
 import TechnicianPages from "../components/staff/technician/TechnicianPages.vue";
 import { useStaffDashboard } from "../view-logic/useStaffDashboard.js";
@@ -97,8 +97,8 @@ const { activeRole } = useStaffDashboard();
           </button>
           <button
             class="nav-item"
-            data-page="administrative-center"
-            data-roles="administrative"
+            data-page="clerk-center"
+            data-roles="clerk"
           >
             <span class="nav-icon">02</span>ศูนย์รับงาน
           </button>
@@ -110,13 +110,13 @@ const { activeRole } = useStaffDashboard();
             <span class="nav-icon">02</span
             ><span id="jobsNavLabel">ศูนย์รับงานรวม</span>
           </button>
-          <button class="nav-item" data-page="lost" data-roles="administrative,admin">
+          <button class="nav-item" data-page="lost" data-roles="clerk,admin">
             <span class="nav-icon">03</span>ของหายและรับฝาก
           </button>
           <button
             class="nav-item"
             data-page="my-history"
-            data-roles="housekeeper,technician,administrative"
+            data-roles="housekeeper,technician,clerk"
           >
             <span class="nav-icon">H</span>ประวัติงานของฉัน
           </button>
@@ -221,7 +221,7 @@ const { activeRole } = useStaffDashboard();
 
         <HousekeeperPages v-if="activeRole === 'housekeeper'" />
         <TechnicianPages v-else-if="activeRole === 'technician'" />
-        <AdministrativePages v-else-if="activeRole === 'administrative'" />
+        <ClerkPages v-else-if="activeRole === 'clerk'" />
         <AdminPages v-else />
       </main>
     </div>

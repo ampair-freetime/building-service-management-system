@@ -6,21 +6,21 @@ from app.models.enums import LostStatus, LostType
 from app.models.lost_found import LostItem
 
 
-def test_administrative_can_view_found_item_detail(test_context):
+def test_clerk_can_view_found_item_detail(test_context):
     client, session_factory = test_context
 
     seed_staff(
         session_factory,
-        staff_code="ADMINISTRATIVE001",
-        email="administrative@example.com",
+        staff_code="CLERK001",
+        email="clerk@example.com",
         password="admin-password",
-        role="administrative",
+        role="clerk",
     )
 
     login = client.post(
         "/api/v1/auth/login",
         json={
-            "identifier": "ADMINISTRATIVE001",
+            "identifier": "CLERK001",
             "password": "admin-password",
         },
     )
@@ -40,7 +40,7 @@ def test_administrative_can_view_found_item_detail(test_context):
                 event_datetime=datetime.now(timezone.utc),
                 location_id=None,
                 location_detail="Building B",
-                custody_location="Administrative Office",
+                custody_location="Clerk Office",
                 reporter_email="user@example.com",
                 status=LostStatus.PENDING,
             )
@@ -66,5 +66,5 @@ def test_administrative_can_view_found_item_detail(test_context):
     assert data["item_category"] == "Electronics"
     assert data["description"] == "Silver laptop"
     assert data["location_detail"] == "Building B"
-    assert data["custody_location"] == "Administrative Office"
+    assert data["custody_location"] == "Clerk Office"
     assert data["status"] == "pending"

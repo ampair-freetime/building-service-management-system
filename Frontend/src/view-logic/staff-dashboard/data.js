@@ -31,7 +31,7 @@ export function createStaffDashboardData() {
       jobSubtitle: "กรองประเภทปัญหาที่ผู้ใช้เลือก และรับงานจากคิวกลางของช่าง",
       primary: "เปิดคิวรับงานช่าง",
     },
-    administrative: {
+    clerk: {
       label: "ธุรการ",
       name: "ชนาภา ธุรการ",
       staffId: "STF-006",
@@ -65,7 +65,7 @@ export function createStaffDashboardData() {
   const currentUserName = {
     housekeeper: "อรทัย ใจดี",
     technician: "ธีรภัทร วงศ์คำ",
-    administrative: "ชนาภา มณีวงศ์",
+    clerk: "ชนาภา มณีวงศ์",
     admin: "พิมพ์ชนก วัฒนา",
   };
   let allJobs = [
@@ -539,7 +539,7 @@ export function createStaffDashboardData() {
         unread: true,
       },
     ],
-    administrative: [
+    clerk: [
       {
         id: "n-c1",
         symbol: "?",

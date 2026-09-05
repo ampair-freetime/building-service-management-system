@@ -55,7 +55,7 @@
             ><select id="newRole" required>
               <option value="housekeeper">แม่บ้าน</option>
               <option value="technician">ช่าง</option>
-              <option value="administrative">ธุรการ</option>
+              <option value="clerk">ธุรการ</option>
               <option value="admin">แอดมิน</option>
             </select>
           </div>

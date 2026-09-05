@@ -15,18 +15,20 @@ import {
 } from "./staff-dashboard/utils.js";
 
 const STAFF_ENDPOINT = "http://localhost:8000/api/v1/staff";
+const PENDING_FOUND_ITEMS_ENDPOINT =
+  "http://localhost:8000/api/v1/lost-found/pending-found-items";
 const STAFF_ROLE_LABELS = {
   housekeeper: "แม่บ้าน",
   technician: "ช่าง",
-  administrative: "ธุรการ",
+  clerk: "ธุรการ",
   admin: "แอดมิน",
 };
 
 export function useStaffDashboard() {
   const router = useRouter();
-  const allowedRoles = ["housekeeper", "technician", "administrative", "admin"];
+  const allowedRoles = ["housekeeper", "technician", "clerk", "admin"];
   const savedRole = localStorage.getItem("buildingCareRole");
-  const activeRole = ref(allowedRoles.includes(savedRole) ? savedRole : "admin");
+  const activeRole = ref(allowedRoles.includes(savedRole) ? savedRole : "clerk");
 
   onMounted(async () => {
     try {
@@ -79,7 +81,7 @@ export function useStaffDashboard() {
       console.warn("Stored staff profile is invalid:", error);
     }
     let currentLostTab = "inventory";
-    let currentAdministrativeCenterView = "approvals";
+    let currentClerkCenterView = "approvals";
     const readClaimNotifications = new Set();
     let currentBoardView = "unassigned";
     let selectedJobId = "";
@@ -116,6 +118,41 @@ export function useStaffDashboard() {
       } catch (error) {
         console.error("Loading staff accounts failed:", error);
         toast("ไม่สามารถโหลดบัญชีเจ้าหน้าที่จากระบบได้");
+      }
+    }
+
+    async function loadPendingFoundItems() {
+      if (currentRole !== "clerk") return;
+      const pendingList = $("#pendingApprovalList");
+      try {
+        const response = await fetch(PENDING_FOUND_ITEMS_ENDPOINT, {
+          headers: authHeaders(),
+        });
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.detail || response.status);
+        }
+        const pendingFoundItems = data.map((item) => ({
+          backendId: item.id,
+          id: item.item_code,
+          title: item.item_name,
+          category: "ของที่พบ",
+          place: item.location_detail || "ไม่ระบุสถานที่พบ",
+          description: item.description || "ไม่มีรายละเอียดเพิ่มเติม",
+          custody: `รายงานเมื่อ ${new Date(item.created_at).toLocaleString("th-TH")}`,
+          status: "รออนุมัติรับฝาก",
+          assignee: null,
+        }));
+        const processedItems = lostSets.inventory.filter(
+          (item) => approvalGroup(item.status) !== "pending"
+        );
+        lostSets.inventory = [...pendingFoundItems, ...processedItems];
+        renderClerkCenter();
+        renderMetrics();
+        renderNotifications();
+      } catch (error) {
+        console.error("Loading pending found-item reports failed:", error);
+        toast(error.message || "ไม่สามารถโหลดรายงานของที่พบได้");
       }
     }
     function toast(message) {
@@ -284,7 +321,7 @@ export function useStaffDashboard() {
             ? "งานอาคารและซ่อมบำรุง"
             : role === "housekeeper"
             ? "งานดูแลความสะอาด"
-            : role === "administrative"
+            : role === "clerk"
             ? "ธุรการและของหาย"
             : "บริหารระบบ";
       }
@@ -354,7 +391,7 @@ export function useStaffDashboard() {
       );
       const titles = {
         dashboard: "ภาพรวมการปฏิบัติงาน",
-        "administrative-center": "ศูนย์รับงาน",
+        "clerk-center": "ศูนย์รับงาน",
         jobs: roleConfig[currentRole].jobTitle,
         "my-history": "ประวัติงานของฉัน",
         lost: "ศูนย์ของหายและรับฝาก",
@@ -365,7 +402,7 @@ export function useStaffDashboard() {
         announcements: "ประกาศอาคาร",
       };
       $("#pageTitle").textContent = titles[page] || "Staff Operations";
-      if (page === "administrative-center") renderAdministrativeCenter();
+      if (page === "clerk-center") renderClerkCenter();
       if (page === "my-history") renderMyHistory();
       if (page === "staff-overview") renderStaffOverview();
       if (page === "history") renderHistory();
@@ -391,7 +428,7 @@ export function useStaffDashboard() {
       const completed = jobs.filter((j) => j.status === "เสร็จสิ้น").length,
         waitingParts = jobs.filter((j) => j.status === "รออะไหล่").length;
       let values;
-      if (currentRole === "administrative")
+      if (currentRole === "clerk")
         values = [
           [
             "ของที่พบใหม่",
@@ -461,7 +498,7 @@ export function useStaffDashboard() {
     }
     function renderQueue() {
       let items;
-      if (currentRole === "administrative")
+      if (currentRole === "clerk")
         items = lostSets.claims
           .slice(0, 3)
           .map((x) => [x.id, x.title, x.custody, x.status]);
@@ -492,7 +529,7 @@ export function useStaffDashboard() {
     }
     function renderActivities() {
       const content =
-        currentRole === "administrative"
+        currentRole === "clerk"
           ? [
               [
                 "เปลี่ยนสถานะคำขอได้จากการ์ด",
@@ -558,7 +595,7 @@ export function useStaffDashboard() {
     }
     function renderJobs() {
       if (!$("#jobList")) return;
-      if (currentRole === "administrative") return;
+      if (currentRole === "clerk") return;
       const query = $("#jobSearch").value.trim().toLowerCase(),
         category = $("#categoryFilter").value || "all",
         status = $("#jobStatusFilter").value || "all";
@@ -838,12 +875,12 @@ export function useStaffDashboard() {
         .filter((item) => item.status !== "คืนของแล้ว")
         .map((item) => ({ ...item, unread: !readClaimNotifications.has(item.id) }));
     }
-    function setAdministrativeCenterView(view) {
-      currentAdministrativeCenterView = view === "claims" ? "claims" : "approvals";
-      $$("#administrativeCenterTabs [data-administrative-center-view]").forEach((tab) => tab.classList.toggle("active", tab.dataset.administrativeCenterView === currentAdministrativeCenterView));
-      $$('[data-administrative-center-panel]').forEach((panel) => panel.classList.toggle("active", panel.dataset.administrativeCenterPanel === currentAdministrativeCenterView));
+    function setClerkCenterView(view) {
+      currentClerkCenterView = view === "claims" ? "claims" : "approvals";
+      $$("#clerkCenterTabs [data-clerk-center-view]").forEach((tab) => tab.classList.toggle("active", tab.dataset.clerkCenterView === currentClerkCenterView));
+      $$('[data-clerk-center-panel]').forEach((panel) => panel.classList.toggle("active", panel.dataset.clerkCenterPanel === currentClerkCenterView));
     }
-    function renderAdministrativeCenter() {
+    function renderClerkCenter() {
       const pendingList = $("#pendingApprovalList"), claimList = $("#activeClaimList");
       if (!pendingList || !claimList) return;
       const approvals = pendingApprovalRequests();
@@ -852,17 +889,17 @@ export function useStaffDashboard() {
       ["#activeClaimCount", "#activeClaimTabCount"].forEach((id) => $(id).textContent = claims.length);
       pendingList.innerHTML = approvals.length ? approvals.map((item) => {
         const record = findLostItem(item.tab, item.approvalId);
-        return `<article class="administrative-request-card"><div class="administrative-request-top"><div><span class="approval-type ${item.tab}">${approvalTypeLabel(item.tab)}</span><h4>${item.approvalId} · ${escapeHtml(item.title)}</h4></div><span class="badge wait">รออนุมัติ</span></div><p>${escapeHtml(item.text)}</p><div class="administrative-request-meta"><span>${escapeHtml(record?.custody || "รอการตรวจสอบ")}</span></div><div class="administrative-request-actions"><button class="small-btn" type="button" data-center-action="detail" data-tab="${item.tab}" data-item-id="${item.approvalId}">ดูรายละเอียด</button><button class="approve-btn" type="button" data-center-action="approve" data-tab="${item.tab}" data-item-id="${item.approvalId}">อนุมัติ</button><button class="reject-btn" type="button" data-center-action="reject" data-tab="${item.tab}" data-item-id="${item.approvalId}">ไม่อนุมัติ</button></div></article>`;
+        return `<article class="clerk-request-card"><div class="clerk-request-top"><div><span class="approval-type ${item.tab}">${approvalTypeLabel(item.tab)}</span><h4>${item.approvalId} · ${escapeHtml(item.title)}</h4></div><span class="badge wait">รออนุมัติ</span></div><p>${escapeHtml(item.text)}</p><div class="clerk-request-meta"><span>${escapeHtml(record?.custody || "รอการตรวจสอบ")}</span></div><div class="clerk-request-actions"><button class="small-btn" type="button" data-center-action="detail" data-tab="${item.tab}" data-item-id="${item.approvalId}">ดูรายละเอียด</button><button class="approve-btn" type="button" data-center-action="approve" data-tab="${item.tab}" data-item-id="${item.approvalId}">อนุมัติ</button><button class="reject-btn" type="button" data-center-action="reject" data-tab="${item.tab}" data-item-id="${item.approvalId}">ไม่อนุมัติ</button></div></article>`;
       }).join("") : '<div class="empty">ไม่มีคำขอที่รออนุมัติ</div>';
-      claimList.innerHTML = claims.length ? claims.map((item) => `<article class="administrative-request-card"><div class="administrative-request-top"><div><span class="approval-type claims">คำขอรับของ</span><h4>${item.id} · ${escapeHtml(item.title)}</h4></div><span class="badge ${badgeClass(item.status)}">${item.status}</span></div><p>${escapeHtml(item.place)}</p><div class="administrative-request-meta"><span>${escapeHtml(item.custody || "คำขอใหม่")}</span></div><div class="administrative-request-actions"><button class="small-btn" type="button" data-center-action="claim-detail" data-item-id="${item.id}">ดูรายละเอียดคำขอ</button></div></article>`).join("") : '<div class="empty">ไม่มีคำขอรับของที่กำลังดำเนินการ</div>';
-      setAdministrativeCenterView(currentAdministrativeCenterView);
+      claimList.innerHTML = claims.length ? claims.map((item) => `<article class="clerk-request-card"><div class="clerk-request-top"><div><span class="approval-type claims">คำขอรับของ</span><h4>${item.id} · ${escapeHtml(item.title)}</h4></div><span class="badge ${badgeClass(item.status)}">${item.status}</span></div><p>${escapeHtml(item.place)}</p><div class="clerk-request-meta"><span>${escapeHtml(item.custody || "คำขอใหม่")}</span></div><div class="clerk-request-actions"><button class="small-btn" type="button" data-center-action="claim-detail" data-item-id="${item.id}">ดูรายละเอียดคำขอ</button></div></article>`).join("") : '<div class="empty">ไม่มีคำขอรับของที่กำลังดำเนินการ</div>';
+      setClerkCenterView(currentClerkCenterView);
     }
     function renderLost() {
       if (!$("#lostGrid")) return;
       const data = currentLostTab === "claims"
         ? lostSets.claims.filter((item) => item.status !== "คืนของแล้ว")
         : lostSets[currentLostTab].filter((item) => approvalGroup(item.status) === "approved");
-      renderAdministrativeCenter();
+      renderClerkCenter();
       $("#lostGrid").innerHTML = data.length
         ? data
             .map((i) => {
@@ -931,7 +968,7 @@ export function useStaffDashboard() {
         detail: item.decisionReason,
       });
       addNotification(
-        "administrative",
+        "clerk",
         `${id} อนุมัติแล้ว`,
         `${item.title} เปลี่ยนเป็น ${nextStatus}`,
         false
@@ -945,7 +982,7 @@ export function useStaffDashboard() {
         );
       toast(`อนุมัติ ${id} แล้ว`);
       renderLost();
-      renderAdministrativeCenter();
+      renderClerkCenter();
       renderMetrics();
       renderQueue();
     }
@@ -1006,10 +1043,10 @@ export function useStaffDashboard() {
       });
       toast(`เปลี่ยน ${item.id} เป็น “${item.status}” แล้ว`);
       renderLost();
-      renderAdministrativeCenter();
+      renderClerkCenter();
       renderMetrics();
       addNotification(
-        "administrative",
+        "clerk",
         `อัปเดต ${item.id} แล้ว`,
         `สถานะคำขอเปลี่ยนเป็น ${item.status}`,
         false
@@ -1041,7 +1078,7 @@ export function useStaffDashboard() {
       const select = $("#myHistoryType");
       if (!select) return;
       const base =
-        currentRole === "administrative"
+        currentRole === "clerk"
           ? [
               "all",
               "อนุมัติ",
@@ -1435,10 +1472,10 @@ export function useStaffDashboard() {
     }
     function renderNotifications() {
       const list = notificationSets[currentRole] || [];
-      const approvals = currentRole === "administrative" ? pendingApprovalRequests() : [];
-      const claims = currentRole === "administrative" ? activeClaimNotifications() : [];
+      const approvals = currentRole === "clerk" ? pendingApprovalRequests() : [];
+      const claims = currentRole === "clerk" ? activeClaimNotifications() : [];
       const unread = list.filter((n) => n.unread).length + approvals.length + claims.filter((n) => n.unread).length;
-      $("#notificationTitle").textContent = currentRole === "administrative" ? "การแจ้งเตือนของธุรการ" : `การแจ้งเตือนของ${roleConfig[currentRole].label}`;
+      $("#notificationTitle").textContent = currentRole === "clerk" ? "การแจ้งเตือนของธุรการ" : `การแจ้งเตือนของ${roleConfig[currentRole].label}`;
       [$("#notificationCount"), $("#mobileNotificationCount")].forEach(
         (badge) => {
           badge.textContent = unread;
@@ -1450,15 +1487,15 @@ export function useStaffDashboard() {
           '<div class="notification-empty">ไม่มีการแจ้งเตือน</div>';
         return;
       }
-      let administrativeHtml = "";
-      if (approvals.length) administrativeHtml += `<div class="notification-group-label">คำร้องใหม่ · ${approvals.length}</div>` + approvals.map((item) => `<button type="button" class="notification-item unread" data-administrative-notification-target="approval" data-item-id="${item.approvalId}"><div class="notification-symbol"><svg class="icon"><use href="#i-box"/></svg></div><div><span class="approval-type ${item.tab}">${approvalTypeLabel(item.tab)}</span><strong>${item.approvalId} · ${escapeHtml(item.title)}</strong><p>${escapeHtml(item.text)}</p><small>กดเพื่อไปที่ศูนย์รับงาน</small></div></button>`).join("");
-      if (claims.length) administrativeHtml += `<div class="notification-group-label">คำขอรับของ · ${claims.length}</div>` + claims.map((item) => `<button type="button" class="notification-item ${item.unread ? "unread" : ""}" data-administrative-notification-target="claim" data-item-id="${item.id}"><div class="notification-symbol"><svg class="icon"><use href="#i-user"/></svg></div><div><span class="approval-type claims">คำขอรับของ</span><strong>${item.id} · ${escapeHtml(item.title)}</strong><p>${escapeHtml(item.place)}</p><small>กดเพื่อไปที่ศูนย์รับงาน</small></div></button>`).join("");
+      let clerkHtml = "";
+      if (approvals.length) clerkHtml += `<div class="notification-group-label">คำร้องใหม่ · ${approvals.length}</div>` + approvals.map((item) => `<button type="button" class="notification-item unread" data-clerk-notification-target="approval" data-item-id="${item.approvalId}"><div class="notification-symbol"><svg class="icon"><use href="#i-box"/></svg></div><div><span class="approval-type ${item.tab}">${approvalTypeLabel(item.tab)}</span><strong>${item.approvalId} · ${escapeHtml(item.title)}</strong><p>${escapeHtml(item.text)}</p><small>กดเพื่อไปที่ศูนย์รับงาน</small></div></button>`).join("");
+      if (claims.length) clerkHtml += `<div class="notification-group-label">คำขอรับของ · ${claims.length}</div>` + claims.map((item) => `<button type="button" class="notification-item ${item.unread ? "unread" : ""}" data-clerk-notification-target="claim" data-item-id="${item.id}"><div class="notification-symbol"><svg class="icon"><use href="#i-user"/></svg></div><div><span class="approval-type claims">คำขอรับของ</span><strong>${item.id} · ${escapeHtml(item.title)}</strong><p>${escapeHtml(item.place)}</p><small>กดเพื่อไปที่ศูนย์รับงาน</small></div></button>`).join("");
       const groups = [
         ["วันนี้", list.filter((_, index) => index < 2)],
         ["เมื่อวาน", list.filter((_, index) => index === 2)],
         ["ก่อนหน้านี้", list.filter((_, index) => index > 2)],
       ];
-      $("#notificationList").innerHTML = administrativeHtml + groups
+      $("#notificationList").innerHTML = clerkHtml + groups
         .filter((group) => group[1].length)
         .map(
           (group) =>
@@ -1496,7 +1533,7 @@ export function useStaffDashboard() {
     }
     function markNotificationsRead() {
       notificationSets[currentRole].forEach((n) => (n.unread = false));
-      if (currentRole === "administrative") lostSets.claims.filter((item) => item.status !== "คืนของแล้ว").forEach((item) => readClaimNotifications.add(item.id));
+      if (currentRole === "clerk") lostSets.claims.filter((item) => item.status !== "คืนของแล้ว").forEach((item) => readClaimNotifications.add(item.id));
       renderNotifications();
       toast("ทำเครื่องหมายว่าอ่านทั้งหมดแล้ว");
     }
@@ -1842,7 +1879,7 @@ export function useStaffDashboard() {
           ? ["กำลังดำเนินการ", "รอข้อมูลเพิ่มเติม", "รออะไหล่", "เสร็จสิ้น"]
           : currentRole === "housekeeper"
           ? ["กำลังดำเนินการ", "พักงาน", "รอข้อมูลเพิ่มเติม", "เสร็จสิ้น"]
-          : currentRole === "administrative"
+          : currentRole === "clerk"
           ? [
               "กำลังตรวจสอบ",
               "ขอข้อมูลเพิ่มเติม",
@@ -2170,7 +2207,7 @@ export function useStaffDashboard() {
               ["mine", "งานของฉัน"],
               ["schedule", "ดูตารางงาน"],
             ]
-          : currentRole === "administrative"
+          : currentRole === "clerk"
           ? [
               ["found", "ของที่พบใหม่"],
               ["claims", "คำขอรับคืน"],
@@ -2209,7 +2246,7 @@ export function useStaffDashboard() {
               "เสร็จสิ้น",
               "คืนงานเข้าคิวกลาง",
             ]
-          : currentRole === "administrative"
+          : currentRole === "clerk"
           ? [
               "รับเคส",
               "ตรวจสอบข้อมูล",
@@ -2240,7 +2277,7 @@ export function useStaffDashboard() {
     );
     $$("[data-go]").forEach((button) =>
       button.addEventListener("click", () =>
-        navigate(currentRole === "administrative" && button.dataset.go === "jobs" ? "administrative-center" : button.dataset.go)
+        navigate(currentRole === "clerk" && button.dataset.go === "jobs" ? "clerk-center" : button.dataset.go)
       )
     );
     $$("[data-role-switch]").forEach((button) =>
@@ -2264,10 +2301,10 @@ export function useStaffDashboard() {
       const button = event.target.closest("[data-dashboard-action]");
       if (!button) return;
       const index = Number(button.dataset.dashboardAction);
-      if (currentRole === "administrative") {
-        navigate("administrative-center");
-        setAdministrativeCenterView(index === 4 ? "claims" : "approvals");
-        renderAdministrativeCenter();
+      if (currentRole === "clerk") {
+        navigate("clerk-center");
+        setClerkCenterView(index === 4 ? "claims" : "approvals");
+        renderClerkCenter();
         if (index === 4 && lostSets.claims[0])
           openAppointment(lostSets.claims[0].id, button);
         return;
@@ -2323,8 +2360,8 @@ export function useStaffDashboard() {
     $$("[data-mobile-page]").forEach((button) =>
       button.addEventListener("click", () =>
         navigate(
-          currentRole === "administrative" && button.dataset.mobilePage === "jobs"
-            ? "administrative-center"
+          currentRole === "clerk" && button.dataset.mobilePage === "jobs"
+            ? "clerk-center"
             : button.dataset.mobilePage
         )
       )
@@ -2700,9 +2737,9 @@ export function useStaffDashboard() {
       currentLostTab = button.dataset.tab;
       renderLost();
     });
-    $("#administrativeCenterTabs")?.addEventListener("click", (event) => {
-      const tab = event.target.closest("[data-administrative-center-view]");
-      if (tab) setAdministrativeCenterView(tab.dataset.administrativeCenterView);
+    $("#clerkCenterTabs")?.addEventListener("click", (event) => {
+      const tab = event.target.closest("[data-clerk-center-view]");
+      if (tab) setClerkCenterView(tab.dataset.clerkCenterView);
     });
     $("#pendingApprovalList")?.addEventListener("click", (event) => {
       const button = event.target.closest("[data-center-action]");
@@ -2748,14 +2785,14 @@ export function useStaffDashboard() {
     });
     $("#notificationPanel")?.addEventListener("click", (event) => {
       event.stopPropagation();
-      const administrativeTarget = event.target.closest("[data-administrative-notification-target]");
-      if (administrativeTarget) {
-        if (administrativeTarget.dataset.administrativeNotificationTarget === "claim")
-          readClaimNotifications.add(administrativeTarget.dataset.itemId);
-        currentAdministrativeCenterView = administrativeTarget.dataset.administrativeNotificationTarget === "claim" ? "claims" : "approvals";
+      const clerkTarget = event.target.closest("[data-clerk-notification-target]");
+      if (clerkTarget) {
+        if (clerkTarget.dataset.clerkNotificationTarget === "claim")
+          readClaimNotifications.add(clerkTarget.dataset.itemId);
+        currentClerkCenterView = clerkTarget.dataset.clerkNotificationTarget === "claim" ? "claims" : "approvals";
         $("#notificationPanel").classList.remove("open");
-        navigate("administrative-center");
-        renderAdministrativeCenter();
+        navigate("clerk-center");
+        renderClerkCenter();
         return;
       }
       const hide = event.target.closest("[data-hide-notification]");
@@ -2780,7 +2817,7 @@ export function useStaffDashboard() {
       $("#notificationPanel").classList.remove("open");
       const match = item.text.match(/(?:CL|RP)-\d+/);
       if (match) openJobDetail(match[0], itemButton);
-      else if (currentRole === "administrative") navigate("administrative-center");
+      else if (currentRole === "clerk") navigate("clerk-center");
       else toast(item.title);
     });
     document.addEventListener("click", () => {
@@ -2978,7 +3015,7 @@ export function useStaffDashboard() {
       });
       currentLostTab = "inventory";
       renderLost();
-      renderAdministrativeCenter();
+      renderClerkCenter();
       renderNotifications();
       renderMetrics();
       closeModal("foundModal", false);
@@ -3208,12 +3245,13 @@ export function useStaffDashboard() {
         );
     });
     $("#heroPrimary")?.addEventListener("click", () =>
-      navigate(currentRole === "administrative" ? "administrative-center" : "jobs")
+      navigate(currentRole === "clerk" ? "clerk-center" : "jobs")
     );
     renderStaff();
     await loadStaffAccounts();
+    await loadPendingFoundItems();
     setRole(
-      ["housekeeper", "technician", "administrative", "admin"].includes(currentRole)
+      ["housekeeper", "technician", "clerk", "admin"].includes(currentRole)
         ? currentRole
         : "admin"
     );

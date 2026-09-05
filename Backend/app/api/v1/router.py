@@ -3,6 +3,7 @@
 from fastapi import APIRouter
 from app.api.v1.endpoints import auth, found_item, lost_item, staff,lost_found_administrative
 
+from app.api.v1.endpoints import auth, staff, lost_found_clerk
 
 api_router = APIRouter()
 
@@ -22,7 +23,7 @@ api_router.include_router(staff.router, prefix="/staff", tags=["staff"])
 
 # lost and found สำหรับเจ้าหน้าที่ธุรการ
 api_router.include_router(
-    lost_found_administrative.router,
+    lost_found_clerk.router,
     prefix = "/lost-found",
     tags = ["lost-found"],
 )
