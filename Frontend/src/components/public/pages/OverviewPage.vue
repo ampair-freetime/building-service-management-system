@@ -146,7 +146,7 @@
               </div>
               <button type="submit" class="primary-btn">ตรวจสอบสถานะ</button>
             </form>
-            <div class="tracking-result" id="trackingResult">
+            <div class="tracking-result" id="trackingResult" role="status" aria-live="polite">
               <div class="tracking-result-head">
                 <div>
                   <small>รหัสคำร้อง</small

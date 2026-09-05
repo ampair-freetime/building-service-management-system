@@ -56,6 +56,16 @@
                 ><strong>ดูประกาศทั้งหมด</strong
                 ><span>ดูรายการตามหาและรายการที่พบแล้ว</span>
               </button>
+              <button
+                type="button"
+                class="lost-action-card"
+                data-open-lost-view="track"
+              >
+                <span class="action-symbol"
+                  ><svg class="icon"><use href="#i-history" /></svg></span
+                ><strong>ติดตามคำร้อง</strong
+                ><span>ตรวจสอบสถานะด้วยรหัสติดตาม</span>
+              </button>
             </div>
 
             <div
@@ -83,6 +93,9 @@
                 data-lost-view="report-found"
               >
                 แจ้งพบของ
+              </button>
+              <button type="button" class="lost-tab" data-lost-view="track">
+                ติดตามคำร้อง
               </button>
             </div>
 
@@ -149,8 +162,8 @@
                       </div>
                       <h4>บัตรนักศึกษา</h4>
                       <p>พบที่โรงอาหารกลาง ฝากไว้ที่เคาน์เตอร์ประชาสัมพันธ์</p>
-                      <button type="button" class="claim-button">
-                        นี่อาจเป็นของฉัน
+                      <button type="button" class="post-detail-button">
+                        ดูรายละเอียด
                       </button>
                     </div>
                   </article>
@@ -169,8 +182,8 @@
                       </div>
                       <h4>กุญแจพร้อมพวงกุญแจ</h4>
                       <p>พบบริเวณบันไดอาคาร 2 พวงกุญแจสีแดง</p>
-                      <button type="button" class="claim-button">
-                        นี่อาจเป็นของฉัน
+                      <button type="button" class="post-detail-button">
+                        ดูรายละเอียด
                       </button>
                     </div>
                   </article>
@@ -209,8 +222,8 @@
                       </div>
                       <h4>หูฟังไร้สายสีขาว</h4>
                       <p>พบบริเวณโต๊ะอ่านหนังสือ ห้องสมุดชั้น 2</p>
-                      <button type="button" class="claim-button">
-                        นี่อาจเป็นของฉัน
+                      <button type="button" class="post-detail-button">
+                        ดูรายละเอียด
                       </button>
                     </div>
                   </article>
@@ -238,13 +251,68 @@
               </section>
             </div>
 
+            <div class="lost-view" id="lost-view-track">
+              <section class="lost-search-panel lost-tracking-panel">
+                <div class="eyebrow">Lost &amp; found tracking</div>
+                <h3>ติดตามคำร้องของหายและของที่พบ</h3>
+                <p>กรอกรหัสติดตามที่ได้รับ โดยไม่ต้องเข้าสู่ระบบ</p>
+                <form id="lostFoundTrackingForm" class="tracking-box lost-tracking-box">
+                  <div class="field">
+                    <label for="lostFoundTrackingCode">รหัสติดตาม</label>
+                    <input
+                      id="lostFoundTrackingCode"
+                      type="text"
+                      required
+                      placeholder="เช่น CLAIM-4821"
+                      autocomplete="off"
+                    />
+                  </div>
+                  <button type="submit" class="primary-btn">ตรวจสอบสถานะ</button>
+                </form>
+                <div
+                  class="tracking-result"
+                  id="lostFoundTrackingResult"
+                  role="status"
+                  aria-live="polite"
+                >
+                  <div class="tracking-result-head">
+                    <div>
+                      <small>รหัสติดตาม</small>
+                      <strong id="lostFoundTrackingResultCode">–</strong>
+                      <p id="lostFoundTrackingResultText" style="margin: 5px 0 0"></p>
+                    </div>
+                    <span class="status" id="lostFoundTrackingResultStatus"></span>
+                  </div>
+                  <div id="lostFoundTrackingDetails" class="tracking-request-details" hidden>
+                    <div>
+                      <small>ประเภทคำร้อง</small>
+                      <strong id="lostFoundTrackingRequestType">–</strong>
+                    </div>
+                    <div>
+                      <small>รายการ</small>
+                      <strong id="lostFoundTrackingItemName">–</strong>
+                    </div>
+                    <div>
+                      <small>อัปเดตล่าสุด</small>
+                      <strong id="lostFoundTrackingUpdatedAt">–</strong>
+                    </div>
+                  </div>
+                </div>
+              </section>
+            </div>
+
             <div class="lost-view" id="lost-view-report-lost">
               <div class="two-form-layout">
-                <form class="form-panel" data-submit-type="แจ้งของหาย">
+                <form id="lostItemForm" class="form-panel" novalidate>
                   <h3>แจ้งของหาย</h3>
                   <div class="field">
-                    <label>ประเภทสิ่งของ</label
-                    ><select required>
+                    <label for="lostItemCategory">ประเภทสิ่งของ</label
+                    ><select
+                      id="lostItemCategory"
+                      name="item_category"
+                      required
+                      aria-describedby="lostItemCategoryError"
+                    >
                       <option value="">เลือกประเภท</option>
                       <option>กระเป๋า</option>
                       <option>บัตรหรือเอกสาร</option>
@@ -252,39 +320,66 @@
                       <option>กุญแจ</option>
                       <option>อื่น ๆ</option>
                     </select>
+                    <p id="lostItemCategoryError" class="field-error" aria-live="polite"></p>
                   </div>
                   <div class="field">
-                    <label>ชื่อสิ่งของ</label
+                    <label for="lostItemName">ชื่อสิ่งของ</label
                     ><input
+                      id="lostItemName"
+                      name="item_name"
                       type="text"
                       required
+                      minlength="2"
+                      maxlength="200"
+                      aria-describedby="lostItemNameError"
                       placeholder="เช่น กระเป๋าผ้าสีดำ"
                     />
+                    <p id="lostItemNameError" class="field-error" aria-live="polite"></p>
                   </div>
                   <div class="field">
-                    <label>วันที่และเวลาที่คาดว่าทำหาย</label
-                    ><input type="datetime-local" required />
-                  </div>
-                  <div class="field">
-                    <label>สถานที่คาดว่าทำหาย</label
+                    <label for="lostItemDateTime">วันที่และเวลาที่คาดว่าทำหาย</label
                     ><input
+                      id="lostItemDateTime"
+                      name="event_datetime"
+                      type="datetime-local"
+                      required
+                      aria-describedby="lostItemDateTimeError"
+                    />
+                    <p id="lostItemDateTimeError" class="field-error" aria-live="polite"></p>
+                  </div>
+                  <div class="field">
+                    <label for="lostItemLocation">สถานที่คาดว่าทำหาย</label
+                    ><input
+                      id="lostItemLocation"
+                      name="location_detail"
                       type="text"
                       required
+                      minlength="2"
+                      maxlength="255"
+                      aria-describedby="lostItemLocationError"
                       placeholder="อาคาร / ชั้น / ห้อง"
                     />
+                    <p id="lostItemLocationError" class="field-error" aria-live="polite"></p>
                   </div>
                   <div class="field">
-                    <label>ลักษณะเฉพาะ</label
+                    <label for="lostItemDescription">ลักษณะเฉพาะ</label
                     ><textarea
+                      id="lostItemDescription"
+                      name="description"
                       required
+                      minlength="10"
+                      maxlength="5000"
+                      aria-describedby="lostItemDescriptionError"
                       placeholder="สี ยี่ห้อ รอยตำหนิ หรือพวงกุญแจที่ติดอยู่"
                     ></textarea>
+                    <p id="lostItemDescriptionError" class="field-error" aria-live="polite"></p>
                   </div>
                   <div class="field">
                     <label>รูปภาพสิ่งของ (ถ้ามี)</label>
                     <div class="upload-field">
                       <label class="upload-trigger"
                         ><input
+                          name="image"
                           type="file"
                           class="image-input"
                           accept="image/jpeg,image/png,image/webp"
@@ -305,14 +400,18 @@
                     </div>
                   </div>
                   <div class="field">
-                    <label>อีเมลสำหรับติดตามสถานะ</label
+                    <label for="lostItemEmail">อีเมลสำหรับติดตามสถานะ</label
                     ><input
+                      id="lostItemEmail"
                       type="email"
                       name="recipient_email"
                       required
+                      maxlength="255"
+                      aria-describedby="lostItemEmailError"
                       placeholder="name@example.com"
                       autocomplete="email"
                     />
+                    <p id="lostItemEmailError" class="field-error" aria-live="polite"></p>
                   </div>
                   <button type="submit" class="submit-btn">
                     เผยแพร่ประกาศตามหา
@@ -353,12 +452,17 @@
 
             <div class="lost-view" id="lost-view-report-found">
               <div class="two-form-layout">
-                <form id="publicFoundForm" class="form-panel" data-submit-type="ส่งรายการพบของเพื่อรอเจ้าหน้าที่ตรวจสอบ">
+                <form
+                  id="publicFoundForm"
+                  class="form-panel"
+                  data-confirmation-mode="lost-found"
+                  novalidate
+                >
                   <h3>แจ้งพบของ</h3>
                   <p class="form-helper">กรอกข้อมูลสิ่งของและจุดรับฝาก รายการจะส่งให้เจ้าหน้าที่ตรวจสอบก่อนแสดงในประกาศ</p>
                   <div class="field">
                     <label for="publicFoundCategory">ประเภทสิ่งของ</label
-                    ><select id="publicFoundCategory" required>
+                    ><select id="publicFoundCategory" name="item_category" required aria-describedby="publicFoundCategoryError">
                       <option value="">เลือกประเภท</option>
                       <option>อุปกรณ์อิเล็กทรอนิกส์</option>
                       <option>กระเป๋าและของใช้ส่วนตัว</option>
@@ -367,59 +471,80 @@
                       <option>เสื้อผ้าและเครื่องแต่งกาย</option>
                       <option>อื่น ๆ</option>
                     </select>
+                    <p id="publicFoundCategoryError" class="field-error" aria-live="polite"></p>
                   </div>
                   <div class="field">
                     <label for="publicFoundName">ชื่อสิ่งของ</label
                     ><input
                       id="publicFoundName"
+                      name="item_name"
                       type="text"
                       required
+                      minlength="2"
                       maxlength="120"
+                      aria-describedby="publicFoundNameError"
                       placeholder="เช่น กุญแจพร้อมพวงกุญแจสีแดง"
                     />
+                    <p id="publicFoundNameError" class="field-error" aria-live="polite"></p>
                   </div>
                   <div class="public-found-row">
-                    <div class="field"><label for="publicFoundDate">วันที่พบ</label><input id="publicFoundDate" type="date" required /></div>
-                    <div class="field"><label for="publicFoundTime">เวลาที่พบ</label><input id="publicFoundTime" type="time" required /></div>
+                    <div class="field"><label for="publicFoundDate">วันที่พบ</label><input id="publicFoundDate" name="found_date" type="date" required aria-describedby="publicFoundDateError" /><p id="publicFoundDateError" class="field-error" aria-live="polite"></p></div>
+                    <div class="field"><label for="publicFoundTime">เวลาที่พบ</label><input id="publicFoundTime" name="found_time" type="time" required aria-describedby="publicFoundTimeError" /><p id="publicFoundTimeError" class="field-error" aria-live="polite"></p></div>
                   </div>
                   <div class="field">
                     <label for="publicFoundLocation">สถานที่พบ</label
                     ><input
                       id="publicFoundLocation"
+                      name="location_detail"
                       type="text"
                       required
+                      minlength="2"
                       maxlength="160"
+                      aria-describedby="publicFoundLocationError"
                       placeholder="อาคาร / ชั้น / ห้อง"
                     />
+                    <p id="publicFoundLocationError" class="field-error" aria-live="polite"></p>
                   </div>
                   <div class="field">
                     <label for="publicFoundCustody">นำของไปฝากไว้ที่ใด</label
                     ><input
                       id="publicFoundCustody"
+                      name="custody_location"
                       type="text"
                       required
+                      minlength="2"
                       maxlength="160"
+                      aria-describedby="publicFoundCustodyError"
                       placeholder="เช่น ห้องประชาสัมพันธ์ชั้น 1"
                     />
+                    <p id="publicFoundCustodyError" class="field-error" aria-live="polite"></p>
                   </div>
                   <div class="field">
                     <label for="publicFoundDescription">รายละเอียดทั่วไป</label
                     ><textarea
                       id="publicFoundDescription"
+                      name="description"
                       required
+                      minlength="10"
                       maxlength="600"
+                      aria-describedby="publicFoundDescriptionError"
                       placeholder="อธิบายเฉพาะข้อมูลที่เปิดเผยต่อสาธารณะได้"
                     ></textarea>
+                    <p id="publicFoundDescriptionError" class="field-error" aria-live="polite"></p>
                   </div>
                   <div class="field">
-                    <label>รูปภาพของที่พบ</label>
+                    <label for="publicFoundPhoto">รูปภาพของที่พบ <span class="optional-label">(ไม่บังคับ)</span></label>
                     <div class="upload-field">
                       <label class="upload-trigger"
                         ><input
+                          id="publicFoundPhoto"
+                          name="image"
                           type="file"
                           class="image-input"
                           accept="image/jpeg,image/png,image/webp"
                           data-max-size="5242880"
+                          data-error-id="publicFoundPhotoError"
+                          aria-describedby="publicFoundPhotoError"
                         /><span class="upload-icon">＋</span
                         ><span class="upload-copy"
                           ><strong>เลือกรูปภาพ</strong
@@ -434,15 +559,20 @@
                         ><button type="button" class="remove-image">ลบ</button>
                       </div>
                     </div>
+                    <p id="publicFoundPhotoError" class="field-error" aria-live="polite"></p>
                   </div>
                   <div class="field">
                     <label for="publicFoundPrivateDetail">รายละเอียดลับสำหรับยืนยันเจ้าของ</label
                     ><textarea
                       id="publicFoundPrivateDetail"
+                      name="private_detail"
                       required
+                      minlength="10"
                       maxlength="600"
+                      aria-describedby="publicFoundPrivateDetailError"
                       placeholder="เช่น ของภายใน ตำหนิ หรือข้อมูลที่ไม่ควรแสดงสาธารณะ"
                     ></textarea>
+                    <p id="publicFoundPrivateDetailError" class="field-error" aria-live="polite"></p>
                   </div>
                   <div class="field"><label for="publicFinderName">ชื่อผู้พบหรือผู้ส่งมอบ <span class="optional-label">(ไม่บังคับ)</span></label><input id="publicFinderName" type="text" maxlength="120" /></div>
                   <div class="field">
@@ -452,9 +582,12 @@
                       type="email"
                       name="recipient_email"
                       required
+                      maxlength="255"
+                      aria-describedby="publicFoundEmailError"
                       placeholder="name@example.com"
                       autocomplete="email"
                     />
+                    <p id="publicFoundEmailError" class="field-error" aria-live="polite"></p>
                   </div>
                   <button type="submit" class="submit-btn">
                     ส่งให้เจ้าหน้าที่ตรวจสอบ
