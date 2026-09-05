@@ -2,7 +2,6 @@
 
 from datetime import UTC, datetime, timedelta
 import string
-from turtle import update
 from uuid import UUID
 from zoneinfo import ZoneInfo
 

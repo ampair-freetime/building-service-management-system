@@ -103,7 +103,7 @@ async def create_guest_item(
             LostItemHistory(
                 lost_item_id=item_id,
                 old_status=None,
-                new_status=LostStatus.APPROVED,
+                new_status=LostStatus.PENDING,
                 note="Guest submitted report",
             )
         )
@@ -270,9 +270,9 @@ def _to_public_response(
             for image in images
         ],
     )
-def track_guest_item(session: AsyncSession,item_id: str ,reporter_email: str) -> LostItem:
-
-    return
+# def track_guest_item(session: AsyncSession,item_id: str ,reporter_email: str) -> LostItem:
+#         statement = select(LostItem).where(LostItem.item_code == item_id)
+#     return LostItem
 
 def _make_item_code(report_type: LostType, item_id: UUID) -> str:
     """สร้าง tracking code ที่อ่านง่ายและแทบไม่มีโอกาสชนกัน."""
