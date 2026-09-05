@@ -40,13 +40,12 @@ async def get_found_item_detail(
      result = await session.scalar(statement)
      return result
 
-
 async def approve_found_item(
     session: AsyncSession,
     item_id: UUID,
     staff_id: UUID,
 ) -> LostItem | None:
-    """ อนุมัติรายการของที่พบและบันทึกเจ้าหน้าที่ผู้ตรวจสอบ"""
+    """อนุมัติรายการของที่พบและบันทึกเจ้าหน้าที่ผู้ตรวจสอบ"""
 
     statement = (
         select(LostItem)
