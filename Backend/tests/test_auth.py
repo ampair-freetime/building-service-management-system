@@ -72,8 +72,8 @@ def test_suspended_staff_cannot_login(
     client, session_factory = test_context
     seed_staff(
         session_factory,
-        staff_code="CLERK001",
-        email="clerk@example.com",
+        staff_code="ADMINISTRATIVE001",
+        email="administrative@example.com",
         password="correct-password",
         role="clerk",
         status="suspended",
@@ -81,7 +81,7 @@ def test_suspended_staff_cannot_login(
 
     response = client.post(
         "/api/v1/auth/login",
-        json={"identifier": "CLERK001", "password": "correct-password"},
+        json={"identifier": "ADMINISTRATIVE001", "password": "correct-password"},
     )
 
     assert response.status_code == 401

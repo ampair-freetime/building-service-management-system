@@ -79,7 +79,7 @@ def upgrade_staff() -> None:
     """เปลี่ยน staff_accounts เดิมเป็น staff โดยรักษาข้อมูลทุกบัญชี."""
     bind = op.get_bind()
     account_status.create(bind, checkfirst=True)
-    op.execute("ALTER TYPE staff_role RENAME VALUE 'coordinator' TO 'clerk'")
+    op.execute("ALTER TYPE staff_role RENAME VALUE 'coordinator' TO 'administrative'")
 
     op.rename_table("staff_accounts", "staff")
     op.alter_column("staff", "employee_code", new_column_name="staff_code")
@@ -374,7 +374,7 @@ def downgrade() -> None:
     op.execute("ALTER INDEX ix_staff_staff_code RENAME TO ix_staff_accounts_employee_code")
     op.alter_column("staff", "staff_code", new_column_name="employee_code")
     op.rename_table("staff", "staff_accounts")
-    op.execute("ALTER TYPE staff_role RENAME VALUE 'clerk' TO 'coordinator'")
+    op.execute("ALTER TYPE staff_role RENAME VALUE 'administrative' TO 'coordinator'")
 
     bind = op.get_bind()
     for enum_type in reversed(new_enums):
