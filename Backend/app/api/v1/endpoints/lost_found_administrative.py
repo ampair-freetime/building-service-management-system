@@ -2,7 +2,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, HTTPException
 
-from app.api.dependencies import AdministrativeStaff, DbSession
+from app.api.dependencies import ClerkStaff, DbSession
 from app.schemas.lost_found_administrative import (
     FoundItemDetailResponse,
     PendingFoundItemResponse,
@@ -22,7 +22,7 @@ router = APIRouter()
 )
 async def get_pending_found_items(
     session: DbSession,
-    _: AdministrativeStaff,
+    _: ClerkStaff,
 ) -> list[PendingFoundItemResponse]:
     """คืนรายการของที่พบซึ่งกำลังรอเจ้าหน้าที่ธุรการตรวจสอบ"""
     return await list_pending_found_items(session)
@@ -35,7 +35,7 @@ async def get_pending_found_items(
 async def get_found_item(
     item_id: UUID,
     session: DbSession,
-    _: AdministrativeStaff,
+    _: ClerkStaff,
 ) -> FoundItemDetailResponse:
     """คืนรายละเอียดของที่พบตาม ID"""
     item = await get_found_item_detail(session, item_id)
@@ -56,7 +56,7 @@ async def get_found_item(
 async def approve_found_item_report(
     item_id: UUID,
     session: DbSession,
-    current_staff: AdministrativeStaff,
+    current_staff: ClerkStaff,
 ) -> FoundItemDetailResponse:
     """ อนุมัติรายการของที่พบโดยเจ้าหน้าที่ธุรการ"""
 

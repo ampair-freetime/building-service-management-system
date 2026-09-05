@@ -12,16 +12,16 @@ def test_administrative_can_view_found_item_detail(test_context):
 
     seed_staff(
         session_factory,
-        staff_code="ADMINISTRATIVE001",
-        email="administrative@example.com",
+        staff_code="CLERK001",
+        email="clerk@example.com",
         password="admin-password",
-        role="administrative",
+        role="clerk",
     )
 
     login = client.post(
         "/api/v1/auth/login",
         json={
-            "identifier": "ADMINISTRATIVE001",
+            "identifier": "CLERK001",
             "password": "admin-password",
         },
     )
@@ -76,16 +76,16 @@ def test_administrative_can_approve_found_item(test_context):
 
     seed_staff(
         session_factory,
-        staff_code="ADMINISTRATIVE001",
-        email="administrative@example.com",
+        staff_code="CLERK001",
+        email="clerk@example.com",
         password="admin-password",
-        role="administrative",
+        role="clerk",
     )
 
     login = client.post(
         "/api/v1/auth/login",
         json={
-            "identifier": "ADMINISTRATIVE001",
+            "identifier": "CLERK001",
             "password": "admin-password",
         },
     )
@@ -137,16 +137,16 @@ def test_cannot_approve_already_approved_found_item(test_context):
 
     seed_staff(
         session_factory,
-        staff_code="ADMINISTRATIVE001",
-        email="administrative@example.com",
+        staff_code="CLERK001",
+        email="clerk@example.com",
         password="admin-password",
-        role="administrative",
+        role="clerk",
     )
 
     login = client.post(
         "/api/v1/auth/login",
         json={
-            "identifier": "ADMINISTRATIVE001",
+            "identifier": "CLERK001",
             "password": "admin-password",
         },
     )
@@ -193,16 +193,16 @@ def test_cannot_approve_lost_item(test_context):
 
     seed_staff(
         session_factory,
-        staff_code="ADMINISTRATIVE001",
-        email="administrative@example.com",
+        staff_code="CLERK001",
+        email="clerk@example.com",
         password="admin-password",
-        role="administrative",
+        role="clerk",
     )
 
     login = client.post(
         "/api/v1/auth/login",
         json={
-            "identifier": "ADMINISTRATIVE001",
+            "identifier": "CLERK001",
             "password": "admin-password",
         },
     )
@@ -249,16 +249,16 @@ def test_cannot_approve_nonexistent_found_item(test_context):
 
     seed_staff(
         session_factory,
-        staff_code="ADMINISTRATIVE001",
-        email="administrative@example.com",
+        staff_code="CLERK001",
+        email="clerk@example.com",
         password="admin-password",
-        role="administrative",
+        role="clerk",
     )
 
     login = client.post(
         "/api/v1/auth/login",
         json={
-            "identifier": "ADMINISTRATIVE001",
+            "identifier": "CLERK001",
             "password": "admin-password",
         },
     )

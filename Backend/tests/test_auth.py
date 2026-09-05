@@ -75,7 +75,7 @@ def test_suspended_staff_cannot_login(
         staff_code="CLERK001",
         email="clerk@example.com",
         password="correct-password",
-        role="administrative",
+        role="clerk",
         status="suspended",
     )
 
@@ -108,7 +108,7 @@ def test_admin_can_create_and_list_all_staff_roles(
     new_staff = [
         ("HK001", "housekeeper@example.com", "House Keeper", "housekeeper"),
         ("TECH001", "technician@example.com", "Technician", "technician"),
-        ("ADMINISTRATIVE001", "administrative@example.com", "Administrative Staff", "administrative"),
+        ("CLERK001", "clerk@example.com", "Clerk", "clerk"),
     ]
     for staff_code, email, full_name, role in new_staff:
         response = client.post(
@@ -129,7 +129,7 @@ def test_admin_can_create_and_list_all_staff_roles(
     assert {staff["role"] for staff in list_response.json()} == {
         "housekeeper",
         "technician",
-        "administrative",
+        "clerk",
         "admin",
     }
 

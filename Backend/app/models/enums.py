@@ -6,7 +6,7 @@ from enum import Enum
 class StaffRole(str, Enum):
     TECHNICIAN = "technician"
     HOUSEKEEPER = "housekeeper"
-    ADMINISTRATIVE = "administrative"
+    CLERK = "clerk"
     ADMIN = "admin"
 
 

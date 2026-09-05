@@ -61,15 +61,15 @@ async def require_admin(current_staff: CurrentStaff) -> Staff:
 # ใช้กับ endpoint จัดการพนักงานเพื่อบังคับตรวจทั้ง token และบทบาท admin
 AdminStaff = Annotated[Staff, Depends(require_admin)]
 
-async def require_administrative_staff(current_staff: CurrentStaff) -> Staff :
-    if current_staff.role != StaffRole.ADMINISTRATIVE:
+async def require_clerk_staff(current_staff: CurrentStaff) -> Staff :
+    if current_staff.role != StaffRole.CLERK:
         raise HTTPException(
             status_code = status.HTTP_403_FORBIDDEN,
-            detail = "Administrative staff access required",
+            detail = "Clerk staff access required",
         )
     return current_staff
 
-AdministrativeStaff = Annotated[
+ClerkStaff = Annotated[
     Staff,
-    Depends(require_administrative_staff),
+    Depends(require_clerk_staff),
 ]
