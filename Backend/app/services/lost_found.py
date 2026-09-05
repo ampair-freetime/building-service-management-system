@@ -92,7 +92,7 @@ async def create_guest_item(
         custody_location=custody_location,
         private_verification_detail=private_verification_detail,
         reporter_email=str(payload.reporter_email),
-        status=LostStatus.APPROVED,
+        status=LostStatus.PENDING,
     )
     try:
         session.add(item)
