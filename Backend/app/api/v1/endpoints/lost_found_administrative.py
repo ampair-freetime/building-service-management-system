@@ -6,11 +6,13 @@ from app.api.dependencies import ClerkStaff, DbSession
 from app.schemas.lost_found_administrative import (
     FoundItemDetailResponse,
     PendingFoundItemResponse,
+    RejectFoundItemRequest,
 )
 from app.services.lost_found_administrative import (
     approve_found_item,
     get_found_item_detail,
     list_pending_found_items,
+    reject_found_item,
 )
 
 router = APIRouter()
@@ -66,6 +68,34 @@ async def approve_found_item_report(
         current_staff.id,
     )
     
+    if item is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Pending found item not found",
+        )
+
+    return item
+
+
+@router.post(
+    "/found-items/{item_id}/reject",
+    response_model=FoundItemDetailResponse,
+)
+async def reject_found_item_report(
+    item_id: UUID,
+    request: RejectFoundItemRequest,
+    session: DbSession,
+    current_staff: ClerkStaff,
+) -> FoundItemDetailResponse:
+    """ปฏิเสธรายการของที่พบโดยเจ้าหน้าที่ธุรการ"""
+
+    item = await reject_found_item(
+        session,
+        item_id,
+        current_staff.id,
+        request.reason,
+    )
+
     if item is None:
         raise HTTPException(
             status_code=404,
