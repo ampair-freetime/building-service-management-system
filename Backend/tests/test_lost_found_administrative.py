@@ -486,3 +486,343 @@ def test_rejected_found_item_is_removed_from_pending_list(test_context):
         item["id"] != str(item_id)
         for item in pending_items
     )
+
+
+def test_administrative_can_view_pending_lost_items(test_context):
+    client, session_factory = test_context
+
+    seed_staff(
+        session_factory,
+        staff_code="CLERK001",
+        email="clerk@example.com",
+        password="admin-password",
+        role="clerk",
+    )
+
+    login = client.post(
+        "/api/v1/auth/login",
+        json={
+            "identifier": "CLERK001",
+            "password": "admin-password",
+        },
+    )
+
+    headers = {
+        "Authorization": f"Bearer {login.json()['access_token']}"
+    }
+
+    async def seed_item():
+        async with session_factory() as session:
+            item = LostItem(
+                item_code="LOST002",
+                report_type=LostType.LOST,
+                item_category="Electronics",
+                item_name="Lost Phone",
+                description="Black phone",
+                event_datetime=datetime.now(timezone.utc),
+                location_id=None,
+                location_detail="Lobby",
+                custody_location=None,
+                reporter_email="guest@example.com",
+                status=LostStatus.PENDING,
+            )
+
+            session.add(item)
+            await session.commit()
+            await session.refresh(item)
+
+            return item.id
+
+    item_id = asyncio.run(seed_item())
+
+    response = client.get(
+        "/api/v1/lost-found/pending-lost-items",
+        headers=headers,
+    )
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert any(
+        item["id"] == str(item_id)
+        for item in data
+    )
+
+
+def test_administrative_can_view_lost_item_detail(test_context):
+    client, session_factory = test_context
+
+    seed_staff(
+        session_factory,
+        staff_code="CLERK001",
+        email="clerk@example.com",
+        password="admin-password",
+        role="clerk",
+    )
+
+    login = client.post(
+        "/api/v1/auth/login",
+        json={
+            "identifier": "CLERK001",
+            "password": "admin-password",
+        },
+    )
+
+    headers = {
+        "Authorization": f"Bearer {login.json()['access_token']}"
+    }
+
+    async def seed_item():
+        async with session_factory() as session:
+            item = LostItem(
+                item_code="LOST003",
+                report_type=LostType.LOST,
+                item_category="Electronics",
+                item_name="Phone",
+                description="Black phone",
+                event_datetime=datetime.now(timezone.utc),
+                location_id=None,
+                location_detail="Building A",
+                custody_location=None,
+                reporter_email="user@example.com",
+                status=LostStatus.PENDING,
+            )
+
+            session.add(item)
+            await session.commit()
+            await session.refresh(item)
+
+            return item.id
+
+    item_id = asyncio.run(seed_item())
+
+    response = client.get(
+        f"/api/v1/lost-found/lost-items/{item_id}",
+        headers=headers,
+    )
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert data["id"] == str(item_id)
+    assert data["item_code"] == "LOST003"
+    assert data["report_type"] == "lost"
+    assert data["item_category"] == "Electronics"
+    assert data["item_name"] == "Phone"
+    assert data["description"] == "Black phone"
+    assert data["location_detail"] == "Building A"
+    assert data["reporter_email"] == "user@example.com"
+    assert data["status"] == "pending"
+
+
+def test_administrative_can_approve_lost_item(test_context):
+    client, session_factory = test_context
+
+    seed_staff(
+        session_factory,
+        staff_code="CLERK001",
+        email="clerk@example.com",
+        password="admin-password",
+        role="clerk",
+    )
+
+    login = client.post(
+        "/api/v1/auth/login",
+        json={
+            "identifier": "CLERK001",
+            "password": "admin-password",
+        },
+    )
+
+    headers = {
+        "Authorization": f"Bearer {login.json()['access_token']}"
+    }
+
+    async def seed_item():
+        async with session_factory() as session:
+            item = LostItem(
+                item_code="LOST004",
+                report_type=LostType.LOST,
+                item_category="Accessories",
+                item_name="Wallet",
+                description="Black wallet",
+                event_datetime=datetime.now(timezone.utc),
+                location_id=None,
+                location_detail="Building A",
+                custody_location=None,
+                reporter_email="user@example.com",
+                status=LostStatus.PENDING,
+            )
+
+            session.add(item)
+            await session.commit()
+            await session.refresh(item)
+
+            return item.id
+
+    item_id = asyncio.run(seed_item())
+
+    response = client.post(
+        f"/api/v1/lost-found/lost-items/{item_id}/approve",
+        headers=headers,
+    )
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert data["id"] == str(item_id)
+    assert data["report_type"] == "lost"
+    assert data["status"] == "approved"
+
+    async def get_approved_item():
+        async with session_factory() as session:
+            return await session.get(LostItem, item_id)
+
+    approved_item = asyncio.run(get_approved_item())
+
+    assert approved_item.status == LostStatus.APPROVED
+    assert approved_item.reviewed_by is not None
+
+
+def test_approved_lost_item_is_removed_from_pending_list(test_context):
+    client, session_factory = test_context
+
+    seed_staff(
+        session_factory,
+        staff_code="CLERK001",
+        email="clerk@example.com",
+        password="admin-password",
+        role="clerk",
+    )
+
+    login = client.post(
+        "/api/v1/auth/login",
+        json={
+            "identifier": "CLERK001",
+            "password": "admin-password",
+        },
+    )
+
+    headers = {
+        "Authorization": f"Bearer {login.json()['access_token']}"
+    }
+
+    async def seed_item():
+        async with session_factory() as session:
+            item = LostItem(
+                item_code="LOST005",
+                report_type=LostType.LOST,
+                item_category="Electronics",
+                item_name="Laptop",
+                description="Silver laptop",
+                event_datetime=datetime.now(timezone.utc),
+                location_id=None,
+                location_detail="Building B",
+                custody_location=None,
+                reporter_email="user@example.com",
+                status=LostStatus.PENDING,
+            )
+
+            session.add(item)
+            await session.commit()
+            await session.refresh(item)
+
+            return item.id
+
+    item_id = asyncio.run(seed_item())
+
+    # Approve lost-item announcement
+    approve_response = client.post(
+        f"/api/v1/lost-found/lost-items/{item_id}/approve",
+        headers=headers,
+    )
+
+    assert approve_response.status_code == 200
+
+    # Approved item must be removed from pending list
+    pending_response = client.get(
+        "/api/v1/lost-found/pending-lost-items",
+        headers=headers,
+    )
+
+    assert pending_response.status_code == 200
+
+    pending_items = pending_response.json()
+
+    assert all(
+        item["id"] != str(item_id)
+        for item in pending_items
+    )
+
+
+def test_approved_lost_item_is_published(test_context):
+    client, session_factory = test_context
+
+    seed_staff(
+        session_factory,
+        staff_code="CLERK001",
+        email="clerk@example.com",
+        password="admin-password",
+        role="clerk",
+    )
+
+    login = client.post(
+        "/api/v1/auth/login",
+        json={
+            "identifier": "CLERK001",
+            "password": "admin-password",
+        },
+    )
+
+    headers = {
+        "Authorization": f"Bearer {login.json()['access_token']}"
+    }
+
+    async def seed_item():
+        async with session_factory() as session:
+            item = LostItem(
+                item_code="LOST006",
+                report_type=LostType.LOST,
+                item_category="Accessories",
+                item_name="Wallet",
+                description="Brown wallet",
+                event_datetime=datetime.now(timezone.utc),
+                location_id=None,
+                location_detail="Building C",
+                custody_location=None,
+                reporter_email="user@example.com",
+                status=LostStatus.PENDING,
+            )
+
+            session.add(item)
+            await session.commit()
+            await session.refresh(item)
+
+            return item.id
+
+    item_id = asyncio.run(seed_item())
+
+    # Approve lost-item announcement
+    approve_response = client.post(
+        f"/api/v1/lost-found/lost-items/{item_id}/approve",
+        headers=headers,
+    )
+
+    assert approve_response.status_code == 200
+
+    # Check public Lost & Found list
+    public_response = client.get(
+        "/api/v1/guest/lost-items",
+    )
+
+    assert public_response.status_code == 200
+
+    data = public_response.json()
+
+    assert any(
+        item["id"] == str(item_id)
+        for item in data["items"]
+    )
