@@ -114,6 +114,7 @@ class GuestItemPublicResponse(BaseModel):
     custody_location: str | None
     status: LostStatus
     created_at: datetime
+    updated_at: datetime
     images: list[GuestImageResponse]
 
 
@@ -124,18 +125,3 @@ class GuestItemListResponse(BaseModel):
     total: int
     limit: int
     offset: int
-
-class Guest_Tracking_Request(BaseModel):
-    reporter_email: EmailStr
-    item_code: str
-    @field_validator("reporter_email")
-    @classmethod
-    def normalize_email(cls, value: EmailStr) -> str:
-        return str(value).strip().lower()
-
-class Guest_Tracking_Response(BaseModel):
-    item_code: str
-    report_type: LostType
-    status: LostStatus
-    created_at: datetime
-    updated_at: datetime

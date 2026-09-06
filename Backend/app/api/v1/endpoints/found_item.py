@@ -3,6 +3,7 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
+from pydantic import EmailStr
 
 from app.api.dependencies import DbSession, ObjectStorageClient
 from app.api.v1.forms import parse_guest_found_item_form
@@ -96,14 +97,19 @@ async def read_found_item(
     item_code: str,
     session: DbSession,
     storage: ObjectStorageClient,
+    reporter_email: Annotated[EmailStr | None, Query()] = None,
 ) -> GuestItemPublicResponse:
-    """อ่านรายละเอียดประกาศพบของโดยไม่คืนข้อมูลยืนยันเจ้าของ."""
+    """อ่านรายละเอียดประกาศพบของโดยไม่คืนข้อมูลยืนยันเจ้าของ.
+
+    ผู้แจ้งส่ง reporter_email ของตัวเองมาด้วยเพื่อติดตามสถานะประกาศของตัวเองได้ทุกสถานะ
+    """
     try:
         return await get_public_item(
             session,
             report_type=LostType.FOUND,
             item_code=item_code,
             storage=storage,
+            reporter_email=reporter_email,
         )
     except PublicItemNotFoundError as exc:
         raise HTTPException(

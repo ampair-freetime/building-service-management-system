@@ -256,3 +256,61 @@ def test_r2_failure_does_not_create_database_row(
             return int(count or 0)
 
     assert asyncio.run(count_items()) == 0
+
+
+def test_owner_tracks_pending_item_that_public_cannot_see(
+    test_context: tuple[TestClient, async_sessionmaker[AsyncSession]],
+    fake_storage: FakeObjectStorage,
+) -> None:
+    client, _ = test_context
+    created = client.post("/api/v1/guest/lost-items", data=lost_form())
+    assert created.status_code == 201
+    item_code = created.json()["item_code"]
+
+    # ไม่ส่งอีเมล = โหมด public ซึ่งยังไม่เห็นประกาศที่รอตรวจสอบ
+    assert client.get(f"/api/v1/guest/lost-items/{item_code}").status_code == 404
+
+    # ส่งอีเมลผู้แจ้ง = โหมดติดตาม เห็นประกาศของตัวเองแม้ยังไม่อนุมัติ
+    tracked = client.get(
+        f"/api/v1/guest/lost-items/{item_code.lower()}",
+        params={"reporter_email": "GUEST@EXAMPLE.COM"},
+    )
+    assert tracked.status_code == 200
+    body = tracked.json()
+    assert body["item_code"] == item_code
+    assert body["status"] == "pending"
+    assert "reporter_email" not in body
+    assert "private_verification_detail" not in body
+
+
+def test_tracking_does_not_reveal_whether_reporter_email_matches(
+    test_context: tuple[TestClient, async_sessionmaker[AsyncSession]],
+    fake_storage: FakeObjectStorage,
+) -> None:
+    client, _ = test_context
+    item_code = client.post("/api/v1/guest/lost-items", data=lost_form()).json()["item_code"]
+
+    wrong_email = client.get(
+        f"/api/v1/guest/lost-items/{item_code}",
+        params={"reporter_email": "someone-else@example.com"},
+    )
+    unknown_code = client.get(
+        "/api/v1/guest/lost-items/LOST-20250101-DEADBEEF",
+        params={"reporter_email": "guest@example.com"},
+    )
+    # ตอบเหมือนกันเป๊ะ เพื่อไม่ให้ใช้ endpoint นี้ไล่เดาอีเมลผู้แจ้งได้
+    assert wrong_email.status_code == unknown_code.status_code == 404
+    assert wrong_email.json() == unknown_code.json()
+
+    # รหัสของประกาศของหายต้องดูผ่าน namespace ของหายเท่านั้น
+    crossed = client.get(
+        f"/api/v1/guest/found-items/{item_code}",
+        params={"reporter_email": "guest@example.com"},
+    )
+    assert crossed.status_code == 404
+
+    malformed = client.get(
+        f"/api/v1/guest/lost-items/{item_code}",
+        params={"reporter_email": "not-an-email"},
+    )
+    assert malformed.status_code == 422

@@ -20,8 +20,6 @@ from app.schemas.lost_found_item import (
     GuestItemCreatedResponse,
     GuestItemListResponse,
     GuestItemPublicResponse,
-    Guest_Tracking_Request,
-    Guest_Tracking_Response
 )
 from app.services.images import prepare_guest_image
 from app.services.object_storage import (
@@ -201,17 +199,28 @@ async def get_public_item(
     report_type: LostType,
     item_code: str,
     storage: ObjectStorage,
+    reporter_email: str | None = None,
 ) -> GuestItemPublicResponse:
-    """อ่านรายละเอียดประกาศ approved โดยไม่คืนข้อมูลส่วนตัวของผู้รายงาน."""
-    item = await session.scalar(
-        select(LostItem).where(
-            LostItem.report_type == report_type,
-            LostItem.item_code == item_code.strip().upper(),
-            LostItem.status == LostStatus.APPROVED,
-            LostItem.deleted_at.is_(None),
-        )
-    )
+    """อ่านรายละเอียดประกาศโดยไม่คืนข้อมูลส่วนตัวของผู้รายงาน.
+
+    ไม่ส่ง reporter_email คือโหมด public ซึ่งเห็นเฉพาะประกาศที่อนุมัติแล้ว
+    ส่ง reporter_email ที่ตรงกับผู้แจ้งคือโหมดติดตามสถานะ ซึ่งเห็นประกาศของตัวเองได้ทุกสถานะ
+    """
+    filters = [
+        LostItem.report_type == report_type,
+        LostItem.item_code == item_code.strip().upper(),
+        LostItem.deleted_at.is_(None),
+    ]
+    # แยกสองกรณีให้ชัดแทนการรวมด้วย or_() เพื่อไม่ให้ประกาศที่ยังไม่อนุมัติหลุดออก public
+    if reporter_email is None:
+        filters.append(LostItem.status == LostStatus.APPROVED)
+    else:
+        # อีเมลถูก normalize เป็นตัวพิมพ์เล็กตั้งแต่ตอนสร้าง จึงต้องเทียบด้วยรูปแบบเดียวกัน
+        filters.append(LostItem.reporter_email == reporter_email.strip().lower())
+
+    item = await session.scalar(select(LostItem).where(*filters))
     if item is None:
+        # ใช้ข้อความเดียวกันทั้งกรณีไม่มีรหัสนี้และกรณีอีเมลไม่ตรง เพื่อกันการไล่เดาอีเมลผู้แจ้ง
         raise PublicItemNotFoundError("ไม่พบประกาศนี้")
 
     image_map = await _load_image_map(session, [item.id])
@@ -259,6 +268,7 @@ def _to_public_response(
         custody_location=item.custody_location,
         status=item.status,
         created_at=item.created_at,
+        updated_at=item.updated_at,
         images=[
             GuestImageResponse(
                 id=image.id,
@@ -270,9 +280,6 @@ def _to_public_response(
             for image in images
         ],
     )
-# def track_guest_item(session: AsyncSession,item_id: str ,reporter_email: str) -> LostItem:
-#         statement = select(LostItem).where(LostItem.item_code == item_id)
-#     return LostItem
 
 def _make_item_code(report_type: LostType, item_id: UUID) -> str:
     """สร้าง tracking code ที่อ่านง่ายและแทบไม่มีโอกาสชนกัน."""
