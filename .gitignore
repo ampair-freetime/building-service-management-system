@@ -18,3 +18,5 @@ AGENTS.override.md
 **/AGENTS.override.md
 .agents/
 .codex/
+/PLANNING.md
+/ARCHITECTURE.md
