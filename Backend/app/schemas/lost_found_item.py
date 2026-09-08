@@ -13,7 +13,7 @@ from pydantic import (
     field_validator,
 )
 
-from app.models.enums import LostStatus, LostType
+from app.models.enums import ClaimStatus, LostStatus, LostType
 
 BANGKOK_TIMEZONE = ZoneInfo("Asia/Bangkok")
 
@@ -100,7 +100,11 @@ class GuestImageResponse(BaseModel):
 
 
 class GuestItemPublicResponse(BaseModel):
-    """ข้อมูลประกาศที่ผ่านการอนุมัติ โดยตัดอีเมลและรายละเอียดลับออก."""
+    """ข้อมูลประกาศที่ผ่านการอนุมัติ โดยตัดอีเมลและรายละเอียดลับออก.
+
+    ไม่มี custody_location โดยตั้งใจ การบอกที่เก็บของกับคนที่ยังไม่ผ่านการตรวจหลักฐาน
+    เท่ากับเปิดทางให้เดินไปเอาของเองโดยข้าม flow claim ทั้งหมด
+    """
 
     id: UUID
     item_code: str
@@ -111,7 +115,6 @@ class GuestItemPublicResponse(BaseModel):
     event_datetime: datetime
     location_id: int | None
     location_detail: str | None
-    custody_location: str | None
     status: LostStatus
     created_at: datetime
     updated_at: datetime
@@ -125,3 +128,53 @@ class GuestItemListResponse(BaseModel):
     total: int
     limit: int
     offset: int
+
+class GuestItemClaim(BaseModel):
+    """ข้อมูลที่ guest กรอกเพื่อขอรับของคืน.
+
+    ความยาวทุก field ต้องตรงกับคอลัมน์ใน LostClaim ไม่งั้นข้อมูลจะโดน DB ปฏิเสธหลัง validate ผ่าน
+    """
+
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+
+    claimant_name: str = Field(min_length=1, max_length=150)
+    claimant_email: EmailStr = Field(max_length=255)
+    proof_detail: str = Field(min_length=1, max_length=2_000)
+
+    @field_validator("claimant_name")
+    @classmethod
+    def normalize_claimant_name(cls, value: str) -> str:
+        """รวมช่องว่างที่เกินมาให้เหมือนฝั่งสร้างประกาศ."""
+        return " ".join(value.split())
+
+    @field_validator("claimant_email")
+    @classmethod
+    def normalize_claimant_email(cls, value: EmailStr) -> str:
+        """อีเมลคือกุญแจตรวจ claim ซ้ำและใช้ติดตามสถานะ จึงต้องเก็บรูปแบบเดียว."""
+        return str(value).strip().lower()
+
+
+class GuestClaimCreatedResponse(BaseModel):
+    """ใบรับเรื่อง claim ที่ส่งกลับให้ guest.
+
+    ไม่มี custody_location / private_verification_detail / reporter_email เพราะ endpoint นี้เปิด public
+    """
+
+    id: UUID
+    found_item_code: str
+    status: ClaimStatus
+    created_at: datetime
+    message: str
+
+
+class GuestClaimStatusResponse(BaseModel):
+    """สถานะ claim ที่เจ้าของเรื่องติดตามได้ โดยไม่เผย review_note ซึ่งเป็นโน้ตภายใน."""
+
+    id: UUID
+    found_item_code: str
+    item_name: str
+    status: ClaimStatus
+    created_at: datetime
+    updated_at: datetime
+    # บอกที่รับของเฉพาะคนที่ผ่านการตรวจหลักฐานแล้วเท่านั้น สถานะอื่นเป็น None เสมอ
+    custody_location: str | None = None

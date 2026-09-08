@@ -1,5 +1,9 @@
 import asyncio
+import concurrent.futures
+from datetime import datetime
 from io import BytesIO
+from uuid import uuid4
+from zoneinfo import ZoneInfo
 
 import pytest
 from fastapi.testclient import TestClient
@@ -8,9 +12,9 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.api.dependencies import provide_object_storage
-from app.models.enums import LostStatus, LostType
+from app.models.enums import ClaimStatus, LostStatus, LostType
 from app.models.image import Image
-from app.models.lost_found import LostItem
+from app.models.lost_found import LostClaim, LostItem
 from app.services.object_storage import StorageOperationError, StoredObject
 
 
@@ -171,10 +175,11 @@ def test_public_list_only_returns_approved_items_and_hides_private_fields(
     assert body["total"] == 1
     public_item = body["items"][0]
     assert public_item["item_code"] == item_code
-    assert public_item["custody_location"] == "ห้องประชาสัมพันธ์"
     assert public_item["images"][0]["url"].startswith("https://signed.example/lost-found/found/")
     assert "reporter_email" not in public_item
     assert "private_verification_detail" not in public_item
+    # ที่เก็บของต้องไม่หลุดสู่ public ไม่งั้นคนเดินไปเอาเองได้โดยข้าม flow claim
+    assert "custody_location" not in public_item
 
     detail = client.get(f"/api/v1/guest/found-items/{item_code.lower()}")
     assert detail.status_code == 200
@@ -314,3 +319,416 @@ def test_tracking_does_not_reveal_whether_reporter_email_matches(
         params={"reporter_email": "not-an-email"},
     )
     assert malformed.status_code == 422
+
+
+def claim_form() -> dict[str, str]:
+    return {
+        "claimant_name": "สมชาย  ใจดี",
+        "claimant_email": "Claimant@Example.COM",
+        "proof_detail": "พวงกุญแจมีหมายเลข 1042 สลักด้านหลัง",
+    }
+
+
+def _create_found_item(client: TestClient) -> str:
+    response = client.post("/api/v1/guest/found-items", data=found_form())
+    assert response.status_code == 201
+    return response.json()["item_code"]
+
+
+def _set_item_status(
+    session_factory: async_sessionmaker[AsyncSession],
+    *,
+    item_code: str,
+    new_status: LostStatus,
+) -> None:
+    """เลื่อนสถานะให้ตรงกับที่เจ้าหน้าที่จะทำ โดยไม่ต้องรอ staff endpoint ที่ยังไม่มี."""
+
+    async def update() -> None:
+        async with session_factory() as session:
+            item = await session.scalar(
+                select(LostItem).where(LostItem.item_code == item_code)
+            )
+            assert item is not None
+            item.status = new_status
+            await session.commit()
+
+    asyncio.run(update())
+
+
+def _read_claims(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> list[LostClaim]:
+    async def read() -> list[LostClaim]:
+        async with session_factory() as session:
+            result = await session.scalars(select(LostClaim))
+            return list(result)
+
+    return asyncio.run(read())
+
+
+def test_guest_claims_approved_found_item_creates_pending_row(
+    test_context: tuple[TestClient, async_sessionmaker[AsyncSession]],
+    fake_storage: FakeObjectStorage,
+) -> None:
+    client, session_factory = test_context
+    item_code = _create_found_item(client)
+    _set_item_status(session_factory, item_code=item_code, new_status=LostStatus.APPROVED)
+
+    response = client.post(
+        f"/api/v1/guest/found-items/{item_code.lower()}/claims",
+        json=claim_form(),
+    )
+
+    assert response.status_code == 201
+    body = response.json()
+    assert body["found_item_code"] == item_code
+    assert body["status"] == ClaimStatus.PENDING.value
+    assert body["created_at"] is not None
+
+    claims = _read_claims(session_factory)
+    assert len(claims) == 1
+    claim = claims[0]
+    assert claim.status == ClaimStatus.PENDING
+    assert claim.reviewed_by is None
+    assert claim.review_note is None
+    # normalize ต้องทำงาน ไม่งั้นตรวจ claim ซ้ำด้วยอีเมลจะพลาด
+    assert claim.claimant_email == "claimant@example.com"
+    assert claim.claimant_name == "สมชาย ใจดี"
+
+
+def test_claim_response_does_not_leak_private_item_fields(
+    test_context: tuple[TestClient, async_sessionmaker[AsyncSession]],
+    fake_storage: FakeObjectStorage,
+) -> None:
+    client, session_factory = test_context
+    item_code = _create_found_item(client)
+    _set_item_status(session_factory, item_code=item_code, new_status=LostStatus.APPROVED)
+
+    response = client.post(
+        f"/api/v1/guest/found-items/{item_code}/claims",
+        json=claim_form(),
+    )
+
+    assert response.status_code == 201
+    body = response.json()
+    for leaked in (
+        "custody_location",
+        "private_verification_detail",
+        "reporter_email",
+        "review_note",
+        "reviewed_by",
+    ):
+        assert leaked not in body
+
+
+def test_claim_on_pending_item_returns_404(
+    test_context: tuple[TestClient, async_sessionmaker[AsyncSession]],
+    fake_storage: FakeObjectStorage,
+) -> None:
+    client, session_factory = test_context
+    item_code = _create_found_item(client)
+
+    response = client.post(
+        f"/api/v1/guest/found-items/{item_code}/claims",
+        json=claim_form(),
+    )
+
+    assert response.status_code == 404
+    assert _read_claims(session_factory) == []
+
+
+def test_claim_on_lost_item_code_returns_404(
+    test_context: tuple[TestClient, async_sessionmaker[AsyncSession]],
+    fake_storage: FakeObjectStorage,
+) -> None:
+    client, session_factory = test_context
+    created = client.post("/api/v1/guest/lost-items", data=lost_form())
+    assert created.status_code == 201
+    item_code = created.json()["item_code"]
+    _set_item_status(session_factory, item_code=item_code, new_status=LostStatus.APPROVED)
+
+    response = client.post(
+        f"/api/v1/guest/found-items/{item_code}/claims",
+        json=claim_form(),
+    )
+
+    assert response.status_code == 404
+    assert _read_claims(session_factory) == []
+
+
+def test_claim_on_already_claimed_item_returns_409(
+    test_context: tuple[TestClient, async_sessionmaker[AsyncSession]],
+    fake_storage: FakeObjectStorage,
+) -> None:
+    client, session_factory = test_context
+    item_code = _create_found_item(client)
+    _set_item_status(session_factory, item_code=item_code, new_status=LostStatus.CLAIMED)
+
+    response = client.post(
+        f"/api/v1/guest/found-items/{item_code}/claims",
+        json=claim_form(),
+    )
+
+    assert response.status_code == 409
+    assert _read_claims(session_factory) == []
+
+
+def test_duplicate_pending_claim_from_same_email_returns_409(
+    test_context: tuple[TestClient, async_sessionmaker[AsyncSession]],
+    fake_storage: FakeObjectStorage,
+) -> None:
+    client, session_factory = test_context
+    item_code = _create_found_item(client)
+    _set_item_status(session_factory, item_code=item_code, new_status=LostStatus.APPROVED)
+
+    first = client.post(
+        f"/api/v1/guest/found-items/{item_code}/claims",
+        json=claim_form(),
+    )
+    assert first.status_code == 201
+
+    # ตัวพิมพ์ต่างกันต้องยังนับเป็นคนเดียวกัน
+    payload = claim_form() | {"claimant_email": "claimant@example.com"}
+    second = client.post(
+        f"/api/v1/guest/found-items/{item_code}/claims",
+        json=payload,
+    )
+
+    assert second.status_code == 409
+    assert len(_read_claims(session_factory)) == 1
+
+
+@pytest.mark.parametrize(
+    "override",
+    [
+        {"claimant_name": ""},
+        {"claimant_name": "ก" * 151},
+        {"proof_detail": "   "},
+        {"claimant_email": "not-an-email"},
+    ],
+)
+def test_claim_rejects_invalid_payload(
+    test_context: tuple[TestClient, async_sessionmaker[AsyncSession]],
+    fake_storage: FakeObjectStorage,
+    override: dict[str, str],
+) -> None:
+    client, session_factory = test_context
+    item_code = _create_found_item(client)
+    _set_item_status(session_factory, item_code=item_code, new_status=LostStatus.APPROVED)
+
+    response = client.post(
+        f"/api/v1/guest/found-items/{item_code}/claims",
+        json=claim_form() | override,
+    )
+
+    assert response.status_code == 422
+    assert _read_claims(session_factory) == []
+
+
+def test_claim_ignores_client_supplied_status(
+    test_context: tuple[TestClient, async_sessionmaker[AsyncSession]],
+    fake_storage: FakeObjectStorage,
+) -> None:
+    client, session_factory = test_context
+    item_code = _create_found_item(client)
+    _set_item_status(session_factory, item_code=item_code, new_status=LostStatus.APPROVED)
+
+    response = client.post(
+        f"/api/v1/guest/found-items/{item_code}/claims",
+        json=claim_form() | {"status": "approved", "reviewed_by": str(uuid4())},
+    )
+
+    assert response.status_code == 422
+    assert _read_claims(session_factory) == []
+
+
+def test_claim_status_requires_matching_email(
+    test_context: tuple[TestClient, async_sessionmaker[AsyncSession]],
+    fake_storage: FakeObjectStorage,
+) -> None:
+    client, session_factory = test_context
+    item_code = _create_found_item(client)
+    _set_item_status(session_factory, item_code=item_code, new_status=LostStatus.APPROVED)
+    created = client.post(
+        f"/api/v1/guest/found-items/{item_code}/claims",
+        json=claim_form(),
+    )
+    assert created.status_code == 201
+    claim_id = created.json()["id"]
+
+    owner = client.get(
+        f"/api/v1/guest/found-items/{item_code}/claims/{claim_id}",
+        params={"claimant_email": "CLAIMANT@example.com"},
+    )
+    assert owner.status_code == 200
+    body = owner.json()
+    assert body["status"] == ClaimStatus.PENDING.value
+    assert body["item_name"] == "กุญแจพร้อมพวงสีแดง"
+    assert "review_note" not in body
+
+    stranger = client.get(
+        f"/api/v1/guest/found-items/{item_code}/claims/{claim_id}",
+        params={"claimant_email": "someone-else@example.com"},
+    )
+    assert stranger.status_code == 404
+    assert stranger.json()["detail"] == "ไม่พบคำขอนี้"
+
+
+def test_item_code_uses_bangkok_date_not_utc(
+    test_context: tuple[TestClient, async_sessionmaker[AsyncSession]],
+    fake_storage: FakeObjectStorage,
+) -> None:
+    """ช่วงเที่ยงคืนถึงเจ็ดโมงเช้าไทย วันที่แบบ UTC จะเป็นเมื่อวาน ซึ่งผู้ใช้อ่านแล้วสับสน."""
+    client, _ = test_context
+    response = client.post("/api/v1/guest/lost-items", data=lost_form())
+
+    assert response.status_code == 201
+    expected = datetime.now(ZoneInfo("Asia/Bangkok")).strftime("%Y%m%d")
+    assert response.json()["item_code"].split("-")[1] == expected
+
+
+def build_multipart_with_empty_file(fields: dict[str, str]) -> tuple[bytes, str]:
+    """ประกอบ body เองเพราะ httpx ตัด filename= ทิ้งเมื่อชื่อว่าง แต่เบราว์เซอร์ส่ง filename="" มาจริง."""
+    boundary = "testboundary"
+    parts = []
+    for name, value in fields.items():
+        parts.append(
+            f'--{boundary}\r\nContent-Disposition: form-data; name="{name}"\r\n\r\n{value}\r\n'
+        )
+    parts.append(
+        f'--{boundary}\r\n'
+        f'Content-Disposition: form-data; name="image"; filename=""\r\n'
+        f"Content-Type: application/octet-stream\r\n\r\n\r\n"
+    )
+    parts.append(f"--{boundary}--\r\n")
+    return "".join(parts).encode(), f"multipart/form-data; boundary={boundary}"
+
+
+def test_empty_file_input_is_treated_as_no_image(
+    test_context: tuple[TestClient, async_sessionmaker[AsyncSession]],
+    fake_storage: FakeObjectStorage,
+) -> None:
+    """input type=file ที่ผู้ใช้ไม่เลือกไฟล์ มาถึงเป็น UploadFile ที่ filename ว่าง ไม่ใช่ None."""
+    client, session_factory = test_context
+    body, content_type = build_multipart_with_empty_file(lost_form())
+    response = client.post(
+        "/api/v1/guest/lost-items",
+        content=body,
+        headers={"Content-Type": content_type},
+    )
+
+    assert response.status_code == 201
+    assert fake_storage.objects == {}
+
+    async def count_images() -> int:
+        async with session_factory() as session:
+            count = await session.scalar(select(func.count(Image.id)))
+            return int(count or 0)
+
+    assert asyncio.run(count_images()) == 0
+
+
+def test_category_filter_matches_normalized_value(
+    test_context: tuple[TestClient, async_sessionmaker[AsyncSession]],
+    fake_storage: FakeObjectStorage,
+) -> None:
+    """ตอนสร้างยุบช่องว่างซ้อน ตัวกรองจึงต้องยุบด้วย ไม่งั้นค่าที่ผู้ใช้พิมพ์เกินมากรองไม่เจอ."""
+    client, session_factory = test_context
+    created = client.post(
+        "/api/v1/guest/lost-items",
+        data=lost_form() | {"item_category": "ของ  ใช้   ส่วนตัว"},
+    )
+    assert created.status_code == 201
+    item_code = created.json()["item_code"]
+    _set_item_status(session_factory, item_code=item_code, new_status=LostStatus.APPROVED)
+
+    exact = client.get(
+        "/api/v1/guest/lost-items",
+        params={"category": "ของ ใช้ ส่วนตัว"},
+    )
+    assert exact.json()["total"] == 1
+
+    spaced = client.get(
+        "/api/v1/guest/lost-items",
+        params={"category": "  ของ   ใช้  ส่วนตัว  "},
+    )
+    assert spaced.json()["total"] == 1
+
+    unrelated = client.get(
+        "/api/v1/guest/lost-items",
+        params={"category": "เครื่องประดับ"},
+    )
+    assert unrelated.json()["total"] == 0
+
+
+def test_custody_location_appears_only_after_claim_is_approved(
+    test_context: tuple[TestClient, async_sessionmaker[AsyncSession]],
+    fake_storage: FakeObjectStorage,
+) -> None:
+    client, session_factory = test_context
+    item_code = _create_found_item(client)
+    _set_item_status(session_factory, item_code=item_code, new_status=LostStatus.APPROVED)
+    created = client.post(
+        f"/api/v1/guest/found-items/{item_code}/claims",
+        json=claim_form(),
+    )
+    assert created.status_code == 201
+    claim_id = created.json()["id"]
+    status_url = f"/api/v1/guest/found-items/{item_code}/claims/{claim_id}"
+    params = {"claimant_email": "claimant@example.com"}
+
+    pending = client.get(status_url, params=params)
+    assert pending.status_code == 200
+    assert pending.json()["custody_location"] is None
+
+    async def approve_claim() -> None:
+        async with session_factory() as session:
+            claim = await session.scalar(select(LostClaim))
+            assert claim is not None
+            claim.status = ClaimStatus.APPROVED
+            await session.commit()
+
+    asyncio.run(approve_claim())
+
+    approved = client.get(status_url, params=params)
+    assert approved.status_code == 200
+    assert approved.json()["custody_location"] == "ห้องประชาสัมพันธ์"
+
+
+def test_cancellation_after_upload_still_removes_orphaned_r2_object(
+    test_context: tuple[TestClient, async_sessionmaker[AsyncSession]],
+    fake_storage: FakeObjectStorage,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """CancelledError สืบทอดจาก BaseException จึงไม่ถูก except SQLAlchemyError จับ.
+
+    ถ้าไม่เก็บกวาดใน finally ไฟล์จะค้างใน R2 โดยไม่มีแถวในฐานข้อมูลอ้างถึงตลอดไป
+    """
+    client, session_factory = test_context
+
+    def cancel_after_upload(*args: object, **kwargs: object) -> None:
+        raise asyncio.CancelledError
+
+    # ระเบิดหลัง storage.put สำเร็จแล้ว แต่ก่อน commit
+    monkeypatch.setattr(
+        "app.services.lost_found.LostItemHistory",
+        cancel_after_upload,
+    )
+
+    # portal ของ TestClient แปลง asyncio.CancelledError เป็นตัวของ concurrent.futures
+    # ตอนข้ามขอบ event loop ตัว service เห็นของเดิมที่เป็น BaseException
+    with pytest.raises(concurrent.futures.CancelledError):
+        client.post(
+            "/api/v1/guest/lost-items",
+            data=lost_form(),
+            files={"image": ("phone.png", make_png(), "image/png")},
+        )
+
+    assert fake_storage.objects == {}
+
+    async def count_items() -> int:
+        async with session_factory() as session:
+            count = await session.scalar(select(func.count(LostItem.id)))
+            return int(count or 0)
+
+    assert asyncio.run(count_items()) == 0

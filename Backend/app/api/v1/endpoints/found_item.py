@@ -1,6 +1,7 @@
 """Guest API สำหรับสร้างและอ่านประกาศพบของ."""
 
 from typing import Annotated
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from pydantic import EmailStr
@@ -9,7 +10,10 @@ from app.api.dependencies import DbSession, ObjectStorageClient
 from app.api.v1.forms import parse_guest_found_item_form
 from app.models.enums import LostType
 from app.schemas.lost_found_item import (
+    GuestClaimCreatedResponse,
+    GuestClaimStatusResponse,
     GuestFoundItemCreate,
+    GuestItemClaim,
     GuestItemCreatedResponse,
     GuestItemListResponse,
     GuestItemPublicResponse,
@@ -22,6 +26,15 @@ from app.services.lost_found import (
     create_guest_item,
     get_public_item,
     list_public_items,
+)
+from app.services.lost_found_claim import (
+    ClaimItemNotFoundError,
+    ClaimNotFoundError,
+    ClaimPersistenceError,
+    DuplicateClaimError,
+    ItemNotClaimableError,
+    create_guest_claim,
+    get_guest_claim_status,
 )
 from app.services.object_storage import StorageOperationError
 
@@ -120,4 +133,63 @@ async def read_found_item(
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail="ไม่สามารถสร้าง URL รูปภาพได้",
+        ) from exc
+
+
+@router.post(
+    "/{item_code}/claims",
+    response_model=GuestClaimCreatedResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def add_found_item_claim(
+    item_code: str,
+    payload: GuestItemClaim,
+    session: DbSession,
+) -> GuestClaimCreatedResponse:
+    """รับคำขอรับของคืนจาก guest โดยไม่คืนข้อมูลที่ใช้ยืนยันตัวเจ้าของ."""
+    try:
+        return await create_guest_claim(
+            session,
+            item_code=item_code,
+            payload=payload,
+        )
+    except ClaimItemNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
+    except (ItemNotClaimableError, DuplicateClaimError) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc),
+        ) from exc
+    except ClaimPersistenceError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(exc),
+        ) from exc
+
+
+@router.get(
+    "/{item_code}/claims/{claim_id}",
+    response_model=GuestClaimStatusResponse,
+)
+async def read_found_item_claim(
+    item_code: str,
+    claim_id: UUID,
+    session: DbSession,
+    claimant_email: Annotated[EmailStr, Query()],
+) -> GuestClaimStatusResponse:
+    """ให้ผู้ยื่นคำขอติดตามสถานะของตัวเอง โดยต้องยืนยันด้วยอีเมลที่ใช้ยื่น."""
+    try:
+        return await get_guest_claim_status(
+            session,
+            item_code=item_code,
+            claim_id=claim_id,
+            claimant_email=str(claimant_email),
+        )
+    except (ClaimItemNotFoundError, ClaimNotFoundError) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str("ไม่พบคำขอนี้"),
         ) from exc

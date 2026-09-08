@@ -1,7 +1,7 @@
 """Business logic ร่วมของ guest lost/found endpoints."""
 
 import logging
-from datetime import UTC, datetime
+from datetime import datetime
 from uuid import UUID, uuid4
 
 from fastapi import UploadFile
@@ -14,6 +14,7 @@ from app.models.image import Image
 from app.models.location import Location
 from app.models.lost_found import LostItem, LostItemHistory
 from app.schemas.lost_found_item import (
+    BANGKOK_TIMEZONE,
     GuestFoundItemCreate,
     GuestImageResponse,
     GuestItemCreateBase,
@@ -63,7 +64,7 @@ async def create_guest_item(
     stored: StoredObject | None = None
     image_id: UUID | None = None
 
-    if image_upload is not None:
+    if _has_uploaded_file(image_upload):
         processed = await prepare_guest_image(image_upload)
         image_id = uuid4()
         object_key = f"lost-found/{report_type.value}/{item_id}/{image_id}.webp"
@@ -94,6 +95,7 @@ async def create_guest_item(
         reporter_email=str(payload.reporter_email),
         status=LostStatus.PENDING,
     )
+    committed = False
     try:
         session.add(item)
         await session.flush()
@@ -124,10 +126,14 @@ async def create_guest_item(
                 )
             )
         await session.commit()
-        await session.refresh(item)
+        committed = True
     except SQLAlchemyError as exc:
         await session.rollback()
-        if stored is not None:
+        raise ItemPersistenceError("ไม่สามารถบันทึกประกาศได้") from exc
+    finally:
+        # asyncio.CancelledError สืบทอดจาก BaseException จึงไม่ถูก except ด้านบนจับ
+        # ต้องเก็บกวาดใน finally เท่านั้น ไม่งั้นไฟล์ค้างใน R2 โดยไม่มีแถวอ้างถึง
+        if not committed and stored is not None:
             try:
                 await storage.delete(stored.object_key)
             except StorageOperationError:
@@ -135,7 +141,6 @@ async def create_guest_item(
                     "Failed to remove orphaned R2 object %s after DB rollback",
                     stored.object_key,
                 )
-        raise ItemPersistenceError("ไม่สามารถบันทึกประกาศได้") from exc
 
     return GuestItemCreatedResponse(
         id=item.id,
@@ -163,7 +168,10 @@ async def list_public_items(
         LostItem.deleted_at.is_(None),
     ]
     if category:
-        filters.append(LostItem.item_category == category.strip())
+        # ตอนสร้างใช้ " ".join(split()) จึงต้อง normalize เหมือนกัน ไม่งั้นค่าที่มีเว้นวรรคซ้อนกรองไม่เจอ
+        normalized_category = " ".join(category.split())
+        if normalized_category:
+            filters.append(LostItem.item_category == normalized_category)
     if search:
         pattern = f"%{search.strip()}%"
         filters.append(
@@ -265,7 +273,6 @@ def _to_public_response(
         event_datetime=item.event_datetime,
         location_id=item.location_id,
         location_detail=item.location_detail,
-        custody_location=item.custody_location,
         status=item.status,
         created_at=item.created_at,
         updated_at=item.updated_at,
@@ -281,8 +288,14 @@ def _to_public_response(
         ],
     )
 
+def _has_uploaded_file(upload: UploadFile | None) -> bool:
+    """input type=file ที่ว่างเปล่ามาถึงเป็น UploadFile ที่ filename เป็นค่าว่าง ไม่ใช่ None."""
+    return upload is not None and bool(upload.filename)
+
+
 def _make_item_code(report_type: LostType, item_id: UUID) -> str:
     """สร้าง tracking code ที่อ่านง่ายและแทบไม่มีโอกาสชนกัน."""
     prefix = "LOST" if report_type == LostType.LOST else "FOUND"
-    date_part = datetime.now(UTC).strftime("%Y%m%d")
+    # ผู้ใช้อ่านรหัสนี้เทียบกับวันที่ตัวเองแจ้ง จึงต้องเป็นเวลาไทย ไม่ใช่ UTC
+    date_part = datetime.now(BANGKOK_TIMEZONE).strftime("%Y%m%d")
     return f"{prefix}-{date_part}-{item_id.hex[:8].upper()}"
