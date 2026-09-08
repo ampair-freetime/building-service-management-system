@@ -26,7 +26,7 @@ const routes = [
     name: "staff-dashboard",
     component: StaffDashboard,
   },
-  
+
   {
     path: "/admin-dashboard",
     name: "admin-dashboard",
