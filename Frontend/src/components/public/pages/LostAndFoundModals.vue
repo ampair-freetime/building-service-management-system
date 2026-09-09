@@ -63,11 +63,8 @@
         </section>
       </div>
 
-<<<<<<< HEAD
-<div
-=======
+
       <div
->>>>>>> origin/main
         class="ui-modal"
         id="claimModal"
         role="dialog"
