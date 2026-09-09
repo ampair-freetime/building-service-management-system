@@ -89,6 +89,7 @@ export function useStaffDashboard() {
     let lastModalTrigger = null;
     const $ = (s) => document.querySelector(s),
       $$ = (s) => [...document.querySelectorAll(s)];
+    // แนบ token ที่ได้ตอนล็อกอิน; ตั้ง JSON header เฉพาะคำขอที่ส่ง JSON
     function authHeaders(includeJson = false) {
       const headers = {
         Authorization: `Bearer ${localStorage.getItem("buildingCareAccessToken") || ""}`,
@@ -96,6 +97,7 @@ export function useStaffDashboard() {
       if (includeJson) headers["Content-Type"] = "application/json";
       return headers;
     }
+    // แปลงชื่อฟิลด์และสถานะจาก API ให้เข้ารูปแบบที่ตาราง dashboard ใช้อยู่
     function apiStaffToDashboardStaff(account) {
       return {
         name: account.full_name,
@@ -2754,6 +2756,7 @@ export function useStaffDashboard() {
       if (button?.dataset.centerAction === "claim-detail")
         openClaimDetail(button.dataset.itemId, button);
     });
+    // ฟังคลิกที่ container เพื่อรองรับปุ่มในการ์ดที่ถูกสร้างใหม่หลัง render โดยไม่ต้องผูก event ซ้ำ
     $("#lostGrid")?.addEventListener("click", (event) => {
       const button = event.target.closest("[data-lost-action]");
       if (!button) return;

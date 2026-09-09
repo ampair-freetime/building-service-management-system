@@ -49,7 +49,7 @@ async def create_guest_item(
     payload: GuestItemCreateBase,
     report_type: LostType,
     image_upload: UploadFile | None,
-    storage: ObjectStorage,
+    # storage: ObjectStorage,
 ) -> GuestItemCreatedResponse:
     """ตรวจข้อมูล อัปโหลดรูป แล้ว commit ประกาศกับ image metadata พร้อมกัน."""
     if payload.location_id is not None:
@@ -63,15 +63,15 @@ async def create_guest_item(
     stored: StoredObject | None = None
     image_id: UUID | None = None
 
-    if image_upload is not None:
-        processed = await prepare_guest_image(image_upload)
-        image_id = uuid4()
-        object_key = f"lost-found/{report_type.value}/{item_id}/{image_id}.webp"
-        stored = await storage.put(
-            object_key=object_key,
-            data=processed.data,
-            content_type=processed.content_type,
-        )
+    # if image_upload is not None:
+        # processed = await prepare_guest_image(image_upload)
+        # image_id = uuid4()
+        # object_key = f"lost-found/{report_type.value}/{item_id}/{image_id}.webp"
+        # stored = await storage.put(
+            # object_key=object_key,
+            # data=processed.data,
+            # content_type=processed.content_type,
+        # )
 
     private_verification_detail = None
     custody_location = None
@@ -105,36 +105,36 @@ async def create_guest_item(
                 note="Guest submitted report",
             )
         )
-        if stored is not None and processed is not None and image_id is not None:
-            session.add(
-                Image(
-                    id=image_id,
-                    lost_item_id=item_id,
-                    request_id=None,
-                    object_key=stored.object_key,
-                    storage_provider="r2",
-                    bucket_name=stored.bucket_name,
-                    content_type=processed.content_type,
-                    size_bytes=len(processed.data),
-                    etag=stored.etag,
-                    width=processed.width,
-                    height=processed.height,
-                    image_type=None,
-                    uploaded_by_staff_id=None,
-                )
-            )
+        # if stored is not None and processed is not None and image_id is not None:
+            # session.add(
+                # Image(
+                    # id=image_id,
+                    # lost_item_id=item_id,
+                    # request_id=None,
+                    # object_key=stored.object_key,
+                    # storage_provider="r2",
+                    # bucket_name=stored.bucket_name,
+                    # content_type=processed.content_type,
+                    # size_bytes=len(processed.data),
+                    # etag=stored.etag,
+                    # width=processed.width,
+                    # height=processed.height,
+                    # image_type=None,
+                    # uploaded_by_staff_id=None,
+                # )
+            # )
         await session.commit()
         await session.refresh(item)
     except SQLAlchemyError as exc:
         await session.rollback()
-        if stored is not None:
-            try:
-                await storage.delete(stored.object_key)
-            except StorageOperationError:
-                logger.exception(
-                    "Failed to remove orphaned R2 object %s after DB rollback",
-                    stored.object_key,
-                )
+        # if stored is not None:
+            # try:
+                # await storage.delete(stored.object_key)
+            # except StorageOperationError:
+                # logger.exception(
+                    # "Failed to remove orphaned R2 object %s after DB rollback",
+                    # stored.object_key,
+                # )
         raise ItemPersistenceError("ไม่สามารถบันทึกประกาศได้") from exc
 
     return GuestItemCreatedResponse(

@@ -39,6 +39,7 @@ const router = createRouter({
   routes,
 });
 
+// guard นี้ทำงานเฉพาะ route ที่ตั้ง meta.requiresAuth; routes ด้านบนยังไม่ได้ตั้งค่านี้
 router.beforeEach((to) => {
   if (to.meta.requiresAuth) {
     const token = localStorage.getItem('access_token')

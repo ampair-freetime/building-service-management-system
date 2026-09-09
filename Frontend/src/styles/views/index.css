@@ -751,6 +751,12 @@ main {
   color: #fff;
   padding: 0 22px;
   font-weight: 800;
+  cursor: pointer;
+  transition: transform 140ms ease, box-shadow 140ms ease;
+}
+.search-row button:active,
+.search-row button.pressed {
+  transform: scale(0.96);
 }
 .lost-actions-grid {
   display: grid;
@@ -808,6 +814,9 @@ main {
   display: flex;
   justify-content: space-between;
 }
+.lost-board {
+  scroll-margin-top: 24px;
+}
 .post-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -823,6 +832,25 @@ main {
 .post-card:focus-visible {
   outline: 3px solid rgba(109, 93, 246, 0.3);
   outline-offset: 3px;
+}
+.no-search-results {
+  margin-top: 18px;
+  padding: 28px 20px;
+  border: 1px dashed var(--line);
+  border-radius: 18px;
+  background: #fff;
+  text-align: center;
+}
+.no-search-results[hidden] {
+  display: none;
+}
+.no-search-results strong {
+  display: block;
+  margin-bottom: 6px;
+}
+.no-search-results p {
+  margin: 0;
+  color: var(--muted);
 }
 .post-image {
   height: 110px;
@@ -1828,6 +1856,41 @@ textarea:focus-visible {
 .detail-hero .icon {
   width: 68px;
   height: 68px;
+}
+.item-detail-state {
+  min-height: 240px;
+  padding: 36px 20px;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 10px;
+  text-align: center;
+}
+.item-detail-state[hidden] {
+  display: none;
+}
+.item-detail-state p {
+  max-width: 340px;
+  margin: 0;
+  color: var(--muted);
+}
+.detail-spinner {
+  width: 34px;
+  height: 34px;
+  border: 3px solid var(--lost-soft);
+  border-top-color: var(--lost);
+  border-radius: 50%;
+  animation: detail-spinner-rotate 0.8s linear infinite;
+}
+@keyframes detail-spinner-rotate {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .detail-spinner {
+    animation: none;
+  }
 }
 .detail-meta {
   display: grid;

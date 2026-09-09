@@ -18,33 +18,47 @@
               <svg class="icon"><use href="#i-close" /></svg>
             </button>
           </header>
-          <div class="detail-hero">
-            <svg class="icon" id="detailIcon"><use href="#i-box" /></svg>
+          <div id="detailLoadingState" class="item-detail-state" role="status" hidden>
+            <span class="detail-spinner" aria-hidden="true"></span>
+            <strong>กำลังโหลดรายละเอียด...</strong>
           </div>
-          <h3 id="detailTitle">รายการ</h3>
-          <p id="detailDescription"></p>
-          <div class="detail-meta">
-            <div><small>วันที่</small><strong id="detailDate">–</strong></div>
-            <div>
-              <small>สถานที่</small><strong id="detailLocation">–</strong>
+          <div id="detailNotFoundState" class="item-detail-state" role="status" hidden>
+            <strong>ไม่พบรายการนี้</strong>
+            <p>รายการอาจถูกลบ ปิดประกาศ หรือรหัสรายการไม่ถูกต้อง</p>
+          </div>
+          <div id="detailErrorState" class="item-detail-state" role="alert" hidden>
+            <strong>โหลดรายละเอียดไม่สำเร็จ</strong>
+            <p id="detailErrorMessage">กรุณาลองใหม่อีกครั้ง</p>
+          </div>
+          <div id="detailContent">
+            <div class="detail-hero">
+              <svg class="icon" id="detailIcon"><use href="#i-box" /></svg>
             </div>
-            <div><small>สถานะ</small><strong id="detailStatus">–</strong></div>
-            <div><small>หมายเลข</small><strong id="detailCode">–</strong></div>
-          </div>
-          <div class="modal-actions">
-            <button
-              type="button"
-              class="secondary"
-              data-modal-close="detailModal"
-            >
-              ปิด</button
-            ><button
-              type="button"
-              class="primary-btn"
-              id="detailContinueButton"
-            >
-              ดำเนินการต่อ
-            </button>
+            <h3 id="detailTitle">รายการ</h3>
+            <p id="detailDescription"></p>
+            <div class="detail-meta">
+              <div><small>วันที่</small><strong id="detailDate">–</strong></div>
+              <div>
+                <small>สถานที่</small><strong id="detailLocation">–</strong>
+              </div>
+              <div><small>สถานะ</small><strong id="detailStatus">–</strong></div>
+              <div><small>หมายเลข</small><strong id="detailCode">–</strong></div>
+            </div>
+            <div class="modal-actions">
+              <button
+                type="button"
+                class="secondary"
+                data-modal-close="detailModal"
+              >
+                ปิด</button
+              ><button
+                type="button"
+                class="primary-btn"
+                id="detailContinueButton"
+              >
+                ดำเนินการต่อ
+              </button>
+            </div>
           </div>
         </section>
       </div>

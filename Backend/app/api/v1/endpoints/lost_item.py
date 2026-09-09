@@ -36,7 +36,7 @@ router = APIRouter()
 async def add_lost_item(
     payload: Annotated[GuestLostItemCreate, Depends(parse_guest_lost_item_form)],
     session: DbSession,
-    storage: ObjectStorageClient,
+    # storage: ObjectStorageClient,
     image: Annotated[UploadFile | None, File()] = None,
 ) -> GuestItemCreatedResponse:
     """รับรายงานของหายจาก guest และส่งรูปที่ตรวจแล้วไปเก็บใน R2."""
@@ -46,7 +46,7 @@ async def add_lost_item(
             payload=payload,
             report_type=LostType.LOST,
             image_upload=image,
-            storage=storage,
+            # storage=storage,
         )
     except (InvalidImageError, LocationNotFoundError) as exc:
         raise HTTPException(

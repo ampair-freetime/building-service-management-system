@@ -1,7 +1,8 @@
 import { onMounted, onUnmounted } from "vue";
-import { createLostItem } from "../services/api";
+import { createFoundItem, createLostItem, getLostFoundItem } from "../services/api";
 
 export function usePublicServicePortal() {
+  // รอ Vue สร้าง DOM ก่อนผูก event เพราะหน้านี้ควบคุมองค์ประกอบผ่าน querySelector
   onMounted(() => {
     document.title = "CMU Building Care";
 
@@ -18,7 +19,9 @@ export function usePublicServicePortal() {
     let lastModalTrigger = null;
     let toastTimer = 0;
     let detailAction = "close";
+    let detailRequestId = 0;
     let selectedClaimItem = "";
+    // ข้อมูลติดตามในหน่วยความจำของหน้านี้ ไม่ใช่การอ่านสถานะล่าสุดจาก API และหายเมื่อโหลดหน้าใหม่
     const trackedRequests = new Map([
       [
         "BC-4821",
@@ -163,6 +166,7 @@ export function usePublicServicePortal() {
         document.body.classList.remove("modal-open");
         syncBottomNavigation();
       }
+      // คืน focus ให้ปุ่มที่เปิด modal เพื่อให้ใช้งานต่อด้วยคีย์บอร์ดได้ โดยตรวจว่าปุ่มยังอยู่ใน DOM
       if (
         restoreFocus &&
         lastModalTrigger instanceof HTMLElement &&
@@ -183,6 +187,7 @@ export function usePublicServicePortal() {
       modal.removeAttribute("aria-hidden");
       document.body.classList.add("modal-open");
       syncBottomNavigation(id);
+      // เลื่อน focus หลังเปลี่ยนสถานะ modal เพื่อให้ช่องเป้าหมายพร้อมแสดงผล
       window.requestAnimationFrame(() => {
         const focusTarget = modal.querySelector(
           'input:not([type="hidden"]), select, textarea, button:not([disabled])'
@@ -219,20 +224,23 @@ export function usePublicServicePortal() {
 
     function filterPosts() {
       const searchInput = document.getElementById("lostSearch");
+      const resultSummary = document.getElementById("resultSummary");
+      const noSearchResults = document.getElementById("noSearchResults");
       const query = searchInput.value.trim().toLowerCase();
       let visible = 0;
       document.querySelectorAll(".post-card").forEach((card) => {
+        const searchableText = card.dataset.search?.toLowerCase() || "";
         const matchesType =
           activePostFilter === "all" || card.dataset.kind === activePostFilter;
-        const matchesQuery =
-          !query || card.dataset.search.toLowerCase().includes(query);
+        const matchesQuery = !query || searchableText.includes(query);
         const show = matchesType && matchesQuery;
-        card.style.display = show ? "" : "none";
+        card.hidden = !show;
         if (show) visible += 1;
       });
-      document.getElementById("resultSummary").textContent = query
+      resultSummary.textContent = query
         ? `พบ ${visible} รายการที่ตรงกับ “${query}”`
         : `แสดง ${visible} รายการล่าสุด`;
+      noSearchResults.hidden = visible !== 0;
       openLostView("browse");
     }
 
@@ -245,14 +253,20 @@ export function usePublicServicePortal() {
         filterPosts();
       })
     );
-    document
-      .getElementById("lostSearchButton")
-      .addEventListener("click", filterPosts);
-    document.getElementById("lostSearch").addEventListener("keydown", (event) => {
-      if (event.key === "Enter") {
-        event.preventDefault();
+    document.getElementById("lostSearchForm").addEventListener("submit", (event) => {
+      event.preventDefault();
+      const searchButton = document.getElementById("lostSearchButton");
+      searchButton.classList.add("pressed");
+      window.setTimeout(() => {
+        searchButton.classList.remove("pressed");
         filterPosts();
-      }
+        window.requestAnimationFrame(() => {
+          document.getElementById("lostSearchResults").scrollIntoView({
+            behavior: prefersReducedMotion ? "auto" : "smooth",
+            block: "start",
+          });
+        });
+      }, 120);
     });
 
     function setDetailContent(data, action = "close") {
@@ -278,6 +292,35 @@ export function usePublicServicePortal() {
           : action === "contact"
           ? "ติดต่อเจ้าหน้าที่"
           : "รับทราบ";
+    }
+
+    function setItemDetailState(state, message = "") {
+      document.getElementById("detailLoadingState").hidden = state !== "loading";
+      document.getElementById("detailNotFoundState").hidden = state !== "not-found";
+      document.getElementById("detailErrorState").hidden = state !== "error";
+      document.getElementById("detailContent").hidden = state !== "content";
+      if (message) document.getElementById("detailErrorMessage").textContent = message;
+    }
+
+    function itemStatusLabel(status) {
+      return (
+        {
+          pending: "รอเจ้าหน้าที่ตรวจสอบ",
+          approved: "เผยแพร่แล้ว",
+          claimed: "มีผู้ขอรับคืน",
+          closed: "ปิดประกาศแล้ว",
+          rejected: "ไม่อนุมัติ",
+        }[status] || status || "–"
+      );
+    }
+
+    function formatItemDate(value) {
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return "–";
+      return new Intl.DateTimeFormat("th-TH", {
+        dateStyle: "medium",
+        timeStyle: "short",
+      }).format(date);
     }
 
     function openDetailFromData(element, trigger = element) {
@@ -306,22 +349,65 @@ export function usePublicServicePortal() {
       .forEach((item) =>
         item.addEventListener("click", () => openDetailFromData(item))
       );
-    function openLostFoundDetail(card, trigger = card) {
-      selectedClaimItem = card.querySelector("h4").textContent.trim();
+    async function openLostFoundDetail(card, trigger = card) {
+      const requestId = ++detailRequestId;
+      selectedClaimItem = card.querySelector("h4")?.textContent.trim() || "รายการ";
       const isFound = card.dataset.kind === "found";
-      setDetailContent(
-        {
-          dialogTitle: "รายละเอียดประกาศ",
-          title: selectedClaimItem,
-          detail: card.querySelector(".post-body p").textContent.trim(),
-          date: card.querySelector(".post-date").textContent.trim(),
-          location: card.dataset.search.split(" ").slice(-3).join(" "),
-          status: card.querySelector(".post-type").textContent.trim(),
-          icon: isFound ? "#i-box" : "#i-search",
-        },
-        isFound ? "claim" : "contact"
-      );
+      const itemCode = card.dataset.itemCode || card.dataset.code || "";
+
       openUiModal("detailModal", trigger);
+
+      // การ์ดตัวอย่างยังไม่มี item_code จึงแสดงข้อมูลเดิมจากหน้าเว็บได้ตามปกติ
+      if (!itemCode) {
+        setDetailContent(
+          {
+            dialogTitle: "รายละเอียดประกาศ",
+            title: selectedClaimItem,
+            detail: card.querySelector(".post-body p")?.textContent.trim(),
+            date: card.querySelector(".post-date")?.textContent.trim(),
+            location: card.dataset.search?.split(" ").slice(-3).join(" "),
+            status: card.querySelector(".post-type")?.textContent.trim(),
+            icon: isFound ? "#i-box" : "#i-search",
+          },
+          isFound ? "claim" : "contact"
+        );
+        setItemDetailState("content");
+        return;
+      }
+
+      setItemDetailState("loading");
+
+      try {
+        const item = await getLostFoundItem(itemCode, card.dataset.kind);
+        if (requestId !== detailRequestId) return;
+
+        if (!item) {
+          setItemDetailState("not-found");
+          return;
+        }
+
+        selectedClaimItem = item.item_name;
+        setDetailContent(
+          {
+            dialogTitle: "รายละเอียดประกาศ",
+            title: item.item_name,
+            detail: item.description,
+            date: formatItemDate(item.event_datetime),
+            location: item.location_detail,
+            status: itemStatusLabel(item.status),
+            code: item.item_code,
+            icon: item.report_type === "found" ? "#i-box" : "#i-search",
+          },
+          item.report_type === "found" ? "claim" : "contact"
+        );
+        setItemDetailState("content");
+      } catch (error) {
+        if (requestId !== detailRequestId) return;
+        setItemDetailState(
+          "error",
+          error.message || "ไม่สามารถโหลดรายละเอียดรายการได้"
+        );
+      }
     }
 
     document.querySelectorAll(".post-detail-button").forEach((button) =>
@@ -413,6 +499,7 @@ export function usePublicServicePortal() {
       openUiModal("successModal", document.activeElement);
     }
 
+    // blob URL ของพรีวิวใช้หน่วยความจำในเบราว์เซอร์ ต้องคืนด้วย revokeObjectURL เมื่อเลิกใช้
     function clearImagePreviews(form) {
       form.querySelectorAll(".image-preview").forEach((preview) => {
         const image = preview.querySelector("img");
@@ -423,9 +510,11 @@ export function usePublicServicePortal() {
       });
     }
 
+    // ฟอร์มที่เรียกฟังก์ชันนี้ยังจำลองการส่งในหน้าเว็บ ส่วนแจ้งของหายใช้ createLostItem แยกต่างหาก
     function submitDemo(event, type) {
       event.preventDefault();
       const form = event.currentTarget;
+
       if (!form.checkValidity()) {
         form.reportValidity();
         showToast("กรุณากรอกข้อมูลที่จำเป็นให้ครบ");
@@ -486,7 +575,7 @@ export function usePublicServicePortal() {
         if (trimmed.length < 10) return "รายละเอียดต้องมีอย่างน้อย 10 ตัวอักษร";
         return "";
       },
-      recipient_email: (value, field) => {
+      reporter_email: (value, field) => {
         if (!value.trim()) return "กรุณาระบุอีเมลสำหรับติดตามสถานะ";
         if (field.validity.typeMismatch) return "กรุณาระบุอีเมลให้ถูกต้อง";
         return "";
@@ -503,6 +592,7 @@ export function usePublicServicePortal() {
 
     function validateLostItemForm(form) {
       const fields = Array.from(form.querySelectorAll("select, input, textarea"));
+      // ใช้ map ตรวจทุกช่องก่อน every เพื่อแสดง error ครบ ไม่หยุดตรวจเมื่อเจอช่องแรกที่ผิด
       const isValid = fields
         .filter((field) => lostItemValidationRules[field.name])
         .map(validateLostItemField)
@@ -526,8 +616,10 @@ export function usePublicServicePortal() {
     lostItemForm.addEventListener("submit", async (event) => {
       event.preventDefault();
       const form = event.currentTarget;
+      // ป้องกัน submit ซ้ำระหว่างคำขอเดิมยังรอคำตอบ
+      if (form.querySelector('button[type="submit"]').disabled) return;
 
-      if (!validateLostItemForm(form)) {
+      if (!validateLostItemForm(form) || !form.checkValidity()) {
         form.reportValidity();
         showToast("กรุณากรอกข้อมูลที่จำเป็นให้ครบ");
         return;
@@ -535,27 +627,34 @@ export function usePublicServicePortal() {
 
       const formData = new FormData(form);
       const submitButton = form.querySelector('button[type="submit"]');
-      const reporterEmail = formData.get("reporter_email").trim();
+      // รองรับชื่อช่องเดิมระหว่างหน้าเว็บอัปเดต แต่ส่งให้ Backend ด้วยชื่อ reporter_email เสมอ
+      const emailValue = formData.get("reporter_email") ?? formData.get("recipient_email");
+      const reporterEmail = typeof emailValue === "string" ? emailValue.trim() : "";
+      if (!reporterEmail) {
+        showToast("กรุณาระบุอีเมลสำหรับติดตามสถานะ แล้วลองส่งอีกครั้ง");
+        form.querySelector('input[type="email"]')?.focus();
+        return;
+      }
 
       submitButton.disabled = true;
       submitButton.textContent = "กำลังส่งประกาศ...";
 
       try {
-        const item = await createLostItem({
-          report_type: "lost",
-          item_category: formData.get("item_category"),
-          item_name: formData.get("item_name"),
-          event_datetime: new Date(formData.get("event_datetime")).toISOString(),
-          location_detail: formData.get("location_detail"),
-          description: formData.get("description"),
-          reporter_email: reporterEmail,
-        });
+        // datetime-local ไม่มีเขตเวลา: แปลงเวลาท้องถิ่นเป็น ISO UTC ก่อนส่งให้ Backend
+        formData.set("event_datetime", new Date(formData.get("event_datetime")).toISOString());
+        formData.set("reporter_email", reporterEmail);
+        formData.delete("recipient_email");
+        // ช่องไฟล์ที่ไม่ได้เลือกอาจอยู่ใน FormData เป็น File ชื่อว่าง ต้องลบเพื่อไม่ให้ Backend รับเป็นรูปว่าง
+        const image = formData.get("image");
+        if (!image || !image.name) formData.delete("image");
+        const item = await createLostItem(formData);
 
         clearImagePreviews(form);
         form.reset();
-        showSuccess("แจ้งของหายเรียบร้อยแล้ว", item.reporter_email || reporterEmail, item.item_code);
+        showSuccess("แจ้งของหายเรียบร้อยแล้ว", reporterEmail, item.item_code);
       } catch (error) {
         showToast(error.message || "ไม่สามารถส่งรายการของหายได้");
+      // คืนปุ่มทุกกรณี; ล้างฟอร์มเฉพาะเมื่อสำเร็จ เพื่อให้ข้อมูลยังอยู่เมื่อส่งไม่ผ่าน
       } finally {
         submitButton.disabled = false;
         submitButton.textContent = "เผยแพร่ประกาศตามหา";
@@ -631,58 +730,115 @@ export function usePublicServicePortal() {
       field.addEventListener("blur", () => validateFoundItemField(field));
     });
 
-    foundItemForm.addEventListener("submit", (event) => {
-      if (!validateFoundItemForm(foundItemForm)) {
-        event.preventDefault();
-        foundItemForm.reportValidity();
+    foundItemForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const form = event.currentTarget;
+      const submitButton = form.querySelector('button[type="submit"]');
+      if (submitButton.disabled) return;
+
+      if (!validateFoundItemForm(form) || !form.checkValidity()) {
+        form.reportValidity();
         showToast("กรุณากรอกข้อมูลที่จำเป็นให้ครบ");
         return;
       }
-      submitDemo(event, "ส่งรายการพบของเพื่อรอเจ้าหน้าที่ตรวจสอบ");
+
+      const formData = new FormData(form);
+      const emailValue = formData.get("recipient_email");
+      const reporterEmail = typeof emailValue === "string" ? emailValue.trim() : "";
+      if (!reporterEmail) {
+        showToast("กรุณาระบุอีเมลสำหรับติดตามสถานะ แล้วลองส่งอีกครั้ง");
+        form.querySelector('input[type="email"]')?.focus();
+        return;
+      }
+
+      submitButton.disabled = true;
+      submitButton.textContent = "กำลังส่งรายการ...";
+
+      try {
+        const foundDate = formData.get("found_date");
+        const foundTime = formData.get("found_time");
+        formData.set(
+          "event_datetime",
+          new Date(`${foundDate}T${foundTime}`).toISOString()
+        );
+        formData.set("reporter_email", reporterEmail);
+        formData.set(
+          "private_verification_detail",
+          formData.get("private_detail")
+        );
+        formData.delete("found_date");
+        formData.delete("found_time");
+        formData.delete("recipient_email");
+        formData.delete("private_detail");
+        const image = formData.get("image");
+        if (!image || !image.name) formData.delete("image");
+
+        const item = await createFoundItem(formData);
+        clearImagePreviews(form);
+        form.reset();
+        showSuccess("แจ้งพบของเรียบร้อยแล้ว", reporterEmail, item.item_code);
+      } catch (error) {
+        showToast(error.message || "ไม่สามารถส่งรายการพบของได้");
+      } finally {
+        submitButton.disabled = false;
+        submitButton.textContent = "ส่งให้เจ้าหน้าที่ตรวจสอบ";
+      }
     });
 
     document.querySelectorAll(".image-input").forEach((input) => {
       const container = input.closest(".upload-field");
       const preview = container.querySelector(".image-preview");
       const image = preview.querySelector("img");
-      const fileName = preview.querySelector("span");
+      const fileName = preview.querySelector(".image-file-name");
       const removeButton = preview.querySelector(".remove-image");
       const fileError = document.getElementById(input.dataset.errorId);
+      const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
+      const maxSize = Number(input.dataset.maxSize) || 5 * 1024 * 1024;
+      const maxSizeMB = maxSize / (1024 * 1024);
+
       const setFileError = (message = "") => {
+        // เมื่อมีข้อความ ฟอร์มจะไม่ผ่าน checkValidity()
         input.setCustomValidity(message);
         input.setAttribute("aria-invalid", String(Boolean(message)));
         if (fileError) fileError.textContent = message;
       };
+      function clearPreview() {
+        // คืนหน่วยความจำของรูปเดิมก่อนล้างหรือเปลี่ยนพรีวิว
+        if (image.src.startsWith("blob:")) URL.revokeObjectURL(image.src);
+        image.removeAttribute("src");
+        fileName.textContent = "";
+        preview.classList.remove("visible");
+      }
+
       input.addEventListener("change", () => {
         const file = input.files[0];
-        if (!file) {
-          setFileError();
-          return;
-        }
-        if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
-          setFileError("รองรับเฉพาะไฟล์ JPG, PNG หรือ WebP");
-          input.value = "";
-          showToast("รองรับเฉพาะไฟล์ JPG, PNG หรือ WebP");
-          return;
-        }
-        if (file.size > Number(input.dataset.maxSize)) {
-          setFileError("รูปภาพต้องมีขนาดไม่เกิน 5 MB");
-          input.value = "";
-          showToast("รูปภาพต้องมีขนาดไม่เกิน 5 MB");
-          return;
-        }
+        clearPreview();
         setFileError();
-        if (image.src.startsWith("blob:")) URL.revokeObjectURL(image.src);
+        if (!file) return;
+
+        let message = "";
+        if (!allowedTypes.includes(file.type)) {
+          message = "รองรับเฉพาะไฟล์ JPG, PNG หรือ WebP";
+        } else if (file.size === 0) {
+          message = "ไฟล์รูปภาพว่างเปล่า กรุณาเลือกไฟล์ใหม่";
+        } else if (file.size > maxSize) {
+          message = `รูปภาพต้องมีขนาดไม่เกิน ${maxSizeMB} MB`;
+        }
+
+        if (message) {
+          input.value = "";
+          setFileError(message);
+          showToast(message);
+          return;
+        }
+        // สร้างพรีวิวเฉพาะไฟล์ที่ผ่านการตรวจแล้ว
         image.src = URL.createObjectURL(file);
         fileName.textContent = file.name;
         preview.classList.add("visible");
       });
       removeButton.addEventListener("click", () => {
-        if (image.src.startsWith("blob:")) URL.revokeObjectURL(image.src);
         input.value = "";
-        image.removeAttribute("src");
-        fileName.textContent = "";
-        preview.classList.remove("visible");
+        clearPreview();
         setFileError();
         input.focus();
       });
