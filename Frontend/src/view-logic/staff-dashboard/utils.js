@@ -2,6 +2,7 @@ export function loadQrCodeLibrary() {
   if (window.QRCode) return Promise.resolve();
 
   return new Promise((resolve, reject) => {
+    // ถ้ามี script ที่กำลังโหลดอยู่ ให้รออันเดิมแทนการเพิ่ม script ซ้ำ
     const existing = document.querySelector("script[data-qrcodejs]");
     if (existing) {
       existing.addEventListener("load", resolve, { once: true });
@@ -20,6 +21,7 @@ export function loadQrCodeLibrary() {
   });
 }
 
+// ใช้วันที่ตามเวลาไทย เพราะการตัดวันที่จาก ISO UTC อาจได้วันก่อนหน้าในช่วงเช้ามืด
 export function todayISO() {
   return new Intl.DateTimeFormat("en-CA", {
     timeZone: "Asia/Bangkok",
@@ -37,6 +39,7 @@ export function currentTimeHM() {
     .replace(".", ":");
 }
 
+// แปลงอักขระพิเศษก่อนนำข้อความไปแทรกใน HTML เพื่อไม่ให้ข้อความถูกตีความเป็นแท็ก
 export function escapeHtml(value) {
   return String(value ?? "").replace(
     /[&<>"']/g,
@@ -61,6 +64,7 @@ export function isTerminalStatus(status) {
   ].some((value) => String(status).includes(value));
 }
 
+// ตรวจคำปฏิเสธก่อนคำว่าอนุมัติ เพราะ "ไม่อนุมัติ" มีคำว่า "อนุมัติ" อยู่ด้วย
 export function badgeClass(status) {
   if (["ไม่อนุมัติ", "ข้อมูลไม่ตรง", "ลบแล้ว"].some((value) => status.includes(value)))
     return "danger";

@@ -45,6 +45,7 @@ export function useStaffLogin() {
     forgotModalOpen.value = false;
   }
 
+  // ส่วนนี้ยังแสดงผลจำลอง ไม่มีการเรียก API ส่งอีเมลรีเซ็ตรหัสผ่าน
   function handleForgotPassword() {
     if (!resetEmail.value.trim()) {
       showToast("กรุณากรอกอีเมลเจ้าหน้าที่ของคุณ");
@@ -77,9 +78,11 @@ export function useStaffLogin() {
         return;
       }
 
+      // เก็บ token สำหรับแนบ Bearer ในคำขอถัดไป; โปรไฟล์และ role ใช้ประกอบการแสดงผล
       localStorage.setItem("buildingCareAccessToken", data.access_token);
       localStorage.setItem("buildingCareStaff", JSON.stringify(data.staff));
       localStorage.setItem("buildingCareRole", data.staff.role);
+      // rememberMe จำเฉพาะอีเมล/รหัสเจ้าหน้าที่ ไม่ได้เก็บรหัสผ่าน
       if (rememberMe.value) {
         localStorage.setItem("buildingCareStaffId", identifier.value.trim());
       } else {

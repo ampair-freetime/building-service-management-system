@@ -50,7 +50,6 @@ async def create_guest_item(
     payload: GuestItemCreateBase,
     report_type: LostType,
     image_upload: UploadFile | None,
-    storage: ObjectStorage,
 ) -> GuestItemCreatedResponse:
     """ตรวจข้อมูล อัปโหลดรูป แล้ว commit ประกาศกับ image metadata พร้อมกัน."""
     if payload.location_id is not None:
@@ -107,24 +106,6 @@ async def create_guest_item(
                 note="Guest submitted report",
             )
         )
-        if stored is not None and processed is not None and image_id is not None:
-            session.add(
-                Image(
-                    id=image_id,
-                    lost_item_id=item_id,
-                    request_id=None,
-                    object_key=stored.object_key,
-                    storage_provider="r2",
-                    bucket_name=stored.bucket_name,
-                    content_type=processed.content_type,
-                    size_bytes=len(processed.data),
-                    etag=stored.etag,
-                    width=processed.width,
-                    height=processed.height,
-                    image_type=None,
-                    uploaded_by_staff_id=None,
-                )
-            )
         await session.commit()
         committed = True
     except SQLAlchemyError as exc:

@@ -18,49 +18,69 @@
               <svg class="icon"><use href="#i-close" /></svg>
             </button>
           </header>
-          <div class="detail-hero">
-            <svg class="icon" id="detailIcon"><use href="#i-box" /></svg>
+          <div id="detailLoadingState" class="item-detail-state" role="status" hidden>
+            <span class="detail-spinner" aria-hidden="true"></span>
+            <strong>กำลังโหลดรายละเอียด...</strong>
           </div>
-          <h3 id="detailTitle">รายการ</h3>
-          <p id="detailDescription"></p>
-          <div class="detail-meta">
-            <div><small>วันที่</small><strong id="detailDate">–</strong></div>
-            <div>
-              <small>สถานที่</small><strong id="detailLocation">–</strong>
+          <div id="detailNotFoundState" class="item-detail-state" role="status" hidden>
+            <strong>ไม่พบรายการนี้</strong>
+            <p>รายการอาจถูกลบ ปิดประกาศ หรือรหัสรายการไม่ถูกต้อง</p>
+          </div>
+          <div id="detailErrorState" class="item-detail-state" role="alert" hidden>
+            <strong>โหลดรายละเอียดไม่สำเร็จ</strong>
+            <p id="detailErrorMessage">กรุณาลองใหม่อีกครั้ง</p>
+          </div>
+          <div id="detailContent">
+            <div class="detail-hero">
+              <svg class="icon" id="detailIcon"><use href="#i-box" /></svg>
             </div>
-            <div><small>สถานะ</small><strong id="detailStatus">–</strong></div>
-            <div><small>หมายเลข</small><strong id="detailCode">–</strong></div>
-          </div>
-          <div class="modal-actions">
-            <button
-              type="button"
-              class="secondary"
-              data-modal-close="detailModal"
-            >
-              ปิด</button
-            ><button
-              type="button"
-              class="primary-btn"
-              id="detailContinueButton"
-            >
-              ดำเนินการต่อ
-            </button>
+            <h3 id="detailTitle">รายการ</h3>
+            <p id="detailDescription"></p>
+            <div class="detail-meta">
+              <div><small>วันที่</small><strong id="detailDate">–</strong></div>
+              <div>
+                <small>สถานที่</small><strong id="detailLocation">–</strong>
+              </div>
+              <div><small>สถานะ</small><strong id="detailStatus">–</strong></div>
+              <div><small>หมายเลข</small><strong id="detailCode">–</strong></div>
+            </div>
+            <div class="modal-actions">
+              <button
+                type="button"
+                class="secondary"
+                data-modal-close="detailModal"
+              >
+                ปิด</button
+              ><button
+                type="button"
+                class="primary-btn"
+                id="detailContinueButton"
+              >
+                ดำเนินการต่อ
+              </button>
+            </div>
           </div>
         </section>
       </div>
 
+<<<<<<< HEAD
 <div
+=======
+      <div
+>>>>>>> origin/main
         class="ui-modal"
         id="claimModal"
         role="dialog"
         aria-modal="true"
         aria-labelledby="claimModalTitle"
       >
-        <section class="ui-modal-card">
+        <section class="ui-modal-card wide">
           <header class="ui-modal-head">
             <div>
-              <h2 id="claimModalTitle">ยืนยันความเป็นเจ้าของ</h2>
-              <p class="modal-copy" id="claimItemName">รายการสิ่งของ</p>
+              <h2 id="claimModalTitle">ขอรับคืนสิ่งของ</h2>
+              <p class="modal-copy">
+                กรอกรายละเอียดเพื่อให้เจ้าหน้าที่ตรวจสอบความเป็นเจ้าของ
+              </p>
             </div>
             <button
               type="button"
@@ -71,39 +91,64 @@
               <svg class="icon"><use href="#i-close" /></svg>
             </button>
           </header>
-          <form id="claimForm">
-            <div class="modal-grid">
-              <div class="modal-field">
-                <label for="claimName">ชื่อผู้ขอรับ</label
-                ><input id="claimName" type="text" required />
-              </div>
-              <div class="modal-field">
-                <label for="claimContact">อีเมลสำหรับติดต่อ</label
-                ><input
-                  id="claimContact"
-                  name="recipient_email"
-                  type="email"
-                  required
-                  placeholder="name@example.com"
-                  autocomplete="email"
-                />
-              </div>
+
+          <form id="claimForm" class="form-panel" novalidate>
+            <div class="field">
+              <label>สิ่งของที่ต้องการขอรับคืน</label>
+              <strong id="claimItemName">–</strong>
             </div>
-            <div class="modal-field">
-              <label for="claimProof">รายละเอียดที่ใช้ยืนยัน</label
-              ><textarea
-                id="claimProof"
+            <div class="field">
+              <label for="claimName">ชื่อผู้ขอรับคืน</label>
+              <input
+                id="claimName"
+                name="claimant_name"
+                type="text"
                 required
-                placeholder="เช่น ตำหนิ ของภายใน หรือจุดสังเกต"
+                minlength="2"
+                maxlength="150"
+                aria-describedby="claimNameError"
+                autocomplete="name"
+                placeholder="ชื่อ-นามสกุล"
+              />
+              <p id="claimNameError" class="field-error" aria-live="polite"></p>
+            </div>
+            <div class="field">
+              <label for="claimContact">อีเมลสำหรับติดต่อ</label>
+              <input
+                id="claimContact"
+                name="claimant_email"
+                type="email"
+                required
+                maxlength="255"
+                aria-describedby="claimContactError"
+                autocomplete="email"
+                placeholder="name@example.com"
+              />
+              <p id="claimContactError" class="field-error" aria-live="polite"></p>
+            </div>
+            <div class="field">
+              <label for="claimProofDetail">รายละเอียดเพื่อยืนยันความเป็นเจ้าของ</label>
+              <textarea
+                id="claimProofDetail"
+                name="proof_detail"
+                required
+                minlength="10"
+                maxlength="1000"
+                aria-describedby="claimProofDetailError"
+                placeholder="เช่น สี ยี่ห้อ ตำหนิ ของที่อยู่ภายใน หรือข้อมูลเฉพาะที่เจ้าของทราบ"
               ></textarea>
+              <p id="claimProofDetailError" class="field-error" aria-live="polite"></p>
             </div>
-            <div class="modal-field">
-              <label for="claimDate">วันที่สะดวกรับของ</label
-              ><input id="claimDate" type="date" required />
+            <p class="privacy-note">
+              อย่าใส่รหัสผ่าน เลขบัตร หรือข้อมูลส่วนบุคคลที่ละเอียดอ่อน
+              เจ้าหน้าที่จะใช้ข้อมูลนี้เพื่อตรวจสอบก่อนนัดรับคืน
+            </p>
+            <div class="modal-actions">
+              <button type="button" class="secondary" data-modal-close="claimModal">
+                ยกเลิก
+              </button>
+              <button type="submit" class="primary-btn">ส่งคำขอรับคืน</button>
             </div>
-            <button type="submit" class="primary-btn modal-action">
-              ส่งคำขอ
-            </button>
           </form>
         </section>
       </div>
