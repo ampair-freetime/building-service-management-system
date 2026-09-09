@@ -2,7 +2,7 @@ import asyncio
 import concurrent.futures
 from datetime import datetime
 from io import BytesIO
-from uuid import uuid4
+from uuid import UUID, uuid4
 from zoneinfo import ZoneInfo
 
 import pytest
@@ -67,6 +67,25 @@ def make_png() -> bytes:
         output,
         format="PNG",
     )
+    return output.getvalue()
+
+
+def make_wide_png() -> bytes:
+    """20000x1000 = 20 ล้าน pixel รวม (ต่ำกว่าเพดาน 25 ล้าน) แต่ด้านกว้างเกิน
+    ขีดจำกัด 16383 px ของฟอร์แมต WebP — ตรวจแค่พื้นที่รวมอย่างเดียวจะจับไม่ได้."""
+    output = BytesIO()
+    PillowImage.new("RGB", (20_000, 1_000), color=(10, 20, 30)).save(output, format="PNG")
+    return output.getvalue()
+
+
+def make_rotated_jpeg() -> bytes:
+    """JPEG แนวตั้ง 400x1200 ติด EXIF orientation=6 (หมุน 90 องศาตามเข็ม)
+    ไฟล์ที่ decode แล้วหมุนจริงจะกลายเป็น 1200x400."""
+    output = BytesIO()
+    image = PillowImage.new("RGB", (400, 1200), color=(200, 60, 60))
+    exif = image.getexif()
+    exif[274] = 6  # 274 = Orientation tag
+    image.save(output, format="JPEG", exif=exif)
     return output.getvalue()
 
 
@@ -261,6 +280,64 @@ def test_r2_failure_does_not_create_database_row(
             return int(count or 0)
 
     assert asyncio.run(count_items()) == 0
+
+
+def test_extremely_wide_image_is_rejected_with_422(
+    test_context: tuple[TestClient, async_sessionmaker[AsyncSession]],
+    fake_storage: FakeObjectStorage,
+) -> None:
+    """รูปที่ด้านใดด้านหนึ่งเกิน 16383 px ต้องได้ 422 ที่อ่านรู้เรื่อง ไม่ใช่ 500 จาก
+    Pillow ตอน encode WebP ล้มเหลว — การตรวจแค่ width*height เทียบเพดานพื้นที่รวม
+    ปล่อยรูปยาวเรียวแบบนี้หลุดผ่านไปได้."""
+    client, session_factory = test_context
+    response = client.post(
+        "/api/v1/guest/lost-items",
+        data=lost_form(),
+        files={"image": ("panorama.png", make_wide_png(), "image/png")},
+    )
+
+    assert response.status_code == 422
+    assert fake_storage.objects == {}
+
+    async def count_items() -> int:
+        async with session_factory() as session:
+            count = await session.scalar(select(func.count(LostItem.id)))
+            return int(count or 0)
+
+    assert asyncio.run(count_items()) == 0
+
+
+def test_exif_rotated_image_reports_saved_dimensions(
+    test_context: tuple[TestClient, async_sessionmaker[AsyncSession]],
+    fake_storage: FakeObjectStorage,
+) -> None:
+    """width/height ที่บันทึกลง DB ต้องตรงกับไฟล์ WebP จริงหลังหมุนตาม EXIF
+    ไม่ใช่ขนาดดิบก่อนหมุนที่อ่านมาตอนต้น ไม่งั้น frontend ที่ใช้ค่านี้จองพื้นที่
+    แสดงผลจะจองผิดด้าน."""
+    client, session_factory = test_context
+    response = client.post(
+        "/api/v1/guest/lost-items",
+        data=lost_form(),
+        files={"image": ("rotated.jpg", make_rotated_jpeg(), "image/jpeg")},
+    )
+
+    assert response.status_code == 201
+    item_code = response.json()["item_code"]
+
+    async def read_image() -> Image:
+        async with session_factory() as session:
+            item = await session.scalar(
+                select(LostItem).where(LostItem.item_code == item_code)
+            )
+            image = await session.scalar(select(Image).where(Image.lost_item_id == item.id))
+            assert image is not None
+            return image
+
+    image = asyncio.run(read_image())
+    # ไฟล์ต้นทางถือกล้องแนวตั้ง 400x1200 แต่ EXIF บอกให้หมุน 90 องศา
+    # หลังหมุนจริงจะกลายเป็น 1200x400 — ถ้าโค้ดยังอ่าน source.size ก่อนหมุน
+    # ค่าที่ได้จะสลับกันเป็น (400, 1200)
+    assert (image.width, image.height) == (1200, 400)
 
 
 def test_owner_tracks_pending_item_that_public_cannot_see(
@@ -496,6 +573,106 @@ def test_duplicate_pending_claim_from_same_email_returns_409(
 
     assert second.status_code == 409
     assert len(_read_claims(session_factory)) == 1
+
+
+def test_race_between_concurrent_claims_is_rejected_at_the_database(
+    test_context: tuple[TestClient, async_sessionmaker[AsyncSession]],
+    fake_storage: FakeObjectStorage,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """สอง request ที่แข่งกันยื่น claim อีเมลเดียวกันพร้อมกัน (เช่น ผู้ใช้กดปุ่มส่งซ้ำ)
+    อาจเห็นผล SELECT ตรวจซ้ำว่า "ยังไม่มี" ทั้งคู่ ก่อนที่อีกฝั่งจะ commit ทัน — จำลอง
+    จังหวะนั้นด้วยการแทรกคำขอคู่แข่งเข้าไปพอดีตอนที่ dedup SELECT วิ่งผ่านไปแล้วแต่ยัง
+    ไม่ทันโยน error ยืนยันว่า partial unique index ที่ DB จับได้ และ service แปลง
+    IntegrityError เป็น 409 ไม่ใช่ 500 (ต้องดัก IntegrityError ก่อน SQLAlchemyError
+    เพราะเป็นชนิดย่อยของมัน)."""
+    client, session_factory = test_context
+    item_code = _create_found_item(client)
+    _set_item_status(session_factory, item_code=item_code, new_status=LostStatus.APPROVED)
+
+    async def load_item_id() -> UUID:
+        async with session_factory() as session:
+            item = await session.scalar(select(LostItem).where(LostItem.item_code == item_code))
+            assert item is not None
+            return item.id
+
+    found_item_id = asyncio.run(load_item_id())
+
+    original_scalar = AsyncSession.scalar
+    injected = {"done": False}
+
+    async def scalar_that_misses_a_concurrent_insert(self, statement, *args, **kwargs):
+        result = await original_scalar(self, statement, *args, **kwargs)
+        # กรองเฉพาะ SELECT ตรวจ claim ซ้ำใน lost_found_claim.py ไม่แตะ query อื่น
+        # เช่น select(LostItem)... ของ _load_found_item
+        if (
+            not injected["done"]
+            and result is None
+            and "lost_claims.id" in str(statement).lower()
+        ):
+            injected["done"] = True
+            async with session_factory() as racer:
+                racer.add(
+                    LostClaim(
+                        id=uuid4(),
+                        found_item_id=found_item_id,
+                        claimant_name="สมชาย ใจดี",
+                        claimant_email="claimant@example.com",
+                        proof_detail="แข่งกันยื่นพร้อมกัน",
+                        status=ClaimStatus.PENDING,
+                    )
+                )
+                await racer.commit()
+        return result
+
+    monkeypatch.setattr(AsyncSession, "scalar", scalar_that_misses_a_concurrent_insert)
+
+    response = client.post(
+        f"/api/v1/guest/found-items/{item_code}/claims",
+        json=claim_form(),
+    )
+
+    assert injected["done"], "การจำลอง race ไม่ทำงาน เทสต์นี้จึงไม่ได้พิสูจน์อะไร"
+    assert response.status_code == 409
+    assert len(_read_claims(session_factory)) == 1
+
+
+def test_rejected_claim_does_not_block_a_new_claim_from_the_same_email(
+    test_context: tuple[TestClient, async_sessionmaker[AsyncSession]],
+    fake_storage: FakeObjectStorage,
+) -> None:
+    """partial unique index ต้องครอบเฉพาะสถานะ pending — คนที่เคยถูกปฏิเสธและมี
+    หลักฐานเพิ่มต้องยื่นคำขอใหม่ได้ ถ้าทำเป็น unique index ธรรมดา (ไม่มี WHERE) จะบล็อก
+    คนกลุ่มนี้ไปตลอดชีวิตโดยไม่ตั้งใจ"""
+    client, session_factory = test_context
+    item_code = _create_found_item(client)
+    _set_item_status(session_factory, item_code=item_code, new_status=LostStatus.APPROVED)
+
+    first = client.post(
+        f"/api/v1/guest/found-items/{item_code}/claims",
+        json=claim_form(),
+    )
+    assert first.status_code == 201
+    claim_id = UUID(first.json()["id"])
+
+    async def reject_claim() -> None:
+        async with session_factory() as session:
+            claim = await session.scalar(select(LostClaim).where(LostClaim.id == claim_id))
+            assert claim is not None
+            claim.status = ClaimStatus.REJECTED
+            await session.commit()
+
+    asyncio.run(reject_claim())
+
+    second = client.post(
+        f"/api/v1/guest/found-items/{item_code}/claims",
+        json=claim_form(),
+    )
+
+    assert second.status_code == 201
+    claims = _read_claims(session_factory)
+    assert len(claims) == 2
+    assert {c.status for c in claims} == {ClaimStatus.REJECTED, ClaimStatus.PENDING}
 
 
 @pytest.mark.parametrize(

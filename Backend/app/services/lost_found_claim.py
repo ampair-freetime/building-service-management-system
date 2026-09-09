@@ -4,7 +4,7 @@ import logging
 from uuid import UUID, uuid4
 
 from sqlalchemy import select
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.enums import ClaimStatus, LostStatus, LostType
@@ -78,6 +78,15 @@ async def create_guest_claim(
         # การปล่อยให้ lazy load ตอน serialize จะพังด้วย MissingGreenlet ใน async context
         await session.refresh(claim, ["created_at"])
         await session.commit()
+    except IntegrityError as exc:
+        # SELECT ตรวจซ้ำด้านบนเช็คได้แค่ ณ ขณะนั้น ถ้าสอง request แข่งกันเข้ามาพร้อมกัน
+        # (เช่น ผู้ใช้กดปุ่มส่งซ้ำ) ทั้งคู่จะเห็นว่า "ยังไม่ซ้ำ" แล้วพยายาม INSERT พร้อมกัน
+        # partial unique index (uq_lost_claims_pending_per_email) ที่ DB จะกันแถวที่สอง
+        # แล้วโยน IntegrityError ออกมาแทน — ต้องดัก IntegrityError ก่อน SQLAlchemyError
+        # เพราะ IntegrityError เป็นชนิดย่อยของมัน ถ้าสลับลำดับจะไปเข้า except ด้านล่าง
+        # กลายเป็น 500 แทนที่จะเป็น 409 ที่ถูกต้อง
+        await session.rollback()
+        raise DuplicateClaimError("คุณมีคำขอรับคืนของรายการนี้ที่รอตรวจสอบอยู่แล้ว") from exc
     except SQLAlchemyError as exc:
         await session.rollback()
         raise ClaimPersistenceError("ไม่สามารถบันทึกคำขอรับคืนได้") from exc

@@ -69,7 +69,7 @@ async def add_lost_item(
 async def read_lost_items(
     session: DbSession,
     storage: ObjectStorageClient,
-    limit: Annotated[int, Query(ge=1, le=100)] = 20,
+    limit: Annotated[int, Query(ge=1, le=200)] = 200,
     offset: Annotated[int, Query(ge=0)] = 0,
     category: Annotated[str | None, Query(max_length=100)] = None,
     search: Annotated[str | None, Query(max_length=200)] = None,

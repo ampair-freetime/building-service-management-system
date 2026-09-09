@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING
 from uuid import UUID, uuid4
 
-from sqlalchemy import DateTime, ForeignKey, Index, Integer, String, Text, Uuid, func
+from sqlalchemy import DateTime, ForeignKey, Index, Integer, String, Text, Uuid, func, text
 from sqlalchemy import Enum as SqlEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -123,6 +123,20 @@ class LostItemHistory(Base):
 
 class LostClaim(Base):
     __tablename__ = "lost_claims"
+    __table_args__ = (
+        # อนุญาตให้อีเมลเดียวมีคำขอ pending ต่อประกาศได้แค่ 1 แถวเท่านั้น
+        # ต้องเป็น partial index (WHERE status='pending') ไม่ใช่ unique ธรรมดา
+        # เพื่อให้คนที่เคยถูก reject ยื่นคำขอใหม่ได้ — ตรวจใน service (SELECT ก่อน INSERT)
+        # อย่างเดียวไม่พอ เพราะสอง request ที่แข่งกันเข้ามาพร้อมกันจะลอดผ่านทั้งคู่
+        Index(
+            "uq_lost_claims_pending_per_email",
+            "found_item_id",
+            "claimant_email",
+            unique=True,
+            postgresql_where=text("status = 'pending'"),
+            sqlite_where=text("status = 'pending'"),
+        ),
+    )
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
     found_item_id: Mapped[UUID] = mapped_column(ForeignKey("lost_items.id"), index=True)

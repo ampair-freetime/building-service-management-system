@@ -14,6 +14,7 @@ from app.core.config import settings
 ALLOWED_IMAGE_CONTENT_TYPES = {"image/jpeg", "image/png", "image/webp"}
 ALLOWED_IMAGE_FORMATS = {"JPEG", "PNG", "WEBP"}
 OUTPUT_CONTENT_TYPE = "image/webp"
+MAX_WEBP_DIMENSION = 16383
 
 
 class InvalidImageError(ValueError):
@@ -69,11 +70,19 @@ def _normalize_to_webp(
                 width, height = source.size
                 if width <= 0 or height <= 0 or width * height > max_pixels:
                     raise InvalidImageError("รูปภาพมีความละเอียดสูงเกินกำหนด")
+                if width > MAX_WEBP_DIMENSION or height > MAX_WEBP_DIMENSION:
+                    raise InvalidImageError(
+                        f"รูปภาพแต่ละด้านต้องไม่เกิน {MAX_WEBP_DIMENSION:,} พิกเซล"
+                    )
 
                 source.load()
                 normalized = ImageOps.exif_transpose(source)
                 target_mode = "RGBA" if "A" in normalized.getbands() else "RGB"
                 normalized = normalized.convert(target_mode)
+                # ต้องอ่านขนาดใหม่หลัง exif_transpose เพราะภาพที่ถูกหมุน 90/270 องศา
+                # จะสลับด้านกว้าง-สูง ถ้าใช้ width/height จาก source เดิม ค่าที่บันทึกลง DB
+                # จะไม่ตรงกับไฟล์ WebP จริงที่ถูกเก็บใน R2
+                width, height = normalized.size
 
                 output = BytesIO()
                 normalized.save(
@@ -87,9 +96,13 @@ def _normalize_to_webp(
     except (
         UnidentifiedImageError,
         OSError,
+        ValueError,
         PillowImage.DecompressionBombError,
         PillowImage.DecompressionBombWarning,
     ) as exc:
+        # ValueError ครอบไว้เป็นตาข่ายกันตก (เช่น Pillow ปฏิเสธตอน encode เกินขีดจำกัดของฟอร์แมต)
+        # ต้องอยู่หลัง "except InvalidImageError: raise" เสมอ เพราะ InvalidImageError
+        # สืบทอดจาก ValueError — ถ้าสลับลำดับ ข้อความ error ที่ตั้งใจเขียนจะถูกกลืนหมด
         raise InvalidImageError("ไม่สามารถอ่านไฟล์รูปภาพนี้ได้") from exc
 
     encoded = output.getvalue()
