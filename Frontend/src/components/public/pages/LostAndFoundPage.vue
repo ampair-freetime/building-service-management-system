@@ -247,8 +247,19 @@
                 id="lostFoundTrackingCode"
                 type="text"
                 required
-                placeholder="เช่น CLAIM-4821"
+                placeholder="เช่น LOST-20260910-ABC12345"
                 autocomplete="off"
+              />
+            </div>
+            <div class="field">
+              <label for="lostFoundTrackingEmail">อีเมลผู้แจ้ง</label>
+              <input
+                id="lostFoundTrackingEmail"
+                type="email"
+                required
+                maxlength="255"
+                placeholder="name@example.com"
+                autocomplete="email"
               />
             </div>
             <button type="submit" class="primary-btn">ตรวจสอบสถานะ</button>

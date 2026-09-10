@@ -821,6 +821,7 @@ main {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 14px;
+  margin-top: 22px;
 }
 .post-card {
   border: 1px solid var(--line);
@@ -858,6 +859,11 @@ main {
   place-items: center;
   background: var(--lost-soft);
   font-size: 38px;
+}
+.post-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 .post-body {
   padding: 15px;
