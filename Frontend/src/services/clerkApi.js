@@ -138,7 +138,32 @@ export async function getPendingOwnershipRequests() {
   const controller = new AbortController();
 
   try{
-    const response = await fetch(`${API_BASE_URL}/lost-found/`,{
+    const response = await fetch(`${API_BASE_URL}/lost-found/ownership-requests`,{
+      method : "GET",
+      headers: {
+          Authorization: `Bearer ${localStorage.getItem("buildingCareAccessToken") || ""}`,
+        },
+        signal: controller.signal,
+    });
+    return await parseResponse(
+      response,
+      "ไม่สามารถโหลดรายละเอียดประกาศของหายได้",
+    );
+  }catch (error) {
+    if (controller.signal.aborted) {
+      throw new ClerkApiError("ใช้เวลาโหลดคำขอนานเกินไป กรุณาลองใหม่",);
+  }
+  if (error instanceof TypeError) {
+      throw new ClerkApiError("เชื่อมต่อ Backend ไม่ได้ กรุณาลองใหม่",);
+    }
+    throw error;
+  }
+}
+export async function getOwnershipRequestDetail(claimId) {
+  const controller = new AbortController();
+
+  try{
+    const response = await fetch(`${API_BASE_URL}/lost-found/ownership-requests/${encodeURIComponent(claimId)}`,{
       method : "GET",
       headers: {
           Authorization: `Bearer ${localStorage.getItem("buildingCareAccessToken") || ""}`,
@@ -160,60 +185,67 @@ export async function getPendingOwnershipRequests() {
   }
 }
 
-export async function reviewFoundItem(itemId, status, reason) {
-  const controller = new AbortController();
-
-  try {
-    const response = await fetch(
-      `${API_BASE_URL}/lost-found/found-items/${encodeURIComponent(itemId)}/review`,
-      {
-        method: "PATCH",
-        headers: {
-          Authorization: `Bearer ${
-            localStorage.getItem("buildingCareAccessToken") || ""
-          }`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          status,
-          reason,
-        }),
-        signal: controller.signal,
+export async function approveOwnershipRequest(claimId) {
+  const response = await fetch(
+    `${API_BASE_URL}/lost-found/ownership-requests/${encodeURIComponent(claimId)}/approve`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem("buildingCareAccessToken") || ""}`,
       },
-    );
+    },
+  );
 
-    return await parseResponse(
-      response,
-      "ไม่สามารถบันทึกผลการตรวจสอบได้",
-    );
-  } catch (error) {
-    if (controller.signal.aborted) {
-      throw new ClerkApiError(
-        "ใช้เวลาบันทึกผลนานเกินไป กรุณาลองใหม่",
-      );
-    }
-
-    if (error instanceof TypeError) {
-      throw new ClerkApiError(
-        "เชื่อมต่อ Backend ไม่ได้ กรุณาลองใหม่",
-      );
-    }
-    throw error;
-  }
+  return await parseResponse(response, "ไม่สามารถอนุมัติคำขอรับของได้");
 }
 
-export function approveFoundItem(itemId) {
-  return reviewFoundItem(
-    itemId,
-    "approved",
-    "ตรวจสอบข้อมูลแล้ว",
+export async function requestOwnershipAdditionalInfo(claimId, message) {
+  const response = await fetch(
+    `${API_BASE_URL}/lost-found/ownership-requests/${encodeURIComponent(claimId)}/request-additional-info`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem("buildingCareAccessToken") || ""}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ message }),
+    },
   );
+
+  return await parseResponse(response, "ไม่สามารถขอข้อมูลเพิ่มเติมได้");
 }
 
-export function rejectFoundItem(itemId, reason) {
-  return reviewFoundItem(
-    itemId,
-    "rejected",
-    reason,
+
+export async function approveFoundItem(itemId) {
+  const response = await fetch(
+    `${API_BASE_URL}/lost-found/found-items/${encodeURIComponent(itemId)}/approve`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${
+          localStorage.getItem("buildingCareAccessToken") || ""
+        }`,
+      },
+    },
   );
+
+  return await parseResponse(response, "ไม่สามารถอนุมัติรายการได้");
+}
+
+export async function rejectFoundItem(itemId, reason) {
+  const response = await fetch(
+    `${API_BASE_URL}/lost-found/found-items/${encodeURIComponent(itemId)}/reject`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${
+          localStorage.getItem("buildingCareAccessToken") || ""
+        }`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ reason }),
+    },
+  );
+
+  return await parseResponse(response, "ไม่สามารถปฏิเสธรายการได้");
 }

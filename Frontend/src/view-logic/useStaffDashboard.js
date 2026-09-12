@@ -7,10 +7,12 @@ import {
   getLostItemDetail,
   getPendingFoundItems,
   getPendingLostItems,
-  reviewFoundItem,
   rejectFoundItem,
   approveFoundItem,
   getPendingOwnershipRequests,
+  getOwnershipRequestDetail,
+  approveOwnershipRequest,
+  requestOwnershipAdditionalInfo,
 } from "../services/clerkApi.js";
 import {
   badgeClass,
@@ -206,13 +208,24 @@ export function useStaffDashboard() {
       if (currentRole !== "clerk") return;
 
       try {
-        const data = await getPendingOwnershipRequests();
+        const summaries = await getPendingOwnershipRequests();
+        const data = await Promise.all(
+          summaries.map(async (claim) => {
+            try {
+              return await getOwnershipRequestDetail(claim.id);
+            } catch (error) {
+              if (error.status === 401 || error.status === 403) throw error;
+              console.warn("Loading ownership request detail failed:", error);
+              return claim;
+            }
+          }),
+        );
 
         lostSets.claims = data.map((claim) => ({
           backendId: claim.id,
           foundItemBackendId: claim.found_item_id,
           id: claim.claim_code || claim.id,
-          title: `คำขอรับ${claim.item_name}`,
+          title: `คำขอรับ${claim.item_name || "ของคืน"}`,
           place: claim.proof_detail || "ไม่มีรายละเอียดหลักฐาน",
           custody: "คำขอใหม่",
           status: claim.status === "pending"
@@ -2257,7 +2270,6 @@ export function useStaffDashboard() {
       $("#claimActions").innerHTML = [
         ["more", "ขอข้อมูลเพิ่มเติม", ""],
         ["verify", "ยืนยันความเป็นเจ้าของ", "primary-action"],
-        ["reject", "ไม่อนุมัติ", ""],
         ["appointment", "สร้างนัดหมาย", ""],
       ].map((action) =>
         `<button type="button" class="quick-action ${action[2]}" data-claim-action="${action[0]}" data-claim-id="${id}">${action[1]}</button>`
@@ -2275,7 +2287,6 @@ export function useStaffDashboard() {
       const map = {
         more: ["ขอข้อมูลเพิ่มเติม", "ขอข้อมูลเพิ่มเติม"],
         verify: ["ยืนยันความเป็นเจ้าของ", "ผ่านการตรวจสอบ"],
-        reject: ["ยืนยันไม่อนุมัติคำขอ", "ไม่ผ่านการตรวจสอบ"],
       };
       const actionConfig = map[action];
       if (!actionConfig) return;
@@ -2285,8 +2296,23 @@ export function useStaffDashboard() {
         action === "verify"
           ? `${id} · ${item.requester || "ผู้ยื่นคำขอ"} ให้หลักฐานตรงกับรายการ ${item.title} แล้วใช่หรือไม่?`
           : `ยืนยันการดำเนินการกับคำขอ ${id} หรือไม่?`;
-      requestConfirmation(title, confirmationText, () => {
-        item.status = status;
+      const additionalInfoMessage = action === "more"
+        ? window.prompt("ระบุข้อมูลที่ต้องการให้ผู้ยื่นคำขอส่งเพิ่มเติม")
+        : null;
+      if (action === "more" && !additionalInfoMessage?.trim()) return;
+      requestConfirmation(title, confirmationText, async () => {
+        try {
+          const result = action === "verify"
+            ? await approveOwnershipRequest(item.backendId)
+            : await requestOwnershipAdditionalInfo(
+                item.backendId,
+                additionalInfoMessage.trim(),
+              );
+          item.status = result.status === "approved"
+            ? "ผ่านการตรวจสอบ"
+            : result.status === "additional_info_required"
+              ? "ขอข้อมูลเพิ่มเติม"
+              : status;
         item.assignee = activeStaffName();
         addAudit("lost", title, id, item.title, `เปลี่ยนสถานะเป็น ${status}`);
         recordWorkHistory({
@@ -2307,6 +2333,11 @@ export function useStaffDashboard() {
             ? "ยืนยันความเป็นเจ้าของแล้ว"
             : "อัปเดตคำขอแล้ว"
         );
+        } catch (error) {
+          if (await handleUnauthorizedResponse(error.status)) return;
+          console.error("Updating ownership request failed:", error);
+          toast(error.message || "ไม่สามารถอัปเดตคำขอรับของได้");
+        }
       });
     }
     function openAppointment(id, trigger = document.activeElement) {
