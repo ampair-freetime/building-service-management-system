@@ -91,10 +91,13 @@
             </select>
           </div>
           <div class="field">
-            <label for="rejectNote">หมายเหตุเพิ่มเติม</label
+            <label for="rejectReasonDetail">รายละเอียดเหตุผล</label
             ><textarea
-              id="rejectNote"
+              id="rejectReasonDetail"
               placeholder="อธิบายสิ่งที่ตรวจพบ เพื่อให้ตรวจสอบย้อนหลังได้"
+              minlength="5"
+              maxlength="500"
+              required
             ></textarea>
           </div>
           <button class="danger" style="width: 100%" type="submit">

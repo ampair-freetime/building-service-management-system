@@ -25,12 +25,14 @@ const routes = [
     path: "/staff-dashboard",
     name: "staff-dashboard",
     component: StaffDashboard,
+    meta: { requiresAuth: true },
   },
 
   {
     path: "/admin-dashboard",
     name: "admin-dashboard",
     component: StaffDashboard,
+    meta: { requiresAuth: true },
   },
 ];
 
@@ -42,12 +44,12 @@ const router = createRouter({
 // guard นี้ทำงานเฉพาะ route ที่ตั้ง meta.requiresAuth; routes ด้านบนยังไม่ได้ตั้งค่านี้
 router.beforeEach((to) => {
   if (to.meta.requiresAuth) {
-    const token = localStorage.getItem('access_token')
+    const token = localStorage.getItem("buildingCareAccessToken");
 
     if (!token) {
-      return '/staff-login'
+      return "/staff-login";
     }
   }
-})
+});
 
 export default router;
