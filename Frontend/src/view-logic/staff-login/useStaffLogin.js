@@ -1,7 +1,8 @@
 import { onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 
-const LOGIN_ENDPOINT = "http://localhost:8000/api/v1/auth/login";
+const API_BASE_URL = "http://localhost:8000/api/v1";
+const LOGIN_ENDPOINT = `${API_BASE_URL}/auth/login`;
 
 export function useStaffLogin() {
   const router = useRouter();

@@ -35,19 +35,19 @@
           <p id="jobDetailDescription"></p>
           <div class="detail-meta">
             <div>
-              <small>สถานที่พบ</small>
+              <small id="jobDetailRoomLabel">สถานที่พบ</small>
               <strong id="jobDetailRoom">–</strong>
             </div>
             <div>
-              <small>ผู้แจ้ง</small>
+              <small id="jobDetailReporterLabel">ผู้แจ้ง</small>
               <strong id="jobDetailReporter">–</strong>
             </div>
             <div>
-              <small>ช่องทางติดต่อ</small>
+              <small id="jobDetailContactLabel">ช่องทางติดต่อ</small>
               <strong id="jobDetailContact">–</strong>
             </div>
             <div>
-              <small>ผู้รับผิดชอบ</small>
+              <small id="jobDetailAssigneeLabel">ผู้รับผิดชอบ</small>
               <strong id="jobDetailAssignee">–</strong>
             </div>
           </div>
