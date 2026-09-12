@@ -26,7 +26,7 @@
         ประกาศของหาย <span id="pendingLostAnnouncementTabCount">0</span>
       </button>
       <button class="tab" type="button" data-clerk-center-view="claims">
-        คำขอรับของ <span id="activeClaimTabCount">0</span>
+        คำขอแสดงความเป็นเจ้าของ <span id="activeClaimTabCount">0</span>
       </button>
     </div>
     <div class="clerk-center-grid single-view">
@@ -68,10 +68,9 @@
         <div class="clerk-center-head">
           <div>
             <span class="center-kicker claim">ไม่ต้องอนุมัติ</span>
-            <h3>คำขอรับของ</h3>
+            <h3>คำขอแสดงความเป็นเจ้าของ</h3>
             <p>
-              คำขอรับของจะเข้าสู่ระบบอัตโนมัติ ธุรการตรวจรายละเอียด นัดหมาย
-              และยืนยันการส่งคืนได้
+              ตรวจสอบผู้ยื่นคำขอ หลักฐานความเป็นเจ้าของ สถานะ และดำเนินการนัดรับ
             </p>
           </div>
           <span class="center-count" id="activeClaimCount">0</span>
