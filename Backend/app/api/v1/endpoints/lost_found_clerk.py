@@ -6,18 +6,25 @@ from app.api.dependencies import ClerkStaff, DbSession
 from app.schemas.lost_found_clerk import (
     FoundItemDetailResponse,
     LostItemDetailResponse,
+    OwnershipRequestDetailResponse,
+    OwnershipRequestListResponse,
     PendingFoundItemResponse,
     PendingLostItemResponse,
     RejectFoundItemRequest,
+    RequestAdditionalInfoRequest,
 )
 from app.services.lost_found_clerk import (
     approve_found_item,
     approve_lost_item,
     get_found_item_detail,
     get_lost_item_detail,
+    get_ownership_request_detail,
     list_pending_found_items,
     list_pending_lost_items,
+    list_pending_ownership_requests,
     reject_found_item,
+    approve_ownership_request,
+    request_additional_ownership_information,
 )
 
 router = APIRouter()
@@ -167,3 +174,95 @@ async def reject_found_item_report(
         )
 
     return item
+
+
+@router.get(
+    "/ownership-requests",
+    response_model=list[OwnershipRequestListResponse],
+)
+async def get_pending_ownership_requests(
+    session: DbSession,
+    _: ClerkStaff,
+) -> list[OwnershipRequestListResponse]:
+    """คืนรายการคำขอรับของคืนที่กำลังรอตรวจสอบ"""
+
+    return await list_pending_ownership_requests(session)
+
+
+@router.get(
+    "/ownership-requests/{claim_id}",
+    response_model=OwnershipRequestDetailResponse,
+)
+async def get_ownership_request(
+    claim_id: UUID,
+    session: DbSession,
+    _: ClerkStaff,
+) -> OwnershipRequestDetailResponse:
+    """คืนรายละเอียดคำขอรับของคืน"""
+
+    claim = await get_ownership_request_detail(
+        session,
+        claim_id,
+    )
+
+    if claim is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Ownership request not found",
+        )
+
+    return claim
+
+
+@router.post(
+    "/ownership-requests/{claim_id}/approve",
+    response_model=OwnershipRequestListResponse,
+)
+async def approve_ownership_request_endpoint(
+    claim_id: UUID,
+    session: DbSession,
+    current_staff: ClerkStaff,
+) -> OwnershipRequestListResponse:
+    """อนุมัติคำขอรับของคืน"""
+
+    claim = await approve_ownership_request(
+        session,
+        claim_id,
+        current_staff.id,
+    )
+
+    if claim is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Pending ownership request not found",
+        )
+
+    return claim
+
+
+@router.post(
+    "/ownership-requests/{claim_id}/request-additional-info",
+    response_model=OwnershipRequestListResponse,
+)
+async def request_additional_ownership_info(
+    claim_id: UUID,
+    request: RequestAdditionalInfoRequest,
+    session: DbSession,
+    current_staff: ClerkStaff,
+) -> OwnershipRequestListResponse:
+    """ขอข้อมูลเพิ่มเติมสำหรับคำขอรับของคืน"""
+
+    claim = await request_additional_ownership_information(
+        session,
+        claim_id,
+        current_staff.id,
+        request.message,
+    )
+
+    if claim is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Pending ownership request not found",
+        )
+
+    return claim

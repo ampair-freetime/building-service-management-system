@@ -54,6 +54,7 @@ class LostStatus(str, Enum):
 
 class ClaimStatus(str, Enum):
     PENDING = "pending"
+    ADDITIONAL_INFO_REQUIRED = "additional_info_required"
     APPROVED = "approved"
     REJECTED = "rejected"
     COMPLETED = "completed"
