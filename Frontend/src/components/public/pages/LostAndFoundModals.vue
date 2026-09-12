@@ -32,6 +32,7 @@
           </div>
           <div id="detailContent">
             <div class="detail-hero">
+              <img id="detailImage" alt="" hidden />
               <svg class="icon" id="detailIcon"><use href="#i-box" /></svg>
             </div>
             <h3 id="detailTitle">รายการ</h3>

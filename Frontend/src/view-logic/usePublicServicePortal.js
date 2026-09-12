@@ -434,8 +434,29 @@ export function usePublicServicePortal() {
         data.status || "รอรับเรื่อง";
       document.getElementById("detailCode").textContent =
         data.code || `BC-${Math.floor(1000 + Math.random() * 9000)}`;
-      const use = document.querySelector("#detailIcon use");
+      const detailHero = document.querySelector("#detailModal .detail-hero");
+      const detailImage = document.getElementById("detailImage");
+      const detailIcon = document.getElementById("detailIcon");
+      const use = detailIcon.querySelector("use");
       use.setAttribute("href", data.icon || "#i-box");
+
+      // แสดงรูปจริงแบบเต็มกรอบในรายละเอียด และใช้ไอคอนแทนเมื่อไม่มีรูปหรือโหลดรูปไม่ได้
+      const showImagePlaceholder = () => {
+        detailImage.hidden = true;
+        detailImage.removeAttribute("src");
+        detailIcon.removeAttribute("hidden");
+        detailHero.classList.remove("has-image");
+      };
+      if (data.imageUrl) {
+        detailImage.alt = `รูป${data.title || "ประกาศ"}`;
+        detailImage.onerror = showImagePlaceholder;
+        detailImage.src = data.imageUrl;
+        detailImage.hidden = false;
+        detailIcon.setAttribute("hidden", "");
+        detailHero.classList.add("has-image");
+      } else {
+        showImagePlaceholder();
+      }
       const continueButton = document.getElementById("detailContinueButton");
       detailAction = action;
       continueButton.textContent =
@@ -558,6 +579,7 @@ export function usePublicServicePortal() {
             status: itemStatusLabel(item.status),
             code: item.item_code,
             icon: item.report_type === "found" ? "#i-box" : "#i-search",
+            imageUrl: item.images?.[0]?.url,
           },
           item.report_type === "found" ? "claim" : "contact",
         );
