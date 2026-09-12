@@ -1,10 +1,11 @@
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, field_validator
 from app.models.enums import LostType, LostStatus
 
-class PendingFoundItemResponse (BaseModel) :
+
+class PendingFoundItemResponse(BaseModel):
     """ข้อมูลของที่พบซึ่งรอเจ้าหน้าที่ธุรการตรวจสอบ"""
     model_config = ConfigDict(from_attributes=True)
 
@@ -16,6 +17,21 @@ class PendingFoundItemResponse (BaseModel) :
     location_detail: str | None
     status: LostStatus
     created_at: datetime
+
+
+class PendingLostItemResponse(BaseModel):
+    """ข้อมูลประกาศของหายซึ่งรอเจ้าหน้าที่ธุรการตรวจสอบ"""
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    item_code: str
+    report_type: LostType
+    item_name: str
+    description: str | None
+    location_detail: str | None
+    status: LostStatus
+    created_at: datetime
+
 
 class FoundItemDetailResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -32,3 +48,34 @@ class FoundItemDetailResponse(BaseModel):
     reporter_email: str
     status: LostStatus
     created_at: datetime
+
+
+class LostItemDetailResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    item_code: str
+    report_type: LostType
+    item_category: str
+    item_name: str
+    description: str | None
+    event_datetime: datetime
+    location_detail: str | None
+    reporter_email: str
+    status: LostStatus
+    created_at: datetime
+
+
+class RejectFoundItemRequest(BaseModel):
+    reason: str
+
+    @field_validator("reason")
+    @classmethod
+    def validate_reason(cls, value: str) -> str:
+        value = value.strip()
+
+        if not value:
+            raise ValueError("Rejection reason is required")
+
+        return value
+

@@ -66,6 +66,21 @@ async def require_admin(current_staff: CurrentStaff) -> Staff:
 # ใช้กับ endpoint จัดการพนักงานเพื่อบังคับตรวจทั้ง token และบทบาท admin
 AdminStaff = Annotated[Staff, Depends(require_admin)]
 
+async def require_clerk_staff(current_staff: CurrentStaff) -> Staff:
+    if current_staff.role != StaffRole.CLERK:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Clerk staff access required",
+        )
+    return current_staff
+
+
+ClerkStaff = Annotated[
+    Staff,
+    Depends(require_clerk_staff),
+]
+
+
 def provide_object_storage() -> ObjectStorage:
     """คืน R2 client หรือแจ้ง 503 แบบชัดเจนเมื่อ environment ยังไม่พร้อม."""
     try:
@@ -77,17 +92,7 @@ def provide_object_storage() -> ObjectStorage:
         ) from exc
 
 
-ObjectStorageClient = Annotated[ObjectStorage, Depends(provide_object_storage)]
-
-async def require_clerk_staff(current_staff: CurrentStaff) -> Staff :
-    if current_staff.role != StaffRole.CLERK:
-        raise HTTPException(
-            status_code = status.HTTP_403_FORBIDDEN,
-            detail = "Clerk staff access required",
-        )
-    return current_staff
-
-ClerkStaff = Annotated[
-    Staff,
-    Depends(require_clerk_staff),
+ObjectStorageClient = Annotated[
+    ObjectStorage,
+    Depends(provide_object_storage),
 ]

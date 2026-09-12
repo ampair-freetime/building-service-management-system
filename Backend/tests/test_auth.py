@@ -110,6 +110,7 @@ def test_admin_can_create_and_list_all_staff_roles(
         ("TECH001", "technician@example.com", "Technician", "technician"),
         ("CLERK001", "clerk@example.com", "Clerk Staff", "clerk"),
     ]
+    
     for staff_code, email, full_name, role in new_staff:
         response = client.post(
             "/api/v1/staff",
