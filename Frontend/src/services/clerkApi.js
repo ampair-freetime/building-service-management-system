@@ -138,7 +138,7 @@ export async function getPendingOwnershipRequests() {
   const controller = new AbortController();
 
   try{
-    const response = await fetch(`${API_BASE_URL}/lost-found/pending-ownership`,{
+    const response = await fetch(`${API_BASE_URL}/lost-found/`,{
       method : "GET",
       headers: {
           Authorization: `Bearer ${localStorage.getItem("buildingCareAccessToken") || ""}`,
