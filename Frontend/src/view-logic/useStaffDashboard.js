@@ -4,10 +4,13 @@ import { createStaffDashboardData } from "./staff-dashboard/data.js";
 import { canRoleOpenPage } from "../config/staff-role-pages.js";
 import {
   getFoundItemDetail,
+  getLostItemDetail,
   getPendingFoundItems,
+  getPendingLostItems,
   reviewFoundItem,
   rejectFoundItem,
   approveFoundItem,
+  getPendingOwnershipRequests,
 } from "../services/clerkApi.js";
 import {
   badgeClass,
@@ -171,6 +174,81 @@ export function useStaffDashboard() {
         toast(error.message || "ไม่สามารถโหลดรายงานของที่พบได้");
       }
     }
+    async function loadPendingLostItems() {
+      if (currentRole !== "clerk") return;
+      try {
+        const data = await getPendingLostItems();
+        const pendingLostItems = data.map((item) => ({
+          backendId: item.id,
+          id: item.item_code,
+          title: item.item_name,
+          category: "ประกาศตามหา",
+          place: item.location_detail || "ไม่ระบุสถานที่คาดว่าหาย",
+          description: item.description || "ไม่มีรายละเอียดเพิ่มเติม",
+          custody: `ส่งประกาศเมื่อ ${new Date(item.created_at).toLocaleString("th-TH")}`,
+          status: "รออนุมัติเผยแพร่",
+          assignee: null,
+        }));
+        const processedItems = lostSets.lostposts.filter(
+          (item) => approvalGroup(item.status) !== "pending"
+        );
+        lostSets.lostposts = [...pendingLostItems, ...processedItems];
+        renderClerkCenter();
+        renderMetrics();
+        renderNotifications();
+      } catch (error) {
+        if (await handleUnauthorizedResponse(error.status)) return;
+        console.error("Loading pending lost-item reports failed:", error);
+        toast(error.message || "ไม่สามารถโหลดประกาศของหายได้");
+      }
+    }
+    async function loadPendingOwnershipRequests() {
+      if (currentRole !== "clerk") return;
+
+      try {
+        const data = await getPendingOwnershipRequests();
+
+        lostSets.claims = data.map((claim) => ({
+          backendId: claim.id,
+          foundItemBackendId: claim.found_item_id,
+          id: claim.claim_code || claim.id,
+          title: `คำขอรับ${claim.item_name}`,
+          place: claim.proof_detail || "ไม่มีรายละเอียดหลักฐาน",
+          custody: "คำขอใหม่",
+          status: claim.status === "pending"
+            ? "รอตรวจสอบ"
+            : claim.status,
+          requester: claim.claimant_name,
+          contact: claim.claimant_email,
+          requestDate: new Date(
+            claim.created_at,
+          ).toLocaleString("th-TH"),
+          evidence: claim.proof_detail,
+          appointment: "ยังไม่มีนัดหมาย",
+          assignee: null,
+        }));
+
+        renderClerkCenter();
+        renderMetrics();
+        renderNotifications();
+      } catch (error) {
+        if (await handleUnauthorizedResponse(error.status)) return;
+
+        console.error(
+          "Loading pending ownership requests failed:",
+          error,
+        );
+
+        // ระหว่างที่ Backend ยังไม่มี endpoint ให้คงข้อมูลจำลองเดิมไว้
+        if (error.status !== 404) {
+          toast(
+            error.message ||
+              "ไม่สามารถโหลดคำขอแสดงความเป็นเจ้าของได้",
+          );
+        }
+      }
+    }
+
     function toast(message) {
       const el = $("#toast");
       if (!el) {
@@ -2093,7 +2171,10 @@ export function useStaffDashboard() {
       if (!item) return;
       if (item.backendId) {
         try {
-          const detail = await getFoundItemDetail(item.backendId);
+          const detail =
+            tab === "lostposts"
+              ? await getLostItemDetail(item.backendId)
+              : await getFoundItemDetail(item.backendId);
           item.category = detail.item_category;
           item.description = detail.description || "ไม่มีรายละเอียดเพิ่มเติม";
           item.place = detail.location_detail || "ไม่ระบุสถานที่พบ";
@@ -3358,6 +3439,8 @@ export function useStaffDashboard() {
     renderStaff();
     await loadStaffAccounts();
     await loadPendingFoundItems();
+    await loadPendingLostItems();
+    await loadPendingOwnershipRequests();
     setRole(
       ["housekeeper", "technician", "clerk", "admin"].includes(currentRole)
         ? currentRole
