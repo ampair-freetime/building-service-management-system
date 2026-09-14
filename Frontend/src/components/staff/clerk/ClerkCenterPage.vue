@@ -9,6 +9,15 @@
           โดยแยกคำขอที่ต้องพิจารณาอนุมัติออกจากคำขอรับของ
         </p>
       </div>
+      <div class="toolbar">
+        <input
+          class="field-compact search"
+          id="clerkCenterSearch"
+          type="search"
+          placeholder="ค้นหารหัส ชื่อ สถานที่ ผู้ขอ หรือสถานะ"
+          aria-label="ค้นหาคำขอในศูนย์รับงาน"
+        />
+      </div>
     </div>
     <div class="tabs clerk-center-tabs" id="clerkCenterTabs">
       <button

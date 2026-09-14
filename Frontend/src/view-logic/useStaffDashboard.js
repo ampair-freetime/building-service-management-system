@@ -228,9 +228,9 @@ export function useStaffDashboard() {
           title: `คำขอรับ${claim.item_name || "ของคืน"}`,
           place: claim.proof_detail || "ไม่มีรายละเอียดหลักฐาน",
           custody: "คำขอใหม่",
-          status: claim.status === "pending"
-            ? "รอตรวจสอบ"
-            : claim.status,
+          backendStatus: claim.status,
+          status: ownershipStatusLabel(claim.status),
+          returnStatus: foundItemReturnStatus(claim.status),
           requester: claim.claimant_name,
           contact: claim.claimant_email,
           requestDate: new Date(
@@ -964,6 +964,24 @@ export function useStaffDashboard() {
       if (status.includes("รออนุมัติ")) return "pending";
       return "approved";
     }
+    function ownershipStatusLabel(status = "") {
+      return ({
+        pending: "รอตรวจสอบ",
+        additional_info_required: "ขอข้อมูลเพิ่มเติม",
+        approved: "ผ่านการตรวจสอบ",
+        rejected: "ไม่ผ่านการตรวจสอบ",
+        completed: "คืนของแล้ว",
+      })[status] || status || "ไม่ทราบสถานะ";
+    }
+    function foundItemReturnStatus(status = "") {
+      return ({
+        pending: "รอตรวจสอบคำขอ",
+        additional_info_required: "รอข้อมูลจากผู้ขอ",
+        approved: "ยืนยันเจ้าของแล้ว · รอส่งมอบ",
+        rejected: "คำขอไม่ผ่านการตรวจสอบ",
+        completed: "ส่งคืนเจ้าของแล้ว",
+      })[status] || "ไม่ทราบสถานะการคืน";
+    }
     function approvalTypeLabel(tab) {
       return tab === "inventory" ? "ของที่รับฝาก" : tab === "lostposts" ? "ประกาศตามหา" : "คำขอรับของ";
     }
@@ -982,6 +1000,13 @@ export function useStaffDashboard() {
         .filter((item) => item.status !== "คืนของแล้ว")
         .map((item) => ({ ...item, unread: !readClaimNotifications.has(item.id) }));
     }
+    function matchesClerkCenterSearch(...values) {
+      const keyword = ($("#clerkCenterSearch")?.value || "").trim().toLocaleLowerCase("th");
+      if (!keyword) return true;
+      return values
+        .filter((value) => value !== null && value !== undefined)
+        .some((value) => String(value).toLocaleLowerCase("th").includes(keyword));
+    }
     function setClerkCenterView(view) {
       const availableViews = ["approvals", "lost-announcements", "claims"];
       currentClerkCenterView = availableViews.includes(view) ? view : "approvals";
@@ -994,9 +1019,33 @@ export function useStaffDashboard() {
         claimList = $("#activeClaimList");
       if (!pendingList || !lostAnnouncementList || !claimList) return;
       const pendingRequests = pendingApprovalRequests();
-      const approvals = pendingRequests.filter((item) => item.tab === "inventory");
-      const lostAnnouncements = pendingRequests.filter((item) => item.tab === "lostposts");
-      const claims = lostSets.claims.filter((item) => item.status !== "คืนของแล้ว");
+      const filteredRequests = pendingRequests.filter((item) => {
+        const record = findLostItem(item.tab, item.approvalId);
+        return matchesClerkCenterSearch(
+          item.approvalId,
+          item.title,
+          item.text,
+          record?.category,
+          record?.description,
+          record?.custody,
+          record?.status,
+        );
+      });
+      const approvals = filteredRequests.filter((item) => item.tab === "inventory");
+      const lostAnnouncements = filteredRequests.filter((item) => item.tab === "lostposts");
+      const claims = lostSets.claims.filter((item) =>
+        item.status !== "คืนของแล้ว" && matchesClerkCenterSearch(
+          item.id,
+          item.title,
+          item.place,
+          item.requester,
+          item.contact,
+          item.status,
+          item.returnStatus,
+          item.evidence,
+          item.custody,
+        )
+      );
       ["#pendingApprovalCount", "#pendingApprovalTabCount"].forEach((id) => $(id).textContent = approvals.length);
       ["#pendingLostAnnouncementCount", "#pendingLostAnnouncementTabCount"].forEach((id) => ($(id).textContent = lostAnnouncements.length));
       ["#activeClaimCount", "#activeClaimTabCount"].forEach((id) => $(id).textContent = claims.length);
@@ -1009,7 +1058,7 @@ export function useStaffDashboard() {
         return `<article class="clerk-request-card"><div class="clerk-request-top"><div><span class="approval-type lostposts">ประกาศตามหา</span><h4>${item.approvalId} · ${escapeHtml(item.title)}</h4></div><span class="badge wait">รออนุมัติเผยแพร่</span></div><p>${escapeHtml(item.text)}</p><div class="clerk-request-meta"><span>${escapeHtml(record?.custody || "รอการตรวจสอบ")}</span></div><div class="clerk-request-actions"><button class="small-btn" type="button" data-center-action="detail" data-tab="lostposts" data-item-id="${item.approvalId}">ดูรายละเอียด</button><button class="approve-btn" type="button" data-center-action="approve" data-tab="lostposts" data-item-id="${item.approvalId}">อนุมัติเผยแพร่</button><button class="reject-btn" type="button" data-center-action="reject" data-tab="lostposts" data-item-id="${item.approvalId}">ไม่อนุมัติ</button></div></article>`;
         }).join("") : '<div class="empty">ไม่มีคำขอที่รออนุมัติ</div>';
       claimList.innerHTML = claims.length ? claims.map((item) =>
-        `<article class="clerk-request-card"><div class="clerk-request-top"><div><span class="approval-type claims">คำขอแสดงความเป็นเจ้าของ</span><h4>${item.id} · ${escapeHtml(item.title)}</h4></div><span class="badge ${badgeClass(item.status)}">${escapeHtml(item.status)}</span></div><p>${escapeHtml(item.place)}</p><div class="clerk-request-meta"><span>ผู้ขอ: ${escapeHtml(item.requester || "ไม่ระบุชื่อ")}</span><span>ส่งคำขอ: ${escapeHtml(item.requestDate || "ไม่ระบุเวลา")}</span><span>${escapeHtml(item.custody || "คำขอใหม่")}</span></div><div class="clerk-request-actions"><button class="small-btn" type="button" data-center-action="claim-detail" data-item-id="${item.id}">ดูรายละเอียดคำขอ</button></div></article>`
+        `<article class="clerk-request-card"><div class="clerk-request-top"><div><span class="approval-type claims">คำขอแสดงความเป็นเจ้าของ</span><h4>${item.id} · ${escapeHtml(item.title)}</h4></div><span class="badge ${badgeClass(item.status)}">${escapeHtml(item.status)}</span></div><p>${escapeHtml(item.place)}</p><div class="clerk-request-meta"><span>ผู้ขอ: ${escapeHtml(item.requester || "ไม่ระบุชื่อ")}</span><span>ส่งคำขอ: ${escapeHtml(item.requestDate || "ไม่ระบุเวลา")}</span><span>สถานะการคืน: ${escapeHtml(item.returnStatus || "ไม่ทราบสถานะ")}</span><span>${escapeHtml(item.custody || "คำขอใหม่")}</span></div><div class="clerk-request-actions"><button class="small-btn" type="button" data-center-action="claim-detail" data-item-id="${item.id}">ดูรายละเอียดคำขอ</button></div></article>`
             ).join("") : '<div class="empty">ไม่มีคำขอที่รออนุมัติ</div>';
       setClerkCenterView(currentClerkCenterView);
     }
@@ -2256,6 +2305,8 @@ export function useStaffDashboard() {
       $("#claimDate").textContent = item.requestDate || "ไม่ระบุเวลาส่งคำขอ";
       $("#claimAppointment").textContent =
         item.appointment || "ยังไม่มีนัดหมาย";
+      $("#claimReturnStatus").textContent =
+        item.returnStatus || foundItemReturnStatus(item.backendStatus);
       $("#claimEvidence").textContent =
         item.evidence || item.place || "ยังไม่มีรายละเอียดหลักฐาน";
       $("#claimSecret").textContent =
@@ -2267,13 +2318,21 @@ export function useStaffDashboard() {
       ].map((step) =>
         `<div class="timeline-item"><span class="timeline-dot"></span><div><strong>${step[0]}</strong><small>${step[1]}</small></div></div>`
         ).join("");
-      $("#claimActions").innerHTML = [
+      const claimActions = [
         ["more", "ขอข้อมูลเพิ่มเติม", ""],
         ["verify", "ยืนยันความเป็นเจ้าของ", "primary-action"],
         ["appointment", "สร้างนัดหมาย", ""],
-      ].map((action) =>
+      ];
+      if (item.backendStatus === "approved" || item.status === "นัดหมายแล้ว") {
+        claimActions.push([
+          "returned",
+          "ยืนยันส่งคืนแล้ว",
+          "primary-action",
+        ]);
+      }
+      $("#claimActions").innerHTML = claimActions.map((action) =>
         `<button type="button" class="quick-action ${action[2]}" data-claim-action="${action[0]}" data-claim-id="${id}">${action[1]}</button>`
-        ).join("");
+      ).join("");
       openModal("claimDetailModal", trigger);
     }
     function updateClaimWithConfirmation(id, action, trigger) {
@@ -2287,6 +2346,7 @@ export function useStaffDashboard() {
       const map = {
         more: ["ขอข้อมูลเพิ่มเติม", "ขอข้อมูลเพิ่มเติม"],
         verify: ["ยืนยันความเป็นเจ้าของ", "ผ่านการตรวจสอบ"],
+        returned: ["ยืนยันการส่งคืนของ", "คืนของแล้ว"],
       };
       const actionConfig = map[action];
       if (!actionConfig) return;
@@ -2295,6 +2355,8 @@ export function useStaffDashboard() {
       const confirmationText =
         action === "verify"
           ? `${id} · ${item.requester || "ผู้ยื่นคำขอ"} ให้หลักฐานตรงกับรายการ ${item.title} แล้วใช่หรือไม่?`
+          : action === "returned"
+            ? `${id} · ยืนยันว่าได้ส่ง ${item.title} คืนให้ ${item.requester || "ผู้ยื่นคำขอ"} แล้วใช่หรือไม่?`
           : `ยืนยันการดำเนินการกับคำขอ ${id} หรือไม่?`;
       const additionalInfoMessage = action === "more"
         ? window.prompt("ระบุข้อมูลที่ต้องการให้ผู้ยื่นคำขอส่งเพิ่มเติม")
@@ -2302,37 +2364,48 @@ export function useStaffDashboard() {
       if (action === "more" && !additionalInfoMessage?.trim()) return;
       requestConfirmation(title, confirmationText, async () => {
         try {
-          const result = action === "verify"
-            ? await approveOwnershipRequest(item.backendId)
-            : await requestOwnershipAdditionalInfo(
-                item.backendId,
-                additionalInfoMessage.trim(),
-              );
+          const result = action === "returned"
+            ? { status: "completed" }
+            : action === "verify"
+              ? await approveOwnershipRequest(item.backendId)
+              : await requestOwnershipAdditionalInfo(
+                  item.backendId,
+                  additionalInfoMessage.trim(),
+                );
           item.status = result.status === "approved"
             ? "ผ่านการตรวจสอบ"
             : result.status === "additional_info_required"
               ? "ขอข้อมูลเพิ่มเติม"
               : status;
-        item.assignee = activeStaffName();
-        addAudit("lost", title, id, item.title, `เปลี่ยนสถานะเป็น ${status}`);
-        recordWorkHistory({
-          itemId: id,
-          title: item.title,
-          category: "คำขอรับของ",
-          action: title,
-          status,
-          detail: `ตรวจสอบโดย ${activeStaffName()}`,
-        });
-        renderLost();
-        renderNotifications();
-        showSuccess(
-          action === "verify"
-            ? `${id} · ยืนยันความเป็นเจ้าของสำหรับ ${item.requester || "ผู้ยื่นคำขอ"} แล้ว สถานะเปลี่ยนเป็น “${status}”`
-            : `อัปเดตคำขอ ${id} เป็น “${status}” แล้ว`,
-          action === "verify"
-            ? "ยืนยันความเป็นเจ้าของแล้ว"
-            : "อัปเดตคำขอแล้ว"
-        );
+          item.backendStatus = result.status;
+          item.returnStatus = foundItemReturnStatus(result.status);
+          if (action === "returned") {
+            item.custody = `ส่งคืนโดย ${activeStaffName()} · ${nowThai()}`;
+          }
+          item.assignee = activeStaffName();
+          addAudit("lost", title, id, item.title, `เปลี่ยนสถานะเป็น ${status}`);
+          recordWorkHistory({
+            itemId: id,
+            title: item.title,
+            category: "คำขอรับของ",
+            action: title,
+            status,
+            detail: `ดำเนินการโดย ${activeStaffName()}`,
+          });
+          renderLost();
+          renderNotifications();
+          showSuccess(
+            action === "verify"
+              ? `${id} · ยืนยันความเป็นเจ้าของสำหรับ ${item.requester || "ผู้ยื่นคำขอ"} แล้ว สถานะเปลี่ยนเป็น “${status}”`
+              : action === "returned"
+                ? `${id} · บันทึกว่าส่ง ${item.title} คืนเจ้าของแล้ว`
+                : `อัปเดตคำขอ ${id} เป็น “${status}” แล้ว`,
+            action === "verify"
+              ? "ยืนยันความเป็นเจ้าของแล้ว"
+              : action === "returned"
+                ? "บันทึกการส่งคืนแล้ว"
+                : "อัปเดตคำขอแล้ว"
+          );
         } catch (error) {
           if (await handleUnauthorizedResponse(error.status)) return;
           console.error("Updating ownership request failed:", error);
@@ -2653,6 +2726,7 @@ export function useStaffDashboard() {
       renderStaffOverview();
     });
     $("#jobSearch")?.addEventListener("input", renderJobs);
+    $("#clerkCenterSearch")?.addEventListener("input", renderClerkCenter);
     $("#categoryFilter")?.addEventListener("change", renderJobs);
     $("#jobStatusFilter")?.addEventListener("change", renderJobs);
     $("#boardTabs")?.addEventListener("click", (event) => {

@@ -141,6 +141,10 @@
             <small>นัดหมาย</small
             ><strong id="claimAppointment">ยังไม่มีนัดหมาย</strong>
           </div>
+          <div>
+            <small>สถานะการคืนของ</small
+            ><strong id="claimReturnStatus">รอตรวจสอบคำขอ</strong>
+          </div>
         </div>
         <h4>หลักฐานและรายละเอียด</h4>
         <p id="claimEvidence"></p>
