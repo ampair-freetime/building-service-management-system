@@ -1,36 +1,6 @@
 <template>
 <section class="page active" id="page-dashboard">
-          <div class="hero">
-            <article class="hero-main">
-              <div class="eyebrow" id="heroEyebrow">งานทั้งหมดของอาคาร</div>
-              <h2 id="heroTitle">
-                เห็นภาพรวม ตัดสินใจเร็ว และส่งงานถึงคนที่รับผิดชอบ
-              </h2>
-              <p id="heroText">
-                ติดตามงานแจ้งซ่อม งานทำความสะอาด และของหาย–ของได้คืนจากจุดเดียว
-              </p>
-              <div class="hero-actions">
-                <button class="primary" id="heroPrimary" type="button">
-                  ดูงานเร่งด่วน
-                </button>
-              </div>
-            </article>
-            <aside class="hero-side">
-              <h3>สถานะคิวปัจจุบัน</h3>
-              <div class="pulse">
-                <div class="pulse-ring">
-                  <strong id="completion">68%</strong>
-                </div>
-                <div class="pulse-copy">
-                  <strong id="pulseHeadline">17 จาก 25 งาน</strong
-                  ><span id="pulseSub">มีผู้รับผิดชอบแล้ว</span>
-                </div>
-              </div>
-              <div class="badge progress" id="shiftBadge">
-                กะปัจจุบัน · 08:00–17:00
-              </div>
-            </aside>
-          </div>
+          
           <div class="metrics" id="metricGrid"></div>
           <section class="panel" style="margin-bottom: 20px">
             <div class="panel-head">
