@@ -12,34 +12,48 @@
           <div class="work-layout single-form-layout">
             <form class="form-panel" data-submit-type="แจ้งซ่อม">
               <h3>รายละเอียดปัญหา</h3>
-              <div class="field">
-                <label>ประเภทอุปกรณ์</label
-                ><select required>
-                  <option value="">เลือกประเภท</option>
-                  <option>ไฟฟ้า</option>
-                  <option>ประปา</option>
-                  <option>เครื่องปรับอากาศ</option>
-                  <option>อุปกรณ์ห้องเรียน</option>
-                </select>
+              <div class="form-row repair-location-row">
+                <div class="field">
+                  <label for="repairFloor">ชั้น</label
+                  ><select id="repairFloor" name="repair_floor" required>
+                    <option value="">เลือกชั้น</option>
+                    <option value="1">ชั้น 1</option>
+                    <option value="2">ชั้น 2</option>
+                    <option value="3">ชั้น 3</option>
+                    <option value="4">ชั้น 4</option>
+                    <option value="5">ชั้น 5</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label for="repairRoom">ห้อง</label
+                  ><select id="repairRoom" name="repair_room" required>
+                    <option value="">เลือกห้อง</option>
+                    <option>ห้องเรียน</option>
+                    <option>ห้องปฏิบัติการ</option>
+                    <option>ห้องประชุม</option>
+                    <option>ห้องน้ำ</option>
+                    <option>โถงทางเดิน</option>
+                    <option>พื้นที่ส่วนกลาง</option>
+                  </select>
+                </div>
               </div>
               <div class="field">
-                <label>สถานที่</label
+                <label>ปัญหาที่พบ</label
                 ><input
                   type="text"
                   required
-                  placeholder="อาคาร / ชั้น / ห้อง"
+                  placeholder="เช่น เครื่องปรับอากาศไม่ทำงาน ท่อประปารั่ว"
                 />
               </div>
               <div class="field">
-                <label>ความเร่งด่วน</label
+                <label>ประเภทงาน</label
                 ><select required>
-                  <option>ทั่วไป</option>
-                  <option>เร่งด่วน</option>
-                  <option>กระทบความปลอดภัย</option>
+                  <option>งานซ่อมทั่วไป</option>
+                  <option>เหตุเร่งด่วน</option>
                 </select>
               </div>
               <div class="field">
-                <label>อธิบายปัญหา</label
+                <label>อธิบายปัญหา (ถ้ามี)</label
                 ><textarea
                   required
                   placeholder="เกิดอะไรขึ้น และมีผลต่อการใช้งานอย่างไร"

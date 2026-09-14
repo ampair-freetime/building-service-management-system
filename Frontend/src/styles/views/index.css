@@ -608,8 +608,8 @@ main {
   border-color: #ccebcf;
 }
 .service-card.lost {
-  background: var(--lost-soft);
-  border-color: #f6dda0;
+  background: #fffaf0;
+  border-color: #f4e6bd;
 }
 .service-icon {
   font-size: 38px;
@@ -889,26 +889,26 @@ main {
   background: linear-gradient(135deg, #fff9e7, #fff);
 }
 .user-page #lost .lost-search-panel {
-  background: linear-gradient(135deg, #fff0bd 0%, #fff8df 62%, #fffdf6 100%);
-  border-color: #e8bd58;
-  box-shadow: 0 12px 30px rgba(138, 84, 0, 0.13);
+  background: linear-gradient(135deg, #fff8de 0%, #fffdf3 62%, #fffefa 100%);
+  border-color: #ecd18a;
+  box-shadow: 0 12px 30px rgba(154, 101, 8, 0.1);
 }
 .user-page #lost .lost-search-panel h3 {
-  color: #5f3900;
+  color: #6e4806;
 }
 .user-page #lost .lost-search-panel .eyebrow {
-  color: #8a5400;
+  color: #97620a;
 }
 .user-page #lost .lost-search-panel .search-row input {
-  border-color: #dfc27d;
+  border-color: #e5cf9c;
   background: rgba(255, 255, 255, 0.9);
 }
 .user-page #lost .lost-search-panel .search-row button {
-  background: #a85f08;
-  box-shadow: 0 7px 18px rgba(138, 84, 0, 0.2);
+  background: linear-gradient(135deg, #9a6508, #c28a2a);
+  box-shadow: 0 7px 18px rgba(154, 101, 8, 0.18);
 }
 .user-page #lost .lost-search-panel .search-row button:hover {
-  background: #874700;
+  background: linear-gradient(135deg, #7d5005, #9a6508);
 }
 .lost-search-panel h3 {
   font-size: 24px;
@@ -957,9 +957,10 @@ main {
   box-shadow: var(--shadow-sm);
 }
 .lost-action-card.active {
-  border-color: #c78a22;
-  background: #fff1c7;
-  box-shadow: 0 8px 22px rgba(138, 84, 0, 0.12);
+  border: 2px solid #a96f0a;
+  background: #fff;
+  box-shadow: 0 0 0 2px rgba(169, 111, 10, 0.1),
+    0 8px 22px rgba(154, 101, 8, 0.08);
 }
 .lost-action-card span:last-child {
   font-size: 11px;
@@ -1004,14 +1005,38 @@ main {
   padding: 0 16px;
   border: 0;
   border-radius: 999px;
-  background: #fff6d8;
-  color: #76521b;
+  background: #fff8df;
+  color: #805a14;
   font-weight: 800;
 }
 .filter-row .filter-chip.active {
-  background: #f3d78d;
-  color: #684000;
+  background: #f2dda8;
+  color: #6b4709;
   box-shadow: none;
+}
+.filter-row .filter-chip[data-filter="all"] {
+  background: #eaf3fb;
+  color: #356487;
+}
+.filter-row .filter-chip[data-filter="lost"] {
+  background: #fff0ef;
+  color: #c74343;
+}
+.filter-row .filter-chip[data-filter="found"] {
+  background: #ebf8ed;
+  color: #2f8e4c;
+}
+.filter-row .filter-chip[data-filter="all"].active {
+  background: #cfe4f5;
+  color: #245779;
+}
+.filter-row .filter-chip[data-filter="lost"].active {
+  background: #ffd9d6;
+  color: #aa3030;
+}
+.filter-row .filter-chip[data-filter="found"].active {
+  background: #cfeeda;
+  color: #23743d;
 }
 .lost-view {
   display: none;
@@ -1139,6 +1164,9 @@ main {
   padding: 0 12px;
   font-weight: 800;
 }
+.post-body button:hover {
+  background: #f5e7bd;
+}
 .two-form-layout,
 .work-layout {
   grid-template-columns: minmax(0, 1.35fr) minmax(280px, 0.65fr);
@@ -1165,6 +1193,14 @@ main {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 14px;
+}
+.form-row.clean-location-row,
+.form-row.repair-location-row {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.clean-location-row > .field,
+.repair-location-row > .field {
+  min-width: 0;
 }
 .upload-trigger {
   border: 1px dashed #cdc8df;
@@ -1253,7 +1289,7 @@ main {
   background: var(--lost-soft);
   border-radius: 16px;
   padding: 15px;
-  color: #80651b;
+  color: #76551a;
   font-size: 12px;
 }
 .bottom-nav {
@@ -1680,7 +1716,7 @@ h4,
   color: #36a95a;
 }
 .service-card.lost .service-icon {
-  color: #d5960b;
+  color: #d6a11f;
 }
 .service-card {
   cursor: pointer;
@@ -1726,7 +1762,7 @@ h4,
 .post-image .icon {
   width: 42px;
   height: 42px;
-  color: #b27a00;
+  color: #c18b19;
 }
 .action-symbol {
   display: grid;
@@ -1926,7 +1962,7 @@ textarea:focus-visible {
 .form-panel .form-helper {
   margin: 0 0 14px;
   padding: 12px 14px;
-  border: 1px solid #eee8ca;
+  border: 1px solid #eee1bc;
   border-radius: 14px;
   background: var(--lost-soft);
   color: var(--muted);
@@ -1936,11 +1972,11 @@ textarea:focus-visible {
 .form-panel .found-dropoff-notice {
   margin: 0;
   padding: 10px 14px;
-  border: 1px solid #e4bd52;
-  border-left: 3px solid #b7791f;
+  border: 1px solid #ead39a;
+  border-left: 3px solid #c28a2a;
   border-radius: 10px;
-  background: #fff8e3;
-  color: #69430d;
+  background: #fffaf0;
+  color: #76531a;
   font-size: 14px;
   font-weight: 600;
   line-height: 1.65;
@@ -2123,7 +2159,7 @@ textarea:focus-visible {
   background: var(--lost-soft);
   display: grid;
   place-items: center;
-  color: #b27a00;
+  color: #c18b19;
   margin-bottom: 16px;
 }
 .detail-hero.has-image {
@@ -2200,12 +2236,12 @@ textarea:focus-visible {
   color: var(--muted);
 }
 #detailModal #detailContinueButton {
-  background: linear-gradient(135deg, #8a5400, #a96808);
+  background: linear-gradient(135deg, #9a6508, #c28a2a);
   color: #fff;
-  box-shadow: 0 8px 20px rgba(138, 84, 0, 0.2);
+  box-shadow: 0 8px 20px rgba(154, 101, 8, 0.18);
 }
 #detailModal #detailContinueButton:hover {
-  background: linear-gradient(135deg, #704200, #8a5400);
+  background: linear-gradient(135deg, #7d5005, #9a6508);
 }
 .success-wrap {
   text-align: center;
@@ -2771,7 +2807,7 @@ textarea:focus-visible {
   inset: 0;
   z-index: 0;
   pointer-events: none;
-  background: linear-gradient(145deg, #fffbea 0%, #fffef9 48%, #fff7dc 100%);
+  background: linear-gradient(145deg, #fffaf0 0%, #fffefa 48%, #fffdf5 100%);
   opacity: 0;
   transition: opacity 650ms ease;
 }
@@ -2794,16 +2830,18 @@ textarea:focus-visible {
   opacity: 1;
 }
 .user-page:has(#lost.active) {
-  --primary: #8a5400;
-  --primary-2: #b7791f;
-  --primary-soft: #fff1c2;
-  --line: #ead9aa;
+  --primary: #9a6508;
+  --primary-2: #c28a2a;
+  --primary-soft: #fff7dd;
+  --line: #eadfbd;
+  --lost: #d7a12c;
+  --lost-soft: #fffaf0;
 }
 .user-page:has(#lost.active) .lost-theme-background {
   opacity: 1;
 }
 .user-page #lost .eyebrow {
-  color: #754400;
+  color: #80550b;
 }
 .user-page #clean .eyebrow {
   color: #1f5132;
@@ -2826,8 +2864,8 @@ textarea:focus-visible {
 }
 .user-page:has(#lost.active) .brand-mark,
 .user-page:has(#lost.active) .submit-btn {
-  background: linear-gradient(135deg, #8a5400, #b7791f);
-  box-shadow: 0 8px 20px rgba(138, 84, 0, 0.16);
+  background: linear-gradient(135deg, #9a6508, #c28a2a);
+  box-shadow: 0 8px 20px rgba(154, 101, 8, 0.14);
 }
 .user-page:has(#repair.active) .upload-trigger {
   background: #fff8f1;
@@ -2836,6 +2874,10 @@ textarea:focus-visible {
 .user-page:has(#clean.active) .upload-trigger {
   background: #f4fbf6;
   border-color: #b9dac3;
+}
+.user-page:has(#lost.active) .upload-trigger {
+  background: #fffdf2;
+  border-color: #eadfb6;
 }
 .user-page:has(#repair.active) :is(input, select, textarea, button):focus-visible {
   outline-color: rgba(180, 83, 9, 0.4);
@@ -2852,11 +2894,11 @@ textarea:focus-visible {
   box-shadow: 0 0 0 3px rgba(54, 122, 77, 0.12);
 }
 .user-page:has(#lost.active) :is(input, select, textarea, button):focus-visible {
-  outline-color: rgba(138, 84, 0, 0.4);
+  outline-color: rgba(154, 101, 8, 0.38);
 }
 .user-page:has(#lost.active) :is(input, select, textarea):focus {
-  border-color: #b7791f;
-  box-shadow: 0 0 0 3px rgba(183, 121, 31, 0.14);
+  border-color: #c28a2a;
+  box-shadow: 0 0 0 3px rgba(194, 138, 42, 0.13);
 }
 @media (prefers-reduced-motion: reduce) {
   .user-page::before,
@@ -2887,7 +2929,7 @@ textarea:focus-visible {
   stroke-width: 1.5;
   stroke-linecap: round;
   stroke-linejoin: round;
-  color: rgba(138, 84, 0, 0.18);
+  color: rgba(154, 101, 8, 0.16);
   pointer-events: none;
   z-index: 0;
 }
@@ -2919,4 +2961,489 @@ textarea:focus-visible {
     width: 88px;
     height: 88px;
   }
+}
+
+/* Show announcement details as a compact floating dialog on phones. */
+@media (max-width: 680px) {
+  #detailModal.ui-modal {
+    place-items: center;
+    align-items: center;
+    padding: max(14px, env(safe-area-inset-top)) 14px
+      max(14px, env(safe-area-inset-bottom));
+  }
+
+  #detailModal .ui-modal-card {
+    width: min(360px, 100%);
+    max-height: min(76dvh, 620px);
+    margin: 0;
+    padding: 16px;
+    border-radius: 22px;
+    box-shadow: 0 24px 64px rgba(26, 61, 91, 0.28);
+  }
+
+  #detailModal .ui-modal-head {
+    margin-bottom: 10px;
+  }
+
+  #detailModal .modal-close {
+    width: 36px;
+    height: 36px;
+    border-radius: 12px;
+  }
+
+  #detailModal .detail-hero {
+    height: 130px;
+    margin-bottom: 12px;
+    border-radius: 16px;
+  }
+
+  #detailModal .detail-hero.has-image {
+    min-height: 130px;
+    max-height: 200px;
+  }
+
+  #detailModal .detail-hero.has-image img {
+    max-height: 200px;
+  }
+
+  #detailModal .detail-meta {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  #detailModal .modal-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  #detailModal .modal-actions > * {
+    min-width: 0;
+  }
+}
+
+/* Compact guest layout for phone screens while keeping images easy to inspect. */
+@media (max-width: 680px) {
+  .user-page {
+    font-size: 14px;
+  }
+
+  .user-page .app-shell main {
+    max-width: 100%;
+    padding: 18px 12px 86px;
+    overflow-x: hidden;
+  }
+
+  .user-page .mobile-hero {
+    padding: 12px 0 10px;
+  }
+
+  .user-page .mobile-hero .greeting-name {
+    font-size: clamp(28px, 9vw, 34px);
+    margin-bottom: 4px;
+  }
+
+  .user-page .greeting {
+    margin: 3px 0 5px;
+    font-size: 11px;
+    line-height: 1.45;
+  }
+
+  .user-page .hero-subtitle {
+    font-size: 10px;
+    line-height: 1.4;
+  }
+
+  .user-page .mobile-hero .building-illustration {
+    top: 8px;
+    width: min(156px, 43cqi);
+  }
+
+  .user-page .location-card {
+    gap: 9px;
+    margin-top: 10px;
+    margin-bottom: 14px;
+    padding: 11px 12px;
+    border-radius: 17px;
+  }
+
+  .user-page .location-icon {
+    width: 38px;
+    height: 38px;
+    border-radius: 13px;
+  }
+
+  .user-page .location-copy small {
+    font-size: 9px;
+  }
+
+  .user-page .location-copy strong {
+    font-size: 13px;
+    line-height: 1.35;
+  }
+
+  .user-page .dashboard-section {
+    margin-bottom: 12px;
+    padding: 14px;
+    border-radius: 18px;
+  }
+
+  .user-page .section-head {
+    margin-bottom: 12px;
+  }
+
+  .user-page .section-head h2 {
+    font-size: 17px;
+  }
+
+  .user-page .service-grid.primary-service-menu {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  .user-page .primary-service-menu button.service-card {
+    grid-column: auto;
+    min-width: 0;
+    min-height: 108px;
+    padding: 9px 4px;
+    border-radius: 14px;
+  }
+
+  .user-page .primary-service-menu .service-icon {
+    flex-basis: 42px;
+    width: 42px;
+    height: 42px;
+    margin-bottom: 6px;
+    border-radius: 12px;
+  }
+
+  .user-page .primary-service-menu .service-icon .icon {
+    width: 27px;
+    height: 27px;
+  }
+
+  .user-page .primary-service-menu .service-name {
+    min-height: 2.7em;
+    font-size: clamp(10px, 2.8vw, 12px);
+    line-height: 1.35;
+  }
+
+  .user-page .page-header {
+    margin: 4px 0 10px;
+  }
+
+  .user-page .page-header h2 {
+    font-size: 23px;
+    line-height: 1.3;
+  }
+
+  .user-page :is(#repair, #clean, #lost) .page-header h2 {
+    font-size: clamp(25px, 7vw, 28px);
+  }
+
+  .user-page :is(.repair-page-header, .clean-page-header, .lost-page-header) {
+    margin-bottom: 16px;
+  }
+
+  .user-page .page-header > p {
+    font-size: 10px;
+  }
+
+  .user-page :is(.repair-page-header, .clean-page-header, .lost-page-header) {
+    min-height: 70px;
+    margin-bottom: 8px;
+  }
+
+  .user-page :is(.repair-illustration, .clean-illustration, .lost-illustration) {
+    width: 72px;
+    height: 72px;
+  }
+
+  .user-page :is(.lost-search-panel, .lost-board, .form-panel, .list-panel) {
+    padding: 14px;
+    border-radius: 18px;
+  }
+
+  .user-page .lost-search-panel h3,
+  .user-page .form-panel > h3 {
+    font-size: 18px;
+  }
+
+  .user-page .lost-hub,
+  .user-page .work-layout,
+  .user-page .two-form-layout,
+  .user-page .form-panel {
+    gap: 12px;
+  }
+
+  .user-page .lost-action-card {
+    min-height: 88px;
+    padding: 13px;
+    border-radius: 16px;
+  }
+
+  .user-page .lost-action-card span:last-child {
+    font-size: 10px;
+  }
+
+  .user-page .lost-tab,
+  .user-page .filter-chip {
+    min-height: 34px;
+    padding-inline: 11px;
+    font-size: 11px;
+  }
+
+  .user-page .form-panel > .field {
+    padding: 11px;
+    border-radius: 14px;
+  }
+
+  .user-page .field {
+    gap: 5px;
+  }
+
+  .user-page .field label,
+  .user-page .form-panel > .field label {
+    font-size: 12px;
+  }
+
+  .user-page .field :is(input, select, textarea),
+  .user-page .field-compact {
+    min-height: 44px;
+    padding: 10px 12px;
+    border-radius: 12px;
+    font-size: 14px;
+  }
+
+  .user-page .field textarea {
+    min-height: 92px;
+  }
+
+  .user-page .upload-trigger {
+    min-height: 76px;
+    padding: 11px;
+    border-radius: 13px;
+  }
+
+  .user-page :is(.primary-btn, .primary, .submit-btn) {
+    min-height: 44px;
+    padding-inline: 15px;
+    border-radius: 13px;
+    font-size: 13px;
+  }
+
+  .user-page :is(.ghost-btn, .secondary, .text-btn, .small-btn) {
+    min-height: 40px;
+    padding-inline: 13px;
+    border-radius: 12px;
+    font-size: 13px;
+  }
+
+  .user-page .search-row input,
+  .user-page .search-row button {
+    min-height: 44px;
+    border-radius: 13px;
+    font-size: 13px;
+  }
+
+  .user-page .post-image {
+    height: clamp(150px, 48vw, 190px);
+  }
+
+  .user-page .post-body {
+    padding: 12px;
+  }
+
+  .user-page .post-body h4 {
+    margin: 6px 0 2px;
+    font-size: 15px;
+  }
+
+  .user-page .post-body p {
+    margin-bottom: 10px;
+    font-size: 10px;
+  }
+
+  .user-page .bottom-nav {
+    height: 70px;
+    padding-top: 6px;
+    padding-bottom: max(6px, env(safe-area-inset-bottom));
+  }
+
+  .user-page .bottom-nav button {
+    min-width: 0;
+    padding-inline: 2px;
+    font-size: 8px;
+  }
+
+  .user-page .bottom-nav .nav-glyph .icon {
+    width: 20px;
+    height: 20px;
+  }
+
+  #detailModal .ui-modal-card {
+    width: min(350px, 100%);
+    max-height: min(82dvh, 650px);
+    padding: 14px;
+    border-radius: 20px;
+  }
+
+  #detailModal .ui-modal-head h2 {
+    font-size: 18px;
+  }
+
+  #detailModal .detail-hero.has-image {
+    position: relative;
+    width: 100%;
+    height: clamp(180px, 42dvh, 240px);
+    min-height: 0;
+    max-height: none;
+    background: #f8f7fb;
+  }
+
+  #detailModal .detail-hero.has-image img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    max-width: 100%;
+    max-height: none;
+    object-fit: contain;
+    object-position: center;
+  }
+
+  #detailModal #detailTitle {
+    margin-bottom: 5px;
+    font-size: 17px;
+  }
+
+  #detailModal #detailDescription {
+    margin-bottom: 8px;
+    font-size: 12px;
+    line-height: 1.45;
+  }
+
+  #detailModal .detail-meta {
+    margin: 10px 0;
+  }
+
+  #detailModal .detail-meta div {
+    padding: 9px;
+    border-radius: 11px;
+  }
+
+  #detailModal .modal-actions {
+    margin-top: 12px;
+  }
+}
+
+/* Scale the lost-and-found gallery from two phone columns up to five. */
+@media (min-width: 1281px) {
+  .user-page #lost .post-grid {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 981px) and (max-width: 1280px) {
+  .user-page #lost .post-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 981px) {
+  .user-page #lost .post-meta {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    left: 8px;
+    z-index: 2;
+    width: auto;
+    gap: 4px;
+    justify-content: space-between;
+  }
+
+  .user-page #lost .post-meta .post-type {
+    position: static;
+    flex: 0 0 auto;
+    min-height: 24px;
+    padding: 3px 7px;
+    font-size: clamp(9px, 0.78vw, 11px);
+  }
+
+  .user-page #lost .post-date {
+    position: static;
+    min-width: 0;
+    padding: 3px 6px;
+    font-size: clamp(8px, 0.68vw, 10px);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+
+@media (min-width: 681px) and (max-width: 980px) {
+  .user-page #lost .post-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 680px) {
+  .user-page #lost .post-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 9px;
+    margin-top: 14px;
+  }
+
+  .user-page #lost .post-card {
+    min-width: 0;
+    border-radius: 15px;
+  }
+
+  .user-page #lost .post-image {
+    width: 100%;
+    height: auto;
+    aspect-ratio: 4 / 3;
+  }
+
+  .user-page #lost .post-meta .post-type {
+    top: 7px;
+    left: 7px;
+    min-height: 22px;
+    padding: 2px 6px;
+    font-size: 8px;
+  }
+
+  .user-page #lost .post-date {
+    top: 7px;
+    right: 7px;
+    padding: 3px 5px;
+    font-size: 8px;
+  }
+
+  .user-page #lost .post-body {
+    padding: 9px;
+  }
+
+  .user-page #lost .post-body h4 {
+    margin: 4px 0 2px;
+    font-size: 13px;
+    line-height: 1.35;
+  }
+
+  .user-page #lost .post-body p {
+    min-height: 30px;
+    margin: 0 0 8px;
+    font-size: 9px;
+    line-height: 1.35;
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+
+  .user-page #lost .post-body button {
+    width: 100%;
+    min-height: 32px;
+    padding-inline: 6px;
+    font-size: 12px;
+  }
+
 }
