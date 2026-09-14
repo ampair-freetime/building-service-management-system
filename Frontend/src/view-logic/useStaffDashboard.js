@@ -9,6 +9,7 @@ import {
   getPendingLostItems,
   rejectFoundItem,
   approveFoundItem,
+  approveLostItemAnnouncement,
   getPendingOwnershipRequests,
   getOwnershipRequestDetail,
   approveOwnershipRequest,
@@ -1114,13 +1115,17 @@ export function useStaffDashboard() {
     async function ComfirmationApproveLostItem(tab, id) {
       const item = lostSets[tab].find((x) => x.id === id);
       if (!item) return;
-      if (tab === "inventory" && item.backendId) {
+      if (item.backendId) {
         try {
-          await approveFoundItem(item.backendId);
+          if (tab === "inventory") {
+            await approveFoundItem(item.backendId);
+          } else if (tab === "lostposts") {
+            await approveLostItemAnnouncement(item.backendId);
+          }
         } catch (error) {
           if (await handleUnauthorizedResponse(error.status)) return;
 
-          console.error("Approve found item failed:", error);
+          console.error(`Approve ${tab} item failed:`, error);
           toast(error.message || "ไม่สามารถอนุมัติรายการได้");
           return;
         }
@@ -1164,6 +1169,12 @@ export function useStaffDashboard() {
       renderMetrics();
       renderQueue();
       renderNotifications();
+      currentLostTab = tab;
+      $$("#lostTabs .tab").forEach((tabButton) =>
+        tabButton.classList.toggle("active", tabButton.dataset.tab === tab)
+      );
+      navigate("lost");
+      renderLost();
       if (tab === "lostposts") {
         showSuccess(
           `${id} · ${item.title} ถูกเปลี่ยนสถานะเป็น “${nextStatus}” แล้ว`,

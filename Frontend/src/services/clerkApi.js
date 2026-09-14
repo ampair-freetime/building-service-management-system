@@ -232,6 +232,22 @@ export async function approveFoundItem(itemId) {
   return await parseResponse(response, "ไม่สามารถอนุมัติรายการได้");
 }
 
+export async function approveLostItemAnnouncement(itemId) {
+  const response = await fetch(
+    `${API_BASE_URL}/lost-found/lost-items/${encodeURIComponent(itemId)}/approve`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${
+          localStorage.getItem("buildingCareAccessToken") || ""
+        }`,
+      },
+    },
+  );
+
+  return await parseResponse(response, "ไม่สามารถอนุมัติประกาศของหายได้");
+}
+
 export async function rejectFoundItem(itemId, reason) {
   const response = await fetch(
     `${API_BASE_URL}/lost-found/found-items/${encodeURIComponent(itemId)}/reject`,

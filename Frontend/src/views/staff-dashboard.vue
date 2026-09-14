@@ -232,9 +232,6 @@ const { activeRole } = useStaffDashboard();
       <button type="button" data-mobile-page="jobs">
         <svg class="icon"><use href="#i-list" /></svg><span>งาน</span>
       </button>
-      <button type="button" class="new-action" id="mobileQuickAction">
-        <svg class="icon"><use href="#i-plus" /></svg><span>ดำเนินการ</span>
-      </button>
       <button type="button" id="mobileNotification">
         <svg class="icon"><use href="#i-bell" /></svg><span>แจ้งเตือน</span
         ><span class="notification-count" id="mobileNotificationCount">3</span>
