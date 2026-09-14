@@ -1198,6 +1198,9 @@ export function usePublicServicePortal() {
     document.querySelectorAll("[data-scroll-track]").forEach((button) =>
       button.addEventListener("click", () => {
         navigate("dashboard");
+        bottomButtons.forEach((item) =>
+          item.classList.toggle("active", item === button),
+        );
         window.setTimeout(
           () => {
             document.getElementById("trackingSection").scrollIntoView({

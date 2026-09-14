@@ -172,12 +172,11 @@ const { sidebarOpen, closeSidebar, toggleSidebar } = usePublicServicePortal();
         <button
           type="button"
           data-go="lost"
-          data-lost-tab="report-lost"
           data-bottom-page="lost"
         >
           <span class="nav-glyph"
             ><svg class="icon"><use href="#i-box" /></svg></span
-          ><span>แจ้งของหาย</span>
+          ><span>ของหาย-ได้คืน</span>
         </button>
         <button type="button" data-scroll-track>
           <span class="nav-glyph"

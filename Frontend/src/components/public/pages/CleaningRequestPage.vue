@@ -1,3 +1,17 @@
+<script setup>
+import LocationCombobox from "../LocationCombobox.vue";
+
+const floorSuggestions = ["ชั้น 1", "ชั้น 2", "ชั้น 3"];
+const roomSuggestions = [
+  "ห้องน้ำ",
+  "โถงทางเดิน",
+  "พื้นที่ส่วนกลาง",
+  "CSB201",
+  "CSB307",
+  "CSB209",
+];
+</script>
+
 <template>
 <section class="page" id="clean" data-theme="clean">
           <header class="page-header clean-page-header">
@@ -13,29 +27,22 @@
             <form class="form-panel" data-submit-type="แจ้งทำความสะอาด">
               <h3>ขอทำความสะอาดพื้นที่</h3>
               <div class="form-row clean-location-row">
-                <div class="field">
-                  <label for="cleanFloor">ชั้น</label
-                  ><select id="cleanFloor" name="clean_floor" required>
-                    <option value="">เลือกชั้น</option>
-                    <option value="1">ชั้น 1</option>
-                    <option value="2">ชั้น 2</option>
-                    <option value="3">ชั้น 3</option>
-                    <option value="4">ชั้น 4</option>
-                    <option value="5">ชั้น 5</option>
-                  </select>
-                </div>
-                <div class="field">
-                  <label for="cleanRoom">ห้อง</label
-                  ><select id="cleanRoom" name="clean_room" required>
-                    <option value="">เลือกห้อง</option>
-                    <option>ห้องเรียน</option>
-                    <option>ห้องปฏิบัติการ</option>
-                    <option>ห้องประชุม</option>
-                    <option>ห้องน้ำ</option>
-                    <option>โถงทางเดิน</option>
-                    <option>พื้นที่ส่วนกลาง</option>
-                  </select>
-                </div>
+                <LocationCombobox
+                  id="cleanFloor"
+                  name="clean_floor"
+                  label="ชั้น"
+                  placeholder="เลือกชั้น"
+                  :options="floorSuggestions"
+                  required
+                />
+                <LocationCombobox
+                  id="cleanRoom"
+                  name="clean_room"
+                  label="ห้อง"
+                  placeholder="เลือกห้อง"
+                  :options="roomSuggestions"
+                  required
+                />
               </div>
               <div class="field">
                 <label>ปัญหาที่พบ</label

@@ -6,7 +6,7 @@
       </svg>
       <div>
         <div class="eyebrow">Lost &amp; found</div>
-        <h2>ของหายและของที่พบ</h2>
+        <h2>แจ้งของหายและพบของ</h2>
       </div>
 
     </header>

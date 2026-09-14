@@ -437,6 +437,8 @@ main {
   font-size: 18px;
 }
 .location-card {
+  position: relative;
+  z-index: 2;
   display: flex;
   align-items: center;
   gap: 16px;
@@ -1202,6 +1204,101 @@ main {
 .repair-location-row > .field {
   min-width: 0;
 }
+.location-combobox {
+  position: relative;
+}
+.location-combobox-control {
+  position: relative;
+  min-width: 0;
+}
+.field .location-combobox-input {
+  padding-right: 44px;
+}
+.location-combobox-toggle {
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  width: 36px;
+  min-height: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: 11px;
+  background: transparent;
+  color: var(--primary);
+  display: grid;
+  place-items: center;
+  transform: translateY(-50%);
+}
+.location-combobox-toggle:hover {
+  background: var(--primary-soft);
+}
+.location-combobox-toggle:active {
+  transform: translateY(-50%) scale(0.95);
+}
+.location-combobox-toggle svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.location-suggestions {
+  position: absolute;
+  top: calc(100% + 7px);
+  right: 0;
+  left: 0;
+  z-index: 40;
+  max-height: min(188px, 34vh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 15px;
+  background: #fff;
+  box-shadow: 0 16px 36px rgba(31, 55, 78, 0.18);
+  scrollbar-width: thin;
+  scrollbar-color: var(--primary-soft) transparent;
+}
+.location-suggestion {
+  width: 100%;
+  min-height: 38px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--ink);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  text-align: left;
+  font-size: 13px;
+  font-weight: 650;
+}
+.location-suggestion:hover,
+.location-suggestion.active {
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+.location-suggestion svg {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.location-suggestions-empty {
+  margin: 0;
+  padding: 11px 10px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.45;
+}
 .upload-trigger {
   border: 1px dashed #cdc8df;
   border-radius: 15px;
@@ -1563,6 +1660,18 @@ main {
   }
   .bottom-nav .active {
     color: var(--primary);
+  }
+  .bottom-nav button[data-bottom-page="repair"].active {
+    color: #f47c35;
+  }
+  .bottom-nav button[data-bottom-page="clean"].active {
+    color: #36a95a;
+  }
+  .bottom-nav button[data-bottom-page="lost"].active {
+    color: #d6a11f;
+  }
+  .bottom-nav button[data-scroll-track].active {
+    color: #5967b2;
   }
   .bottom-nav .new-request {
     width: 58px;
