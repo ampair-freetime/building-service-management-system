@@ -61,9 +61,9 @@ const {
       </symbol>
     </svg>
     <main class="login-shell">
-      <section class="login-visual" aria-label="Building Care Staff Portal">
+      <section class="login-visual" aria-label="CS Building Care Staff Portal">
         <div class="visual-brand">
-          <span class="brand-mark">BC</span><span>Building Care</span>
+          <span class="brand-mark">BC</span><span>CS Building Care</span>
         </div>
         <div class="visual-copy">
           <small>Staff Portal</small>

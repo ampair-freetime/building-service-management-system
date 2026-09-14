@@ -7,11 +7,12 @@ import PublicRepairPage from "../components/public/pages/RepairRequestPage.vue";
 import PublicCleanPage from "../components/public/pages/CleaningRequestPage.vue";
 import { usePublicServicePortal } from "../view-logic/usePublicServicePortal.js";
 
-usePublicServicePortal();
+const { sidebarOpen, closeSidebar, toggleSidebar } = usePublicServicePortal();
 </script>
 
 <template>
   <div class="user-page">
+    <div class="lost-theme-background" aria-hidden="true"></div>
     <svg class="svg-sprite" aria-hidden="true" focusable="false">
       <symbol id="i-menu" viewBox="0 0 24 24">
         <path d="M4 7h16M4 12h16M4 17h16" />
@@ -93,63 +94,59 @@ usePublicServicePortal();
       </div>
     </div>
     <div class="app-shell">
-      <aside class="sidebar" id="sidebar">
+      <aside class="sidebar" id="sidebar" :class="{ open: sidebarOpen }">
         <div class="brand">
           <div class="brand-mark">BC</div>
-          <div><strong>Building Care</strong><span>ศูนย์บริการอาคาร</span></div>
+          <div><strong>CS Building Care</strong><span>ศูนย์บริการอาคาร</span></div>
+          <button type="button" class="sidebar-close" aria-label="ปิดเมนู" @click="closeSidebar">
+            <svg class="icon" aria-hidden="true"><use href="#i-close" /></svg>
+          </button>
         </div>
-        <p class="nav-label">เมนูบริการ</p>
         <nav class="nav-list" aria-label="เมนูหลัก">
           <button type="button" class="nav-item active" data-page="dashboard">
-            <span class="nav-dot"></span>ภาพรวม
-          </button>
-          <button type="button" class="nav-item" data-page="lost">
-            <span class="nav-dot"></span>ของหาย–ของได้คืน
+            หน้าหลัก
           </button>
           <button type="button" class="nav-item" data-page="repair">
-            <span class="nav-dot"></span>แจ้งซ่อม
+            แจ้งซ่อม
           </button>
           <button type="button" class="nav-item" data-page="clean">
-            <span class="nav-dot"></span>แจ้งทำความสะอาด
+            แจ้งทำความสะอาด
+          </button>
+          <button type="button" class="nav-item" data-page="lost">
+            ของหาย–ของได้คืน
           </button>
         </nav>
-        <div class="sidebar-note">
-          <strong>ไม่ต้องเข้าสู่ระบบ</strong
-          >ผู้ใช้งานสามารถส่งเรื่องได้โดยไม่ต้องมีบัญชี
-          และติดตามสถานะด้วยรหัสคำร้อง + อีเมล
-        </div>
       </aside>
       <button
         type="button"
         class="sidebar-backdrop"
         id="sidebarBackdrop"
+        :class="{ open: sidebarOpen }"
+        @click="closeSidebar"
         aria-label="ปิดเมนู"
       ></button>
 
+      <button
+        type="button"
+        class="sidebar-floating-toggle"
+        :class="{ 'is-open': sidebarOpen }"
+        id="menuButton"
+        :aria-expanded="sidebarOpen"
+        aria-controls="sidebar"
+        aria-label="เปิดเมนู"
+        @click="toggleSidebar"
+      >
+        <svg class="icon" aria-hidden="true"><use href="#i-menu" /></svg>
+      </button>
+
       <main>
-        <div class="pull-indicator">↓ ดึงลงเพื่อรีเฟรช</div>
-        <div class="topbar">
-          <button
-            type="button"
-            class="mobile-menu"
-            id="menuButton"
-            aria-label="เปิดเมนู"
-          >
-            <svg class="icon"><use href="#i-menu" /></svg>
-          </button>
-          <div></div>
-          <div class="date-chip">
-            อาคาร วิทยาศาสตร์คอมพิวเตอร์ (CS) · เปิดบริการ 08:00–18:00
-          </div>
-        </div>
-
         <PublicDashboardPage />
-
-        <PublicLostPage />
 
         <PublicRepairPage />
 
         <PublicCleanPage />
+
+        <PublicLostPage />
       </main>
       <nav class="bottom-nav" aria-label="เมนูด้านล่าง">
         <button

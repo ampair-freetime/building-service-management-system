@@ -1,14 +1,13 @@
 <template>
 <section class="page" id="repair" data-theme="repair">
-          <header class="page-header">
+          <header class="page-header repair-page-header">
+            <svg class="repair-illustration" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <use href="#i-tools" />
+            </svg>
             <div>
               <div class="eyebrow">Repair request</div>
               <h2>แจ้งซ่อม</h2>
             </div>
-            <p>
-              แจ้งอุปกรณ์หรือพื้นที่ชำรุด
-              พร้อมระดับความเร่งด่วนเพื่อให้ทีมช่างจัดลำดับงานได้เหมาะสม
-            </p>
           </header>
           <div class="work-layout single-form-layout">
             <form class="form-panel" data-submit-type="แจ้งซ่อม">

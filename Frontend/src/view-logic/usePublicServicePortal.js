@@ -1,4 +1,4 @@
-import { onMounted, onUnmounted } from "vue";
+import { onMounted, onUnmounted, ref } from "vue";
 import {
   createFoundItem,
   createFoundItemClaim,
@@ -9,14 +9,19 @@ import {
 } from "../services/api";
 
 export function usePublicServicePortal() {
+  const sidebarOpen = ref(false);
+  const closeSidebar = () => { sidebarOpen.value = false; };
+  const toggleSidebar = () => { sidebarOpen.value = !sidebarOpen.value; };
+  const compactSidebar = window.matchMedia("(min-width: 681px) and (max-width: 980px)");
+  onMounted(() => compactSidebar.addEventListener("change", closeSidebar));
+  onUnmounted(() => compactSidebar.removeEventListener("change", closeSidebar));
   // รอ Vue สร้าง DOM ก่อนผูก event เพราะหน้านี้ควบคุมองค์ประกอบผ่าน querySelector
   onMounted(() => {
-    document.title = "CMU Building Care";
+    document.title = "CS Building Care";
 
     const pages = document.querySelectorAll(".page");
     const navItems = document.querySelectorAll(".nav-item");
     const sidebar = document.getElementById("sidebar");
-    const sidebarBackdrop = document.getElementById("sidebarBackdrop");
     const bottomButtons = document.querySelectorAll(".bottom-nav > button");
     const prefersReducedMotion = window.matchMedia(
       "(prefers-reduced-motion: reduce)",
@@ -29,41 +34,9 @@ export function usePublicServicePortal() {
     let detailRequestId = 0;
     let selectedClaimItem = "";
     let selectedClaimItemCode = "";
-    let successTrackingDestination = "dashboard";
-    // ข้อมูลติดตามในหน่วยความจำของหน้านี้ ไม่ใช่การอ่านสถานะล่าสุดจาก API และหายเมื่อโหลดหน้าใหม่
-    const trackedRequests = new Map([
-      [
-        "BC-4821",
-        {
-          summary: "คำร้องอยู่ระหว่างการตรวจสอบ",
-          status: "กำลังดำเนินการ",
-          statusClass: "progress",
-          requestType: "คำขอรับคืนสิ่งของ",
-          itemName: "บัตรนักศึกษา",
-          updatedAt: "อยู่ระหว่างเจ้าหน้าที่ตรวจสอบ",
-        },
-      ],
-    ]);
+    // เก็บเฉพาะคำร้องที่ผู้ใช้ส่งจริงในรอบการเปิดหน้านี้ ไม่มีข้อมูลตัวอย่างปะปน
+    const trackedRequests = new Map();
 
-    function closeSidebar() {
-      sidebar.classList.remove("open");
-      sidebarBackdrop.classList.remove("open");
-      document
-        .getElementById("menuButton")
-        .setAttribute("aria-expanded", "false");
-    }
-
-    function toggleSidebar(forceOpen) {
-      const shouldOpen =
-        typeof forceOpen === "boolean"
-          ? forceOpen
-          : !sidebar.classList.contains("open");
-      sidebar.classList.toggle("open", shouldOpen);
-      sidebarBackdrop.classList.toggle("open", shouldOpen);
-      document
-        .getElementById("menuButton")
-        .setAttribute("aria-expanded", String(shouldOpen));
-    }
 
     function syncBottomNavigation(modalId = "") {
       bottomButtons.forEach((button) => {
@@ -110,11 +83,11 @@ export function usePublicServicePortal() {
         behavior: prefersReducedMotion ? "auto" : "smooth",
       });
 
-      const pageForms = {
-        repair: "#repair form.form-panel",
-        clean: "#clean form.form-panel",
-      };
-      if (pageForms[pageId]) scrollToForm(pageForms[pageId]);
+      if (pageId === "lost") {
+        openLostView("browse", false);
+        void filterPosts();
+      }
+
     }
 
     navItems.forEach((item) =>
@@ -124,7 +97,9 @@ export function usePublicServicePortal() {
       button.addEventListener("click", (event) => {
         event.stopPropagation();
         navigate(button.dataset.go);
-        if (button.dataset.lostTab) openLostView(button.dataset.lostTab);
+        if (button.dataset.lostTab && button.dataset.lostTab !== "browse") {
+          openLostView(button.dataset.lostTab);
+        }
       }),
     );
     document.querySelectorAll("[data-card-go]").forEach((card) => {
@@ -145,10 +120,6 @@ export function usePublicServicePortal() {
         }
       });
     });
-    document
-      .getElementById("menuButton")
-      .addEventListener("click", () => toggleSidebar());
-    sidebarBackdrop.addEventListener("click", closeSidebar);
 
     function openLostView(viewName, moveToForm = true) {
       document
@@ -160,6 +131,14 @@ export function usePublicServicePortal() {
         .querySelectorAll(".lost-tab")
         .forEach((tab) =>
           tab.classList.toggle("active", tab.dataset.lostView === viewName),
+        );
+      document
+        .querySelectorAll("[data-open-lost-view]")
+        .forEach((button) =>
+          button.classList.toggle(
+            "active",
+            button.dataset.openLostView === viewName,
+          ),
         );
       if (viewName === "report-found") {
         const now = new Date();
@@ -178,7 +157,6 @@ export function usePublicServicePortal() {
         const lostViewForms = {
           // ปุ่มดูประกาศทั้งหมดเลื่อนไปยังส่วนรายการประกาศโดยตรง
           browse: "#lostSearchResults",
-          track: "#lostFoundTrackingForm",
           "report-lost": "#lostItemForm",
           "report-found": "#publicFoundForm",
         };
@@ -197,9 +175,21 @@ export function usePublicServicePortal() {
     document
       .querySelectorAll("[data-open-lost-view]")
       .forEach((button) =>
-        button.addEventListener("click", () =>
-          openLostView(button.dataset.openLostView),
-        ),
+        button.addEventListener("click", () => {
+          const viewName = button.dataset.openLostView;
+          if (viewName === "browse") {
+            void filterPosts();
+          } else {
+            openLostView(viewName, false);
+          }
+
+          window.requestAnimationFrame(() => {
+            document.querySelector(".lost-tabs")?.scrollIntoView({
+              behavior: prefersReducedMotion ? "auto" : "smooth",
+              block: "start",
+            });
+          });
+        }),
       );
 
     function showToast(message) {
@@ -291,7 +281,8 @@ export function usePublicServicePortal() {
       openLostView("browse", false);
       summary.textContent = "กำลังค้นหา...";
       empty.hidden = true;
-      grid.replaceChildren();
+      grid.setAttribute("aria-busy", "true");
+      grid.classList.add("is-loading");
 
       try {
         const result = await searchLostFoundItems({
@@ -305,9 +296,13 @@ export function usePublicServicePortal() {
         renderSearchPosts(result.items);
         summary.textContent = `แสดง ${result.items.length} จาก ${result.total} รายการ`;
         empty.hidden = result.items.length !== 0;
+        grid.removeAttribute("aria-busy");
+        grid.classList.remove("is-loading");
       } catch (error) {
         if (requestId !== searchRequestId) return;
         summary.textContent = error.message;
+        grid.removeAttribute("aria-busy");
+        grid.classList.remove("is-loading");
       }
     }
 
@@ -430,10 +425,6 @@ export function usePublicServicePortal() {
       document.getElementById("detailDate").textContent = data.date || "–";
       document.getElementById("detailLocation").textContent =
         data.location || "–";
-      document.getElementById("detailStatus").textContent =
-        data.status || "รอรับเรื่อง";
-      document.getElementById("detailCode").textContent =
-        data.code || `BC-${Math.floor(1000 + Math.random() * 9000)}`;
       const detailHero = document.querySelector("#detailModal .detail-hero");
       const detailImage = document.getElementById("detailImage");
       const detailIcon = document.getElementById("detailIcon");
@@ -654,9 +645,6 @@ export function usePublicServicePortal() {
     function showSuccess(type, recipientEmail = "", requestId = "") {
       const trackingCode =
         requestId || `BC-${Math.floor(1000 + Math.random() * 9000)}`;
-      const isLostFoundTracking =
-        trackingCode.startsWith("LOST-") || trackingCode.startsWith("FOUND-");
-      successTrackingDestination = isLostFoundTracking ? "lost" : "dashboard";
 
       trackedRequests.set(trackingCode, {
         summary: type,
@@ -665,6 +653,7 @@ export function usePublicServicePortal() {
         requestType: "คำร้องที่ส่งผ่านระบบ",
         itemName: "ไม่แสดงข้อมูลส่วนบุคคล",
         updatedAt: "เพิ่งส่งคำร้อง",
+        email: recipientEmail.trim().toLowerCase(),
       });
       document.getElementById("successType").textContent = type;
       document.getElementById("successInstruction").textContent =
@@ -677,17 +666,13 @@ export function usePublicServicePortal() {
       document.getElementById("successEmail").hidden = false;
       document.getElementById("viewStatusButton").hidden = false;
       document.getElementById("backHomeButton").textContent = "กลับหน้าหลัก";
-      if (isLostFoundTracking) {
-        document.getElementById("lostFoundTrackingCode").value = trackingCode;
-        if (recipientEmail) {
-          document.getElementById("lostFoundTrackingEmail").value =
-            recipientEmail;
-        }
-      } else {
-        document.getElementById("trackingCode").value = trackingCode;
-        if (recipientEmail)
-          document.getElementById("trackingEmail").value = recipientEmail;
-      }
+      // ทุกประเภทคำร้องใช้ฟอร์มติดตามเดียวกันในหน้าภาพรวม
+      document.getElementById("trackingCode").value = trackingCode;
+      if (recipientEmail)
+        document.getElementById("trackingEmail").value = recipientEmail;
+      validateTrackingField(document.getElementById("trackingCode"));
+      if (recipientEmail)
+        validateTrackingField(document.getElementById("trackingEmail"));
       openUiModal("successModal", document.activeElement);
     }
 
@@ -1070,6 +1055,34 @@ export function usePublicServicePortal() {
       });
     });
 
+    function validateTrackingField(field) {
+      let message = "";
+      if (field.id === "trackingCode" && !field.value.trim()) {
+        message = "กรุณากรอกรหัสคำร้อง";
+      }
+      if (field.id === "trackingEmail") {
+        if (!field.value.trim()) {
+          message = "กรุณากรอกอีเมลที่ใช้แจ้งคำร้อง";
+        } else if (field.validity.typeMismatch) {
+          message = "กรุณากรอกอีเมลให้ถูกต้อง";
+        }
+      }
+
+      field.setCustomValidity(message);
+      field.setAttribute("aria-invalid", String(Boolean(message)));
+      document.getElementById(`${field.id}Error`).textContent = message;
+      return !message;
+    }
+
+    const trackingFields = [
+      document.getElementById("trackingCode"),
+      document.getElementById("trackingEmail"),
+    ];
+    trackingFields.forEach((field) => {
+      field.addEventListener("input", () => validateTrackingField(field));
+      field.addEventListener("blur", () => validateTrackingField(field));
+    });
+
     function renderTrackingResult(item, code, ids) {
       const result = document.getElementById(ids.result);
       const statusBadge = document.getElementById(ids.status);
@@ -1094,27 +1107,29 @@ export function usePublicServicePortal() {
         return;
       }
 
-      // แปลงสถานะจาก backend เป็นข้อความภาษาไทย
-      const statusText = itemStatusLabel(item.status);
+      // รองรับทั้งผลจาก Lost & Found API และรายการชั่วคราวของบริการอื่นในหน้าเดียวกัน
+      const statusText = item.statusClass
+        ? item.status
+        : itemStatusLabel(item.status);
 
       document.getElementById(ids.text).textContent =
-        `สถานะล่าสุด: ${statusText}`;
+        item.summary || `สถานะล่าสุด: ${statusText}`;
 
       statusBadge.textContent = statusText;
-      statusBadge.className = `status ${item.status}`;
+      statusBadge.className = `status ${item.statusClass || item.status}`;
 
-      // หน้า Lost & Found มีพื้นที่แสดงรายละเอียดเพิ่มเติม
       if (ids.details) {
         document.getElementById(ids.details).hidden = false;
 
         document.getElementById(ids.requestType).textContent =
-          item.report_type === "found" ? "แจ้งพบของ" : "แจ้งของหาย";
+          item.requestType ||
+          (item.report_type === "found" ? "แจ้งพบของ" : "แจ้งของหาย");
 
-        document.getElementById(ids.itemName).textContent = item.item_name;
+        document.getElementById(ids.itemName).textContent =
+          item.itemName || item.item_name || "–";
 
-        document.getElementById(ids.updatedAt).textContent = formatItemDate(
-          item.updated_at,
-        );
+        document.getElementById(ids.updatedAt).textContent =
+          item.updatedAt || formatItemDate(item.updated_at);
       }
 
       result.classList.add("show");
@@ -1122,41 +1137,49 @@ export function usePublicServicePortal() {
     }
 
     document
-      .getElementById("lostFoundTrackingForm")
+      .getElementById("trackingForm")
       .addEventListener("submit", async (event) => {
         event.preventDefault();
 
-        const form = event.currentTarget;
-
-        if (!form.checkValidity()) {
-          form.reportValidity();
+        const isValid = trackingFields
+          .map(validateTrackingField)
+          .every(Boolean);
+        if (!isValid) {
+          trackingFields.find((field) => !field.checkValidity())?.focus();
           return;
         }
 
         const code = document
-          .getElementById("lostFoundTrackingCode")
+          .getElementById("trackingCode")
           .value.trim()
           .toUpperCase();
 
         const email = document
-          .getElementById("lostFoundTrackingEmail")
+          .getElementById("trackingEmail")
           .value.trim()
           .toLowerCase();
 
         const ids = {
-          result: "lostFoundTrackingResult",
-          code: "lostFoundTrackingResultCode",
-          text: "lostFoundTrackingResultText",
-          status: "lostFoundTrackingResultStatus",
-          details: "lostFoundTrackingDetails",
-          requestType: "lostFoundTrackingRequestType",
-          itemName: "lostFoundTrackingItemName",
-          updatedAt: "lostFoundTrackingUpdatedAt",
+          result: "trackingResult",
+          code: "trackingResultCode",
+          text: "trackingResultText",
+          status: "trackingResultStatus",
+          details: "trackingDetails",
+          requestType: "trackingRequestType",
+          itemName: "trackingItemName",
+          updatedAt: "trackingUpdatedAt",
         };
 
         try {
-          // ส่งรหัสและอีเมลไปตรวจที่ backend
-          const item = await trackLostFoundItem(code, email);
+          const isLostFoundCode =
+            code.startsWith("LOST-") || code.startsWith("FOUND-");
+          // LOST-/FOUND- อ่านสถานะจริงจาก API ส่วนรหัสบริการเดิมอ่านจากรายการของหน้านี้
+          const localItem = trackedRequests.get(code);
+          const item = isLostFoundCode
+            ? await trackLostFoundItem(code, email)
+            : localItem && (!localItem.email || localItem.email === email)
+              ? localItem
+              : null;
           renderTrackingResult(item, code, ids);
         } catch (error) {
           // แสดงกรอบผลลัพธ์แม้เกิดปัญหาการเชื่อมต่อ
@@ -1288,7 +1311,7 @@ export function usePublicServicePortal() {
           `รหัสประกาศ ${claim.found_item_code} · สถานะ ${claim.status}`;
         document.getElementById("successEmail").hidden = false;
 
-        // หน้า Tracking ปัจจุบันยังรับรหัส LOST-/FOUND- ไม่ได้รับ UUID ของ claim
+        // ฟอร์มติดตามรวมรับรหัสคำร้องหลัก แต่ยังไม่รับ UUID ของคำขอรับคืน
         document.getElementById("viewStatusButton").hidden = true;
         document.getElementById("backHomeButton").textContent = "รับทราบ";
         openUiModal("successModal", document.activeElement);
@@ -1303,19 +1326,19 @@ export function usePublicServicePortal() {
     const viewStatusButton = document.getElementById("viewStatusButton");
     viewStatusButton?.addEventListener("click", () => {
       closeUiModal("successModal", false);
-      navigate(successTrackingDestination);
-
-      if (successTrackingDestination === "lost") {
-        openLostView("track");
-        return;
-      }
+      navigate("dashboard");
 
       window.setTimeout(
-        () =>
+        () => {
           document.getElementById("trackingSection").scrollIntoView({
             behavior: prefersReducedMotion ? "auto" : "smooth",
             block: "center",
-          }),
+          });
+          // รหัสและอีเมลถูกกรอกไว้ตั้งแต่ได้รับผลสำเร็จ เหลือเพียงกดตรวจสอบสถานะ
+          document.getElementById("trackingCode").focus({
+            preventScroll: true,
+          });
+        },
         80,
       );
     });
@@ -1346,4 +1369,5 @@ export function usePublicServicePortal() {
   onUnmounted(() => {
     document.body.classList.remove("modal-open", "offline");
   });
+  return { sidebarOpen, closeSidebar, toggleSidebar };
 }

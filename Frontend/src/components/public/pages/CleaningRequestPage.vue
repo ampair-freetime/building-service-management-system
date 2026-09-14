@@ -1,14 +1,13 @@
 <template>
 <section class="page" id="clean" data-theme="clean">
-          <header class="page-header">
+          <header class="page-header clean-page-header">
+            <svg class="clean-illustration" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <use href="#i-broom" />
+            </svg>
             <div>
               <div class="eyebrow">Cleaning request</div>
               <h2>แจ้งทำความสะอาด</h2>
             </div>
-            <p>
-              ระบุพื้นที่และลักษณะงาน
-              เพื่อให้เจ้าหน้าที่เตรียมอุปกรณ์และเข้าดำเนินการได้ตรงจุด
-            </p>
           </header>
           <div class="work-layout single-form-layout">
             <form class="form-panel" data-submit-type="แจ้งทำความสะอาด">

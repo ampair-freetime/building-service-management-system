@@ -2213,7 +2213,7 @@ export function useStaffDashboard() {
       const contactLabel = $("#jobDetailContactLabel");
       if (contactLabel) contactLabel.textContent = "ช่องทางติดต่อ";
       $("#jobDetailContact").textContent =
-        item.reporterEmail || "ติดต่อผ่านระบบ Building Care";
+        item.reporterEmail || "ติดต่อผ่านระบบ CS Building Care";
       const assigneeLabel = $("#jobDetailAssigneeLabel");
       if (assigneeLabel) assigneeLabel.textContent = "ผู้ตรวจสอบ";
       $("#jobDetailAssignee").textContent = item.assignee || "ธุรการส่วนกลาง";

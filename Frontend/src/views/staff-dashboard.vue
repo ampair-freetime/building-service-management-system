@@ -83,7 +83,7 @@ const { activeRole } = useStaffDashboard();
         <div class="brand">
           <div class="brand-mark">BC</div>
           <div>
-            <strong>Building Care</strong><span>Staff operations portal</span>
+            <strong>CS Building Care</strong><span>Staff operations portal</span>
           </div>
         </div>
         <div class="nav-label">Operations</div>

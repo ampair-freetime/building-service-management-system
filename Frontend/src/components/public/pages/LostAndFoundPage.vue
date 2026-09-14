@@ -1,14 +1,14 @@
 <template>
   <section class="page" id="lost" data-theme="lost">
-    <header class="page-header">
+    <header class="page-header lost-page-header">
+      <svg class="lost-illustration" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <use href="#i-box" />
+      </svg>
       <div>
         <div class="eyebrow">Lost &amp; found</div>
         <h2>ของหายและของที่พบ</h2>
       </div>
-      <p>
-        ค้นหาประกาศที่มีอยู่ก่อน หากยังไม่พบจึงสร้างประกาศใหม่
-        เพื่อช่วยลดรายการซ้ำและเพิ่มโอกาสได้ของคืน
-      </p>
+
     </header>
     <div class="lost-hub">
       <section class="lost-search-panel">
@@ -28,6 +28,16 @@
         <button
           type="button"
           class="lost-action-card"
+          data-open-lost-view="browse"
+        >
+          <span class="action-symbol"
+            ><svg class="icon"><use href="#i-history" /></svg></span
+          ><strong>ดูประกาศทั้งหมด</strong
+          ><span>ดูรายการตามหาและรายการที่พบแล้ว</span>
+        </button>
+        <button
+          type="button"
+          class="lost-action-card"
           data-open-lost-view="report-lost"
         >
           <span class="action-symbol"
@@ -44,25 +54,6 @@
             ><svg class="icon"><use href="#i-box" /></svg></span
           ><strong>แจ้งพบของ</strong><span>ระบุสิ่งของและจุดรับฝาก</span>
         </button>
-        <button
-          type="button"
-          class="lost-action-card"
-          data-open-lost-view="browse"
-        >
-          <span class="action-symbol"
-            ><svg class="icon"><use href="#i-history" /></svg></span
-          ><strong>ดูประกาศทั้งหมด</strong
-          ><span>ดูรายการตามหาและรายการที่พบแล้ว</span>
-        </button>
-        <button
-          type="button"
-          class="lost-action-card"
-          data-open-lost-view="track"
-        >
-          <span class="action-symbol"
-            ><svg class="icon"><use href="#i-history" /></svg></span
-          ><strong>ติดตามคำร้อง</strong><span>ตรวจสอบสถานะด้วยรหัสติดตาม</span>
-        </button>
       </div>
 
       <div class="lost-tabs" role="tablist" aria-label="เมนูของหายและของที่พบ">
@@ -74,9 +65,6 @@
         </button>
         <button type="button" class="lost-tab" data-lost-view="report-found">
           แจ้งพบของ
-        </button>
-        <button type="button" class="lost-tab" data-lost-view="track">
-          ติดตามคำร้อง
         </button>
       </div>
 
@@ -232,76 +220,8 @@
         </section>
       </div>
 
-      <div class="lost-view" id="lost-view-track">
-        <section class="lost-search-panel lost-tracking-panel">
-          <div class="eyebrow">Lost &amp; found tracking</div>
-          <h3>ติดตามคำร้องของหายและของที่พบ</h3>
-          <p>กรอกรหัสติดตามที่ได้รับ โดยไม่ต้องเข้าสู่ระบบ</p>
-          <form
-            id="lostFoundTrackingForm"
-            class="tracking-box lost-tracking-box"
-          >
-            <div class="field">
-              <label for="lostFoundTrackingCode">รหัสติดตาม</label>
-              <input
-                id="lostFoundTrackingCode"
-                type="text"
-                required
-                placeholder="เช่น LOST-20260910-ABC12345"
-                autocomplete="off"
-              />
-            </div>
-            <div class="field">
-              <label for="lostFoundTrackingEmail">อีเมลผู้แจ้ง</label>
-              <input
-                id="lostFoundTrackingEmail"
-                type="email"
-                required
-                maxlength="255"
-                placeholder="name@example.com"
-                autocomplete="email"
-              />
-            </div>
-            <button type="submit" class="primary-btn">ตรวจสอบสถานะ</button>
-          </form>
-          <div
-            class="tracking-result"
-            id="lostFoundTrackingResult"
-            role="status"
-            aria-live="polite"
-          >
-            <div class="tracking-result-head">
-              <div>
-                <small>รหัสติดตาม</small>
-                <strong id="lostFoundTrackingResultCode">–</strong>
-                <p id="lostFoundTrackingResultText" style="margin: 5px 0 0"></p>
-              </div>
-              <span class="status" id="lostFoundTrackingResultStatus"></span>
-            </div>
-            <div
-              id="lostFoundTrackingDetails"
-              class="tracking-request-details"
-              hidden
-            >
-              <div>
-                <small>ประเภทคำร้อง</small>
-                <strong id="lostFoundTrackingRequestType">–</strong>
-              </div>
-              <div>
-                <small>รายการ</small>
-                <strong id="lostFoundTrackingItemName">–</strong>
-              </div>
-              <div>
-                <small>อัปเดตล่าสุด</small>
-                <strong id="lostFoundTrackingUpdatedAt">–</strong>
-              </div>
-            </div>
-          </div>
-        </section>
-      </div>
-
       <div class="lost-view" id="lost-view-report-lost">
-        <div class="two-form-layout">
+        <div class="two-form-layout single-form-layout">
           <form id="lostItemForm" class="form-panel" novalidate>
             <h3>แจ้งของหาย</h3>
             <div class="field">
@@ -445,41 +365,12 @@
             </div>
             <button type="submit" class="submit-btn">เผยแพร่ประกาศตามหา</button>
           </form>
-          <div class="list-panel">
-            <h3>ก่อนเผยแพร่</h3>
-            <div class="privacy-note">
-              อย่าใส่ข้อมูลสำคัญทั้งหมดในประกาศสาธารณะ
-              ควรเก็บรายละเอียดบางอย่างไว้ใช้ตรวจสอบผู้ที่อ้างว่าเป็นเจ้าของ
-            </div>
-            <div class="ticket-list">
-              <div class="ticket">
-                <div>
-                  <strong>ค้นหาประกาศก่อน</strong
-                  ><small>อาจมีคนประกาศพบสิ่งของไว้แล้ว</small>
-                </div>
-                <span class="status">แนะนำ</span>
-              </div>
-              <div class="ticket">
-                <div>
-                  <strong>ระบุลักษณะให้ชัด</strong
-                  ><small>สี ยี่ห้อ จุดสังเกต และบริเวณที่หาย</small>
-                </div>
-                <span class="status">สำคัญ</span>
-              </div>
-              <div class="ticket">
-                <div>
-                  <strong>เก็บรหัสติดตาม</strong
-                  ><small>ใช้ตรวจสอบสถานะหรือปิดประกาศภายหลัง</small>
-                </div>
-                <span class="status">จำเป็น</span>
-              </div>
-            </div>
-          </div>
+
         </div>
       </div>
 
       <div class="lost-view" id="lost-view-report-found">
-        <div class="two-form-layout">
+        <div class="two-form-layout single-form-layout">
           <form
             id="publicFoundForm"
             class="form-panel"
@@ -487,9 +378,8 @@
             novalidate
           >
             <h3>แจ้งพบของ</h3>
-            <p class="form-helper">
-              กรอกข้อมูลสิ่งของและจุดรับฝาก
-              รายการจะส่งให้เจ้าหน้าที่ตรวจสอบก่อนแสดงในประกาศ
+            <p class="found-dropoff-notice">
+              กรุณานำไปฝากไว้ที่บริเวณห้องธุรการ ชั้น 1
             </p>
             <div class="field">
               <label for="publicFoundCategory">ประเภทสิ่งของ</label
@@ -670,12 +560,12 @@
                 aria-live="polite"
               ></p>
             </div>
-            <div class="field">
+            <!-- <div class="field">
               <label for="publicFinderName"
                 >ชื่อผู้พบหรือผู้ส่งมอบ
                 <span class="optional-label">(ไม่บังคับ)</span></label
               ><input id="publicFinderName" type="text" maxlength="120" />
-            </div>
+            </div> -->
             <div class="field">
               <label for="publicFoundEmail">อีเมลสำหรับติดตามสถานะ</label
               ><input
@@ -698,36 +588,7 @@
               ส่งให้เจ้าหน้าที่ตรวจสอบ
             </button>
           </form>
-          <div class="list-panel">
-            <h3>การปกป้องเจ้าของสิ่งของ</h3>
-            <div class="privacy-note">
-              เลขบัตร ชื่อเต็ม จำนวนเงิน หรือรายละเอียดสำคัญไม่ควรแสดงต่อสาธารณะ
-              ให้เจ้าหน้าที่ใช้ข้อมูลเหล่านี้ตรวจสอบก่อนคืนของ
-            </div>
-            <div class="ticket-list">
-              <div class="ticket">
-                <div>
-                  <strong>ฝากไว้ในจุดที่ปลอดภัย</strong
-                  ><small>ระบุห้องหรือเคาน์เตอร์ที่ผู้ใช้ติดต่อรับได้</small>
-                </div>
-                <span class="status">แนะนำ</span>
-              </div>
-              <div class="ticket">
-                <div>
-                  <strong>อย่าเปิดเผยข้อมูลทั้งหมด</strong
-                  ><small>เก็บรายละเอียดบางอย่างไว้ยืนยันเจ้าของจริง</small>
-                </div>
-                <span class="status">สำคัญ</span>
-              </div>
-              <div class="ticket">
-                <div>
-                  <strong>ให้ Staff ตรวจคำขอรับ</strong
-                  ><small>ลดความเสี่ยงจากการแอบอ้างเป็นเจ้าของ</small>
-                </div>
-                <span class="status">ปลอดภัย</span>
-              </div>
-            </div>
-          </div>
+
         </div>
       </div>
     </div>

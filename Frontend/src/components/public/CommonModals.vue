@@ -73,7 +73,7 @@
             </div>
             <h3 id="successType">ส่งรายการเรียบร้อยแล้ว</h3>
             <p id="successInstruction">เก็บรหัสคำร้องนี้ไว้เพื่อติดตามสถานะ</p>
-            <strong class="request-code" id="successCode">BC-0000</strong>
+            <strong class="request-code" id="successCode">LOST-20260912-3BE8986F</strong>
             <small class="success-email" id="successEmail"></small>
           </div>
           <div class="modal-actions">

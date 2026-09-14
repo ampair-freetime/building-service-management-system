@@ -42,8 +42,6 @@
               <div>
                 <small>สถานที่</small><strong id="detailLocation">–</strong>
               </div>
-              <div><small>สถานะ</small><strong id="detailStatus">–</strong></div>
-              <div><small>หมายเลข</small><strong id="detailCode">–</strong></div>
             </div>
             <div class="modal-actions">
               <button
