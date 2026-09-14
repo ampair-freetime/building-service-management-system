@@ -163,10 +163,7 @@ const { activeRole } = useStaffDashboard();
       <main>
         <div class="pull-indicator">↓ ดึงลงเพื่อรีเฟรช</div>
         <header class="topbar">
-          <div>
-            <div class="eyebrow" id="eyebrow">Admin command center</div>
-            <h1 id="pageTitle">ภาพรวมการปฏิบัติงาน</h1>
-          </div>
+          
           <div class="top-actions">
             <span class="ready-pill">พร้อมปฏิบัติงาน</span>
             <div class="notification-wrap">
@@ -192,17 +189,19 @@ const { activeRole } = useStaffDashboard();
                 </svg>
                 <span class="notification-count" id="notificationCount">3</span>
               </button>
-              <section
-                class="notification-panel"
-                id="notificationPanel"
-                aria-label="รายการแจ้งเตือน"
-              >
-                <div class="notification-head">
-                  <h3 id="notificationTitle">การแจ้งเตือนของแอดมิน</h3>
-                  <button id="markAllRead">อ่านทั้งหมดแล้ว</button>
-                </div>
-                <div class="notification-list" id="notificationList"></div>
-              </section>
+              <Teleport to="body">
+                <section
+                  class="notification-panel"
+                  id="notificationPanel"
+                  aria-label="รายการแจ้งเตือน"
+                >
+                  <div class="notification-head">
+                    <h3 id="notificationTitle">การแจ้งเตือนของแอดมิน</h3>
+                    <button id="markAllRead">อ่านทั้งหมดแล้ว</button>
+                  </div>
+                  <div class="notification-list" id="notificationList"></div>
+                </section>
+              </Teleport>
             </div>
             <button
               class="header-profile"

@@ -1,6 +1,12 @@
 <template>
 <section class="page active" id="page-dashboard">
-          
+          <div class="section-title">
+      <div>
+        <div class="eyebrow">Clerk Overview</div>
+        <h2>ภาพรวมงาน</h2>
+      </div>
+      
+    </div>
           <div class="metrics" id="metricGrid"></div>
           <section class="panel" style="margin-bottom: 20px">
             <div class="panel-head">

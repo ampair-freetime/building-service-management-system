@@ -9,7 +9,19 @@
           โดยแยกคำขอที่ต้องพิจารณาอนุมัติออกจากคำขอรับของ
         </p>
       </div>
-      <div class="toolbar">
+      <div class="toolbar clerk-center-search">
+        <svg
+          class="search-icon"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          aria-hidden="true"
+        >
+          <circle cx="11" cy="11" r="7" />
+          <path d="m20 20-4-4" />
+        </svg>
         <input
           class="field-compact search"
           id="clerkCenterSearch"

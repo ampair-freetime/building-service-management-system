@@ -566,6 +566,27 @@ body {
   align-items: center;
   gap: 10px;
 }
+.staff-dashboard-page .topbar > .top-actions {
+  margin-left: auto;
+  margin-right: 25px;
+}
+.staff-dashboard-page .clerk-center-search {
+  position: relative;
+}
+.staff-dashboard-page .clerk-center-search .search-icon {
+  position: absolute;
+  z-index: 1;
+  top: 50%;
+  left: 15px;
+  width: 18px;
+  height: 18px;
+  color: var(--muted);
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+.staff-dashboard-page .clerk-center-search .search {
+  padding-left: 43px;
+}
 .icon-btn {
   position: relative;
   width: 46px;
@@ -1959,6 +1980,12 @@ textarea:focus-visible,
   border-color: var(--role);
   color: #fff;
 }
+.staff-dashboard-page #dashboardQuickActions .quick-action:hover,
+.staff-dashboard-page #dashboardQuickActions .quick-action:focus-visible {
+  background: #40E0D0;
+  border-color: #40E0D0;
+  color: #fff;
+}
 .progress-upload {
   border: 1px dashed #cbc6de;
   border-radius: 14px;
@@ -2403,7 +2430,7 @@ textarea:focus-visible,
 .staff-dashboard-page .app main > .page,
 .staff-dashboard-page .topbar {
   max-width: 1240px;
-  margin-top: 30px;
+  margin-top: 15px;
 }
 
 .staff-dashboard-page .topbar {
@@ -3628,12 +3655,12 @@ body {
     position: fixed;
     z-index: 50;
     left: 16px;
-    top: 16px;
+    top: 40px;
     display: grid;
-    width: 48px;
-    height: 48px;
-    min-height: 48px;
-    border-radius: 16px;
+    width: 38px;
+    height: 38px;
+    min-height: 38px;
+    border-radius: 15px;
     background: #fff;
     box-shadow: var(--shadow-sm);
   }
@@ -3776,9 +3803,47 @@ body {
 
 /* Mobile already provides notification and profile actions in the bottom navigation. */
 @media (max-width: 720px) {
-  .staff-dashboard-page .top-actions .notification-wrap,
+  .staff-dashboard-page .topbar {
+    display: block;
+    position: relative;
+    z-index: 100;
+    min-height: 0;
+    height: 0;
+    padding: 0;
+    overflow: visible;
+  }
+
+  .staff-dashboard-page .app main,
+  .staff-dashboard-page .app.sidebar-collapsed main {
+    padding-top: 50px;
+  }
+
+  .staff-dashboard-page .top-actions {
+    height: 0;
+  }
+
+  .staff-dashboard-page .top-actions .ready-pill,
+  .staff-dashboard-page .top-actions #notificationButton,
   .staff-dashboard-page .top-actions .header-profile {
     display: none !important;
+  }
+
+  .staff-dashboard-page .top-actions .notification-wrap {
+    display: block;
+    position: static;
+  }
+
+  body > .notification-panel {
+    position: fixed;
+    z-index: 1000;
+    top: 16px;
+    right: 12px;
+    bottom: calc(96px + env(safe-area-inset-bottom));
+    left: 12px;
+    width: auto;
+    max-height: none;
+    background: #fff;
+    box-shadow: 0 24px 70px rgba(34, 29, 66, 0.28);
   }
 }
 

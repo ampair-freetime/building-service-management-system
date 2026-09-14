@@ -2549,9 +2549,9 @@ export function useStaffDashboard() {
           : currentRole === "clerk"
           ? [
               "รับเคส",
-              "ตรวจสอบข้อมูล",
-              "อนุมัติรับคืน",
-              "ไม่อนุมัติ",
+              "คำขอรับของคืน",
+              "ฝากของ",
+              "ของหาย",
               "นัดหมายรับของ",
               "ยืนยันคืนของแล้ว",
             ]
@@ -2564,12 +2564,15 @@ export function useStaffDashboard() {
               "ดู Activity Log",
             ];
       $("#dashboardQuickActions").innerHTML = actions.map((label, index) =>
-          `<button type="button" class="quick-action ${index === 0 ? "primary-action" : ""
+          `<button type="button" class="quick-action ${index === 0 && currentRole !== "clerk" ? "primary-action" : ""
           }" data-dashboard-action="${index}">${label}</button>`
         ).join("");
     }
     $$(".nav-item").forEach((button) =>
-      button.addEventListener("click", () => navigate(button.dataset.page))
+      button.addEventListener("click", () => {
+        closeSidebar();
+        navigate(button.dataset.page);
+      })
     );
     $$("[data-go]").forEach((button) =>
       button.addEventListener("click", () =>
@@ -2598,11 +2601,31 @@ export function useStaffDashboard() {
       if (!button) return;
       const index = Number(button.dataset.dashboardAction);
       if (currentRole === "clerk") {
-        navigate("clerk-center");
-        setClerkCenterView(index === 4 ? "claims" : "approvals");
-        renderClerkCenter();
-        if (index === 4 && lostSets.claims[0])
-          openAppointment(lostSets.claims[0].id, button);
+        if (index === 0) {
+          navigate("clerk-center");
+          setClerkCenterView("approvals");
+          renderClerkCenter();
+        } else if ([1, 4, 5].includes(index)) {
+          navigate("clerk-center");
+          setClerkCenterView("claims");
+          renderClerkCenter();
+          const firstClaim = lostSets.claims.find(
+            (item) => item.status !== "คืนของแล้ว",
+          );
+          if (index === 4 && firstClaim) {
+            openAppointment(firstClaim.id, button);
+          } else if (index === 5 && firstClaim) {
+            openClaimDetail(firstClaim.id, button);
+          }
+        } else {
+          currentLostTab = index === 2 ? "inventory" : "lostposts";
+          navigate("lost");
+          $$("#lostTabs .tab").forEach((tab) =>
+            tab.classList.toggle("active", tab.dataset.tab === currentLostTab)
+          );
+          renderLost();
+          if (index === 2) openFoundForm(button);
+        }
         return;
       }
       if (currentRole === "admin") {
