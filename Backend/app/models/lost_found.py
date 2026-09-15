@@ -176,3 +176,45 @@ class LostClaim(Base):
         back_populates="reviewed_lost_claims",
         foreign_keys=[reviewed_by],
     )
+
+
+class LostClaimReturnStatusHistory(Base):
+    __tablename__ = "lost_claim_return_status_history"
+
+    id: Mapped[int] = mapped_column(
+        Integer,
+        primary_key=True,
+        autoincrement=True,
+    )
+
+    claim_id: Mapped[UUID] = mapped_column(
+        ForeignKey("lost_claims.id"),
+        index=True,
+    )
+
+    staff_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("staff.id"),
+        nullable=True,
+    )
+
+    old_status: Mapped[ReturnStatus | None] = mapped_column(
+        SqlEnum(
+            ReturnStatus,
+            name="return_status",
+            values_callable=lambda values: [value.value for value in values],
+        ),
+        nullable=True,
+    )
+
+    new_status: Mapped[ReturnStatus] = mapped_column(
+        SqlEnum(
+            ReturnStatus,
+            name="return_status",
+            values_callable=lambda values: [value.value for value in values],
+        ),
+    )
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+    )

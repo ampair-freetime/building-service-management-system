@@ -3,8 +3,13 @@ from datetime import datetime, timezone
 
 from uuid import uuid4
 from conftest import seed_staff
+from sqlalchemy import select
 from app.models.enums import ClaimStatus, LostStatus, LostType, ReturnStatus
-from app.models.lost_found import LostClaim, LostItem
+from app.models.lost_found import (
+    LostClaim,
+    LostClaimReturnStatusHistory,
+    LostItem,
+)
 
 
 def test_clerk_can_view_found_item_detail(test_context):
@@ -1447,3 +1452,89 @@ def test_cannot_update_return_status_for_unapproved_claim(test_context):
 
     assert response.status_code == 404
     assert response.json()["detail"] == "Approved ownership request not found"
+
+
+def test_return_status_history_is_saved(test_context):
+    client, session_factory = test_context
+
+    seed_staff(
+        session_factory,
+        staff_code="CLERK001",
+        email="clerk@example.com",
+        password="admin-password",
+        role="clerk",
+    )
+
+    login = client.post(
+        "/api/v1/auth/login",
+        json={
+            "identifier": "CLERK001",
+            "password": "admin-password",
+        },
+    )
+
+    headers = {
+        "Authorization": f"Bearer {login.json()['access_token']}"
+    }
+
+    async def seed_claim():
+        async with session_factory() as session:
+            item = LostItem(
+                item_code="FOUND205",
+                report_type=LostType.FOUND,
+                item_category="Accessories",
+                item_name="Bag",
+                description="Black bag",
+                event_datetime=datetime.now(timezone.utc),
+                location_id=None,
+                location_detail="Building A",
+                custody_location="Clerk Office",
+                reporter_email="finder@example.com",
+                status=LostStatus.APPROVED,
+            )
+
+            session.add(item)
+            await session.flush()
+
+            claim = LostClaim(
+                found_item_id=item.id,
+                claimant_name="Owner User",
+                claimant_email="owner205@example.com",
+                proof_detail="มีพวงกุญแจสีแดง",
+                status=ClaimStatus.APPROVED,
+                return_status=ReturnStatus.PENDING,
+            )
+
+            session.add(claim)
+            await session.commit()
+            await session.refresh(claim)
+
+            return claim.id
+
+    claim_id = asyncio.run(seed_claim())
+
+    response = client.patch(
+        f"/api/v1/lost-found/ownership-requests/{claim_id}/return-status",
+        headers=headers,
+        json={
+            "return_status": "ready_for_pickup",
+        },
+    )
+
+    assert response.status_code == 200
+
+    async def get_history():
+        async with session_factory() as session:
+            result = await session.scalars(
+                select(LostClaimReturnStatusHistory).where(
+                    LostClaimReturnStatusHistory.claim_id == claim_id
+                )
+            )
+            return list(result)
+
+    history = asyncio.run(get_history())
+
+    assert len(history) == 1
+    assert history[0].old_status == ReturnStatus.PENDING
+    assert history[0].new_status == ReturnStatus.READY_FOR_PICKUP
+    assert history[0].staff_id is not None

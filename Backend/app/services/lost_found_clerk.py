@@ -4,8 +4,11 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.enums import ClaimStatus, LostStatus, LostType, ReturnStatus
-from app.models.lost_found import LostClaim, LostItem
-
+from app.models.lost_found import (
+    LostClaim,
+    LostClaimReturnStatusHistory,
+    LostItem,
+)
 
 async def list_pending_found_items(session: AsyncSession) -> list[LostItem]:
     """คืนรายการของที่พบซึ่งกำลังรอเจ้าหน้าที่ธุรการตรวจสอบ"""
@@ -292,8 +295,9 @@ async def update_ownership_return_status(
     session: AsyncSession,
     claim_id: UUID,
     new_status: ReturnStatus,
+    staff_id: UUID,
 ) -> LostClaim | None:
-    """อัปเดตสถานะการคืนของสำหรับ ownership request ที่ผ่านการอนุมัติแล้ว"""
+    """อัปเดตสถานะการคืนของและบันทึกประวัติ"""
 
     statement = (
         select(LostClaim)
@@ -308,7 +312,18 @@ async def update_ownership_return_status(
     if claim is None:
         return None
 
+    old_status = claim.return_status
+
     claim.return_status = new_status
+
+    history = LostClaimReturnStatusHistory(
+        claim_id=claim.id,
+        staff_id=staff_id,
+        old_status=old_status,
+        new_status=new_status,
+    )
+
+    session.add(history)
 
     if new_status == ReturnStatus.RETURNED:
         claim.status = ClaimStatus.COMPLETED

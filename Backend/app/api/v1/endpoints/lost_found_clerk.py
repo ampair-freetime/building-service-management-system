@@ -278,14 +278,13 @@ async def update_return_status(
     claim_id: UUID,
     request: UpdateReturnStatusRequest,
     session: DbSession,
-    _: ClerkStaff,
+    current_staff: ClerkStaff,
 ) -> OwnershipRequestListResponse:
-    """อัปเดตสถานะการคืนของสำหรับคำขอรับคืนที่อนุมัติแล้ว"""
-
     claim = await update_ownership_return_status(
         session,
         claim_id,
         request.return_status,
+        current_staff.id,
     )
 
     if claim is None:

@@ -12,6 +12,7 @@ EXPECTED_TABLES = {
     "lost_items",
     "lost_item_history",
     "lost_claims",
+    "lost_claim_return_status_history",
     "notifications",
 }
 
