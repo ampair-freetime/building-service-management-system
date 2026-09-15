@@ -1,6 +1,6 @@
 import asyncio
 import concurrent.futures
-from datetime import datetime
+from datetime import datetime, timezone
 from io import BytesIO
 from uuid import UUID, uuid4
 from zoneinfo import ZoneInfo
@@ -12,7 +12,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.api.dependencies import provide_object_storage
-from app.models.enums import ClaimStatus, LostStatus, LostType
+from app.models.enums import ClaimStatus, LostStatus, LostType, ReturnStatus
 from app.models.image import Image
 from app.models.lost_found import LostClaim, LostItem
 from app.services.object_storage import StorageOperationError, StoredObject
@@ -909,3 +909,59 @@ def test_cancellation_after_upload_still_removes_orphaned_r2_object(
             return int(count or 0)
 
     assert asyncio.run(count_items()) == 0
+
+
+def test_guest_can_view_latest_return_status(test_context):
+    client, session_factory = test_context
+
+    async def seed_claim():
+        async with session_factory() as session:
+            item = LostItem(
+                item_code="FOUND204",
+                report_type=LostType.FOUND,
+                item_category="Accessories",
+                item_name="Bag",
+                description="Black bag",
+                event_datetime=datetime.now(timezone.utc),
+                location_id=None,
+                location_detail="Building A",
+                custody_location="Clerk Office",
+                reporter_email="finder@example.com",
+                status=LostStatus.APPROVED,
+            )
+
+            session.add(item)
+            await session.flush()
+
+            claim = LostClaim(
+                found_item_id=item.id,
+                claimant_name="Owner User",
+                claimant_email="owner204@example.com",
+                proof_detail="มีพวงกุญแจสีแดง",
+                status=ClaimStatus.APPROVED,
+                return_status=ReturnStatus.READY_FOR_PICKUP,
+            )
+
+            session.add(claim)
+            await session.commit()
+            await session.refresh(claim)
+
+            return item.item_code, claim.id
+
+    item_code, claim_id = asyncio.run(seed_claim())
+
+    response = client.get(
+        f"/api/v1/guest/found-items/{item_code}/claims/{claim_id}",
+        params={
+            "claimant_email": "owner204@example.com",
+        },
+    )
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert data["id"] == str(claim_id)
+    assert data["status"] == "approved"
+    assert data["return_status"] == "ready_for_pickup"
+    assert data["custody_location"] == "Clerk Office"

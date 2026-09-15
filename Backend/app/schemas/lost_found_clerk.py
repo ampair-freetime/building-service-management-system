@@ -2,7 +2,7 @@ from datetime import datetime
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, field_validator
-from app.models.enums import ClaimStatus, LostStatus, LostType
+from app.models.enums import ClaimStatus, LostStatus, LostType, ReturnStatus
 
 
 class PendingFoundItemResponse(BaseModel):
@@ -88,6 +88,7 @@ class OwnershipRequestListResponse(BaseModel):
     claimant_name: str
     claimant_email: str
     status: ClaimStatus
+    return_status: ReturnStatus | None
     created_at: datetime
 
 
@@ -106,6 +107,7 @@ class OwnershipRequestDetailResponse(BaseModel):
 
     # Request information
     status: ClaimStatus
+    return_status: ReturnStatus | None
     review_note: str | None
     created_at: datetime
     updated_at: datetime
@@ -131,3 +133,7 @@ class RequestAdditionalInfoRequest(BaseModel):
             raise ValueError("Additional information request message is required")
 
         return value
+
+
+class UpdateReturnStatusRequest(BaseModel):
+    return_status: ReturnStatus

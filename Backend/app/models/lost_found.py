@@ -9,7 +9,7 @@ from sqlalchemy import Enum as SqlEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
-from app.models.enums import ClaimStatus, LostStatus, LostType
+from app.models.enums import ClaimStatus, LostStatus, LostType, ReturnStatus
 
 if TYPE_CHECKING:
     from app.models.image import Image
@@ -152,6 +152,14 @@ class LostClaim(Base):
         default=ClaimStatus.PENDING,
         server_default=ClaimStatus.PENDING.value,
         index=True,
+    )
+    return_status: Mapped[ReturnStatus | None] = mapped_column(
+        SqlEnum(
+            ReturnStatus,
+            name="return_status",
+            values_callable=lambda values: [value.value for value in values],
+        ),
+        nullable=True,
     )
     reviewed_by: Mapped[UUID | None] = mapped_column(ForeignKey("staff.id"), nullable=True)
     review_note: Mapped[str | None] = mapped_column(Text, nullable=True)

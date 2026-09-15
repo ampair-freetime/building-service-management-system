@@ -60,6 +60,12 @@ class ClaimStatus(str, Enum):
     COMPLETED = "completed"
 
 
+class ReturnStatus(str, Enum):
+    PENDING = "pending"
+    READY_FOR_PICKUP = "ready_for_pickup"
+    RETURNED = "returned"
+
+
 class RequestAction(str, Enum):
     CREATED = "created"
     ASSIGNED = "assigned"

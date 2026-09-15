@@ -3,7 +3,7 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.enums import ClaimStatus, LostStatus, LostType
+from app.models.enums import ClaimStatus, LostStatus, LostType, ReturnStatus
 from app.models.lost_found import LostClaim, LostItem
 
 
@@ -214,6 +214,7 @@ async def get_ownership_request_detail(
         "claimant_email": claim.claimant_email,
         "proof_detail": claim.proof_detail,
         "status": claim.status,
+        "return_status": claim.return_status,
         "review_note": claim.review_note,
         "created_at": claim.created_at,
         "updated_at": claim.updated_at,
@@ -247,6 +248,7 @@ async def approve_ownership_request(
         return None
 
     claim.status = ClaimStatus.APPROVED
+    claim.return_status = ReturnStatus.PENDING
     claim.reviewed_by = staff_id
 
     await session.commit()
@@ -279,6 +281,37 @@ async def request_additional_ownership_information(
     claim.status = ClaimStatus.ADDITIONAL_INFO_REQUIRED
     claim.reviewed_by = staff_id
     claim.review_note = message
+
+    await session.commit()
+    await session.refresh(claim)
+
+    return claim
+
+
+async def update_ownership_return_status(
+    session: AsyncSession,
+    claim_id: UUID,
+    new_status: ReturnStatus,
+) -> LostClaim | None:
+    """อัปเดตสถานะการคืนของสำหรับ ownership request ที่ผ่านการอนุมัติแล้ว"""
+
+    statement = (
+        select(LostClaim)
+        .where(
+            LostClaim.id == claim_id,
+            LostClaim.status == ClaimStatus.APPROVED,
+        )
+    )
+
+    claim = await session.scalar(statement)
+
+    if claim is None:
+        return None
+
+    claim.return_status = new_status
+
+    if new_status == ReturnStatus.RETURNED:
+        claim.status = ClaimStatus.COMPLETED
 
     await session.commit()
     await session.refresh(claim)

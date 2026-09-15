@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 
 from uuid import uuid4
 from conftest import seed_staff
-from app.models.enums import ClaimStatus, LostStatus, LostType
+from app.models.enums import ClaimStatus, LostStatus, LostType, ReturnStatus
 from app.models.lost_found import LostClaim, LostItem
 
 
@@ -1137,3 +1137,313 @@ def test_clerk_can_request_additional_ownership_information(test_context):
     assert claim.status == ClaimStatus.ADDITIONAL_INFO_REQUIRED
     assert claim.reviewed_by is not None
     assert claim.review_note == "Please provide additional proof of ownership"
+
+
+def test_clerk_can_update_return_status_to_ready_for_pickup(test_context):
+    client, session_factory = test_context
+
+    seed_staff(
+        session_factory,
+        staff_code="CLERK001",
+        email="clerk@example.com",
+        password="admin-password",
+        role="clerk",
+    )
+
+    login = client.post(
+        "/api/v1/auth/login",
+        json={
+            "identifier": "CLERK001",
+            "password": "admin-password",
+        },
+    )
+
+    headers = {
+        "Authorization": f"Bearer {login.json()['access_token']}"
+    }
+
+    async def seed_claim():
+        async with session_factory() as session:
+            item = LostItem(
+                item_code="FOUND200",
+                report_type=LostType.FOUND,
+                item_category="Accessories",
+                item_name="Bag",
+                description="Black bag",
+                event_datetime=datetime.now(timezone.utc),
+                location_id=None,
+                location_detail="Building A",
+                custody_location="Clerk Office",
+                reporter_email="finder@example.com",
+                status=LostStatus.APPROVED,
+            )
+
+            session.add(item)
+            await session.flush()
+
+            claim = LostClaim(
+                found_item_id=item.id,
+                claimant_name="Owner User",
+                claimant_email="owner@example.com",
+                proof_detail="มีพวงกุญแจสีแดงติดอยู่",
+                status=ClaimStatus.APPROVED,
+                return_status=ReturnStatus.PENDING,
+            )
+
+            session.add(claim)
+            await session.commit()
+            await session.refresh(claim)
+
+            return claim.id
+
+    claim_id = asyncio.run(seed_claim())
+
+    response = client.patch(
+        f"/api/v1/lost-found/ownership-requests/{claim_id}/return-status",
+        headers=headers,
+        json={
+            "return_status": "ready_for_pickup",
+        },
+    )
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert data["id"] == str(claim_id)
+    assert data["status"] == "approved"
+    assert data["return_status"] == "ready_for_pickup"
+
+    async def get_claim():
+        async with session_factory() as session:
+            return await session.get(LostClaim, claim_id)
+
+    claim = asyncio.run(get_claim())
+
+    assert claim.return_status == ReturnStatus.READY_FOR_PICKUP
+
+
+def test_clerk_can_update_return_status_to_returned(test_context):
+    client, session_factory = test_context
+
+    seed_staff(
+        session_factory,
+        staff_code="CLERK001",
+        email="clerk@example.com",
+        password="admin-password",
+        role="clerk",
+    )
+
+    login = client.post(
+        "/api/v1/auth/login",
+        json={
+            "identifier": "CLERK001",
+            "password": "admin-password",
+        },
+    )
+
+    headers = {
+        "Authorization": f"Bearer {login.json()['access_token']}"
+    }
+
+    async def seed_claim():
+        async with session_factory() as session:
+            item = LostItem(
+                item_code="FOUND201",
+                report_type=LostType.FOUND,
+                item_category="Accessories",
+                item_name="Wallet",
+                description="Brown wallet",
+                event_datetime=datetime.now(timezone.utc),
+                location_id=None,
+                location_detail="Building B",
+                custody_location="Clerk Office",
+                reporter_email="finder@example.com",
+                status=LostStatus.APPROVED,
+            )
+
+            session.add(item)
+            await session.flush()
+
+            claim = LostClaim(
+                found_item_id=item.id,
+                claimant_name="Owner User",
+                claimant_email="owner201@example.com",
+                proof_detail="มีบัตรนักศึกษาอยู่ด้านใน",
+                status=ClaimStatus.APPROVED,
+                return_status=ReturnStatus.READY_FOR_PICKUP,
+            )
+
+            session.add(claim)
+            await session.commit()
+            await session.refresh(claim)
+
+            return claim.id
+
+    claim_id = asyncio.run(seed_claim())
+
+    response = client.patch(
+        f"/api/v1/lost-found/ownership-requests/{claim_id}/return-status",
+        headers=headers,
+        json={
+            "return_status": "returned",
+        },
+    )
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert data["id"] == str(claim_id)
+    assert data["status"] == "completed"
+    assert data["return_status"] == "returned"
+
+    async def get_claim():
+        async with session_factory() as session:
+            return await session.get(LostClaim, claim_id)
+
+    claim = asyncio.run(get_claim())
+
+    assert claim.status == ClaimStatus.COMPLETED
+    assert claim.return_status == ReturnStatus.RETURNED
+
+
+def test_invalid_return_status_returns_422(test_context):
+    client, session_factory = test_context
+
+    seed_staff(
+        session_factory,
+        staff_code="CLERK001",
+        email="clerk@example.com",
+        password="admin-password",
+        role="clerk",
+    )
+
+    login = client.post(
+        "/api/v1/auth/login",
+        json={
+            "identifier": "CLERK001",
+            "password": "admin-password",
+        },
+    )
+
+    headers = {
+        "Authorization": f"Bearer {login.json()['access_token']}"
+    }
+
+    async def seed_claim():
+        async with session_factory() as session:
+            item = LostItem(
+                item_code="FOUND202",
+                report_type=LostType.FOUND,
+                item_category="Electronics",
+                item_name="Phone",
+                description="Black phone",
+                event_datetime=datetime.now(timezone.utc),
+                location_id=None,
+                location_detail="Building A",
+                custody_location="Clerk Office",
+                reporter_email="finder@example.com",
+                status=LostStatus.APPROVED,
+            )
+
+            session.add(item)
+            await session.flush()
+
+            claim = LostClaim(
+                found_item_id=item.id,
+                claimant_name="Owner User",
+                claimant_email="owner202@example.com",
+                proof_detail="มีรอยแตกที่มุมซ้าย",
+                status=ClaimStatus.APPROVED,
+                return_status=ReturnStatus.PENDING,
+            )
+
+            session.add(claim)
+            await session.commit()
+            await session.refresh(claim)
+
+            return claim.id
+
+    claim_id = asyncio.run(seed_claim())
+
+    response = client.patch(
+        f"/api/v1/lost-found/ownership-requests/{claim_id}/return-status",
+        headers=headers,
+        json={
+            "return_status": "invalid_status",
+        },
+    )
+
+    assert response.status_code == 422
+
+
+def test_cannot_update_return_status_for_unapproved_claim(test_context):
+    client, session_factory = test_context
+
+    seed_staff(
+        session_factory,
+        staff_code="CLERK001",
+        email="clerk@example.com",
+        password="admin-password",
+        role="clerk",
+    )
+
+    login = client.post(
+        "/api/v1/auth/login",
+        json={
+            "identifier": "CLERK001",
+            "password": "admin-password",
+        },
+    )
+
+    headers = {
+        "Authorization": f"Bearer {login.json()['access_token']}"
+    }
+
+    async def seed_claim():
+        async with session_factory() as session:
+            item = LostItem(
+                item_code="FOUND203",
+                report_type=LostType.FOUND,
+                item_category="Accessories",
+                item_name="Bag",
+                description="Blue bag",
+                event_datetime=datetime.now(timezone.utc),
+                location_id=None,
+                location_detail="Building C",
+                custody_location="Clerk Office",
+                reporter_email="finder@example.com",
+                status=LostStatus.APPROVED,
+            )
+
+            session.add(item)
+            await session.flush()
+
+            claim = LostClaim(
+                found_item_id=item.id,
+                claimant_name="Owner User",
+                claimant_email="owner203@example.com",
+                proof_detail="มีพวงกุญแจรูปดาว",
+                status=ClaimStatus.PENDING,
+                return_status=None,
+            )
+
+            session.add(claim)
+            await session.commit()
+            await session.refresh(claim)
+
+            return claim.id
+
+    claim_id = asyncio.run(seed_claim())
+
+    response = client.patch(
+        f"/api/v1/lost-found/ownership-requests/{claim_id}/return-status",
+        headers=headers,
+        json={
+            "return_status": "ready_for_pickup",
+        },
+    )
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Approved ownership request not found"

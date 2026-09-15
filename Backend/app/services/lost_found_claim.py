@@ -126,11 +126,14 @@ async def get_guest_claim_status(
         found_item_code=item.item_code,
         item_name=item.item_name,
         status=claim.status,
+        return_status=claim.return_status,
         created_at=claim.created_at,
         updated_at=claim.updated_at,
         # เปิดเผยที่เก็บของต่อเมื่อเจ้าหน้าที่ตรวจหลักฐานผ่านแล้วเท่านั้น
         custody_location=(
-            item.custody_location if claim.status == ClaimStatus.APPROVED else None
+            item.custody_location
+            if claim.status in (ClaimStatus.APPROVED, ClaimStatus.COMPLETED)
+            else None
         ),
     )
 

@@ -13,7 +13,7 @@ from pydantic import (
     field_validator,
 )
 
-from app.models.enums import ClaimStatus, LostStatus, LostType
+from app.models.enums import ClaimStatus, LostStatus, LostType, ReturnStatus
 
 BANGKOK_TIMEZONE = ZoneInfo("Asia/Bangkok")
 
@@ -174,6 +174,7 @@ class GuestClaimStatusResponse(BaseModel):
     found_item_code: str
     item_name: str
     status: ClaimStatus
+    return_status: ReturnStatus | None
     created_at: datetime
     updated_at: datetime
     # บอกที่รับของเฉพาะคนที่ผ่านการตรวจหลักฐานแล้วเท่านั้น สถานะอื่นเป็น None เสมอ

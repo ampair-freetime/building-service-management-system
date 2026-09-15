@@ -12,6 +12,7 @@ from app.schemas.lost_found_clerk import (
     PendingLostItemResponse,
     RejectFoundItemRequest,
     RequestAdditionalInfoRequest,
+    UpdateReturnStatusRequest,
 )
 from app.services.lost_found_clerk import (
     approve_found_item,
@@ -25,6 +26,7 @@ from app.services.lost_found_clerk import (
     reject_found_item,
     approve_ownership_request,
     request_additional_ownership_information,
+    update_ownership_return_status,
 )
 
 router = APIRouter()
@@ -263,6 +265,33 @@ async def request_additional_ownership_info(
         raise HTTPException(
             status_code=404,
             detail="Pending ownership request not found",
+        )
+
+    return claim
+
+
+@router.patch(
+    "/ownership-requests/{claim_id}/return-status",
+    response_model=OwnershipRequestListResponse,
+)
+async def update_return_status(
+    claim_id: UUID,
+    request: UpdateReturnStatusRequest,
+    session: DbSession,
+    _: ClerkStaff,
+) -> OwnershipRequestListResponse:
+    """อัปเดตสถานะการคืนของสำหรับคำขอรับคืนที่อนุมัติแล้ว"""
+
+    claim = await update_ownership_return_status(
+        session,
+        claim_id,
+        request.return_status,
+    )
+
+    if claim is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Approved ownership request not found",
         )
 
     return claim
