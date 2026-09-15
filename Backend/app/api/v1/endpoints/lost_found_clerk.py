@@ -24,6 +24,7 @@ from app.services.lost_found_clerk import (
     list_pending_lost_items,
     list_pending_ownership_requests,
     reject_found_item,
+    reject_lost_item,
     approve_ownership_request,
     request_additional_ownership_information,
     update_ownership_return_status,
@@ -139,6 +140,34 @@ async def approve_lost_item_report(
         session,
         item_id,
         current_staff.id,
+    )
+
+    if item is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Pending lost item not found",
+        )
+
+    return item
+
+
+@router.post(
+    "/lost-items/{item_id}/reject",
+    response_model=LostItemDetailResponse,
+)
+async def reject_lost_item_report(
+    item_id: UUID,
+    request: RejectFoundItemRequest,
+    session: DbSession,
+    current_staff: ClerkStaff,
+) -> LostItemDetailResponse:
+    """ปฏิเสธประกาศของหายโดยเจ้าหน้าที่ธุรการ"""
+
+    item = await reject_lost_item(
+        session,
+        item_id,
+        current_staff.id,
+        request.reason,
     )
 
     if item is None:
