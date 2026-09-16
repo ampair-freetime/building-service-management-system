@@ -25,6 +25,7 @@
       <div class="detail-layout">
         <div>
           <div class="detail-photo">
+            <img id="jobDetailImage" alt="" hidden />
             <svg class="icon" id="jobDetailIcon"><use href="#i-box" /></svg>
           </div>
           <div class="timeline" id="jobTimeline"></div>
@@ -49,6 +50,10 @@
             <div>
               <small id="jobDetailAssigneeLabel">ผู้รับผิดชอบ</small>
               <strong id="jobDetailAssignee">–</strong>
+            </div>
+            <div id="jobDetailReturnStatusGroup">
+              <small>สถานะการคืนของ</small>
+              <strong id="jobDetailReturnStatus">ยังไม่มีคำขอรับคืน</strong>
             </div>
           </div>
           <div class="detail-notes">

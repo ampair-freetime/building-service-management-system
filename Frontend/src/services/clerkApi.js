@@ -106,6 +106,28 @@ export async function getPendingLostItems() {
   } 
 }
 
+export async function getApprovedLostFoundItems() {
+  const params = new URLSearchParams({ limit: "200", offset: "0" });
+  const [foundResponse, lostResponse] = await Promise.all([
+    fetch(`${API_BASE_URL}/guest/found-items?${params}`),
+    fetch(`${API_BASE_URL}/guest/lost-items?${params}`),
+  ]);
+
+  const found = await parseResponse(
+    foundResponse,
+    "ไม่สามารถโหลดรายการของที่รับฝากได้",
+  );
+  const lost = await parseResponse(
+    lostResponse,
+    "ไม่สามารถโหลดประกาศของหายได้",
+  );
+
+  return {
+    foundItems: found.items || [],
+    lostItems: lost.items || [],
+  };
+}
+
 export async function getLostItemDetail(itemId) {
   const controller = new AbortController();
 
@@ -215,6 +237,22 @@ export async function requestOwnershipAdditionalInfo(claimId, message) {
   return await parseResponse(response, "ไม่สามารถขอข้อมูลเพิ่มเติมได้");
 }
 
+export async function updateOwnershipReturnStatus(claimId, returnStatus) {
+  const response = await fetch(
+    `${API_BASE_URL}/lost-found/ownership-requests/${encodeURIComponent(claimId)}/return-status`,
+    {
+      method: "PATCH",
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem("buildingCareAccessToken") || ""}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ return_status: returnStatus }),
+    },
+  );
+
+  return await parseResponse(response, "ไม่สามารถอัปเดตสถานะการคืนของได้");
+}
+
 
 export async function approveFoundItem(itemId) {
   const response = await fetch(
@@ -264,4 +302,25 @@ export async function rejectFoundItem(itemId, reason) {
   );
 
   return await parseResponse(response, "ไม่สามารถปฏิเสธรายการได้");
+}
+
+export async function rejectLostItemAnnouncement(itemId, reason) {
+  const response = await fetch(
+    `${API_BASE_URL}/lost-found/lost-items/${encodeURIComponent(itemId)}/reject`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${
+          localStorage.getItem("buildingCareAccessToken") || ""
+        }`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ reason }),
+    },
+  );
+
+  return await parseResponse(
+    response,
+    "ไม่สามารถปฏิเสธประกาศของหายได้",
+  );
 }

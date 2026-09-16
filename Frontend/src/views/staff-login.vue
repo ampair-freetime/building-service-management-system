@@ -63,7 +63,7 @@ const {
     <main class="login-shell">
       <section class="login-visual" aria-label="CS Building Care Staff Portal">
         <div class="visual-brand">
-          <span class="brand-mark">BC</span><span>CS Building Care</span>
+          <span class="brand-mark">CS</span><span>CS Building Care</span>
         </div>
         <div class="visual-copy">
           <small>Staff Portal</small>
@@ -85,9 +85,7 @@ const {
       </section>
       <section class="login-panel">
         <div class="login-card">
-          <RouterLink class="back-link" to="/"
-            >← กลับหน้าเลือกพื้นที่ใช้งาน</RouterLink
-          >
+        
           <header class="login-head">
             <div class="eyebrow">สำหรับเจ้าหน้าที่</div>
             <h2>เข้าสู่ระบบเจ้าหน้าที่</h2>
@@ -158,7 +156,7 @@ const {
             >
               {{ loading ? "กำลังเข้าสู่ระบบ…" : "เข้าสู่ระบบ" }}
             </button>
-            <div class="divider">หรือ</div>
+            <!-- <div class="divider">หรือ</div>
             <button
               class="google-button"
               id="googleLogin"
@@ -166,11 +164,9 @@ const {
               @click="loginWithGoogle"
             >
               <span class="google-logo">G</span> เข้าสู่ระบบด้วย Google
-            </button>
+            </button> -->
           </form>
-          <p class="user-link">
-            <RouterLink to="/">กลับหน้าเลือกพื้นที่ใช้งาน</RouterLink>
-          </p>
+          
         </div>
       </section>
     </main>
