@@ -253,6 +253,27 @@ export async function updateOwnershipReturnStatus(claimId, returnStatus) {
   return await parseResponse(response, "ไม่สามารถอัปเดตสถานะการคืนของได้");
 }
 
+export async function scheduleOwnershipPickup(claimId, appointment) {
+  const response = await fetch(
+    `${API_BASE_URL}/lost-found/ownership-requests/${encodeURIComponent(claimId)}/`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem("buildingCareAccessToken") || ""}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        pickup_date: appointment.date,
+        pickup_time: appointment.time,
+        pickup_location: appointment.location,
+        note: appointment.note || null,
+      }),
+    },
+  );
+
+  return await parseResponse(response, "ไม่สามารถสร้างนัดหมายรับของได้");
+}
+
 
 export async function approveFoundItem(itemId) {
   const response = await fetch(

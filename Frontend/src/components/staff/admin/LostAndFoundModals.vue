@@ -130,8 +130,23 @@
             <small>วันที่ส่งคำขอ</small><strong id="claimDate">–</strong>
           </div>
           <div>
-            <small>นัดหมาย</small
-            ><strong id="claimAppointment">ยังไม่มีนัดหมาย</strong>
+            <small>วันที่นัดรับ</small
+            ><strong id="claimPickupDate">ยังไม่มีนัดหมาย</strong>
+          </div>
+          <div>
+            <small>เวลานัดรับ</small><strong id="claimPickupTime">–</strong>
+          </div>
+          <div>
+            <small>จุดรับของ</small
+            ><strong id="claimPickupLocation">ยังไม่ระบุจุดรับของ</strong>
+          </div>
+          <div>
+            <small>หมายเหตุนัดหมาย</small
+            ><strong id="claimPickupNote">ไม่มีหมายเหตุ</strong>
+          </div>
+          <div>
+            <small>สถานะการคืนของ</small
+            ><strong id="claimReturnStatus">รอตรวจสอบคำขอ</strong>
           </div>
         </div>
         <h4>หลักฐานและรายละเอียด</h4>
@@ -173,9 +188,18 @@
             </div>
             <div class="field">
               <label for="appointmentTime">เวลา</label
-              ><input id="appointmentTime" type="time" required />
+              ><input
+                id="appointmentTime"
+                type="time"
+                step="300"
+                aria-describedby="appointmentDateTimeHint"
+                required
+              />
             </div>
           </div>
+          <small class="field-hint" id="appointmentDateTimeHint">
+            กรุณาเลือกวันและเวลาที่ยังมาไม่ถึง
+          </small>
           <div class="field">
             <label for="appointmentPlace">จุดรับของ</label
             ><input

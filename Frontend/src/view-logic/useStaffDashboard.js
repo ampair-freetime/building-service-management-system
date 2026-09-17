@@ -16,6 +16,7 @@ import {
   getOwnershipRequestDetail,
   approveOwnershipRequest,
   requestOwnershipAdditionalInfo,
+  scheduleOwnershipPickup,
   updateOwnershipReturnStatus,
 } from "../services/clerkApi.js";
 import {
@@ -290,7 +291,18 @@ export function useStaffDashboard() {
             claim.created_at,
           ).toLocaleString("th-TH"),
           evidence: claim.proof_detail,
-          appointment: "ยังไม่มีนัดหมาย",
+          pickupDate:
+            claim.pickup_date || claim.appointment?.pickup_date || "",
+          pickupTime:
+            claim.pickup_time || claim.appointment?.pickup_time || "",
+          pickupLocation:
+            claim.pickup_location ||
+            claim.appointment?.pickup_location ||
+            "",
+          pickupNote: claim.pickup_note || claim.appointment?.note || "",
+          appointment: claim.pickup_date
+            ? `${claim.pickup_date} เวลา ${claim.pickup_time || "–"}`
+            : "ยังไม่มีนัดหมาย",
           assignee: null,
         }));
 
@@ -1347,8 +1359,7 @@ export function useStaffDashboard() {
       renderClerkCenter();
       renderMetrics();
       renderQueue();
-      showSuccess(`${id} · ${item.title} ถูกเปลี่ยนสถานะเป็น “${item.status}” · เหตุผล: ${item.decisionReason}`,
-        "บันทึกผลการปฏิเสธแล้ว");
+      showRejectionResult(item, tab);
     }
     function updateClaimStatus(id, button) {
       const item = lostSets.claims.find((x) => x.id === id),
@@ -2106,9 +2117,30 @@ export function useStaffDashboard() {
       openModal("confirmModal");
     }
     function showSuccess(message, title = "บันทึกสำเร็จ") {
+      const successModal = $("#successModal");
+      successModal?.classList.remove("rejection-result");
+      successModal
+        ?.querySelector(".success-check use")
+        ?.setAttribute("href", "#i-check");
       const successTitle = $("#successModalTitle");
       if (successTitle) successTitle.textContent = title;
       $("#successModalText").textContent = message;
+      openModal("successModal");
+    }
+    function showRejectionResult(item, tab) {
+      const successModal = $("#successModal");
+      successModal?.classList.add("rejection-result");
+      successModal
+        ?.querySelector(".success-check use")
+        ?.setAttribute("href", "#i-close");
+      $("#successModalTitle").textContent =
+        tab === "lostposts"
+          ? "ปฏิเสธประกาศของหายแล้ว"
+          : "ไม่อนุมัติรายการรับฝากแล้ว";
+      $("#successModalText").textContent =
+        `${item.id} · ${item.title}\n` +
+        `สถานะ: ${item.status}\n` +
+        `เหตุผล: ${item.decisionReason}`;
       openModal("successModal");
     }
     function renderAssignStaff() {
@@ -2531,8 +2563,17 @@ export function useStaffDashboard() {
       $("#claimRequester").textContent = item.requester || "ไม่ระบุชื่อผู้ขอ";
       $("#claimContact").textContent = item.contact || "ไม่ระบุช่องทางติดต่อ";
       $("#claimDate").textContent = item.requestDate || "ไม่ระบุเวลาส่งคำขอ";
-      $("#claimAppointment").textContent =
-        item.appointment || "ยังไม่มีนัดหมาย";
+      const pickupDateText = item.pickupDate
+        ? new Date(`${item.pickupDate}T00:00:00`).toLocaleDateString("th-TH", {
+            dateStyle: "long",
+          })
+        : "ยังไม่มีนัดหมาย";
+      $("#claimPickupDate").textContent = pickupDateText;
+      $("#claimPickupTime").textContent = item.pickupTime || "–";
+      $("#claimPickupLocation").textContent =
+        item.pickupLocation || "ยังไม่ระบุจุดรับของ";
+      $("#claimPickupNote").textContent =
+        item.pickupNote || "ไม่มีหมายเหตุ";
       $("#claimReturnStatus").textContent =
         item.returnStatus || foundItemReturnStatus(
           item.returnStatusCode,
@@ -2552,9 +2593,13 @@ export function useStaffDashboard() {
       const claimActions = [
         ["more", "ขอข้อมูลเพิ่มเติม", ""],
         ["verify", "ยืนยันความเป็นเจ้าของ", "primary-action"],
-        ["appointment", "สร้างนัดหมาย", ""],
       ];
       if (item.backendStatus === "approved" || item.status === "นัดหมายแล้ว") {
+        claimActions.push([
+          "appointment",
+          item.status === "นัดหมายแล้ว" ? "แก้ไขนัดหมายรับของ" : "นัดหมายรับของ",
+          "",
+        ]);
         claimActions.push([
           "returned",
           "ยืนยันส่งคืนแล้ว",
@@ -2651,8 +2696,13 @@ export function useStaffDashboard() {
     function openAppointment(id, trigger = document.activeElement) {
       const item = lostSets.claims.find((record) => record.id === id);
       if (!item) return;
+      if (item.backendStatus !== "approved" && item.status !== "นัดหมายแล้ว") {
+        toast("กรุณายืนยันความเป็นเจ้าของก่อนสร้างนัดหมายรับของ");
+        return;
+      }
       $("#appointmentItemId").value = id;
       $("#appointmentTitle").textContent = `นัดหมายรับของ · ${id}`;
+      $("#appointmentDate").min = todayISO();
       $("#appointmentDate").value = todayISO();
       $("#appointmentTime").value = "10:00";
       $("#appointmentNote").value = "";
@@ -3668,36 +3718,87 @@ export function useStaffDashboard() {
         "ยืนยันคืนงาน"
       );
     });
-    $("#appointmentForm")?.addEventListener("submit", (event) => {
+    $("#appointmentForm")?.addEventListener("submit", async (event) => {
       event.preventDefault();
-      if (!event.currentTarget.checkValidity()) {
-        event.currentTarget.reportValidity();
+      const form = event.currentTarget;
+      const appointmentTimeInput = $("#appointmentTime");
+      appointmentTimeInput.setCustomValidity("");
+      if (!form.checkValidity()) {
+        form.reportValidity();
         return;
       }
       const item = lostSets.claims.find(
         (record) => record.id === $("#appointmentItemId").value
       );
       if (!item) return;
-      item.status = "นัดหมายแล้ว";
-      item.assignee = activeStaffName();
-      item.custody = `นัด ${$("#appointmentDate").value} เวลา ${
-        $("#appointmentTime").value
-      } · ${$("#appointmentPlace").value.trim()}`;
+      const appointmentDate = $("#appointmentDate").value;
+      const appointmentTime = $("#appointmentTime").value;
+      const appointmentPlace = $("#appointmentPlace").value.trim();
       const note = $("#appointmentNote").value.trim();
-      if (note) item.custody += ` · ${note}`;
-      addAudit("lost", "สร้างนัดหมาย", item.id, item.title, item.custody);
-      recordWorkHistory({
-        itemId: item.id,
-        title: item.title,
-        category: "คำขอรับของ",
-        action: "สร้างนัดหมาย",
-        status: item.status,
-        detail: item.custody,
-      });
-      closeModal("appointmentModal", false);
-      renderLost();
-      renderMetrics();
-      showSuccess(`สร้างนัดหมาย ${item.id} แล้ว`);
+      const pickupAt = new Date(`${appointmentDate}T${appointmentTime}`);
+      if (Number.isNaN(pickupAt.getTime()) || pickupAt.getTime() <= Date.now()) {
+        appointmentTimeInput.setCustomValidity(
+          "กรุณาเลือกวันและเวลานัดหมายที่ยังมาไม่ถึง",
+        );
+        appointmentTimeInput.reportValidity();
+        return;
+      }
+      const submitButton = form.querySelector('button[type="submit"]');
+      if (submitButton) submitButton.disabled = true;
+      try {
+        const result = await scheduleOwnershipPickup(item.backendId, {
+          date: appointmentDate,
+          time: appointmentTime,
+          location: appointmentPlace,
+          note,
+        });
+        item.backendStatus = result.status || item.backendStatus;
+        item.returnStatusCode = result.return_status || "ready_for_pickup";
+        item.returnStatus = foundItemReturnStatus(
+          item.returnStatusCode,
+          item.backendStatus,
+        );
+        item.pickupDate =
+          result.pickup_date || result.appointment?.pickup_date || appointmentDate;
+        item.pickupTime =
+          result.pickup_time || result.appointment?.pickup_time || appointmentTime;
+        item.pickupLocation =
+          result.pickup_location ||
+          result.appointment?.pickup_location ||
+          appointmentPlace;
+        item.pickupNote = result.pickup_note || result.appointment?.note || note;
+        item.status = "นัดหมายแล้ว";
+        item.assignee = activeStaffName();
+        item.appointment = `${appointmentDate} เวลา ${appointmentTime} · ${appointmentPlace}`;
+        item.custody = `นัด ${item.appointment}`;
+        if (note) {
+          item.appointment += ` · ${note}`;
+          item.custody += ` · ${note}`;
+        }
+        addAudit("lost", "สร้างนัดหมาย", item.id, item.title, item.custody);
+        recordWorkHistory({
+          itemId: item.id,
+          title: item.title,
+          category: "คำขอรับของ",
+          action: "สร้างนัดหมาย",
+          status: item.status,
+          detail: item.custody,
+        });
+        closeModal("appointmentModal", false);
+        renderLost();
+        renderClerkCenter();
+        renderMetrics();
+        showSuccess(
+          `${item.id} · นัดรับ ${item.title}\n${item.appointment}`,
+          "สร้างนัดหมายรับของแล้ว",
+        );
+      } catch (error) {
+        if (await handleUnauthorizedResponse(error.status)) return;
+        console.error("Scheduling ownership pickup failed:", error);
+        toast(error.message || "ไม่สามารถสร้างนัดหมายรับของได้");
+      } finally {
+        if (submitButton) submitButton.disabled = false;
+      }
     });
     $("#openQrModal")?.addEventListener("click", (event) =>
       openModal("qrFormModal", event.currentTarget)
