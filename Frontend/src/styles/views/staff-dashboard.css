@@ -1921,6 +1921,9 @@ textarea:focus-visible,
 .detail-photo img[hidden] {
   display: none;
 }
+#confirmModalText {
+  white-space: pre-line;
+}
 .detail-photo .icon {
   width: 72px;
   height: 72px;

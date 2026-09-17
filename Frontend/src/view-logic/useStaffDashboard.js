@@ -3598,11 +3598,18 @@ export function useStaffDashboard() {
           "";
       const decisionReason = detail ? `${reason} — ${detail}` : reason;
       closeModal("rejectModal", false);
+      const isLostAnnouncement = tab === "lostposts";
       requestConfirmation(
-        "ยืนยันไม่อนุมัติรายการ",
-        `${id} · ${item.title}\nเหตุผล: ${decisionReason}`,
+        isLostAnnouncement
+          ? "ยืนยันปฏิเสธประกาศของหาย"
+          : "ยืนยันไม่อนุมัติรายการรับฝาก",
+        `${id} · ${item.title}\nเหตุผล: ${decisionReason}\n\n${
+          isLostAnnouncement
+            ? "ประกาศนี้จะไม่ถูกเผยแพร่ให้ผู้ใช้งานเห็น"
+            : "รายการนี้จะไม่ได้รับการอนุมัติเข้าสู่ระบบรับฝาก"
+        }`,
         () => ConfirmationRejectLostItem(tab, id, decisionReason),
-        "ยืนยันไม่อนุมัติ"
+        isLostAnnouncement ? "ยืนยันปฏิเสธประกาศ" : "ยืนยันไม่อนุมัติ",
       );
     });
     $("#returnJobForm")?.addEventListener("submit", (event) => {
