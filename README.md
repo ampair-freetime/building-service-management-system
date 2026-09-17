@@ -95,8 +95,15 @@ Login request example:
 
 ```json
 {
+  "role": "Admin",
   "identifier": "ADMIN001",
-  "password": "Admin@1234"
+  "password": "Admin@1234",
+  "role": "แม่บ้าน",
+  "identifier": "CL002@gmail.com",
+  "password": "1234567A",
+  "role": "Clerk",
+  "identifier": "CL001@gmail.com",
+  "password": "1234567A"
 }
 ```
 
