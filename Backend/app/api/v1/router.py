@@ -1,7 +1,15 @@
 """รวม endpoint เวอร์ชัน 1 เพื่อให้ main application ลงทะเบียนในจุดเดียว."""
 
 from fastapi import APIRouter
-from app.api.v1.endpoints import auth, found_item, lost_found_clerk, lost_item, staff
+
+from app.api.v1.endpoints import (
+    auth,
+    cleaning_guest,
+    found_item,
+    lost_found_clerk,
+    lost_item,
+    staff,
+)
 
 api_router = APIRouter()
 
@@ -17,11 +25,16 @@ api_router.include_router(
     prefix="/guest/found-items",
     tags=["guest found items"],
 )
+api_router.include_router(
+    cleaning_guest.router,
+    prefix="/guest/cleaning-requests",
+    tags=["guest cleaning requests"],
+)
 api_router.include_router(staff.router, prefix="/staff", tags=["staff"])
 
 # lost and found สำหรับเจ้าหน้าที่ธุรการ
 api_router.include_router(
     lost_found_clerk.router,
-    prefix = "/lost-found",
-    tags = ["lost-found"],
+    prefix="/lost-found",
+    tags=["lost-found"],
 )

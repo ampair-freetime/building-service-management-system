@@ -5,7 +5,6 @@ from app.db.base import Base
 EXPECTED_TABLES = {
     "staff",
     "locations",
-    "service_categories",
     "service_requests",
     "request_history",
     "images",

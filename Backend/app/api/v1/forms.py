@@ -3,10 +3,46 @@
 from datetime import datetime
 from typing import Annotated
 
-from fastapi import Form, HTTPException, status
+from fastapi import Form, HTTPException, Request, status
 from pydantic import EmailStr, ValidationError
 
+from app.models.enums import PriorityLevel
+from app.schemas.cleaning_guest import GuestCleaningCreate
 from app.schemas.lost_found_item import GuestFoundItemCreate, GuestLostItemCreate
+
+
+async def parse_guest_cleaning_form(
+    request: Request,
+    title: Annotated[str, Form(min_length=1, max_length=200)],
+    reporter_email: Annotated[EmailStr, Form()],
+    location_id: Annotated[int, Form(gt=0)],
+    description: Annotated[str, Form(max_length=255)] = "",
+    priority: Annotated[PriorityLevel, Form()] = PriorityLevel.NORMAL,
+) -> GuestCleaningCreate:
+    """แปลง multipart form เป็นคำร้อง Cleaning แล้วให้ schema ตรวจซ้ำ."""
+    form = await request.form()
+    allowed_fields = {"title", "description", "priority", "reporter_email", "location_id", "image"}
+    unexpected_fields = sorted(set(form) - allowed_fields)
+    if unexpected_fields:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=[
+                {
+                    "type": "extra_forbidden",
+                    "loc": ["body", field],
+                    "msg": "Extra inputs are not permitted",
+                }
+                for field in unexpected_fields
+            ],
+        )
+    return _build_payload(
+        GuestCleaningCreate,
+        title=title,
+        description=description,
+        priority=priority,
+        reporter_email=reporter_email,
+        location_id=location_id,
+    )
 
 
 def parse_guest_lost_item_form(

@@ -66,6 +66,7 @@ async def require_admin(current_staff: CurrentStaff) -> Staff:
 # ใช้กับ endpoint จัดการพนักงานเพื่อบังคับตรวจทั้ง token และบทบาท admin
 AdminStaff = Annotated[Staff, Depends(require_admin)]
 
+
 async def require_clerk_staff(current_staff: CurrentStaff) -> Staff:
     if current_staff.role != StaffRole.CLERK:
         raise HTTPException(
@@ -95,4 +96,18 @@ def provide_object_storage() -> ObjectStorage:
 ObjectStorageClient = Annotated[
     ObjectStorage,
     Depends(provide_object_storage),
+]
+
+
+def provide_optional_object_storage() -> ObjectStorage | None:
+    """คืน R2 client เมื่อพร้อม และยอมให้คำร้องที่ไม่มีรูปทำงานได้เมื่อยังไม่ตั้งค่า."""
+    try:
+        return get_object_storage()
+    except StorageConfigurationError:
+        return None
+
+
+OptionalObjectStorageClient = Annotated[
+    ObjectStorage | None,
+    Depends(provide_optional_object_storage),
 ]
