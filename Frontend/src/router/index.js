@@ -12,6 +12,11 @@ const routes = [
     name: "user",
     component: PublicServicePortal,
   },
+  {
+    path: "/cleaning",
+    name: "guest-cleaning",
+    component: PublicServicePortal,
+  },
 
   // เจ้าหน้าที่ -> Login
   {

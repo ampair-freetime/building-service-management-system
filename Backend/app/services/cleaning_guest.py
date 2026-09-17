@@ -15,9 +15,8 @@ from sqlalchemy.orm import selectinload
 from app.models.enums import ImageType, RequestAction, RequestStatus, RequestType
 from app.models.image import Image
 from app.models.location import Location
-from app.models.service_request import RequestHistory, ServiceCategory, ServiceRequest
+from app.models.service_request import RequestHistory, ServiceRequest
 from app.schemas.cleaning_guest import (
-    GuestCleaningCategoryResponse,
     GuestCleaningCreate,
     GuestCleaningCreateResponse,
     GuestLocationResponse,
@@ -26,6 +25,7 @@ from app.schemas.cleaning_guest import (
 from app.services.images import ProcessedImage, prepare_guest_image
 from app.services.object_storage import (
     ObjectStorage,
+    StorageConfigurationError,
     StorageOperationError,
     StoredObject,
 )
@@ -33,21 +33,9 @@ from app.services.object_storage import (
 logger = logging.getLogger(__name__)
 BANGKOK_TIMEZONE = ZoneInfo("Asia/Bangkok")
 
-# จำกัดไว้ที่ชั้น service ด้วย เพราะการ decode รูปกินเวลา worker จริง
-# endpoint ควรเช็คซ้ำก่อนเรียกเพื่อปฏิเสธคำขอที่แนบรูปเกินตั้งแต่ยังไม่อ่านไฟล์
-MAX_GUEST_IMAGE_COUNT = 5
-
-
-class CategoryNotFoundError(ValueError):
-    """category_id ไม่มีอยู่ ถูกปิดใช้งาน หรือไม่ใช่หมวดงานทำความสะอาด."""
-
 
 class LocationNotFoundError(ValueError):
     """QR token หรือ location_id ไม่มีอยู่หรือถูกปิดใช้งาน."""
-
-
-class TooManyImagesError(ValueError):
-    """แนบรูปเกินจำนวนที่ระบบรับได้ต่อหนึ่งคำร้อง."""
 
 
 class RequestNotFoundError(LookupError):
@@ -67,24 +55,22 @@ class _PreparedImage:
     stored: StoredObject
 
 
-async def list_cleaning_categories(
-    session: AsyncSession,
-) -> list[GuestCleaningCategoryResponse]:
-    """คืนหมวดหมู่สำหรับ dropdown เฉพาะงานทำความสะอาดที่ยังเปิดใช้งาน."""
-    result = await session.scalars(
-        select(ServiceCategory)
-        .where(
-            ServiceCategory.request_type == RequestType.CLEANING,
-            ServiceCategory.is_active.is_(True),
-        )
-        .order_by(ServiceCategory.category_name)
+async def list_guest_locations(session: AsyncSession) -> list[GuestLocationResponse]:
+    """คืนสถานที่ที่เปิดใช้งานสำหรับ dropdown ของ guest."""
+    locations = await session.scalars(
+        select(Location)
+        .where(Location.is_active.is_(True))
+        .order_by(Location.building, Location.floor, Location.room, Location.id)
     )
     return [
-        GuestCleaningCategoryResponse(
-            id=category.id,
-            category_name=category.category_name,
+        GuestLocationResponse(
+            id=location.id,
+            building=location.building,
+            floor=location.floor,
+            room=location.room,
+            area_type=location.area_type,
         )
-        for category in result
+        for location in locations
     ]
 
 
@@ -120,45 +106,25 @@ async def create_guest_cleaning_request(
     session: AsyncSession,
     *,
     payload: GuestCleaningCreate,
-    image_uploads: list[UploadFile] | None,
-    storage: ObjectStorage,
+    image_upload: UploadFile | None,
+    storage: ObjectStorage | None,
 ) -> GuestCleaningCreateResponse:
-    """ตรวจข้อมูล อัปโหลดรูป แล้ว commit คำร้องกับ image metadata พร้อมกัน."""
-    uploads = [upload for upload in (image_uploads or []) if _has_uploaded_file(upload)]
-    if len(uploads) > MAX_GUEST_IMAGE_COUNT:
-        raise TooManyImagesError(f"แนบรูปได้ไม่เกิน {MAX_GUEST_IMAGE_COUNT} รูปต่อหนึ่งคำร้อง")
-
-    category = await session.get(ServiceCategory, payload.category_id)
-    # ต้องเช็ค request_type ด้วย ไม่ใช่แค่ว่ามีแถวนี้อยู่ ไม่งั้น guest ส่ง category_id
-    # ของงานซ่อมเข้ามาได้ คำร้องจะไปโผล่ผิดโมดูลและแม่บ้านมองไม่เห็น
-    if (
-        category is None
-        or not category.is_active
-        or category.request_type != RequestType.CLEANING
-    ):
-        raise CategoryNotFoundError("ไม่พบหมวดหมู่งานทำความสะอาดที่เลือก")
-
-    location: Location | None = None
-    if payload.location_id is not None:
-        # ถึงค่านี้จะมาจากขั้นตอนสแกน QR แต่มันวิ่งผ่าน client จึงถูกแก้ได้
-        # ต้องตรวจซ้ำทุกครั้ง ไม่เชื่อว่า frontend ส่งมาถูกเสมอ
-        location = await session.get(Location, payload.location_id)
-        if location is None or not location.is_active:
-            raise LocationNotFoundError("ไม่พบสถานที่ที่เลือกหรือสถานที่ถูกปิดใช้งาน")
-
+    """เตรียมคำร้อง รูป และ response ให้ครบก่อน commit ฐานข้อมูล."""
+    # Dropdown และ QR ผ่าน client จึงต้องตรวจสถานที่ซ้ำก่อนบันทึก
+    location = await session.get(Location, payload.location_id)
+    if location is None or not location.is_active:
+        raise LocationNotFoundError("ไม่พบสถานที่ที่เลือกหรือสถานที่ถูกปิดใช้งาน")
     # สร้าง id เองก่อนแตะฐานข้อมูล เพราะต้องใช้ตั้งชื่อ object key ใน R2 ตั้งแต่ขั้นอัปโหลด
     request_id = uuid4()
     request_code = _make_request_code(request_id)
-
     prepared: list[_PreparedImage] = []
     service_request = ServiceRequest(
         id=request_id,
         request_code=request_code,
-        category_id=category.id,
-        location_id=location.id if location is not None else None,
+        request_type=RequestType.CLEANING,
+        location_id=location.id,
         title=payload.title,
         description=payload.description,
-        location_detail=payload.location_detail,
         priority=payload.priority,
         status=RequestStatus.WAITING,
         reporter_email=str(payload.reporter_email),
@@ -166,17 +132,17 @@ async def create_guest_cleaning_request(
     )
     committed = False
     try:
-        for upload in uploads:
-            processed = await prepare_guest_image(upload)
+        if _has_uploaded_file(image_upload):
+            if storage is None:
+                raise StorageConfigurationError("Object storage is not configured")
+            processed = await prepare_guest_image(image_upload)
             image_id = uuid4()
             stored = await storage.put(
                 object_key=f"cleaning/{request_id}/{image_id}.webp",
                 data=processed.data,
                 content_type=processed.content_type,
             )
-            prepared.append(
-                _PreparedImage(image_id=image_id, processed=processed, stored=stored)
-            )
+            prepared.append(_PreparedImage(image_id=image_id, processed=processed, stored=stored))
 
         session.add(service_request)
         await session.flush()
@@ -211,28 +177,33 @@ async def create_guest_cleaning_request(
                     uploaded_by_staff_id=None,
                 )
             )
+        # ส่งคำร้อง ประวัติ และข้อมูลรูปลง DB ภายใน transaction เดียวกันก่อนยืนยัน
+        await session.flush()
+        await session.refresh(service_request, attribute_names=["created_at"])
+        response = GuestCleaningCreateResponse(
+            request_code=service_request.request_code,
+            status=service_request.status,
+            request_type=service_request.request_type,
+            location=_format_location(location),
+            image_count=len(prepared),
+            created_at=service_request.created_at,
+            message="รับคำร้องแล้ว กรุณาเก็บรหัสคำร้องไว้ใช้ติดตามสถานะ",
+        )
+        # หลัง commit ไม่อ่าน ORM หรือสร้าง response อีก เพื่อไม่ให้สำเร็จแล้วตอบ error
         await session.commit()
         committed = True
-        # created_at เป็น server_default จึงต้องอ่านกลับมาก่อนใส่ลง response
-        await session.refresh(service_request)
     except SQLAlchemyError as exc:
-        await session.rollback()
         raise RequestPersistenceError("ไม่สามารถบันทึกคำร้องได้") from exc
     finally:
         # asyncio.CancelledError สืบทอดจาก BaseException จึงไม่ถูก except ด้านบนจับ
         # ต้องเก็บกวาดใน finally เท่านั้น ไม่งั้นไฟล์ค้างใน R2 โดยไม่มีแถวอ้างถึง
         if not committed:
-            await _discard_stored_objects(storage, prepared)
+            try:
+                await session.rollback()
+            finally:
+                await _discard_stored_objects(storage, prepared)
 
-    return GuestCleaningCreateResponse(
-        request_code=service_request.request_code,
-        status=service_request.status,
-        category_name=category.category_name,
-        location=_format_location(location, service_request.location_detail),
-        image_count=len(prepared),
-        created_at=service_request.created_at,
-        message="รับคำร้องแล้ว กรุณาเก็บรหัสคำร้องไว้ใช้ติดตามสถานะ",
-    )
+    return response
 
 
 async def get_guest_request_status(
@@ -244,13 +215,12 @@ async def get_guest_request_status(
     """ติดตามสถานะคำร้องโดยใช้รหัสคู่กับอีเมลผู้แจ้งเป็นการพิสูจน์ตัวตน."""
     service_request = await session.scalar(
         select(ServiceRequest)
-        # โหลดมาพร้อมกันใน query เดียว เพราะ async session ทำ lazy load ไม่ได้
-        # ถ้าปล่อยไว้ การอ่าน .category.category_name จะโยน MissingGreenlet
+        # โหลดสถานที่ล่วงหน้า เพื่อไม่ให้การอ่าน relationship เรียก async I/O โดยไม่ await
         .options(
-            selectinload(ServiceRequest.category),
             selectinload(ServiceRequest.location),
         )
         .where(
+            ServiceRequest.request_type == RequestType.CLEANING,
             ServiceRequest.request_code == request_code.strip().upper(),
             # อีเมลถูก normalize เป็นตัวพิมพ์เล็กตั้งแต่ตอนสร้าง จึงต้องเทียบด้วยรูปแบบเดียวกัน
             ServiceRequest.reporter_email == reporter_email.strip().lower(),
@@ -261,12 +231,8 @@ async def get_guest_request_status(
         raise RequestNotFoundError("ไม่พบคำร้องนี้")
 
     return GuestTrackingResponse(
-        request_code=service_request.request_code,
-        category_name=service_request.category.category_name,
-        location=_format_location(
-            service_request.location,
-            service_request.location_detail,
-        ),
+        request_type=service_request.request_type,
+        location=_format_location(service_request.location),
         status=service_request.status,
         created_at=service_request.created_at,
         updated_at=service_request.updated_at,
@@ -275,10 +241,12 @@ async def get_guest_request_status(
 
 
 async def _discard_stored_objects(
-    storage: ObjectStorage,
+    storage: ObjectStorage | None,
     prepared: list[_PreparedImage],
 ) -> None:
     """ลบไฟล์ที่อัปขึ้น R2 ไปแล้วเมื่อคำร้องบันทึกไม่สำเร็จ."""
+    if storage is None:
+        return
     for item in prepared:
         try:
             await storage.delete(item.stored.object_key)
@@ -289,20 +257,16 @@ async def _discard_stored_objects(
             )
 
 
-def _format_location(location: Location | None, location_detail: str | None) -> str:
-    """ประกอบสถานที่จาก QR กับรายละเอียดที่ผู้แจ้งพิมพ์เพิ่มให้เป็นข้อความเดียว."""
-    parts: list[str] = []
-    if location is not None:
-        parts.append(location.building)
-        if location.floor:
-            parts.append(f"ชั้น {location.floor}")
-        if location.room:
-            parts.append(f"ห้อง {location.room}")
-    if location_detail:
-        parts.append(location_detail)
-    # schema บังคับให้มี location_id หรือ location_detail อย่างน้อยหนึ่งอย่างอยู่แล้ว
-    # ค่าสำรองนี้กันไว้เผื่อข้อมูลเก่าที่เข้ามาก่อนกฎนั้นถูกบังคับใช้
-    return " ".join(parts) or "ไม่ระบุสถานที่"
+def _format_location(location: Location) -> str:
+    """ประกอบชื่อสถานที่ที่ลงทะเบียนไว้สำหรับแสดงผล."""
+    parts = [location.building]
+    if location.floor:
+        parts.append(f"ชั้น {location.floor}")
+    if location.room:
+        parts.append(f"ห้อง {location.room}")
+    if location.area_type:
+        parts.append(location.area_type)
+    return " ".join(parts)
 
 
 def _has_uploaded_file(upload: UploadFile | None) -> bool:

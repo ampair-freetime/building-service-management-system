@@ -1,4 +1,4 @@
-"""Models สำหรับหมวดงาน คำร้องบริการ และประวัติการดำเนินงาน."""
+"""Models สำหรับคำร้องบริการและประวัติการดำเนินงาน."""
 
 from datetime import datetime
 from typing import TYPE_CHECKING
@@ -8,10 +8,8 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     Index,
-    Integer,
     String,
     Text,
-    UniqueConstraint,
     Uuid,
     func,
 )
@@ -27,34 +25,6 @@ if TYPE_CHECKING:
     from app.models.staff import Staff
 
 
-class ServiceCategory(Base):
-    __tablename__ = "service_categories"
-    __table_args__ = (
-        UniqueConstraint("request_type", "category_name", name="uq_service_category_type_name"),
-    )
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    request_type: Mapped[RequestType] = mapped_column(
-        SqlEnum(
-            RequestType,
-            name="request_type",
-            values_callable=lambda values: [value.value for value in values],
-        )
-    )
-    category_name: Mapped[str] = mapped_column(String(150))
-    is_active: Mapped[bool] = mapped_column(default=True, server_default="true")
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
-    )
-
-    service_requests: Mapped[list["ServiceRequest"]] = relationship(
-        back_populates="category"
-    )
-
-
 class ServiceRequest(Base):
     __tablename__ = "service_requests"
     __table_args__ = (
@@ -64,13 +34,17 @@ class ServiceRequest(Base):
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
     request_code: Mapped[str] = mapped_column(String(30), unique=True)
-    category_id: Mapped[int] = mapped_column(ForeignKey("service_categories.id"))
-    location_id: Mapped[int | None] = mapped_column(
-        ForeignKey("locations.id"), nullable=True
+    request_type: Mapped[RequestType] = mapped_column(
+        SqlEnum(
+            RequestType,
+            name="request_type",
+            values_callable=lambda values: [value.value for value in values],
+        ),
+        nullable=False,
     )
+    location_id: Mapped[int] = mapped_column(ForeignKey("locations.id"), nullable=False)
     title: Mapped[str] = mapped_column(String(200))
     description: Mapped[str] = mapped_column(Text)
-    location_detail: Mapped[str | None] = mapped_column(String(255), nullable=True)
     priority: Mapped[PriorityLevel] = mapped_column(
         SqlEnum(
             PriorityLevel,
@@ -100,26 +74,15 @@ class ServiceRequest(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
-    completed_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
-    category: Mapped["ServiceCategory"] = relationship(
-        back_populates="service_requests"
-    )
-    location: Mapped["Location | None"] = relationship(
-        back_populates="service_requests"
-    )
+    location: Mapped["Location"] = relationship(back_populates="service_requests")
     assigned_staff: Mapped["Staff | None"] = relationship(
         back_populates="assigned_service_requests",
         foreign_keys=[assigned_staff_id],
     )
-    history_entries: Mapped[list["RequestHistory"]] = relationship(
-        back_populates="service_request"
-    )
-    images: Mapped[list["Image"]] = relationship(
-        back_populates="service_request"
-    )
+    history_entries: Mapped[list["RequestHistory"]] = relationship(back_populates="service_request")
+    images: Mapped[list["Image"]] = relationship(back_populates="service_request")
 
 
 class RequestHistory(Base):
@@ -134,12 +97,8 @@ class RequestHistory(Base):
             values_callable=lambda values: [value.value for value in values],
         )
     )
-    performed_by: Mapped[UUID | None] = mapped_column(
-        ForeignKey("staff.id"), nullable=True
-    )
-    target_staff_id: Mapped[UUID | None] = mapped_column(
-        ForeignKey("staff.id"), nullable=True
-    )
+    performed_by: Mapped[UUID | None] = mapped_column(ForeignKey("staff.id"), nullable=True)
+    target_staff_id: Mapped[UUID | None] = mapped_column(ForeignKey("staff.id"), nullable=True)
     old_status: Mapped[RequestStatus | None] = mapped_column(
         SqlEnum(
             RequestStatus,
@@ -157,13 +116,9 @@ class RequestHistory(Base):
         nullable=True,
     )
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
-    service_request: Mapped["ServiceRequest"] = relationship(
-        back_populates="history_entries"
-    )
+    service_request: Mapped["ServiceRequest"] = relationship(back_populates="history_entries")
     performed_by_staff: Mapped["Staff | None"] = relationship(
         back_populates="performed_request_histories",
         foreign_keys=[performed_by],

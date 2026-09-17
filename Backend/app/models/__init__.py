@@ -16,7 +16,7 @@ from app.models.image import Image
 from app.models.location import Location
 from app.models.lost_found import LostClaim, LostItem, LostItemHistory
 from app.models.notification import Notification
-from app.models.service_request import RequestHistory, ServiceCategory, ServiceRequest
+from app.models.service_request import RequestHistory, ServiceRequest
 from app.models.staff import Staff
 
 __all__ = [
@@ -36,7 +36,6 @@ __all__ = [
     "RequestHistory",
     "RequestStatus",
     "RequestType",
-    "ServiceCategory",
     "ServiceRequest",
     "Staff",
     "StaffRole",

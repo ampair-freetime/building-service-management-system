@@ -1,6 +1,69 @@
 // ตัด / ท้าย URL เพื่อให้ต่อ path ได้โดยไม่เกิด // ระหว่าง base URL กับ endpoint
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000/api/v1').replace(/\/+$/, '')
 
+function apiErrorMessage(body, fallback) {
+  const detail = body?.detail
+  if (typeof detail === "string") return detail
+  if (Array.isArray(detail)) {
+    return detail.map((issue) => issue.msg).filter(Boolean).join("\n") || fallback
+  }
+  return fallback
+}
+
+async function fetchWithTimeout(url, options = {}, timeoutMs = 15_000) {
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), timeoutMs)
+  try {
+    return await fetch(url, { ...options, signal: controller.signal })
+  } catch (error) {
+    if (controller.signal.aborted) throw new Error("เซิร์ฟเวอร์ไม่ตอบกลับภายในเวลาที่กำหนด")
+    if (error instanceof TypeError) throw new Error("เชื่อมต่อ Backend ไม่ได้ กรุณาลองใหม่")
+    throw error
+  } finally {
+    clearTimeout(timeout)
+  }
+}
+
+export async function listCleaningLocations() {
+  const response = await fetchWithTimeout(`${API_BASE_URL}/guest/cleaning-requests/locations`)
+  const body = await response.json().catch(() => ([]))
+  if (!response.ok) throw new Error(apiErrorMessage(body, "ไม่สามารถโหลดสถานที่ได้"))
+  return body
+}
+
+export async function resolveCleaningLocation(qrToken) {
+  const response = await fetchWithTimeout(
+    `${API_BASE_URL}/guest/cleaning-requests/locations/by-qr/${encodeURIComponent(qrToken)}`,
+  )
+  if (response.status === 404) return null
+  const body = await response.json().catch(() => ({}))
+  if (!response.ok) throw new Error(apiErrorMessage(body, "ไม่สามารถตรวจสอบ QR ได้"))
+  return body
+}
+
+export async function createCleaningRequest(payload) {
+  const response = await fetchWithTimeout(
+    `${API_BASE_URL}/guest/cleaning-requests`,
+    { method: "POST", body: payload },
+    30_000,
+  )
+  const body = await response.json().catch(() => ({}))
+  if (!response.ok) throw new Error(apiErrorMessage(body, "ไม่สามารถส่งคำขอทำความสะอาดได้"))
+  return body
+}
+
+export async function trackCleaningRequest(requestCode, reporterEmail) {
+  const code = requestCode.trim().toUpperCase()
+  const params = new URLSearchParams({ reporter_email: reporterEmail.trim().toLowerCase() })
+  const response = await fetchWithTimeout(
+    `${API_BASE_URL}/guest/cleaning-requests/${encodeURIComponent(code)}?${params}`,
+  )
+  if (response.status === 404) return null
+  const body = await response.json().catch(() => ({}))
+  if (!response.ok) throw new Error(apiErrorMessage(body, "ไม่สามารถตรวจสอบสถานะได้"))
+  return body
+}
+
 // ส่งรายการของหายไปยัง guest API โดยใช้ FormData เป็น payload
 export async function createLostItem(payload) {
   // ยกเลิกการรอทั้ง request และ response body เมื่อครบ 30 วินาที เพื่อให้ฟอร์มคืนปุ่มส่ง

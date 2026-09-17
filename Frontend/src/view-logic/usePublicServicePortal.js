@@ -5,6 +5,7 @@ import {
   createLostItem,
   getLostFoundItem,
   searchLostFoundItems,
+  trackCleaningRequest,
   trackLostFoundItem,
 } from "../services/api";
 
@@ -88,6 +89,10 @@ export function usePublicServicePortal() {
         void filterPosts();
       }
 
+    }
+
+    if (window.location.pathname.replace(/\/+$/, "").endsWith("/cleaning")) {
+      navigate("clean");
     }
 
     navItems.forEach((item) =>
@@ -1123,10 +1128,11 @@ export function usePublicServicePortal() {
 
         document.getElementById(ids.requestType).textContent =
           item.requestType ||
+          (item.request_type === "cleaning" ? "แจ้งทำความสะอาด" : null) ||
           (item.report_type === "found" ? "แจ้งพบของ" : "แจ้งของหาย");
 
         document.getElementById(ids.itemName).textContent =
-          item.itemName || item.item_name || "–";
+          item.itemName || item.item_name || item.location || "–";
 
         document.getElementById(ids.updatedAt).textContent =
           item.updatedAt || formatItemDate(item.updated_at);
@@ -1171,15 +1177,16 @@ export function usePublicServicePortal() {
         };
 
         try {
-          const isLostFoundCode =
-            code.startsWith("LOST-") || code.startsWith("FOUND-");
-          // LOST-/FOUND- อ่านสถานะจริงจาก API ส่วนรหัสบริการเดิมอ่านจากรายการของหน้านี้
+          const isLostFoundCode = code.startsWith("LOST-") || code.startsWith("FOUND-");
+          const isCleaningCode = code.startsWith("CLN-");
           const localItem = trackedRequests.get(code);
           const item = isLostFoundCode
             ? await trackLostFoundItem(code, email)
-            : localItem && (!localItem.email || localItem.email === email)
-              ? localItem
-              : null;
+            : isCleaningCode
+              ? await trackCleaningRequest(code, email)
+              : localItem && (!localItem.email || localItem.email === email)
+                ? localItem
+                : null;
           renderTrackingResult(item, code, ids);
         } catch (error) {
           // แสดงกรอบผลลัพธ์แม้เกิดปัญหาการเชื่อมต่อ
