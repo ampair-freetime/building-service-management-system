@@ -1,5 +1,5 @@
 // ตัด / ท้าย URL เพื่อให้ต่อ path ได้โดยไม่เกิด // ระหว่าง base URL กับ endpoint
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000/api/v1').replace(/\/+$/, '')
+const API_BASE_URL = (import.meta.env?.VITE_API_BASE_URL ?? 'http://localhost:8000/api/v1').replace(/\/+$/, '')
 
 // ส่งรายการของหายไปยัง guest API โดยใช้ FormData เป็น payload
 export async function createLostItem(payload) {
@@ -209,6 +209,54 @@ export async function trackLostFoundItem(itemCode, reporterEmail) {
     throw error
   } finally {
     clearTimeout(timeout)
+  }
+}
+
+// ดึงสถานะคำร้องแจ้งซ่อมหรือทำความสะอาดสำหรับผู้ใช้งานทั่วไป
+export async function trackServiceRequest(
+  requestCode,
+  reporterEmail,
+  { fetchImpl = fetch, timeoutMs = 15_000 } = {},
+) {
+  const normalizedCode = requestCode.trim().toUpperCase();
+  if (
+    !normalizedCode.startsWith("CLEAN-") &&
+    !normalizedCode.startsWith("REPAIR-")
+  ) {
+    throw new Error("รหัสคำร้องบริการไม่ถูกต้อง");
+  }
+
+  const params = new URLSearchParams({
+    reporter_email: reporterEmail.trim().toLowerCase(),
+  });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetchImpl(
+      `${API_BASE_URL}/guest/service-requests/${encodeURIComponent(normalizedCode)}?${params}`,
+      { signal: controller.signal },
+    );
+    if (response.status === 404) return null;
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(
+        typeof error.detail === "string"
+          ? error.detail
+          : "ไม่สามารถโหลดสถานะคำร้องบริการได้",
+      );
+    }
+    return await response.json();
+  } catch (error) {
+    if (controller.signal.aborted) {
+      throw new Error("ใช้เวลาโหลดสถานะนานเกินไป กรุณาลองใหม่");
+    }
+    if (error instanceof TypeError) {
+      throw new Error("เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ กรุณาลองใหม่");
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeout);
   }
 }
 

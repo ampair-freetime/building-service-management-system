@@ -107,7 +107,7 @@
             <div class="tracking-result" id="trackingResult" role="status" aria-live="polite">
               <div class="tracking-result-head">
                 <div>
-                  <small>รหัสคำร้อง</small
+                  <small>รหัสคำร้อง  </small
                   ><strong id="trackingResultCode">LOST-20260912-3BE8986F</strong>
                   <p id="trackingResultText" style="margin: 5px 0 0"></p>
                 </div>
@@ -132,6 +132,25 @@
                   <small>อัปเดตล่าสุด</small>
                   <strong id="trackingUpdatedAt">–</strong>
                 </div>
+              </div>
+              <div
+                id="trackingProgress"
+                class="tracking-progress"
+                aria-labelledby="trackingProgressTitle"
+                hidden
+              >
+                <strong id="trackingProgressTitle">ความคืบหน้าของคำร้อง</strong>
+                <ol id="trackingProgressSteps" class="tracking-progress-steps"></ol>
+              </div>
+              <div class="tracking-result-actions">
+                <small id="trackingRefreshTime"></small>
+                <button
+                  type="button"
+                  class="secondary"
+                  id="refreshTrackingStatus"
+                >
+                  รีเฟรชสถานะ
+                </button>
               </div>
             </div>
           </section>

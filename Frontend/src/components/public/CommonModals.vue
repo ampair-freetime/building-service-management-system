@@ -72,6 +72,10 @@
               <svg class="icon"><use href="#i-check" /></svg>
             </div>
             <h3 id="successType">ส่งรายการเรียบร้อยแล้ว</h3>
+            <dl id="successRequestDetails" class="success-request-details" hidden>
+              <div><dt>สถานที่</dt><dd id="successLocation"></dd></div>
+              <div><dt>ปัญหาที่พบ</dt><dd id="successProblem"></dd></div>
+            </dl>
             <p id="successInstruction">เก็บรหัสคำร้องนี้ไว้เพื่อติดตามสถานะ</p>
             <strong class="request-code" id="successCode">LOST-20260912-3BE8986F</strong>
             <small class="success-email" id="successEmail"></small>
@@ -87,3 +91,37 @@
         </section>
       </div>
 </template>
+
+<style scoped>
+.success-request-details {
+  width: 100%;
+  margin: 18px 0 0;
+  text-align: center;
+  font-size: 15px;
+  color: var(--muted);
+}
+.success-request-details div {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 8px;
+}
+.success-request-details:not([hidden]) + #successInstruction {
+  margin-top: 28px;
+}
+.success-request-details div + div {
+  margin-top: 6px;
+}
+.success-request-details dt {
+  flex-shrink: 0;
+  font-weight: 700;
+  color: var(--muted);
+}
+.success-request-details dd {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-weight: 400;
+  color: var(--muted);
+}
+</style>

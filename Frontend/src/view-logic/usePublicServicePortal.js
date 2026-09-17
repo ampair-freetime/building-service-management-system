@@ -1,3 +1,9 @@
+import { installServiceFormValidation } from "../services/serviceFormValidation.js";
+import {
+  requestProgress,
+  requestStatusPresentation,
+  serviceTypeForRequest,
+} from "../services/requestStatus.js";
 import { onMounted, onUnmounted, ref } from "vue";
 import {
   createFoundItem,
@@ -6,9 +12,11 @@ import {
   getLostFoundItem,
   searchLostFoundItems,
   trackLostFoundItem,
+  trackServiceRequest,
 } from "../services/api";
 
 export function usePublicServicePortal() {
+  const validationCleanups = [];
   const sidebarOpen = ref(false);
   const closeSidebar = () => { sidebarOpen.value = false; };
   const toggleSidebar = () => { sidebarOpen.value = !sidebarOpen.value; };
@@ -642,18 +650,35 @@ export function usePublicServicePortal() {
         } else closeUiModal("detailModal");
       });
 
-    function showSuccess(type, recipientEmail = "", requestId = "") {
+    function showConfirmationDetails(details = {}) {
+      document.getElementById("successLocation").textContent = details.location || "";
+      document.getElementById("successProblem").textContent = details.problem || "";
+      document.getElementById("successRequestDetails").hidden = !(details.location || details.problem);
+    }
+
+    function showSuccess(type, recipientEmail = "", requestId = "", details = {}) {
+      showConfirmationDetails(details);
       const trackingCode =
         requestId || `BC-${Math.floor(1000 + Math.random() * 9000)}`;
+      const serviceType = serviceTypeForRequest(
+        { requestType: type },
+        trackingCode,
+      );
 
       trackedRequests.set(trackingCode, {
         summary: type,
-        status: "รอเจ้าหน้าที่ตรวจสอบ",
-        statusClass: "wait",
-        requestType: "คำร้องที่ส่งผ่านระบบ",
-        itemName: "ไม่แสดงข้อมูลส่วนบุคคล",
+        status: details.status || "waiting",
+        serviceType,
+        requestType:
+          serviceType === "cleaning"
+            ? "แจ้งทำความสะอาด"
+            : serviceType === "repair"
+              ? "แจ้งซ่อม"
+              : "คำร้องที่ส่งผ่านระบบ",
+        itemName: details.problem || "ไม่ระบุรายละเอียด",
         updatedAt: "เพิ่งส่งคำร้อง",
         email: recipientEmail.trim().toLowerCase(),
+        demo: Boolean(details.demo),
       });
       document.getElementById("successType").textContent = type;
       document.getElementById("successInstruction").textContent =
@@ -677,6 +702,7 @@ export function usePublicServicePortal() {
     }
 
     function showLostFoundConfirmation(type, message) {
+      showConfirmationDetails();
       document.getElementById("successType").textContent = type;
       document.getElementById("successInstruction").textContent =
         "กรุณาติดต่อเจ้าหน้าที่ธุรการด้วยตนเอง";
@@ -699,41 +725,42 @@ export function usePublicServicePortal() {
       });
     }
 
-    // ฟอร์มที่เรียกฟังก์ชันนี้ยังจำลองการส่งในหน้าเว็บ ส่วนแจ้งของหายใช้ createLostItem แยกต่างหาก
-    function submitDemo(event, type) {
-      event.preventDefault();
-      const form = event.currentTarget;
-
-      if (!form.checkValidity()) {
-        form.reportValidity();
-        showToast("กรุณากรอกข้อมูลที่จำเป็นให้ครบ");
-        return;
-      }
-      const recipientEmail =
-        form.querySelector('[name="recipient_email"]')?.value.trim() || "";
-      const trackingPrefix = form.dataset.trackingPrefix;
-      const requestId = trackingPrefix
-        ? `${trackingPrefix}-${Math.floor(1000 + Math.random() * 9000)}`
-        : "";
-      clearImagePreviews(form);
-      form.reset();
-      if (form.dataset.confirmationMode === "lost-found") {
-        showLostFoundConfirmation(
-          `${type}เรียบร้อยแล้ว`,
-          "โปรดนำสิ่งของไปฝากที่สำนักงานธุรการ เพื่อให้เจ้าหน้าที่ตรวจสอบและดูแลการคืนของ",
-        );
-      } else {
-        showSuccess(`${type}เรียบร้อยแล้ว`, recipientEmail, requestId);
-      }
+    function createDemoRequestCode(prefix) {
+      const today = new Date();
+      const date = [today.getFullYear(), String(today.getMonth() + 1).padStart(2, "0"), String(today.getDate()).padStart(2, "0")].join("");
+      const suffix = crypto.randomUUID().replaceAll("-", "").slice(0, 8).toUpperCase();
+      return `${prefix}-${date}-${suffix}`;
     }
 
-    document
-      .querySelectorAll("[data-submit-type]")
-      .forEach((form) =>
-        form.addEventListener("submit", (event) =>
-          submitDemo(event, form.dataset.submitType),
-        ),
+    const cleaningForm = document.querySelector("#clean form");
+    const confirmCleaningRequest = (event) => {
+      const { demo, request_code, recipientEmail, location, problem, status } = event.detail;
+      showSuccess(
+        "แจ้งทำความสะอาดเรียบร้อยแล้ว",
+        recipientEmail,
+        demo ? createDemoRequestCode("CLEAN") : request_code,
+        { location, problem, status, demo },
       );
+    };
+    cleaningForm?.addEventListener("cleaning-request-confirmed", confirmCleaningRequest);
+    validationCleanups.push(() => cleaningForm?.removeEventListener("cleaning-request-confirmed", confirmCleaningRequest));
+
+    const repairForm = document.querySelector("#repair form");
+    const confirmRepairRequest = (event) => {
+      const { demo, request_code, recipientEmail, location, problem, status } = event.detail;
+      showSuccess(
+        "แจ้งซ่อมเรียบร้อยแล้ว",
+        recipientEmail,
+        demo ? createDemoRequestCode("REPAIR") : request_code,
+        { location, problem, status, demo },
+      );
+    };
+    repairForm?.addEventListener("repair-request-confirmed", confirmRepairRequest);
+    validationCleanups.push(() => repairForm?.removeEventListener("repair-request-confirmed", confirmRepairRequest));
+
+    document.querySelectorAll("[data-service-validation]").forEach(form => {
+      validationCleanups.push(installServiceFormValidation(form));
+    });
 
     const lostItemForm = document.getElementById("lostItemForm");
     const lostItemValidationRules = {
@@ -813,8 +840,6 @@ export function usePublicServicePortal() {
       if (form.querySelector('button[type="submit"]').disabled) return;
 
       if (!validateLostItemForm(form) || !form.checkValidity()) {
-        form.reportValidity();
-        showToast("กรุณากรอกข้อมูลที่จำเป็นให้ครบ");
         return;
       }
 
@@ -947,8 +972,6 @@ export function usePublicServicePortal() {
       if (submitButton.disabled) return;
 
       if (!validateFoundItemForm(form) || !form.checkValidity()) {
-        form.reportValidity();
-        showToast("กรุณากรอกข้อมูลที่จำเป็นให้ครบ");
         return;
       }
 
@@ -1083,7 +1106,49 @@ export function usePublicServicePortal() {
       field.addEventListener("blur", () => validateTrackingField(field));
     });
 
-    function renderTrackingResult(item, code, ids) {
+    function renderTrackingProgress(item, code, ids) {
+      if (!ids.progress || !ids.progressSteps) return;
+      const container = document.getElementById(ids.progress);
+      const list = document.getElementById(ids.progressSteps);
+      const progress = requestProgress(item, code);
+
+      list.replaceChildren();
+      if (!progress) {
+        container.hidden = true;
+        return;
+      }
+
+      progress.steps.forEach((step, index) => {
+        const itemElement = document.createElement("li");
+        itemElement.className =
+          index < progress.currentIndex
+            ? "complete"
+            : index === progress.currentIndex
+              ? "current"
+              : "upcoming";
+        if (step.status === "rejected") {
+          itemElement.classList.add("rejected");
+        }
+        if (index === progress.currentIndex) {
+          itemElement.setAttribute("aria-current", "step");
+        }
+
+        const marker = document.createElement("span");
+        marker.className = "tracking-progress-marker";
+        marker.setAttribute("aria-hidden", "true");
+        marker.textContent = index < progress.currentIndex ? "✓" : String(index + 1);
+
+        const label = document.createElement("span");
+        label.className = "tracking-progress-label";
+        label.textContent = step.label;
+
+        itemElement.append(marker, label);
+        list.append(itemElement);
+      });
+      container.hidden = false;
+    }
+
+    function renderTrackingResult(item, code, ids, { refreshed = false } = {}) {
       const result = document.getElementById(ids.result);
       const statusBadge = document.getElementById(ids.status);
 
@@ -1101,100 +1166,154 @@ export function usePublicServicePortal() {
         if (ids.details) {
           document.getElementById(ids.details).hidden = true;
         }
+        if (ids.progress) {
+          document.getElementById(ids.progress).hidden = true;
+        }
 
         result.classList.add("show");
         showToast("ไม่พบคำร้อง");
         return;
       }
 
-      // รองรับทั้งผลจาก Lost & Found API และรายการชั่วคราวของบริการอื่นในหน้าเดียวกัน
-      const statusText = item.statusClass
-        ? item.status
-        : itemStatusLabel(item.status);
+      // ใช้ label และสีชุดเดียวกันกับทุกประเภทคำร้อง โดยบริการอาคารมีขั้นตอนเพิ่มด้านล่าง
+      const presentation = requestStatusPresentation(item, code);
 
       document.getElementById(ids.text).textContent =
-        item.summary || `สถานะล่าสุด: ${statusText}`;
+        presentation.description ||
+        item.summary ||
+        `สถานะล่าสุด: ${presentation.label}`;
 
-      statusBadge.textContent = statusText;
-      statusBadge.className = `status ${item.statusClass || item.status}`;
+      statusBadge.textContent = presentation.label;
+      statusBadge.className = `status ${presentation.className}`;
 
       if (ids.details) {
         document.getElementById(ids.details).hidden = false;
 
         document.getElementById(ids.requestType).textContent =
           item.requestType ||
-          (item.report_type === "found" ? "แจ้งพบของ" : "แจ้งของหาย");
+          (item.request_type === "cleaning"
+            ? "แจ้งทำความสะอาด"
+            : item.request_type === "repair"
+              ? "แจ้งซ่อม"
+              : item.report_type === "found"
+                ? "แจ้งพบของ"
+                : "แจ้งของหาย");
 
         document.getElementById(ids.itemName).textContent =
-          item.itemName || item.item_name || "–";
+          item.itemName || item.item_name || item.title || item.problem || "–";
 
         document.getElementById(ids.updatedAt).textContent =
           item.updatedAt || formatItemDate(item.updated_at);
       }
 
+      renderTrackingProgress(item, code, ids);
+
       result.classList.add("show");
-      showToast("พบข้อมูลคำร้อง");
+      showToast(refreshed ? "รีเฟรชสถานะแล้ว" : "พบข้อมูลคำร้อง");
     }
 
-    document
-      .getElementById("trackingForm")
-      .addEventListener("submit", async (event) => {
-        event.preventDefault();
+    const trackingForm = document.getElementById("trackingForm");
+    const trackingSubmitButton = trackingForm.querySelector('button[type="submit"]');
+    const refreshTrackingButton = document.getElementById("refreshTrackingStatus");
+    const trackingResult = document.getElementById("trackingResult");
+    const trackingIds = {
+      result: "trackingResult",
+      code: "trackingResultCode",
+      text: "trackingResultText",
+      status: "trackingResultStatus",
+      details: "trackingDetails",
+      requestType: "trackingRequestType",
+      itemName: "trackingItemName",
+      updatedAt: "trackingUpdatedAt",
+      progress: "trackingProgress",
+      progressSteps: "trackingProgressSteps",
+    };
+    let isTrackingRequestPending = false;
 
-        const isValid = trackingFields
-          .map(validateTrackingField)
-          .every(Boolean);
-        if (!isValid) {
-          trackingFields.find((field) => !field.checkValidity())?.focus();
-          return;
+    async function loadTrackingStatus({ refreshed = false } = {}) {
+      if (isTrackingRequestPending) return;
+
+      const isValid = trackingFields.map(validateTrackingField).every(Boolean);
+      if (!isValid) {
+        trackingFields.find((field) => !field.checkValidity())?.focus();
+        return;
+      }
+
+      const code = document
+        .getElementById("trackingCode")
+        .value.trim()
+        .toUpperCase();
+      const email = document
+        .getElementById("trackingEmail")
+        .value.trim()
+        .toLowerCase();
+
+      isTrackingRequestPending = true;
+      trackingResult.setAttribute("aria-busy", "true");
+      trackingSubmitButton.disabled = true;
+      refreshTrackingButton.disabled = true;
+      trackingSubmitButton.textContent = refreshed
+        ? "ตรวจสอบสถานะ"
+        : "กำลังตรวจสอบ…";
+      refreshTrackingButton.textContent = refreshed
+        ? "กำลังรีเฟรช…"
+        : "รีเฟรชสถานะ";
+
+      try {
+        const isLostFoundCode =
+          code.startsWith("LOST-") || code.startsWith("FOUND-");
+        const isServiceCode =
+          code.startsWith("CLEAN-") || code.startsWith("REPAIR-");
+        const localItem = trackedRequests.get(code);
+        if (!isLostFoundCode && (!isServiceCode || localItem?.demo)) {
+          // เปิดโอกาสให้ browser วาด loading state ก่อนอัปเดตข้อมูลในหน่วยความจำ
+          await new Promise((resolve) => window.setTimeout(resolve, 0));
         }
-
-        const code = document
-          .getElementById("trackingCode")
-          .value.trim()
-          .toUpperCase();
-
-        const email = document
-          .getElementById("trackingEmail")
-          .value.trim()
-          .toLowerCase();
-
-        const ids = {
-          result: "trackingResult",
-          code: "trackingResultCode",
-          text: "trackingResultText",
-          status: "trackingResultStatus",
-          details: "trackingDetails",
-          requestType: "trackingRequestType",
-          itemName: "trackingItemName",
-          updatedAt: "trackingUpdatedAt",
-        };
-
-        try {
-          const isLostFoundCode =
-            code.startsWith("LOST-") || code.startsWith("FOUND-");
-          // LOST-/FOUND- อ่านสถานะจริงจาก API ส่วนรหัสบริการเดิมอ่านจากรายการของหน้านี้
-          const localItem = trackedRequests.get(code);
-          const item = isLostFoundCode
-            ? await trackLostFoundItem(code, email)
+        const item = isLostFoundCode
+          ? await trackLostFoundItem(code, email)
+          : isServiceCode && !localItem?.demo
+            ? await trackServiceRequest(code, email)
             : localItem && (!localItem.email || localItem.email === email)
               ? localItem
               : null;
-          renderTrackingResult(item, code, ids);
-        } catch (error) {
-          // แสดงกรอบผลลัพธ์แม้เกิดปัญหาการเชื่อมต่อ
-          document.getElementById(ids.code).textContent = code;
-          document.getElementById(ids.text).textContent =
-            error.message || "ไม่สามารถตรวจสอบสถานะได้";
+        renderTrackingResult(item, code, trackingIds, { refreshed });
+        document.getElementById("trackingRefreshTime").textContent =
+          `ตรวจสอบล่าสุด ${new Intl.DateTimeFormat("th-TH", {
+            hour: "2-digit",
+            minute: "2-digit",
+            second: "2-digit",
+          }).format(new Date())}`;
+      } catch (error) {
+        // แสดงกรอบผลลัพธ์แม้เกิดปัญหาการเชื่อมต่อ และให้ผู้ใช้กดรีเฟรชซ้ำได้
+        document.getElementById(trackingIds.code).textContent = code;
+        document.getElementById(trackingIds.text).textContent =
+          error.message || "ไม่สามารถตรวจสอบสถานะได้";
 
-          const statusBadge = document.getElementById(ids.status);
-          statusBadge.textContent = "เกิดข้อผิดพลาด";
-          statusBadge.className = "status not-found";
+        const statusBadge = document.getElementById(trackingIds.status);
+        statusBadge.textContent = "เกิดข้อผิดพลาด";
+        statusBadge.className = "status not-found";
 
-          document.getElementById(ids.details).hidden = true;
-          document.getElementById(ids.result).classList.add("show");
-        }
-      });
+        document.getElementById(trackingIds.details).hidden = true;
+        document.getElementById(trackingIds.progress).hidden = true;
+        trackingResult.classList.add("show");
+        showToast("ไม่สามารถรีเฟรชสถานะได้ กรุณาลองอีกครั้ง");
+      } finally {
+        isTrackingRequestPending = false;
+        trackingResult.removeAttribute("aria-busy");
+        trackingSubmitButton.disabled = false;
+        refreshTrackingButton.disabled = false;
+        trackingSubmitButton.textContent = "ตรวจสอบสถานะ";
+        refreshTrackingButton.textContent = "รีเฟรชสถานะ";
+      }
+    }
+
+    trackingForm.addEventListener("submit", (event) => {
+      event.preventDefault();
+      void loadTrackingStatus();
+    });
+    refreshTrackingButton.addEventListener("click", () => {
+      void loadTrackingStatus({ refreshed: true });
+    });
     document.querySelectorAll("[data-scroll-track]").forEach((button) =>
       button.addEventListener("click", () => {
         navigate("dashboard");
@@ -1370,6 +1489,7 @@ export function usePublicServicePortal() {
   });
 
   onUnmounted(() => {
+    validationCleanups.forEach(cleanup => cleanup());
     document.body.classList.remove("modal-open", "offline");
   });
   return { sidebarOpen, closeSidebar, toggleSidebar };

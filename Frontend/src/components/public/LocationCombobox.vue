@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from "vue";
+import { nextTick, computed, onBeforeUnmount, onMounted, ref } from "vue";
 
 const props = defineProps({
   id: { type: String, required: true },
@@ -40,6 +40,8 @@ function selectOption(option) {
   isOpen.value = false;
   activeIndex.value = -1;
   input.value?.focus();
+  // Selecting a suggestion must update form validation just like typing does.
+  nextTick(() => input.value?.dispatchEvent(new Event("change", { bubbles: true })));
 }
 
 function toggleSuggestions() {
@@ -138,7 +140,6 @@ onBeforeUnmount(() => {
           <path d="m5 7.5 5 5 5-5" />
         </svg>
       </button>
-    </div>
     <div
       v-if="isOpen"
       :id="`${id}-suggestions`"
@@ -166,5 +167,7 @@ onBeforeUnmount(() => {
         ไม่พบรายการแนะนำ สามารถใช้ข้อความที่พิมพ์ได้
       </p>
     </div>
+    </div>
+    <p :id="`${id}Error`" class="field-error" aria-live="polite"></p>
   </div>
 </template>
