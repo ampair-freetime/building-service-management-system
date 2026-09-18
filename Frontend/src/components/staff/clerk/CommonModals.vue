@@ -53,22 +53,22 @@
           </button>
         </header>
         <div class="profile-grid">
-          <div class="profile-avatar-large" id="profileAvatar">AD</div>
+          <div class="profile-avatar-large" id="profileAvatar"></div>
           <div class="profile-data">
             <div>
               <small>ชื่อ</small
-              ><strong id="profileName">พิมพ์ชนก วัฒนา</strong>
+              ><strong id="profileName">-</strong>
             </div>
             <div>
               <small>อีเมล</small
-              ><strong id="profileEmail">staff@building.local</strong>
+              ><strong id="profileEmail">-</strong>
             </div>
             <div>
               <small>รหัสเจ้าหน้าที่</small
-              ><strong id="profileStaffId">ADM-001</strong>
+              ><strong id="profileStaffId">-</strong>
             </div>
             <div>
-              <small>Role</small><strong id="profileRole">แอดมิน</strong>
+              <small>Role</small><strong id="profileRole">-</strong>
             </div>
             <div>
               <small>แผนก</small

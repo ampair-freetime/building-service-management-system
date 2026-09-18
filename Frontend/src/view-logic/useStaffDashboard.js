@@ -315,7 +315,6 @@ export function useStaffDashboard() {
           error,
         );
 
-        // ระหว่างที่ Backend ยังไม่มี endpoint ให้คงข้อมูลจำลองเดิมไว้
         if (error.status !== 404) {
           toast(
             error.message ||
@@ -900,17 +899,6 @@ export function useStaffDashboard() {
         `รับงาน ${id} สำเร็จ`,
         `คุณเป็นผู้รับผิดชอบงาน “${job.title}” แล้ว`
       );
-    }
-    function assignDemoJob(id) {
-      const job = allJobs.find((j) => j.id === id);
-      job.assignee = job.type === "repair" ? "ธีรภัทร วงศ์คำ" : "อรทัย ใจดี";
-      job.status = "รับงานแล้ว";
-      addAudit("jobs", "มอบหมายงาน", id, job.title, `มอบหมายให้ ${job.assignee}`);
-      toast(`มอบหมาย ${id} ให้ ${job.assignee} แล้ว`);
-      renderJobs();
-      renderMetrics();
-      renderQueue();
-      renderStaffOverview();
     }
     function updateJob(id, button) {
       const job = allJobs.find((j) => j.id === id);
@@ -1849,7 +1837,7 @@ export function useStaffDashboard() {
       const item = deletedRecords[index];
       requestConfirmation(
         "ยืนยันลบถาวร",
-        `ลบ ${item.itemId} ถาวรหรือไม่? การกระทำนี้ย้อนกลับไม่ได้ใน Demo`,
+        `ลบ ${item.itemId} ถาวรหรือไม่? การกระทำนี้ย้อนกลับไม่ได้`,
         () => {
           deletedRecords.splice(index, 1);
           addAudit(
@@ -2948,7 +2936,6 @@ export function useStaffDashboard() {
     );
     $$("[data-role-switch]").forEach((button) =>
       button.addEventListener("click", () => {
-        // Demo only: reload so the next Role receives its own isolated page tree.
         localStorage.setItem("buildingCareRole", button.dataset.roleSwitch);
         window.location.reload();
       })
