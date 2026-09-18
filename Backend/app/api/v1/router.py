@@ -8,6 +8,7 @@ from app.api.v1.endpoints import (
     found_item,
     lost_found_clerk,
     lost_item,
+    notification,
     repair_guest,
     staff,
 )
@@ -43,4 +44,11 @@ api_router.include_router(
     lost_found_clerk.router,
     prefix="/lost-found",
     tags=["lost-found"],
+)
+
+
+api_router.include_router(
+    notification.router,
+    prefix="/notifications",
+    tags=["notifications"],
 )

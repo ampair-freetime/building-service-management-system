@@ -29,6 +29,7 @@ from app.services.object_storage import (
     StorageOperationError,
     StoredObject,
 )
+from app.services.notification import create_cleaning_request_notifications
 
 logger = logging.getLogger(__name__)
 BANGKOK_TIMEZONE = ZoneInfo("Asia/Bangkok")
@@ -156,6 +157,12 @@ async def create_guest_cleaning_request(
                 new_status=RequestStatus.WAITING,
                 note="Guest submitted cleaning request",
             )
+        )
+        await create_cleaning_request_notifications(
+            session,
+            request_id=request_id,
+            request_code=request_code,
+            request_title=payload.title,
         )
         for item in prepared:
             session.add(
