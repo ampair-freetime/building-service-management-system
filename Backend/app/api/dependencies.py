@@ -82,6 +82,22 @@ ClerkStaff = Annotated[
 ]
 
 
+async def require_housekeeper_staff(current_staff: CurrentStaff) -> Staff:
+    """อนุญาตให้ทำงานต่อเฉพาะพนักงานทำความสะอาด."""
+    if current_staff.role != StaffRole.HOUSEKEEPER:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Housekeeper access required",
+        )
+    return current_staff
+
+
+HousekeeperStaff = Annotated[
+    Staff,
+    Depends(require_housekeeper_staff),
+]
+
+
 def provide_object_storage() -> ObjectStorage:
     """คืน R2 client หรือแจ้ง 503 แบบชัดเจนเมื่อ environment ยังไม่พร้อม."""
     try:
