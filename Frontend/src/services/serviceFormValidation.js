@@ -7,8 +7,9 @@ export function serviceFieldError(field) {
   if (field.type === "email" && value && field.validity.typeMismatch) {
     return "กรุณาระบุอีเมลให้ถูกต้อง";
   }
-  if (field.name === "description" && descriptionLength(field.value) > MAX_DESCRIPTION_LENGTH) {
-    return "รายละเอียดต้องไม่เกิน 2,000 ตัวอักษร กรุณาย่อข้อความ";
+  const maxLength = field.maxLength > 0 ? field.maxLength : MAX_DESCRIPTION_LENGTH;
+  if (field.name === "description" && descriptionLength(field.value) > maxLength) {
+    return `รายละเอียดต้องไม่เกิน ${maxLength.toLocaleString("th-TH")} ตัวอักษร กรุณาย่อข้อความ`;
   }
   return "";
 }

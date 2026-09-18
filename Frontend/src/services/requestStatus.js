@@ -54,7 +54,10 @@ export function serviceTypeForRequest(item = {}, code = "") {
   if (type === "cleaning" || type === "repair") return type;
 
   const normalizedCode = String(code).toUpperCase();
-  if (normalizedCode.startsWith("CLEAN-")) return "cleaning";
+  if (
+    normalizedCode.startsWith("CLN-") ||
+    normalizedCode.startsWith("CLEAN-")
+  ) return "cleaning";
   if (normalizedCode.startsWith("REPAIR-")) return "repair";
 
   const requestType = String(item.requestType || "");

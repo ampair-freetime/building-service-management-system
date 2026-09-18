@@ -1263,7 +1263,9 @@ export function usePublicServicePortal() {
         const isLostFoundCode =
           code.startsWith("LOST-") || code.startsWith("FOUND-");
         const isServiceCode =
-          code.startsWith("CLEAN-") || code.startsWith("REPAIR-");
+          code.startsWith("CLN-") ||
+          code.startsWith("CLEAN-") ||
+          code.startsWith("REPAIR-");
         const localItem = trackedRequests.get(code);
         if (!isLostFoundCode && (!isServiceCode || localItem?.demo)) {
           // เปิดโอกาสให้ browser วาด loading state ก่อนอัปเดตข้อมูลในหน่วยความจำ

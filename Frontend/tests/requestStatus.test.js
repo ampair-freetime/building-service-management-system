@@ -24,6 +24,7 @@ test("maps every service status to a clear Thai label and badge style", () => {
 });
 
 test("recognizes repair and cleaning request codes and Thai status aliases", () => {
+  assert.equal(serviceTypeForRequest({}, "CLN-123456789ABC"), "cleaning");
   assert.equal(serviceTypeForRequest({}, "CLEAN-20260916-1234"), "cleaning");
   assert.equal(serviceTypeForRequest({}, "REPAIR-20260916-1234"), "repair");
   const presentation = requestStatusPresentation(

@@ -1,43 +1,87 @@
 <script setup>
-import { onBeforeUnmount, ref } from "vue";
+import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { useCleaningSubmission } from "../../../composables/useCleaningSubmission.js";
 import { uploadCleaningRequest } from "../../../services/cleaningRequests.js";
 import LocationCombobox from "../LocationCombobox.vue";
 
-const isDemo = !import.meta.env.VITE_CLEANING_REQUEST_URL;
+const mockLocations = [
+  { id: 1, building: "CSB", floor: "1", room: "ห้องน้ำ", area_type: "ห้องน้ำ" },
+  { id: 2, building: "CSB", floor: "1", room: "โถงทางเดิน", area_type: "ทางเดิน" },
+  { id: 3, building: "CSB", floor: "1", room: "พื้นที่ส่วนกลาง", area_type: "พื้นที่ส่วนกลาง" },
+  { id: 4, building: "CSB", floor: "2", room: "CSB201", area_type: "ห้องเรียน" },
+  { id: 5, building: "CSB", floor: "3", room: "CSB307", area_type: "ห้องเรียน" },
+  { id: 6, building: "CSB", floor: "2", room: "CSB209", area_type: "ห้องเรียน" },
+];
+const priorityValues = {
+  "ทำความสะอาดทั่วไป": "normal",
+  "เหตุเร่งด่วน": "urgent",
+};
+
 const { isSubmitting, status, message, submit, markChanged } = useCleaningSubmission(
-  isDemo ? async () => ({ demo: true }) : uploadCleaningRequest,
+  uploadCleaningRequest,
 );
 
 async function submitCleaning(event) {
   if (isSubmitting.value) return;
   const form = event.currentTarget;
   if (!form.checkValidity()) return;
+  if (!selectedLocation.value) {
+    locationError.value = "กรุณาเลือกชั้นและห้องจากรายการ";
+    return;
+  }
   const payload = new FormData(form);
+  payload.set("location_id", String(selectedLocation.value.id));
+  payload.set("priority", priorityValues[selectedWorkType.value] || "");
   // Explicitly include only accepted photos; omit the empty file input entry.
   payload.delete("image");
   photos.value.forEach(({ file }) => payload.append("image", file));
   await submit(payload, (result) => {
-    const recipientEmail = payload.get("recipient_email") || "";
+    const recipientEmail = payload.get("reporter_email") || "";
+    const submittedLocation = [selectedFloor.value, selectedRoom.value]
+      .filter(Boolean)
+      .join(" · ");
     form.reset();
     form.dispatchEvent(new CustomEvent("cleaning-request-confirmed", {
       bubbles: true,
       detail: {
         ...result,
         recipientEmail,
-        location: [payload.get("clean_floor"), payload.get("clean_room")].filter(Boolean).join(" · "),
-        problem: payload.get("problem") || "",
+        location: submittedLocation,
+        problem: payload.get("title") || "",
       },
     }));
   });
 }
 
+const selectedFloor = ref("");
+const selectedRoom = ref("");
+const selectedWorkType = ref("");
+const locationError = ref("");
 const photoInput = ref(null);
 const photos = ref([]);
 const photoErrors = ref([]);
-const MAX_PHOTOS = 5;
+const MAX_PHOTOS = 1;
 const MAX_PHOTO_BYTES = 5 * 1024 * 1024;
 const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
+
+const floorSuggestions = [...new Set(
+  mockLocations.map(({ floor }) => `ชั้น ${floor}`),
+)];
+const roomSuggestions = computed(() => mockLocations
+  .filter(({ floor }) => `ชั้น ${floor}` === selectedFloor.value)
+  .map(({ room }) => room));
+const selectedLocation = computed(() => mockLocations.find(
+  ({ floor, room }) => `ชั้น ${floor}` === selectedFloor.value && room === selectedRoom.value,
+));
+const workTypeSuggestions = Object.keys(priorityValues);
+
+watch(selectedFloor, () => {
+  selectedRoom.value = "";
+  locationError.value = "";
+});
+watch(selectedRoom, () => {
+  locationError.value = "";
+});
 
 function syncPhotoFiles() {
   const transfer = new DataTransfer();
@@ -54,15 +98,9 @@ function addPhotos(event) {
       errors.push(`${file.name}: ไม่ได้แนบไฟล์ เพราะไฟล์ว่างเปล่า กรุณาเลือกไฟล์ใหม่`);
     } else if (file.size > MAX_PHOTO_BYTES) {
       errors.push(`${file.name}: ไม่ได้แนบไฟล์ ขนาดเกิน 5 MB ต่อรูป กรุณาลดขนาดไฟล์`);
-    } else if (!photos.value.some(({ file: existing }) =>
-      existing.name === file.name && existing.size === file.size &&
-      existing.type === file.type && existing.lastModified === file.lastModified
-    )) {
-      if (photos.value.length >= MAX_PHOTOS) {
-        errors.push(`${file.name}: ไม่ได้แนบไฟล์ แนบได้สูงสุด ${MAX_PHOTOS} รูป กรุณาลบรูปเดิมก่อนเพิ่มรูปใหม่`);
-      } else {
-        photos.value.push({ file, url: URL.createObjectURL(file) });
-      }
+    } else {
+      clearPhotos();
+      photos.value.push({ file, url: URL.createObjectURL(file) });
     }
   }
   photoErrors.value = errors;
@@ -85,16 +123,6 @@ function clearPhotos() {
 }
 
 onBeforeUnmount(clearPhotos);
-
-const floorSuggestions = ["ชั้น 1", "ชั้น 2", "ชั้น 3"];
-const roomSuggestions = [
-  "ห้องน้ำ",
-  "โถงทางเดิน",
-  "พื้นที่ส่วนกลาง",
-  "CSB201",
-  "CSB307",
-  "CSB209",
-];
 </script>
 
 <template>
@@ -114,44 +142,58 @@ const roomSuggestions = [
               <h3>ขอทำความสะอาดพื้นที่</h3>
               <div class="form-row clean-location-row">
                 <LocationCombobox
+                  v-model="selectedFloor"
                   id="cleanFloor"
-                  name="clean_floor"
                   label="ชั้น"
                   placeholder="เลือกชั้น"
                   :options="floorSuggestions"
                   required
                 />
                 <LocationCombobox
+                  v-model="selectedRoom"
                   id="cleanRoom"
-                  name="clean_room"
                   label="ห้อง"
                   placeholder="เลือกห้อง"
                   :options="roomSuggestions"
                   required
                 />
+                <input type="hidden" name="location_id" :value="selectedLocation?.id || ''" />
               </div>
+              <p v-if="locationError" class="field-error clean-location-error" aria-live="polite">
+                {{ locationError }}
+              </p>
               <div class="field">
                 <label for="cleanProblem">ปัญหาที่พบ</label>
                 <input
                   id="cleanProblem"
-                  name="problem"
+                  name="title"
                   type="text"
+                  maxlength="200"
+                  autocomplete="on"
                   required
                   placeholder="เช่น ขยะสะสม น้ำหกบนพื้นหน้าห้อง"
                 />
               </div>
-              <div class="field">
-                <label for="cleanType">ประเภทงาน</label>
-                <select id="cleanType" name="work_type" required>
-                  <option>ทำความสะอาดทั่วไป</option>
-                  <option>เหตุเร่งด่วน</option>
-                </select>
-              </div>
+              <LocationCombobox
+                v-model="selectedWorkType"
+                id="cleanType"
+                label="ประเภทงาน"
+                placeholder="เลือกประเภทงาน"
+                :options="workTypeSuggestions"
+                :allow-custom="false"
+                required
+              />
+              <input
+                type="hidden"
+                name="priority"
+                :value="priorityValues[selectedWorkType] || ''"
+              />
               <div class="field">
                 <label for="cleanDetails">รายละเอียด (ถ้ามี)</label>
                 <textarea
                   id="cleanDetails"
                   name="description"
+                  maxlength="255"
                   aria-describedby="cleanDetailsError"
                   placeholder="บอกตำแหน่งและลักษณะพื้นที่ที่ต้องการให้ดูแล"
                 ></textarea>
@@ -166,15 +208,14 @@ const roomSuggestions = [
                       ref="photoInput"
                       name="image"
                       type="file"
-                      multiple
                       accept="image/jpeg,image/png,image/webp"
                       aria-describedby="cleanImageHint cleanImageError"
                       @change="addPhotos"
                     />
                     <span class="upload-icon" aria-hidden="true">＋</span>
                     <span class="upload-copy">
-                      <strong>{{ photos.length ? "เพิ่มรูปภาพ" : "เลือกรูปภาพ" }}</strong>
-                      <small id="cleanImageHint">แนบได้สูงสุด {{ MAX_PHOTOS }} รูป JPG, PNG หรือ WebP ไม่เกิน 5 MB ต่อรูป</small>
+                      <strong>{{ photos.length ? "เปลี่ยนรูปภาพ" : "เลือกรูปภาพ" }}</strong>
+                      <small id="cleanImageHint">JPG, PNG หรือ WebP ไม่เกิน 5 MB</small>
                     </span>
                   </label>
                   <ul v-if="photos.length" class="clean-photo-list" aria-label="รูปภาพที่แนบ">
@@ -201,7 +242,7 @@ const roomSuggestions = [
                 ><input
                   id="cleanEmail"
                   type="email"
-                  name="recipient_email"
+                  name="reporter_email"
                   required
                   placeholder="name@example.com"
                   autocomplete="email"

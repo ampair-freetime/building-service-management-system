@@ -1,18 +1,21 @@
 <script setup>
-import { nextTick, computed, onBeforeUnmount, onMounted, ref } from "vue";
+import { nextTick, computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 
 const props = defineProps({
   id: { type: String, required: true },
-  name: { type: String, required: true },
+  name: { type: String, default: "" },
   label: { type: String, required: true },
   placeholder: { type: String, default: "พิมพ์เพื่อค้นหา" },
   options: { type: Array, default: () => [] },
   required: { type: Boolean, default: false },
+  allowCustom: { type: Boolean, default: true },
+  modelValue: { type: String, default: "" },
 });
+const emit = defineEmits(["update:modelValue"]);
 
 const root = ref(null);
 const input = ref(null);
-const query = ref("");
+const query = ref(props.modelValue);
 const isOpen = ref(false);
 const activeIndex = ref(-1);
 let parentForm;
@@ -32,11 +35,13 @@ function openSuggestions() {
 
 function handleInput(event) {
   query.value = event.target.value;
+  emit("update:modelValue", query.value);
   openSuggestions();
 }
 
 function selectOption(option) {
   query.value = option;
+  emit("update:modelValue", option);
   isOpen.value = false;
   activeIndex.value = -1;
   input.value?.focus();
@@ -89,9 +94,14 @@ function handleFocusOut(event) {
 function handleFormReset() {
   window.setTimeout(() => {
     query.value = "";
+    emit("update:modelValue", "");
     isOpen.value = false;
   }, 0);
 }
+
+watch(() => props.modelValue, (value) => {
+  if (value !== query.value) query.value = value;
+});
 
 onMounted(() => {
   document.addEventListener("pointerdown", handleDocumentPointerDown);
@@ -113,9 +123,10 @@ onBeforeUnmount(() => {
         :id="id"
         ref="input"
         class="location-combobox-input"
-        :name="name"
+        :name="name || undefined"
         type="text"
         :value="query"
+        :readonly="!allowCustom"
         :placeholder="placeholder"
         autocomplete="off"
         role="combobox"

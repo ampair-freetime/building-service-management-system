@@ -3501,6 +3501,7 @@ textarea:focus-visible {
   }
 
   .user-page .bottom-nav {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
     height: 70px;
     padding-top: 6px;
     padding-bottom: max(6px, env(safe-area-inset-bottom));

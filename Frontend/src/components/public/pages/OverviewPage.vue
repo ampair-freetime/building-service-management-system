@@ -77,7 +77,7 @@
                   type="text"
                   required
                   aria-describedby="trackingCodeError"
-                  placeholder="เช่น LOST-20260912-3BE8986F"
+                  placeholder="เช่น CLN-123456789ABC"
                   autocomplete="off"
                 />
                 <p

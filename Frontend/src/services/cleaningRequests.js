@@ -1,13 +1,14 @@
-// Configure only after the backend implements the contract in CLEANING_UPLOADS.md.
+const API_BASE_URL = (import.meta.env?.VITE_API_BASE_URL ?? "http://localhost:8000/api/v1")
+  .replace(/\/+$/, "");
+const CLEANING_REQUEST_URL = import.meta.env?.VITE_CLEANING_REQUEST_URL
+  || `${API_BASE_URL}/guest/cleaning-requests`;
+
 export async function uploadCleaningRequest(payload, {
   requestId,
-  endpoint = import.meta.env?.VITE_CLEANING_REQUEST_URL,
+  endpoint = CLEANING_REQUEST_URL,
   fetchImpl = fetch,
   timeoutMs = 60_000,
 } = {}) {
-  if (!endpoint) {
-    throw new Error("ระบบรับคำขอทำความสะอาดยังไม่พร้อมใช้งาน ข้อมูลและรูปยังอยู่ในหน้านี้ กรุณาลองใหม่ภายหลัง");
-  }
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {

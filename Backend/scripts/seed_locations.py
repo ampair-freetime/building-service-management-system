@@ -24,9 +24,39 @@ finally:
 
 LOCATIONS = [
     {
-        "building": "A",
+        "building": "CSB",
         "floor": "1",
-        "room": "101",
+        "room": "ห้องน้ำ",
+        "area_type": "ห้องน้ำ",
+    },
+    {
+        "building": "CSB",
+        "floor": "1",
+        "room": "โถงทางเดิน",
+        "area_type": "ทางเดิน",
+    },
+    {
+        "building": "CSB",
+        "floor": "1",
+        "room": "พื้นที่ส่วนกลาง",
+        "area_type": "พื้นที่ส่วนกลาง",
+    },
+    {
+        "building": "CSB",
+        "floor": "2",
+        "room": "CSB201",
+        "area_type": "ห้องเรียน",
+    },
+    {
+        "building": "CSB",
+        "floor": "3",
+        "room": "CSB307",
+        "area_type": "ห้องเรียน",
+    },
+    {
+        "building": "CSB",
+        "floor": "2",
+        "room": "CSB209",
         "area_type": "ห้องเรียน",
     },
 ]

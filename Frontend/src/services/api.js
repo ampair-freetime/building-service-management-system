@@ -219,9 +219,12 @@ export async function trackServiceRequest(
   { fetchImpl = fetch, timeoutMs = 15_000 } = {},
 ) {
   const normalizedCode = requestCode.trim().toUpperCase();
+  const isCleaningCode =
+    normalizedCode.startsWith("CLN-") || normalizedCode.startsWith("CLEAN-");
+  const isRepairCode = normalizedCode.startsWith("REPAIR-");
   if (
-    !normalizedCode.startsWith("CLEAN-") &&
-    !normalizedCode.startsWith("REPAIR-")
+    !isCleaningCode &&
+    !isRepairCode
   ) {
     throw new Error("รหัสคำร้องบริการไม่ถูกต้อง");
   }
@@ -231,10 +234,13 @@ export async function trackServiceRequest(
   });
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  const collection = normalizedCode.startsWith("CLN-")
+    ? "cleaning-requests"
+    : "service-requests";
 
   try {
     const response = await fetchImpl(
-      `${API_BASE_URL}/guest/service-requests/${encodeURIComponent(normalizedCode)}?${params}`,
+      `${API_BASE_URL}/guest/${collection}/${encodeURIComponent(normalizedCode)}?${params}`,
       { signal: controller.signal },
     );
     if (response.status === 404) return null;

@@ -3,9 +3,13 @@ import assert from 'node:assert/strict';
 import { useCleaningSubmission } from '../src/composables/useCleaningSubmission.js';
 import { uploadCleaningRequest } from '../src/services/cleaningRequests.js';
 
-function payload(problem = 'spill') {
+function payload(title = 'spill') {
   const data = new FormData();
-  data.append('problem', problem);
+  data.append('title', title);
+  data.append('description', 'near the lift');
+  data.append('priority', 'urgent');
+  data.append('reporter_email', 'guest@example.com');
+  data.append('location_id', '1');
   return data;
 }
 
@@ -47,7 +51,7 @@ test('failure preserves payload and retry uses same key; changed payload uses a 
   assert.equal(state.isSubmitting.value, false);
   await state.submit(data, () => resets++);
   assert.equal(keys[0], keys[1]);
-  data.set('problem', 'different');
+  data.set('title', 'different');
   await state.submit(data, () => resets++);
   assert.notEqual(keys[1], keys[2]);
 });
@@ -68,14 +72,21 @@ test('successful retry resets once and new request gets a new key', async () => 
   assert.notEqual(keys[1], keys[2]);
 });
 
-test('unconfigured endpoint fails honestly without network access', async () => {
-  await assert.rejects(uploadCleaningRequest(payload(), {
-    endpoint: '', fetchImpl: () => assert.fail('must not send'),
-  }), /ยังไม่พร้อม/);
+test('uses the backend cleaning endpoint by default', async () => {
+  let requestedUrl;
+  await uploadCleaningRequest(payload(), {
+    requestId: 'default-url',
+    fetchImpl: async (url) => {
+      requestedUrl = url;
+      return new Response(JSON.stringify({ request_code: 'CLN-1' }), { status: 201 });
+    },
+  });
+  assert.equal(requestedUrl, 'http://localhost:8000/api/v1/guest/cleaning-requests');
 });
 
 test('adapter sends multipart and idempotency key and requires a receipt', async () => {
   const data = payload();
+  data.append('image', new File(['photo'], 'floor.png', { type: 'image/png' }));
   const result = await uploadCleaningRequest(data, {
     endpoint: '/test', requestId: 'same-key',
     fetchImpl: async (url, options) => {
@@ -83,6 +94,10 @@ test('adapter sends multipart and idempotency key and requires a receipt', async
       assert.equal(options.body, data);
       assert.equal(options.headers['Idempotency-Key'], 'same-key');
       assert.equal(options.headers['Content-Type'], undefined);
+      assert.deepEqual([...options.body.keys()], [
+        'title', 'description', 'priority', 'reporter_email', 'location_id', 'image',
+      ]);
+      assert.equal(options.body.getAll('image').length, 1);
       return new Response(JSON.stringify({ request_code: 'CL-3' }), { status: 201 });
     },
   });
