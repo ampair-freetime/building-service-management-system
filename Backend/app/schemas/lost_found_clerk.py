@@ -107,6 +107,7 @@ class OwnershipRequestDetailResponse(BaseModel):
 
     # Request information
     status: ClaimStatus
+    pickup_datetime: datetime | None
     return_status: ReturnStatus | None
     review_note: str | None
     created_at: datetime
@@ -137,3 +138,7 @@ class RequestAdditionalInfoRequest(BaseModel):
 
 class UpdateReturnStatusRequest(BaseModel):
     return_status: ReturnStatus
+
+
+class SchedulePickupRequest(BaseModel):
+    pickup_datetime: datetime
