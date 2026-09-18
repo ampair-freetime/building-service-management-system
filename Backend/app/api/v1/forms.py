@@ -9,6 +9,56 @@ from pydantic import EmailStr, ValidationError
 from app.models.enums import PriorityLevel
 from app.schemas.cleaning_guest import GuestCleaningCreate
 from app.schemas.lost_found_item import GuestFoundItemCreate, GuestLostItemCreate
+from app.schemas.repair_guest import GuestRepairCreate
+
+
+async def parse_guest_repair_form(
+    request: Request,
+    title: Annotated[str, Form(min_length=1, max_length=200)],
+    reporter_email: Annotated[EmailStr, Form()],
+    location_id: Annotated[int, Form(gt=0)],
+    description: Annotated[str, Form(max_length=1000)] = "",
+    priority: Annotated[PriorityLevel, Form()] = PriorityLevel.NORMAL,
+) -> GuestRepairCreate:
+    """ตรวจ multipart ของ repair ก่อนส่งข้อมูลให้ service."""
+    form = await request.form()
+    allowed_fields = set(GuestRepairCreate.model_fields) | {"image"}
+    errors = [
+        {
+            "type": "extra_forbidden",
+            "loc": ["body", field],
+            "msg": "Extra inputs are not permitted",
+        }
+        for field in sorted(set(form) - allowed_fields)
+    ]
+    if errors:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, detail=errors)
+    # Scalar Form fields อาจเลือกค่าสุดท้ายเมื่อส่งซ้ำ จึงตรวจจำนวนเองทุกช่อง
+    duplicates = [
+        {
+            "type": "value_error",
+            "loc": ["body", field],
+            "msg": "Only one value is permitted",
+        }
+        for field in sorted(allowed_fields)
+        if len(form.getlist(field)) > 1
+    ]
+    if duplicates:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, detail=duplicates)
+    try:
+        return _build_payload(
+            GuestRepairCreate,
+            title=title,
+            description=description,
+            priority=priority,
+            reporter_email=reporter_email,
+            location_id=location_id,
+        )
+    except HTTPException as exc:
+        # ปรับเฉพาะ repair เพื่อคงรูปแบบ error ของ endpoint เดิม
+        for error in exc.detail:
+            error["loc"] = ["body", *error["loc"]]
+        raise
 
 
 async def parse_guest_cleaning_form(

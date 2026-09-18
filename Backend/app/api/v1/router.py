@@ -8,6 +8,7 @@ from app.api.v1.endpoints import (
     found_item,
     lost_found_clerk,
     lost_item,
+    repair_guest,
     staff,
 )
 
@@ -31,6 +32,11 @@ api_router.include_router(
     tags=["guest cleaning requests"],
 )
 api_router.include_router(staff.router, prefix="/staff", tags=["staff"])
+api_router.include_router(
+    repair_guest.router,
+    prefix="/guest/repair-requests",
+    tags=["guest repair requests"],
+)
 
 # lost and found สำหรับเจ้าหน้าที่ธุรการ
 api_router.include_router(
