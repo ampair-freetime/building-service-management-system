@@ -1759,3 +1759,237 @@ def test_rejected_lost_item_is_not_published_and_removed_from_pending_list(test_
         item["id"] != str(item_id)
         for item in public_items
     )
+
+
+def test_clerk_can_schedule_pickup(test_context):
+    client, session_factory = test_context
+
+    seed_staff(
+        session_factory,
+        staff_code="CLERK001",
+        email="clerk@example.com",
+        password="admin-password",
+        role="clerk",
+    )
+
+    login = client.post(
+        "/api/v1/auth/login",
+        json={
+            "identifier": "CLERK001",
+            "password": "admin-password",
+        },
+    )
+
+    headers = {
+        "Authorization": f"Bearer {login.json()['access_token']}"
+    }
+
+    async def seed_claim():
+        async with session_factory() as session:
+            item = LostItem(
+                item_code="FOUND300",
+                report_type=LostType.FOUND,
+                item_category="Accessories",
+                item_name="Bag",
+                description="Black bag",
+                event_datetime=datetime.now(timezone.utc),
+                location_id=None,
+                location_detail="Building A",
+                custody_location="Clerk Office",
+                reporter_email="finder@example.com",
+                status=LostStatus.APPROVED,
+            )
+
+            session.add(item)
+            await session.flush()
+
+            claim = LostClaim(
+                found_item_id=item.id,
+                claimant_name="Owner User",
+                claimant_email="owner300@example.com",
+                proof_detail="มีพวงกุญแจสีแดง",
+                status=ClaimStatus.APPROVED,
+                return_status=ReturnStatus.PENDING,
+            )
+
+            session.add(claim)
+            await session.commit()
+            await session.refresh(claim)
+
+            return claim.id
+
+    claim_id = asyncio.run(seed_claim())
+
+    response = client.post(
+        f"/api/v1/lost-found/ownership-requests/{claim_id}/schedule-pickup",
+        headers=headers,
+        json={
+            "pickup_datetime": "2026-09-20T13:30:00",
+        },
+    )
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert data["status"] == "scheduled"
+    assert data["pickup_datetime"] == "2026-09-20T13:30:00"
+
+    async def get_claim():
+        async with session_factory() as session:
+            return await session.get(LostClaim, claim_id)
+
+    claim = asyncio.run(get_claim())
+
+    assert claim.status == ClaimStatus.SCHEDULED
+    assert claim.pickup_datetime is not None
+
+
+def test_schedule_pickup_requires_datetime(test_context):
+    client, session_factory = test_context
+
+    seed_staff(
+        session_factory,
+        staff_code="CLERK001",
+        email="clerk@example.com",
+        password="admin-password",
+        role="clerk",
+    )
+
+    login = client.post(
+        "/api/v1/auth/login",
+        json={
+            "identifier": "CLERK001",
+            "password": "admin-password",
+        },
+    )
+
+    headers = {
+        "Authorization": f"Bearer {login.json()['access_token']}"
+    }
+
+    async def seed_claim():
+        async with session_factory() as session:
+            item = LostItem(
+                item_code="FOUND301",
+                report_type=LostType.FOUND,
+                item_category="Accessories",
+                item_name="Bag",
+                description="Black bag",
+                event_datetime=datetime.now(timezone.utc),
+                location_id=None,
+                location_detail="Building A",
+                custody_location="Clerk Office",
+                reporter_email="finder@example.com",
+                status=LostStatus.APPROVED,
+            )
+
+            session.add(item)
+            await session.flush()
+
+            claim = LostClaim(
+                found_item_id=item.id,
+                claimant_name="Owner User",
+                claimant_email="owner301@example.com",
+                proof_detail="มีสายคล้องสีแดง",
+                status=ClaimStatus.APPROVED,
+                return_status=ReturnStatus.PENDING,
+            )
+
+            session.add(claim)
+            await session.commit()
+            await session.refresh(claim)
+
+            return claim.id
+
+    claim_id = asyncio.run(seed_claim())
+
+    response = client.post(
+        f"/api/v1/lost-found/ownership-requests/{claim_id}/schedule-pickup",
+        headers=headers,
+        json={},
+    )
+
+    assert response.status_code == 422
+
+    async def get_claim():
+        async with session_factory() as session:
+            return await session.get(LostClaim, claim_id)
+
+    claim = asyncio.run(get_claim())
+
+    assert claim.status == ClaimStatus.APPROVED
+    assert claim.pickup_datetime is None
+
+
+def test_view_scheduled_pickup_details(test_context):
+    client, session_factory = test_context
+
+    seed_staff(
+        session_factory,
+        staff_code="CLERK001",
+        email="clerk@example.com",
+        password="admin-password",
+        role="clerk",
+    )
+
+    login = client.post(
+        "/api/v1/auth/login",
+        json={
+            "identifier": "CLERK001",
+            "password": "admin-password",
+        },
+    )
+
+    headers = {
+        "Authorization": f"Bearer {login.json()['access_token']}"
+    }
+
+    async def seed_claim():
+        async with session_factory() as session:
+            item = LostItem(
+                item_code="FOUND302",
+                report_type=LostType.FOUND,
+                item_category="Accessories",
+                item_name="Bag",
+                description="Black bag",
+                event_datetime=datetime.now(timezone.utc),
+                location_id=None,
+                location_detail="Building A",
+                custody_location="Clerk Office",
+                reporter_email="finder@example.com",
+                status=LostStatus.APPROVED,
+            )
+
+            session.add(item)
+            await session.flush()
+
+            claim = LostClaim(
+                found_item_id=item.id,
+                claimant_name="Owner User",
+                claimant_email="owner302@example.com",
+                proof_detail="มีป้ายชื่อด้านใน",
+                status=ClaimStatus.SCHEDULED,
+                return_status=ReturnStatus.PENDING,
+                pickup_datetime=datetime(2026, 9, 20, 13, 30),
+            )
+
+            session.add(claim)
+            await session.commit()
+            await session.refresh(claim)
+
+            return claim.id
+
+    claim_id = asyncio.run(seed_claim())
+
+    response = client.get(
+        f"/api/v1/lost-found/ownership-requests/{claim_id}",
+        headers=headers,
+    )
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert data["status"] == "scheduled"
+    assert data["pickup_datetime"] == "2026-09-20T13:30:00"

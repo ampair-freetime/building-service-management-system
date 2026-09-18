@@ -13,6 +13,7 @@ from app.schemas.lost_found_clerk import (
     RejectFoundItemRequest,
     RequestAdditionalInfoRequest,
     UpdateReturnStatusRequest,
+    SchedulePickupRequest,
 )
 from app.services.lost_found_clerk import (
     approve_found_item,
@@ -28,6 +29,7 @@ from app.services.lost_found_clerk import (
     approve_ownership_request,
     request_additional_ownership_information,
     update_ownership_return_status,
+    schedule_pickup,
 )
 
 router = APIRouter()
@@ -323,3 +325,36 @@ async def update_return_status(
         )
 
     return claim
+
+
+@router.post(
+    "/ownership-requests/{claim_id}/schedule-pickup",
+    response_model=OwnershipRequestDetailResponse,
+)
+async def schedule_ownership_pickup(
+    claim_id: UUID,
+    request: SchedulePickupRequest,
+    session: DbSession,
+    _: ClerkStaff,
+) -> OwnershipRequestDetailResponse:
+    claim = await schedule_pickup(
+        session,
+        claim_id,
+        request.pickup_datetime,
+    )
+
+    if claim is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Verified ownership request not found",
+        )
+
+    detail = await get_ownership_request_detail(session, claim_id)
+
+    if detail is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Ownership request not found",
+        )
+
+    return detail

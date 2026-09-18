@@ -2,6 +2,7 @@ from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from datetime import datetime
 
 from app.models.enums import ClaimStatus, LostStatus, LostType, ReturnStatus
 from app.models.lost_found import (
@@ -249,6 +250,7 @@ async def get_ownership_request_detail(
         "claimant_email": claim.claimant_email,
         "proof_detail": claim.proof_detail,
         "status": claim.status,
+        "pickup_datetime": claim.pickup_datetime,
         "return_status": claim.return_status,
         "review_note": claim.review_note,
         "created_at": claim.created_at,
@@ -335,7 +337,12 @@ async def update_ownership_return_status(
         select(LostClaim)
         .where(
             LostClaim.id == claim_id,
-            LostClaim.status == ClaimStatus.APPROVED,
+            LostClaim.status.in_(
+                [
+                    ClaimStatus.APPROVED,
+                    ClaimStatus.SCHEDULED,
+                ]
+            ),
         )
     )
 
@@ -366,3 +373,30 @@ async def update_ownership_return_status(
     return claim
 
 
+async def schedule_pickup(
+    session: AsyncSession,
+    claim_id: UUID,
+    pickup_datetime: datetime,
+) -> LostClaim | None:
+    """นัดวันและเวลารับของสำหรับ ownership request ที่ยืนยันแล้ว"""
+
+    statement = (
+        select(LostClaim)
+        .where(
+            LostClaim.id == claim_id,
+            LostClaim.status == ClaimStatus.APPROVED,
+        )
+    )
+
+    claim = await session.scalar(statement)
+
+    if claim is None:
+        return None
+
+    claim.pickup_datetime = pickup_datetime
+    claim.status = ClaimStatus.SCHEDULED
+
+    await session.commit()
+    await session.refresh(claim)
+
+    return claim
