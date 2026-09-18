@@ -3,6 +3,7 @@ import { createRouter, createWebHistory } from "vue-router";
 import PublicServicePortal from "../views/PublicServicePortal.vue";
 import StaffLogin from "../views/staff-login.vue";
 import StaffDashboard from "../views/staff-dashboard.vue";
+import MobileDemo from "../views/MobileDemo.vue";
 
 const routes = [
 
@@ -34,6 +35,13 @@ const routes = [
     component: StaffDashboard,
     meta: { requiresAuth: true },
   },
+
+  // Mobile Demo สำหรับนำเสนอ Client
+  {
+    path: "/demo",
+    name: "mobile-demo",
+    component: MobileDemo,
+  },
 ];
 
 const router = createRouter({
@@ -41,7 +49,6 @@ const router = createRouter({
   routes,
 });
 
-// guard นี้ทำงานเฉพาะ route ที่ตั้ง meta.requiresAuth; routes ด้านบนยังไม่ได้ตั้งค่านี้
 router.beforeEach((to) => {
   if (to.meta.requiresAuth) {
     const token = localStorage.getItem("buildingCareAccessToken");
