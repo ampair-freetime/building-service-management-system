@@ -60,38 +60,32 @@ const {
         <path d="m6 6 12 12M18 6 6 18" />
       </symbol>
     </svg>
+    <div class="visual-brand" aria-label="CS Building Care">
+      <span class="brand-mark">CS</span><span>CS Building Care</span>
+    </div>
+    <!-- <div class="page-visual" aria-hidden="true">
+      <div class="building-art">
+        <svg viewBox="0 0 440 240">
+          <path
+            d="M20 220h400M55 220V110h90v110M145 220V48h150v172M295 220V92h90v128M188 48V22h64v26M80 138h20m20 0h10M80 170h20m20 0h10M180 82h25m28 0h25M180 120h25m28 0h25M180 158h25m28 0h25M325 125h18m16 0h10M325 160h18m16 0h10M215 220v-44h30v44"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="7"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+        </svg>
+      </div>
+    </div> -->
     <main class="login-shell">
-      <section class="login-visual" aria-label="CS Building Care Staff Portal">
-        <div class="visual-brand">
-          <span class="brand-mark">CS</span><span>CS Building Care</span>
-        </div>
-        <div class="visual-copy">
-          <small>Staff Portal</small>
-          <h1>ดูแลงานอาคาร<br />ได้ง่ายกว่าเดิม</h1>
-          <p>รับงาน อัปเดตความคืบหน้า และประสานงานได้จากพื้นที่เดียว</p>
-        </div>
-        <div class="building-art" aria-hidden="true">
-          <svg viewBox="0 0 440 240">
-            <path
-              d="M20 220h400M55 220V110h90v110M145 220V48h150v172M295 220V92h90v128M188 48V22h64v26M80 138h20m20 0h10M80 170h20m20 0h10M180 82h25m28 0h25M180 120h25m28 0h25M180 158h25m28 0h25M325 125h18m16 0h10M325 160h18m16 0h10M215 220v-44h30v44"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="7"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            />
-          </svg>
-        </div>
-      </section>
-      <section class="login-panel">
+      <section class="login-panel" aria-label="CS Building Care Staff Portal">
         <div class="login-card">
-        
-          <header class="login-head">
-            <div class="eyebrow">สำหรับเจ้าหน้าที่</div>
-            <h2>เข้าสู่ระบบเจ้าหน้าที่</h2>
-            <p>ใช้บัญชีเจ้าหน้าที่ของคุณเพื่อดำเนินการต่อ</p>
-          </header>
-          <form id="login-form" class="login-form" @submit.prevent="handleLogin">
+          <div class="login-content">
+            <header class="login-head">
+              <div class="eyebrow">สำหรับเจ้าหน้าที่</div>
+              <h2>เข้าสู่ระบบเจ้าหน้าที่</h2>
+            </header>
+            <form id="login-form" class="login-form" @submit.prevent="handleLogin">
             <div class="field">
               <label for="staff-id">อีเมลหรือรหัสเจ้าหน้าที่</label
               ><input
@@ -165,8 +159,8 @@ const {
             >
               <span class="google-logo">G</span> เข้าสู่ระบบด้วย Google
             </button> -->
-          </form>
-          
+            </form>
+          </div>
         </div>
       </section>
     </main>
