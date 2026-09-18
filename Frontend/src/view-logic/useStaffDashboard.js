@@ -30,23 +30,23 @@ import {
   todayISO,
   validImage,
 } from "./staff-dashboard/utils.js";
-
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000/api/v1").replace(/\/+$/, "");
-const STAFF_ENDPOINT = `${API_BASE_URL}/staff`;
-const STAFF_ROLE_LABELS = {
-  housekeeper: "แม่บ้าน",
-  technician: "ช่าง",
-  clerk: "ธุรการ",
-  admin: "แอดมิน",
-};
+import {
+  createStaffAccount,
+  fetchStaffAccounts,
+  toDashboardStaff,
+} from "./staff-dashboard/staff-accounts.js";
 
 export function useStaffDashboard() {
+  // ---------------------------------------------------------------------------
+  // 1) Dashboard lifecycle และ state ที่ Vue component ต้องใช้งาน
+  // ---------------------------------------------------------------------------
   const router = useRouter();
   const allowedRoles = ["housekeeper", "technician", "clerk", "admin"];
   const savedRole = localStorage.getItem("buildingCareRole");
   const activeRole = ref(allowedRoles.includes(savedRole) ? savedRole : "clerk");
 
-  onMounted(async () => {
+  async function initializeDashboard() {
+    // โหลด dependency ภายนอกก่อนสร้างหน้าจอ หากโหลดไม่ได้จะใช้ QR fallback แทน
     try {
       await loadQrCodeLibrary();
     } catch (error) {
@@ -105,14 +105,12 @@ export function useStaffDashboard() {
     let lastModalTrigger = null;
     const $ = (s) => document.querySelector(s),
       $$ = (s) => [...document.querySelectorAll(s)];
-    // แนบ token ที่ได้ตอนล็อกอิน; ตั้ง JSON header เฉพาะคำขอที่ส่ง JSON
-    function authHeaders(includeJson = false) {
-      const headers = {
-        Authorization: `Bearer ${localStorage.getItem("buildingCareAccessToken") || ""}`,
-      };
-      if (includeJson) headers["Content-Type"] = "application/json";
-      return headers;
-    }
+
+    // -------------------------------------------------------------------------
+    // 2) Authentication และข้อมูลบัญชี Staff
+    // -------------------------------------------------------------------------
+
+    // ล้าง session และพากลับหน้า login เมื่อ access token หมดอายุ
     async function handleUnauthorizedResponse(responseOrStatus) {
       const status =
         typeof responseOrStatus === "number"
@@ -126,35 +124,27 @@ export function useStaffDashboard() {
       await router.replace("/staff-login");
       return true;
     }
-    function apiStaffToDashboardStaff(account) {
-      return {
-        name: account.full_name,
-        id: account.staff_code,
-        email: account.email,
-        role: STAFF_ROLE_LABELS[account.role] || account.role,
-        zone: "-",
-        status: account.status === "active" ? "ใช้งาน" : "พักงาน",
-      };
-    }
     async function loadStaffAccounts() {
       if (currentRole !== "admin") return;
       try {
-        const response = await fetch(STAFF_ENDPOINT, { headers: authHeaders() });
-        if (await handleUnauthorizedResponse(response)) return;
-        if (!response.ok) throw new Error(`Unable to load staff (${response.status})`);
-        staffData = (await response.json()).map(apiStaffToDashboardStaff);
+        staffData = await fetchStaffAccounts();
         renderStaff();
         renderMetrics();
         renderStaffOverview();
       } catch (error) {
+        if (await handleUnauthorizedResponse(error.status)) return;
         console.error("Loading staff accounts failed:", error);
         toast("ไม่สามารถโหลดบัญชีเจ้าหน้าที่จากระบบได้");
       }
     }
 
+    // -------------------------------------------------------------------------
+    // 3) โหลดข้อมูล Lost & Found จาก Backend
+    // -------------------------------------------------------------------------
+
+    // โหลดรายการสิ่งของที่พบซึ่งกำลังรอธุรการอนุมัติรับฝาก
     async function loadPendingFoundItems() {
       if (currentRole !== "clerk") return;
-      const pendingList = $("#pendingApprovalList");
       try {
         const data = await getPendingFoundItems();
         const pendingFoundItems = data.map((item) => ({
@@ -181,6 +171,8 @@ export function useStaffDashboard() {
         toast(error.message || "ไม่สามารถโหลดรายงานของที่พบได้");
       }
     }
+
+    // โหลดประกาศของหายที่กำลังรอธุรการอนุมัติเผยแพร่
     async function loadPendingLostItems() {
       if (currentRole !== "clerk") return;
       try {
@@ -211,6 +203,8 @@ export function useStaffDashboard() {
     }
 
     const completedLostFoundStorageKey = "buildingCareCompletedLostFoundItems";
+
+    // อ่านรหัสรายการที่ปิดงานแล้ว เพื่อไม่ดึงกลับมาแสดงซ้ำ
     function completedLostFoundIds() {
       try {
         return new Set(
@@ -220,6 +214,8 @@ export function useStaffDashboard() {
         return new Set();
       }
     }
+
+    // โหลดของพบและประกาศของหายที่ผ่านการอนุมัติแล้ว
     async function loadApprovedLostFoundItems() {
       if (currentRole !== "clerk") return;
       try {
@@ -257,6 +253,8 @@ export function useStaffDashboard() {
         toast(error.message || "ไม่สามารถโหลดรายการที่อนุมัติแล้วได้");
       }
     }
+
+    // โหลดคำร้องขอรับของคืนพร้อมรายละเอียดของแต่ละคำร้อง
     async function loadPendingOwnershipRequests() {
       if (currentRole !== "clerk") return;
 
@@ -327,6 +325,11 @@ export function useStaffDashboard() {
       }
     }
 
+    // -------------------------------------------------------------------------
+    // 4) Utility ภายใน Dashboard และการกำหนดสิทธิ์ตาม Role
+    // -------------------------------------------------------------------------
+
+    // แสดงข้อความแจ้งเตือนชั่วคราวบริเวณด้านล่างของหน้าจอ
     function toast(message) {
       const el = $("#toast");
       if (!el) {
@@ -338,6 +341,8 @@ export function useStaffDashboard() {
       clearTimeout(window.toastTimer);
       window.toastTimer = setTimeout(() => el.classList.remove("show"), 2300);
     }
+
+    // เพิ่มกิจกรรมลงประวัติงานของเจ้าหน้าที่ปัจจุบัน
     function recordWorkHistory({
       staff = activeStaffName(),
       role = roleConfig[currentRole].label,
@@ -542,6 +547,12 @@ export function useStaffDashboard() {
       renderMobileQuickActions();
       renderDashboardQuickActions();
     }
+
+    // -------------------------------------------------------------------------
+    // 5) Navigation และ Dashboard summary
+    // -------------------------------------------------------------------------
+
+    // เปลี่ยนหน้าภายใน Staff Dashboard โดยตรวจสิทธิ์ของ role ก่อนเสมอ
     function navigate(page) {
       const target = $(`.nav-item[data-page="${page}"]`);
       if (target && target.classList.contains("role-hidden")) {
@@ -735,6 +746,12 @@ export function useStaffDashboard() {
         )
         .join("");
     }
+
+    // -------------------------------------------------------------------------
+    // 6) ระบบคิวงานแม่บ้านและช่าง
+    // -------------------------------------------------------------------------
+
+    // ตรวจว่างานตรงกับ tab และตัวกรองที่ผู้ใช้เลือกหรือไม่
     function jobMatchesView(job) {
       if (currentRole === "admin" && currentBoardView === "mine")
         return job.assignee === activeStaffName();
@@ -1005,6 +1022,12 @@ export function useStaffDashboard() {
         }
       );
     }
+
+    // -------------------------------------------------------------------------
+    // 7) ระบบอนุมัติ Lost & Found และคำขอรับของคืน
+    // -------------------------------------------------------------------------
+
+    // สร้างตัวเลือกสถานะของคำขอคืนของตามสถานะปัจจุบัน
     function claimStatusOptions(item) {
       const list = [
         "รอตรวจสอบ",
@@ -1225,11 +1248,11 @@ export function useStaffDashboard() {
         isLostAnnouncement
           ? `${item.id} · ${item.title} จะถูกเปลี่ยนเป็นประกาศที่อนุมัติเผยแพร่`
           : `ตรวจสอบข้อมูลของ ${item.id} · ${item.title} แล้วใช่หรือไม่?`,
-        () => ComfirmationApproveLostItem(tab, id),
+        () => confirmApproveLostItem(tab, id),
         isLostAnnouncement ? "อนุมัติเผยแพร่" : "อนุมัติ"
       );
     }
-    async function ComfirmationApproveLostItem(tab, id) {
+    async function confirmApproveLostItem(tab, id) {
       const item = lostSets[tab].find((x) => x.id === id);
       if (!item) return;
       if (item.backendId) {
@@ -1317,7 +1340,7 @@ export function useStaffDashboard() {
       $("#rejectModalTitle").textContent = `ไม่อนุมัติ ${id} · ${item.title}`;
       openModal("rejectModal");
     }
-    async function ConfirmationRejectLostItem(tab, id, decisionReason) {
+    async function confirmRejectLostItem(tab, id, decisionReason) {
       const item = lostSets[tab]?.find((record) => record.id === id);
       if (!item) return;
       if (["inventory", "lostposts"].includes(tab) && item.backendId) {
@@ -1371,13 +1394,13 @@ export function useStaffDashboard() {
             ? "ยืนยันอนุมัติคำขอ"
             : "ยืนยันไม่อนุมัติคำขอ",
           `${nextStatus} สำหรับ ${id} หรือไม่?`,
-          () => ComfirmationClaimStatus(item, nextStatus)
+          () => confirmClaimStatus(item, nextStatus)
         );
         return;
       }
-      ComfirmationClaimStatus(item, nextStatus);
+      confirmClaimStatus(item, nextStatus);
     }
-    function ComfirmationClaimStatus(item, nextStatus) {
+    function confirmClaimStatus(item, nextStatus) {
       const previous = item.status;
       item.status = nextStatus;
       item.custody =
@@ -1438,6 +1461,12 @@ export function useStaffDashboard() {
         }
       );
     }
+
+    // -------------------------------------------------------------------------
+    // 8) ระบบประวัติงานและภาพรวมประสิทธิภาพ Staff
+    // -------------------------------------------------------------------------
+
+    // เติมประเภทงานในตัวกรองประวัติจากข้อมูลจริงของ role ปัจจุบัน
     function populateMyHistoryTypes() {
       if (!$("#myHistoryType")) return;
       const select = $("#myHistoryType");
@@ -1835,6 +1864,12 @@ export function useStaffDashboard() {
         }
       );
     }
+
+    // -------------------------------------------------------------------------
+    // 9) ระบบ Notification
+    // -------------------------------------------------------------------------
+
+    // รวม notification ของ role ปัจจุบันและคำร้องใหม่ก่อน render
     function renderNotifications() {
       const list = notificationSets[currentRole] || [];
       const approvals = currentRole === "clerk" ? pendingApprovalRequests() : [];
@@ -1902,6 +1937,12 @@ export function useStaffDashboard() {
       renderNotifications();
       toast("ทำเครื่องหมายว่าอ่านทั้งหมดแล้ว");
     }
+
+    // -------------------------------------------------------------------------
+    // 10) ระบบจัดการบัญชี Staff
+    // -------------------------------------------------------------------------
+
+    // แสดงตารางบัญชีและ action ที่ผู้ดูแลระบบสามารถดำเนินการได้
     function renderStaff() {
       if (!$("#staffTable")) return;
       const roleColors = {
@@ -1995,6 +2036,12 @@ export function useStaffDashboard() {
         }
       );
     }
+
+    // -------------------------------------------------------------------------
+    // 11) ระบบ QR ประจำห้อง
+    // -------------------------------------------------------------------------
+
+    // สร้าง URL ห้องจากข้อมูลอาคาร ชั้น และหมายเลขห้องในฟอร์ม
     function makeRoomUrl() {
       const base = $("#baseUrl").value.trim(),
         service = $("#service").value,
@@ -2060,6 +2107,12 @@ export function useStaffDashboard() {
         toast("สร้าง QR และเพิ่มห้องแล้ว");
       }
     }
+
+    // -------------------------------------------------------------------------
+    // 12) Modal, Sidebar และกล่องยืนยันส่วนกลาง
+    // -------------------------------------------------------------------------
+
+    // เปิด modal และจดจำ element ต้นทางเพื่อคืน focus เมื่อปิด
     function openModal(id, trigger = document.activeElement) {
       const modal = $(`#${id}`);
       if (!modal) return;
@@ -2143,6 +2196,12 @@ export function useStaffDashboard() {
         `เหตุผล: ${item.decisionReason}`;
       openModal("successModal");
     }
+
+    // -------------------------------------------------------------------------
+    // 13) รายละเอียดงาน การมอบหมาย และการเปลี่ยนสถานะงาน
+    // -------------------------------------------------------------------------
+
+    // แสดงรายชื่อเจ้าหน้าที่ที่เหมาะกับประเภทงานใน modal มอบหมาย
     function renderAssignStaff() {
       if (!$("#assignStaffList")) return;
       const query = ($("#assignSearch").value || "").trim().toLowerCase(),
@@ -2380,6 +2439,12 @@ export function useStaffDashboard() {
       renderQueue();
       renderStaffOverview();
     }
+
+    // -------------------------------------------------------------------------
+    // 14) Modal รายละเอียด Lost & Found และการนัดรับของ
+    // -------------------------------------------------------------------------
+
+    // โหลดรายละเอียดล่าสุดจาก Backend แล้วแสดงใน modal กลาง
     async function openLostDetail(tab, id, trigger = document.activeElement) {
       const item = lostSets[tab]?.find((record) => record.id === id);
       if (!item) return;
@@ -2708,6 +2773,12 @@ export function useStaffDashboard() {
       $("#appointmentNote").value = "";
       openModal("appointmentModal", trigger);
     }
+
+    // -------------------------------------------------------------------------
+    // 15) ระบบประกาศอาคาร
+    // -------------------------------------------------------------------------
+
+    // แสดงประกาศทั้งหมด พร้อม action แก้ไขและลบตามสิทธิ์
     function renderAnnouncements() {
       if (!$("#announcementList")) return;
       const list = $("#announcementList");
@@ -2781,6 +2852,12 @@ export function useStaffDashboard() {
       renderAnnouncements();
       showSuccess(status === "เผยแพร่" ? "เผยแพร่ประกาศแล้ว" : "บันทึกฉบับร่างแล้ว");
     }
+
+    // -------------------------------------------------------------------------
+    // 16) Responsive navigation และ Quick actions
+    // -------------------------------------------------------------------------
+
+    // สร้าง action ทางลัดให้เหมาะกับ role และขนาดหน้าจอ
     function renderMobileQuickActions() {
       const actions =
         currentRole === "technician"
@@ -2853,6 +2930,11 @@ export function useStaffDashboard() {
           }" data-dashboard-action="${index}">${label}</button>`
         ).join("");
     }
+
+    // -------------------------------------------------------------------------
+    // 17) Event binding: Navigation, Profile และ Dashboard
+    // -------------------------------------------------------------------------
+
     $$(".nav-item").forEach((button) =>
       button.addEventListener("click", () => {
         closeSidebar();
@@ -3033,6 +3115,11 @@ export function useStaffDashboard() {
       selectedOverviewStaff = "";
       renderStaffOverview();
     });
+
+    // -------------------------------------------------------------------------
+    // 18) Event binding: คิวงานและการอัปเดตความคืบหน้า
+    // -------------------------------------------------------------------------
+
     $("#jobSearch")?.addEventListener("input", renderJobs);
     $("#clerkCenterSearch")?.addEventListener("input", renderClerkCenter);
     $("#categoryFilter")?.addEventListener("change", renderJobs);
@@ -3377,6 +3464,11 @@ export function useStaffDashboard() {
       if (action === "detail") openLostDetail(tab, id, button);
       if (action === "claim-detail") openClaimDetail(id, button);
     });
+    // -------------------------------------------------------------------------
+    // 19) Event binding: Notification, Staff, Lost & Found, QR และประกาศ
+    // -------------------------------------------------------------------------
+
+    // เปิด/ปิด notification panel และอัปเดตค่า accessibility ให้ตรงกัน
     function toggleNotificationPanel(trigger) {
       const panel = $("#notificationPanel"),
         open = !panel.classList.contains("open");
@@ -3509,26 +3601,15 @@ export function useStaffDashboard() {
       };
       let account;
       try {
-        const response = await fetch(STAFF_ENDPOINT, {
-          method: "POST",
-          headers: authHeaders(true),
-          body: JSON.stringify(payload),
-        });
-        const data = await response.json().catch(() => ({}));
-        if (!response.ok) {
-          const detail = Array.isArray(data.detail)
-            ? data.detail.map((item) => item.msg).join(", ")
-            : data.detail;
-          throw new Error(detail || "สร้างบัญชีไม่สำเร็จ");
-        }
-        account = data;
+        account = await createStaffAccount(payload);
       } catch (error) {
+        if (await handleUnauthorizedResponse(error.status)) return;
         console.error("Creating staff account failed:", error);
         toast(error.message || "ไม่สามารถสร้างบัญชีได้");
         submitButton.disabled = false;
         return;
       }
-      const record = apiStaffToDashboardStaff(account);
+      const record = toDashboardStaff(account);
       record.zone = $("#newZone").value.trim() || "-";
       staffData.push(record);
       addAudit(
@@ -3652,7 +3733,7 @@ export function useStaffDashboard() {
       requestConfirmation(isLostAnnouncement ? "ยืนยันปฏิเสธประกาศของหาย" : "ยืนยันไม่อนุมัติรายการรับฝาก",
         `${id} · ${item.title}\nเหตุผล: ${decisionReason}\n\n${
           isLostAnnouncement ? "ประกาศนี้จะไม่ถูกเผยแพร่ให้ผู้ใช้งานเห็น" : "รายการนี้จะไม่ได้รับการอนุมัติเข้าสู่ระบบรับฝาก" }`, () => 
-            ConfirmationRejectLostItem(tab, id, decisionReason),
+            confirmRejectLostItem(tab, id, decisionReason),
           isLostAnnouncement ? "ยืนยันปฏิเสธประกาศ" : "ยืนยันไม่อนุมัติ",
       );
     });
@@ -3899,22 +3980,32 @@ export function useStaffDashboard() {
     $("#heroPrimary")?.addEventListener("click", () =>
       navigate(currentRole === "clerk" ? "clerk-center" : "jobs")
     );
-    renderStaff();
-    await loadStaffAccounts();
-    await loadPendingFoundItems();
-    await loadPendingLostItems();
-    await loadApprovedLostFoundItems();
-    await loadPendingOwnershipRequests();
-    setRole(
-      ["housekeeper", "technician", "clerk", "admin"].includes(currentRole)
-        ? currentRole
-        : "admin"
-    );
+
+    // -------------------------------------------------------------------------
+    // 20) Initial data loading: เริ่มหลังจากผูก event ทุกระบบเรียบร้อยแล้ว
+    // -------------------------------------------------------------------------
+
+    // โหลดข้อมูลแต่ละระบบตามลำดับ เพื่อให้ข้อมูลที่ render ภายหลังครบถ้วน
+    async function loadInitialDashboardData() {
+      renderStaff();
+      await loadStaffAccounts();
+      await loadPendingFoundItems();
+      await loadPendingLostItems();
+      await loadApprovedLostFoundItems();
+      await loadPendingOwnershipRequests();
+      setRole(allowedRoles.includes(currentRole) ? currentRole : "admin");
+    }
+
+    await loadInitialDashboardData();
+
+    // QR library และ DOM พร้อมใช้งานแล้ว จึงสร้าง preview และปิด loading mask
     setTimeout(() => {
       generateQr(false);
       $(".loading-mask")?.remove();
     }, 320);
-  });
+  }
+
+  onMounted(initializeDashboard);
 
   return { activeRole };
 }
