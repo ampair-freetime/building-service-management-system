@@ -56,6 +56,7 @@ class ClaimStatus(str, Enum):
     PENDING = "pending"
     ADDITIONAL_INFO_REQUIRED = "additional_info_required"
     APPROVED = "approved"
+    SCHEDULED = "scheduled"
     REJECTED = "rejected"
     COMPLETED = "completed"
 
@@ -75,3 +76,4 @@ class RequestAction(str, Enum):
     REASSIGNED = "reassigned"
     COMPLETED = "completed"
     CANCELLED = "cancelled"
+
