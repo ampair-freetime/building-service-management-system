@@ -168,6 +168,97 @@ async def update_cleaning_task_status(
     return service_request
 
 
+async def add_completion_note(
+    session: AsyncSession,
+    *,
+    request_id: UUID,
+    staff_id: UUID,
+    note: str,
+) -> RequestHistory:
+    """บันทึก completion note หลังจาก cleaning task เสร็จแล้ว."""
+
+    service_request = await session.scalar(
+        select(ServiceRequest).where(
+            ServiceRequest.id == request_id,
+            ServiceRequest.request_type == RequestType.CLEANING,
+        )
+    )
+
+    if service_request is None:
+        raise CleaningTaskNotFoundError("Cleaning task not found")
+
+    # บันทึกได้เฉพาะ cleaner ที่รับงานนี้
+    if service_request.assigned_staff_id != staff_id:
+        raise CleaningTaskAlreadyAssignedError(
+            "Cleaning task is assigned to another cleaner"
+        )
+
+    # ต้องทำงานเสร็จก่อนจึงจะเพิ่ม completion note ได้
+    if service_request.status != RequestStatus.COMPLETED:
+        raise CleaningTaskNotCompletedError(
+            "Cleaning task must be completed before adding a completion note"
+        )
+
+    cleaned_note = note.strip()
+
+    if not cleaned_note:
+        raise ValueError("Completion note must not be empty")
+
+    history = RequestHistory(
+        request_id=request_id,
+        action=RequestAction.COMPLETION_NOTE_ADDED,
+        performed_by=staff_id,
+        target_staff_id=staff_id,
+        old_status=RequestStatus.COMPLETED,
+        new_status=RequestStatus.COMPLETED,
+        note=cleaned_note,
+    )
+
+    session.add(history)
+    await session.commit()
+    await session.refresh(history)
+
+    return history
+
+
+async def get_cleaning_work_history(
+    session: AsyncSession,
+    *,
+    request_id: UUID,
+    staff_id: UUID,
+) -> list[RequestHistory]:
+    """ดูประวัติการทำงานของ cleaning task."""
+
+    service_request = await session.scalar(
+        select(ServiceRequest).where(
+            ServiceRequest.id == request_id,
+            ServiceRequest.request_type == RequestType.CLEANING,
+        )
+    )
+
+    if service_request is None:
+        raise CleaningTaskNotFoundError("Cleaning task not found")
+
+    # Cleaner ดู history ได้เฉพาะงานที่ตัวเองรับ
+    if service_request.assigned_staff_id != staff_id:
+        raise CleaningTaskAlreadyAssignedError(
+            "Cleaning task is assigned to another cleaner"
+        )
+
+    history = (
+        await session.scalars(
+            select(RequestHistory)
+            .where(RequestHistory.request_id == request_id)
+            .order_by(
+                RequestHistory.created_at.asc(),
+                RequestHistory.id.asc(),
+            )
+        )
+    ).all()
+
+    return list(history)
+
+    
 async def upload_completion_photos(
     session: AsyncSession,
     *,

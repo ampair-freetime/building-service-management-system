@@ -9,17 +9,23 @@ from app.schemas.cleaning_staff import (
     AssignedCleanerResponse,
     CleaningStatusUpdateRequest,
     CleaningTaskResponse,
+    CleaningWorkHistoryItem,
+    CleaningWorkHistoryResponse,
+    CompletionNoteRequest,
+    CompletionNoteResponse,
     CompletionPhotoResponse,
     CompletionPhotoUploadResponse,
 )
 from app.services.cleaning_staff import (
     CleaningTaskAlreadyAssignedError,
+    CleaningTaskNotCompletedError,
     CleaningTaskNotFoundError,
     InvalidCleaningStatusTransitionError,
     accept_cleaning_task,
+    add_completion_note,
     update_cleaning_task_status,
-    CleaningTaskNotCompletedError,
     upload_completion_photos,
+    get_cleaning_work_history,
 )
 from app.services.images import InvalidImageError
 from app.services.object_storage import StorageOperationError
@@ -113,6 +119,52 @@ async def update_task_status(
 
 
 @router.post(
+    "/{request_id}/completion-note",
+    response_model=CompletionNoteResponse,
+)
+async def create_completion_note(
+    request_id: UUID,
+    payload: CompletionNoteRequest,
+    session: DbSession,
+    housekeeper: HousekeeperStaff,
+) -> CompletionNoteResponse:
+    try:
+        history = await add_completion_note(
+            session,
+            request_id=request_id,
+            staff_id=housekeeper.id,
+            note=payload.note,
+        )
+    except CleaningTaskNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
+    except CleaningTaskAlreadyAssignedError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(exc),
+        ) from exc
+    except CleaningTaskNotCompletedError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc),
+        ) from exc
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=str(exc),
+        ) from exc
+
+    return CompletionNoteResponse(
+        id=history.id,
+        request_id=history.request_id,
+        note=history.note,
+        created_at=history.created_at,
+    )
+
+
+@router.post(
     "/{request_id}/completion-photos",
     response_model=CompletionPhotoUploadResponse,
 )
@@ -175,5 +227,47 @@ async def upload_task_completion_photos(
                 created_at=image.created_at,
             )
             for image in images
+        ],
+    )
+
+
+@router.get(
+    "/{request_id}/history",
+    response_model=CleaningWorkHistoryResponse,
+)
+async def read_cleaning_work_history(
+    request_id: UUID,
+    session: DbSession,
+    housekeeper: HousekeeperStaff,
+) -> CleaningWorkHistoryResponse:
+    try:
+        history = await get_cleaning_work_history(
+            session,
+            request_id=request_id,
+            staff_id=housekeeper.id,
+        )
+    except CleaningTaskNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
+    except CleaningTaskAlreadyAssignedError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(exc),
+        ) from exc
+
+    return CleaningWorkHistoryResponse(
+        request_id=request_id,
+        history=[
+            CleaningWorkHistoryItem(
+                id=item.id,
+                action=item.action,
+                note=item.note,
+                old_status=item.old_status,
+                new_status=item.new_status,
+                created_at=item.created_at,
+            )
+            for item in history
         ],
     )

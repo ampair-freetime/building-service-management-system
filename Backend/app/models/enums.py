@@ -77,4 +77,5 @@ class RequestAction(str, Enum):
     REASSIGNED = "reassigned"
     COMPLETED = "completed"
     CANCELLED = "cancelled"
+    COMPLETION_NOTE_ADDED = "completion_note_added"
 
