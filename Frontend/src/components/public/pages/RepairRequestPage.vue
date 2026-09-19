@@ -1,43 +1,57 @@
 <script setup>
-import { onBeforeUnmount, ref } from "vue";
+import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { useRepairSubmission } from "../../../composables/useRepairSubmission.js";
+import { mockServiceLocations as mockLocations } from "../../../services/mockServiceLocations.js";
 import { uploadRepairRequest } from "../../../services/repairRequests.js";
 import LocationCombobox from "../LocationCombobox.vue";
 
-const isDemo = !import.meta.env.VITE_REPAIR_REQUEST_URL;
+const priorityValues = {
+  "งานซ่อมทั่วไป": "normal",
+  "เหตุเร่งด่วน": "urgent",
+};
 const { isSubmitting, status, message, submit, markChanged } = useRepairSubmission(
-  isDemo ? async () => ({ demo: true }) : uploadRepairRequest,
+  uploadRepairRequest,
 );
 
 async function submitRepair(event) {
   if (isSubmitting.value) return;
   const form = event.currentTarget;
   if (!form.checkValidity()) return;
+  if (!selectedLocation.value) {
+    locationError.value = "กรุณาเลือกชั้นและห้องจากรายการ";
+    return;
+  }
 
   const payload = new FormData(form);
+  payload.set("location_id", String(selectedLocation.value.id));
+  payload.set("priority", priorityValues[selectedWorkType.value] || "");
   payload.delete("image");
   photos.value.forEach(({ file }) => payload.append("image", file));
   await submit(payload, (result) => {
-    const recipientEmail = payload.get("recipient_email") || "";
+    const recipientEmail = payload.get("reporter_email") || "";
     form.reset();
     form.dispatchEvent(new CustomEvent("repair-request-confirmed", {
       bubbles: true,
       detail: {
         ...result,
         recipientEmail,
-        location: [payload.get("repair_floor"), payload.get("repair_room")]
+        location: [selectedFloor.value, selectedRoom.value]
           .filter(Boolean)
           .join(" · "),
-        problem: payload.get("problem") || "",
+        problem: payload.get("title") || "",
       },
     }));
   });
 }
 
+const selectedFloor = ref("");
+const selectedRoom = ref("");
+const selectedWorkType = ref("");
+const locationError = ref("");
 const photoInput = ref(null);
 const photos = ref([]);
 const photoErrors = ref([]);
-const MAX_PHOTOS = 5;
+const MAX_PHOTOS = 1;
 const MAX_PHOTO_BYTES = 5 * 1024 * 1024;
 const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
 
@@ -57,20 +71,9 @@ function addPhotos(event) {
       errors.push(`${file.name}: ไฟล์ว่างเปล่า กรุณาเลือกไฟล์ใหม่`);
     } else if (file.size > MAX_PHOTO_BYTES) {
       errors.push(`${file.name}: ขนาดเกิน 5 MB`);
-    } else if (
-      !photos.value.some(
-        ({ file: existing }) =>
-          existing.name === file.name &&
-          existing.size === file.size &&
-          existing.type === file.type &&
-          existing.lastModified === file.lastModified,
-      )
-    ) {
-      if (photos.value.length >= MAX_PHOTOS) {
-        errors.push(`${file.name}: แนบได้สูงสุด ${MAX_PHOTOS} รูป`);
-      } else {
-        photos.value.push({ file, url: URL.createObjectURL(file) });
-      }
+    } else {
+      clearPhotos();
+      photos.value.push({ file, url: URL.createObjectURL(file) });
     }
   }
   photoErrors.value = errors;
@@ -94,19 +97,24 @@ function clearPhotos() {
 
 onBeforeUnmount(clearPhotos);
 
-const floorSuggestions = [
-  "ชั้น 1",
-  "ชั้น 2",
-  "ชั้น 3",
-];
-const roomSuggestions = [
-  "ห้องน้ำ",
-  "โถงทางเดิน",
-  "พื้นที่ส่วนกลาง",
-  "CSB201",
-  "CSB307",
-  "CSB209",
-];
+const floorSuggestions = [...new Set(
+  mockLocations.map(({ floor }) => `ชั้น ${floor}`),
+)];
+const roomSuggestions = computed(() => mockLocations
+  .filter(({ floor }) => `ชั้น ${floor}` === selectedFloor.value)
+  .map(({ room }) => room));
+const selectedLocation = computed(() => mockLocations.find(
+  ({ floor, room }) => `ชั้น ${floor}` === selectedFloor.value && room === selectedRoom.value,
+));
+const workTypeSuggestions = Object.keys(priorityValues);
+
+watch(selectedFloor, () => {
+  selectedRoom.value = "";
+  locationError.value = "";
+});
+watch(selectedRoom, () => {
+  locationError.value = "";
+});
 </script>
 
 <template>
@@ -126,44 +134,58 @@ const roomSuggestions = [
               <h3>รายละเอียดปัญหา</h3>
               <div class="form-row repair-location-row">
                 <LocationCombobox
+                  v-model="selectedFloor"
                   id="repairFloor"
-                  name="repair_floor"
                   label="ชั้น"
                   placeholder="เลือกชั้น"
                   :options="floorSuggestions"
                   required
                 />
                 <LocationCombobox
+                  v-model="selectedRoom"
                   id="repairRoom"
-                  name="repair_room"
                   label="ห้อง"
                   placeholder="เลือกห้อง"
                   :options="roomSuggestions"
                   required
                 />
+                <input type="hidden" name="location_id" :value="selectedLocation?.id || ''" />
               </div>
+              <p v-if="locationError" class="field-error repair-location-error" aria-live="polite">
+                {{ locationError }}
+              </p>
               <div class="field">
                 <label for="repairProblem">ปัญหาที่พบ</label
                 ><input
                   id="repairProblem"
-                  name="problem"
+                  name="title"
                   type="text"
+                  maxlength="200"
+                  autocomplete="on"
                   required
                   placeholder="เช่น เครื่องปรับอากาศไม่ทำงาน ท่อประปารั่ว"
                 />
               </div>
-              <div class="field">
-                <label for="repairType">ประเภทงาน</label
-                ><select id="repairType" name="work_type" required>
-                  <option>งานซ่อมทั่วไป</option>
-                  <option>เหตุเร่งด่วน</option>
-                </select>
-              </div>
+              <LocationCombobox
+                v-model="selectedWorkType"
+                id="repairType"
+                label="ประเภทงาน"
+                placeholder="เลือกประเภทงาน"
+                :options="workTypeSuggestions"
+                :allow-custom="false"
+                required
+              />
+              <input
+                type="hidden"
+                name="priority"
+                :value="priorityValues[selectedWorkType] || ''"
+              />
               <div class="field">
                 <label for="repairDetails">อธิบายปัญหา (ถ้ามี)</label
                 ><textarea
                   id="repairDetails"
                   name="description"
+                  maxlength="1000"
                   placeholder="เกิดอะไรขึ้น และมีผลต่อการใช้งานอย่างไร"
                 ></textarea>
               </div>
@@ -176,15 +198,14 @@ const roomSuggestions = [
                       ref="photoInput"
                       name="image"
                       type="file"
-                      multiple
                       accept="image/jpeg,image/png,image/webp"
                       aria-describedby="repairImageHint repairImageError"
                       @change="addPhotos"
                     />
                     <span class="upload-icon" aria-hidden="true">＋</span>
                     <span class="upload-copy">
-                      <strong>{{ photos.length ? "เพิ่มรูปภาพ" : "เลือกรูปภาพ" }}</strong>
-                      <small id="repairImageHint">แนบได้สูงสุด {{ MAX_PHOTOS }} รูป JPG, PNG หรือ WebP ไม่เกิน 5 MB ต่อรูป</small>
+                      <strong>{{ photos.length ? "เปลี่ยนรูปภาพ" : "เลือกรูปภาพ" }}</strong>
+                      <small id="repairImageHint">JPG, PNG หรือ WebP ไม่เกิน 5 MB</small>
                     </span>
                   </label>
                   <ul v-if="photos.length" class="repair-photo-list" aria-label="รูปจุดชำรุดที่แนบ">
@@ -211,7 +232,7 @@ const roomSuggestions = [
                 ><input
                   id="repairEmail"
                   type="email"
-                  name="recipient_email"
+                  name="reporter_email"
                   required
                   placeholder="name@example.com"
                   autocomplete="email"

@@ -63,11 +63,10 @@ const {
     <div class="visual-brand" aria-label="CS Building Care">
       <span class="brand-mark">CS</span><span>CS Building Care</span>
     </div>
-    <!-- <div class="page-visual" aria-hidden="true">
+    <div class="page-visual" aria-hidden="true">
       <div class="building-art">
         <svg viewBox="0 0 440 240">
           <path
-            d="M20 220h400M55 220V110h90v110M145 220V48h150v172M295 220V92h90v128M188 48V22h64v26M80 138h20m20 0h10M80 170h20m20 0h10M180 82h25m28 0h25M180 120h25m28 0h25M180 158h25m28 0h25M325 125h18m16 0h10M325 160h18m16 0h10M215 220v-44h30v44"
             fill="none"
             stroke="currentColor"
             stroke-width="7"
@@ -76,7 +75,7 @@ const {
           />
         </svg>
       </div>
-    </div> -->
+    </div>
     <main class="login-shell">
       <section class="login-panel" aria-label="CS Building Care Staff Portal">
         <div class="login-card">

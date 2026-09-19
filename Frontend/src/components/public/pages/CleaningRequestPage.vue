@@ -2,16 +2,9 @@
 import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { useCleaningSubmission } from "../../../composables/useCleaningSubmission.js";
 import { uploadCleaningRequest } from "../../../services/cleaningRequests.js";
+import { mockServiceLocations as mockLocations } from "../../../services/mockServiceLocations.js";
 import LocationCombobox from "../LocationCombobox.vue";
 
-const mockLocations = [
-  { id: 1, building: "CSB", floor: "1", room: "ห้องน้ำ", area_type: "ห้องน้ำ" },
-  { id: 2, building: "CSB", floor: "1", room: "โถงทางเดิน", area_type: "ทางเดิน" },
-  { id: 3, building: "CSB", floor: "1", room: "พื้นที่ส่วนกลาง", area_type: "พื้นที่ส่วนกลาง" },
-  { id: 4, building: "CSB", floor: "2", room: "CSB201", area_type: "ห้องเรียน" },
-  { id: 5, building: "CSB", floor: "3", room: "CSB307", area_type: "ห้องเรียน" },
-  { id: 6, building: "CSB", floor: "2", room: "CSB209", area_type: "ห้องเรียน" },
-];
 const priorityValues = {
   "ทำความสะอาดทั่วไป": "normal",
   "เหตุเร่งด่วน": "urgent",

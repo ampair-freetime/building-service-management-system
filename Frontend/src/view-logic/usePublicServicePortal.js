@@ -2,6 +2,7 @@ import { installServiceFormValidation } from "../services/serviceFormValidation.
 import {
   requestProgress,
   requestStatusPresentation,
+  requestTitleForTracking,
   serviceTypeForRequest,
 } from "../services/requestStatus.js";
 import { onMounted, onUnmounted, ref } from "vue";
@@ -153,12 +154,10 @@ export function usePublicServicePortal() {
         const offsetDate = new Date(
           now.getTime() - now.getTimezoneOffset() * 60000,
         );
-        const dateInput = document.getElementById("publicFoundDate");
-        const timeInput = document.getElementById("publicFoundTime");
-        if (dateInput && !dateInput.value)
-          dateInput.value = offsetDate.toISOString().slice(0, 10);
-        if (timeInput && !timeInput.value)
-          timeInput.value = offsetDate.toISOString().slice(11, 16);
+        const dateTimeInput = document.getElementById("publicFoundDateTime");
+        if (dateTimeInput && !dateTimeInput.value) {
+          dateTimeInput.value = offsetDate.toISOString().slice(0, 16);
+        }
       }
 
       if (moveToForm) {
@@ -669,6 +668,7 @@ export function usePublicServicePortal() {
         summary: type,
         status: details.status || "waiting",
         serviceType,
+        title: details.problem || "",
         requestType:
           serviceType === "cleaning"
             ? "แจ้งทำความสะอาด"
@@ -888,21 +888,10 @@ export function usePublicServicePortal() {
     const foundItemValidationRules = {
       item_category: (value) => (value ? "" : "กรุณาเลือกประเภทสิ่งของ"),
       item_name: (value) => validateRequiredText(value, "ชื่อสิ่งของ"),
-      found_date: (value) => {
-        if (!value) return "กรุณาระบุวันที่พบสิ่งของ";
-        if (new Date(`${value}T23:59:59`).getTime() > Date.now()) {
-          return "วันที่พบสิ่งของต้องไม่เป็นวันในอนาคต";
-        }
-        return "";
-      },
-      found_time: (value, field) => {
-        if (!value) return "กรุณาระบุเวลาที่พบสิ่งของ";
-        const foundDate = field.form.elements.found_date.value;
-        if (
-          foundDate &&
-          new Date(`${foundDate}T${value}`).getTime() > Date.now()
-        ) {
-          return "เวลาที่พบสิ่งของต้องไม่เป็นเวลาในอนาคต";
+      event_datetime: (value) => {
+        if (!value) return "กรุณาระบุวันที่และเวลาที่พบสิ่งของ";
+        if (new Date(value).getTime() > Date.now()) {
+          return "วันที่และเวลาที่พบสิ่งของต้องไม่เป็นเวลาในอนาคต";
         }
         return "";
       },
@@ -989,19 +978,15 @@ export function usePublicServicePortal() {
       submitButton.textContent = "กำลังส่งรายการ...";
 
       try {
-        const foundDate = formData.get("found_date");
-        const foundTime = formData.get("found_time");
         formData.set(
           "event_datetime",
-          new Date(`${foundDate}T${foundTime}`).toISOString(),
+          new Date(formData.get("event_datetime")).toISOString(),
         );
         formData.set("reporter_email", reporterEmail);
         formData.set(
           "private_verification_detail",
           formData.get("private_detail"),
         );
-        formData.delete("found_date");
-        formData.delete("found_time");
         formData.delete("recipient_email");
         formData.delete("private_detail");
         const image = formData.get("image");
@@ -1200,7 +1185,7 @@ export function usePublicServicePortal() {
                 : "แจ้งของหาย");
 
         document.getElementById(ids.itemName).textContent =
-          item.itemName || item.item_name || item.title || item.problem || "–";
+          requestTitleForTracking(item);
 
         document.getElementById(ids.updatedAt).textContent =
           item.updatedAt || formatItemDate(item.updated_at);
@@ -1265,19 +1250,32 @@ export function usePublicServicePortal() {
         const isServiceCode =
           code.startsWith("CLN-") ||
           code.startsWith("CLEAN-") ||
+          code.startsWith("RPR-") ||
           code.startsWith("REPAIR-");
         const localItem = trackedRequests.get(code);
         if (!isLostFoundCode && (!isServiceCode || localItem?.demo)) {
           // เปิดโอกาสให้ browser วาด loading state ก่อนอัปเดตข้อมูลในหน่วยความจำ
           await new Promise((resolve) => window.setTimeout(resolve, 0));
         }
-        const item = isLostFoundCode
-          ? await trackLostFoundItem(code, email)
-          : isServiceCode && !localItem?.demo
-            ? await trackServiceRequest(code, email)
-            : localItem && (!localItem.email || localItem.email === email)
-              ? localItem
-              : null;
+        let item;
+        if (isLostFoundCode) {
+          item = await trackLostFoundItem(code, email);
+        } else if (isServiceCode && !localItem?.demo) {
+          const remoteItem = await trackServiceRequest(code, email);
+          const hasMatchingLocalItem =
+            localItem && (!localItem.email || localItem.email === email);
+          item = remoteItem && hasMatchingLocalItem
+            ? {
+                ...localItem,
+                ...remoteItem,
+                title: remoteItem.title || localItem.title || localItem.itemName,
+              }
+            : remoteItem;
+        } else {
+          item = localItem && (!localItem.email || localItem.email === email)
+            ? localItem
+            : null;
+        }
         renderTrackingResult(item, code, trackingIds, { refreshed });
         document.getElementById("trackingRefreshTime").textContent =
           `ตรวจสอบล่าสุด ${new Intl.DateTimeFormat("th-TH", {

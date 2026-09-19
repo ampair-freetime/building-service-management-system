@@ -1,14 +1,14 @@
-// Configure this endpoint after the backend exposes the repair-request contract.
+const API_BASE_URL = (import.meta.env?.VITE_API_BASE_URL ?? "http://localhost:8000/api/v1")
+  .replace(/\/+$/, "");
+const REPAIR_REQUEST_URL = import.meta.env?.VITE_REPAIR_REQUEST_URL
+  || `${API_BASE_URL}/guest/repair-requests`;
+
 export async function uploadRepairRequest(payload, {
   requestId,
-  endpoint = import.meta.env?.VITE_REPAIR_REQUEST_URL,
+  endpoint = REPAIR_REQUEST_URL,
   fetchImpl = fetch,
   timeoutMs = 60_000,
 } = {}) {
-  if (!endpoint) {
-    throw new Error("ระบบรับคำขอซ่อมยังไม่พร้อมใช้งาน ข้อมูลและรูปยังอยู่ในหน้านี้ กรุณาลองใหม่ภายหลัง");
-  }
-
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {

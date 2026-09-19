@@ -4,7 +4,7 @@ import { trackServiceRequest } from "../src/services/api.js";
 
 test("retrieves repair and cleaning status with normalized code and email", async () => {
   const cases = [
-    ["repair-20260916-abcd", /\/guest\/service-requests\/REPAIR-20260916-/],
+    ["rpr-123456789abc", /\/guest\/repair-requests\/RPR-123456789ABC/],
     ["cln-123456789abc", /\/guest\/cleaning-requests\/CLN-123456789ABC/],
   ];
   for (const [code, endpointPattern] of cases) {
@@ -15,11 +15,13 @@ test("retrieves repair and cleaning status with normalized code and email", asyn
         assert.ok(options.signal);
         return new Response(JSON.stringify({
           request_code: code.toUpperCase(),
+          title: "เครื่องปรับอากาศไม่ทำงาน",
           status: "in_progress",
         }));
       },
     });
     assert.equal(result.status, "in_progress");
+    assert.equal(result.title, "เครื่องปรับอากาศไม่ทำงาน");
   }
 });
 

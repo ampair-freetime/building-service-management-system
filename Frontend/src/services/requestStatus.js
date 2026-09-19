@@ -58,12 +58,18 @@ export function serviceTypeForRequest(item = {}, code = "") {
     normalizedCode.startsWith("CLN-") ||
     normalizedCode.startsWith("CLEAN-")
   ) return "cleaning";
-  if (normalizedCode.startsWith("REPAIR-")) return "repair";
-
+  if (
+    normalizedCode.startsWith("RPR-") ||
+    normalizedCode.startsWith("REPAIR-")
+  ) return "repair";
   const requestType = String(item.requestType || "");
   if (requestType.includes("ทำความสะอาด")) return "cleaning";
   if (requestType.includes("ซ่อม")) return "repair";
   return "";
+}
+
+export function requestTitleForTracking(item = {}) {
+  return item.title || item.problem || item.itemName || item.item_name || "–";
 }
 
 export function normalizedServiceStatus(status) {

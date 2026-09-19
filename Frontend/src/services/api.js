@@ -220,8 +220,9 @@ export async function trackServiceRequest(
 ) {
   const normalizedCode = requestCode.trim().toUpperCase();
   const isCleaningCode =
-    normalizedCode.startsWith("CLN-") || normalizedCode.startsWith("CLEAN-");
-  const isRepairCode = normalizedCode.startsWith("REPAIR-");
+    normalizedCode.startsWith("CLN-");
+  const isRepairCode =
+    normalizedCode.startsWith("RPR-");
   if (
     !isCleaningCode &&
     !isRepairCode
@@ -236,6 +237,8 @@ export async function trackServiceRequest(
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
   const collection = normalizedCode.startsWith("CLN-")
     ? "cleaning-requests"
+    : normalizedCode.startsWith("RPR-")
+      ? "repair-requests"
     : "service-requests";
 
   try {

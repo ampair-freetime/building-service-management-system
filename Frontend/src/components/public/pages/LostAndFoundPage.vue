@@ -379,7 +379,7 @@
           >
             <h3>แจ้งพบของ</h3>
             <p class="found-dropoff-notice">
-              กรุณานำไปฝากไว้ที่บริเวณห้องธุรการ ชั้น 1
+              กรุณานำของไปฝากไว้ที่บริเวณห้องธุรการ ชั้น 1
             </p>
             <div class="field">
               <label for="publicFoundCategory">ประเภทสิ่งของ</label
@@ -421,37 +421,20 @@
                 aria-live="polite"
               ></p>
             </div>
-            <div class="public-found-row">
-              <div class="field">
-                <label for="publicFoundDate">วันที่พบ</label
-                ><input
-                  id="publicFoundDate"
-                  name="found_date"
-                  type="date"
-                  required
-                  aria-describedby="publicFoundDateError"
-                />
-                <p
-                  id="publicFoundDateError"
-                  class="field-error"
-                  aria-live="polite"
-                ></p>
-              </div>
-              <div class="field">
-                <label for="publicFoundTime">เวลาที่พบ</label
-                ><input
-                  id="publicFoundTime"
-                  name="found_time"
-                  type="time"
-                  required
-                  aria-describedby="publicFoundTimeError"
-                />
-                <p
-                  id="publicFoundTimeError"
-                  class="field-error"
-                  aria-live="polite"
-                ></p>
-              </div>
+            <div class="field">
+              <label for="publicFoundDateTime">วันที่และเวลาที่พบ</label
+              ><input
+                id="publicFoundDateTime"
+                name="event_datetime"
+                type="datetime-local"
+                required
+                aria-describedby="publicFoundDateTimeError"
+              />
+              <p
+                id="publicFoundDateTimeError"
+                class="field-error"
+                aria-live="polite"
+              ></p>
             </div>
             <div class="field">
               <label for="publicFoundLocation">สถานที่พบ</label
@@ -471,7 +454,7 @@
                 aria-live="polite"
               ></p>
             </div>
-            <div class="field">
+            <!-- <div class="field">
               <label for="publicFoundCustody">นำของไปฝากไว้ที่ใด</label
               ><input
                 id="publicFoundCustody"
@@ -488,7 +471,7 @@
                 class="field-error"
                 aria-live="polite"
               ></p>
-            </div>
+            </div> -->
             <div class="field">
               <label for="publicFoundDescription">รายละเอียดทั่วไป</label
               ><textarea
@@ -509,7 +492,7 @@
             <div class="field">
               <label for="publicFoundPhoto"
                 >รูปภาพของที่พบ
-                <span class="optional-label">(ไม่บังคับ)</span></label
+                <span class="optional-label">(ถ้ามี)</span></label
               >
               <div class="upload-field">
                 <label class="upload-trigger"
@@ -544,7 +527,7 @@
             </div>
             <div class="field">
               <label for="publicFoundPrivateDetail"
-                >รายละเอียดลับสำหรับยืนยันเจ้าของ</label
+                >รายละเอียดลับสำหรับยืนยันเจ้าของ (ถ้ามี)</label
               ><textarea
                 id="publicFoundPrivateDetail"
                 name="private_detail"

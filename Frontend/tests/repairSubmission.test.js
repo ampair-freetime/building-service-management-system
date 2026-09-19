@@ -3,9 +3,13 @@ import assert from "node:assert/strict";
 import { useRepairSubmission } from "../src/composables/useRepairSubmission.js";
 import { uploadRepairRequest } from "../src/services/repairRequests.js";
 
-function payload(problem = "air conditioner is broken") {
+function payload(title = "air conditioner is broken") {
   const data = new FormData();
-  data.append("problem", problem);
+  data.append("title", title);
+  data.append("description", "leaking near the window");
+  data.append("priority", "urgent");
+  data.append("reporter_email", "guest@example.com");
+  data.append("location_id", "1");
   return data;
 }
 
@@ -25,7 +29,7 @@ test("repair submission blocks duplicates until confirmation", async () => {
   assert.equal(calls, 1);
   assert.equal(resets, 0);
 
-  resolve({ request_code: "REPAIR-1" });
+  resolve({ request_code: "RPR-1" });
   await pending;
   assert.equal(resets, 1);
   assert.equal(state.isSubmitting.value, false);
@@ -50,13 +54,26 @@ test("repair failure keeps photos and reuses the idempotency key on retry", asyn
 
   await state.submit(data, () => resets++);
   assert.equal(keys[0], keys[1]);
-  data.set("problem", "different problem");
+  data.set("title", "different problem");
   await state.submit(data, () => resets++);
   assert.notEqual(keys[1], keys[2]);
 });
 
+test("repair adapter uses the backend repair endpoint by default", async () => {
+  let requestedUrl;
+  await uploadRepairRequest(payload(), {
+    requestId: "default-url",
+    fetchImpl: async (url) => {
+      requestedUrl = url;
+      return new Response(JSON.stringify({ request_code: "RPR-1" }), { status: 201 });
+    },
+  });
+  assert.equal(requestedUrl, "http://localhost:8000/api/v1/guest/repair-requests");
+});
+
 test("repair adapter sends multipart data and requires a receipt", async () => {
   const data = payload();
+  data.append("image", new File(["photo"], "damage.png", { type: "image/png" }));
   const result = await uploadRepairRequest(data, {
     endpoint: "/repair-test",
     requestId: "same-key",
@@ -66,10 +83,14 @@ test("repair adapter sends multipart data and requires a receipt", async () => {
       assert.equal(options.body, data);
       assert.equal(options.headers["Idempotency-Key"], "same-key");
       assert.equal(options.headers["Content-Type"], undefined);
-      return new Response(JSON.stringify({ request_code: "REPAIR-2" }), { status: 201 });
+      assert.deepEqual([...options.body.keys()], [
+        "title", "description", "priority", "reporter_email", "location_id", "image",
+      ]);
+      assert.equal(options.body.getAll("image").length, 1);
+      return new Response(JSON.stringify({ request_code: "RPR-2" }), { status: 201 });
     },
   });
-  assert.equal(result.request_code, "REPAIR-2");
+  assert.equal(result.request_code, "RPR-2");
 
   await assert.rejects(uploadRepairRequest(data, {
     endpoint: "/repair-test",
@@ -77,11 +98,7 @@ test("repair adapter sends multipart data and requires a receipt", async () => {
   }), /ยังยืนยัน/);
 });
 
-test("repair adapter reports unavailable, validation, and network failures", async () => {
-  await assert.rejects(uploadRepairRequest(payload(), {
-    endpoint: "",
-    fetchImpl: async () => assert.fail("must not send"),
-  }), /ยังไม่พร้อม/);
+test("repair adapter reports validation and network failures", async () => {
   await assert.rejects(uploadRepairRequest(payload(), {
     endpoint: "/repair-test",
     fetchImpl: async () => new Response(

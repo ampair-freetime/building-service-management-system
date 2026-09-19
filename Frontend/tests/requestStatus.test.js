@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   requestProgress,
   requestStatusPresentation,
+  requestTitleForTracking,
   serviceProgress,
   serviceTypeForRequest,
 } from "../src/services/requestStatus.js";
@@ -26,6 +27,7 @@ test("maps every service status to a clear Thai label and badge style", () => {
 test("recognizes repair and cleaning request codes and Thai status aliases", () => {
   assert.equal(serviceTypeForRequest({}, "CLN-123456789ABC"), "cleaning");
   assert.equal(serviceTypeForRequest({}, "CLEAN-20260916-1234"), "cleaning");
+  assert.equal(serviceTypeForRequest({}, "RPR-123456789ABC"), "repair");
   assert.equal(serviceTypeForRequest({}, "REPAIR-20260916-1234"), "repair");
   const presentation = requestStatusPresentation(
     { status: "กำลังดำเนินการ" },
@@ -37,6 +39,15 @@ test("recognizes repair and cleaning request codes and Thai status aliases", () 
     requestStatusPresentation({ request_type: "repair", status: "assigned" }).status,
     "in_progress",
   );
+});
+
+test("shows the request title first in tracking details", () => {
+  assert.equal(requestTitleForTracking({
+    title: "เครื่องปรับอากาศไม่ทำงาน",
+    itemName: "ชื่อเดิม",
+  }), "เครื่องปรับอากาศไม่ทำงาน");
+  assert.equal(requestTitleForTracking({ item_name: "กระเป๋าสีดำ" }), "กระเป๋าสีดำ");
+  assert.equal(requestTitleForTracking({}), "–");
 });
 
 test("keeps lost-and-found labels while mapping them to existing badge styles", () => {
