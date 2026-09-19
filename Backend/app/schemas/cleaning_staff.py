@@ -4,6 +4,8 @@ from uuid import UUID
 
 from pydantic import BaseModel
 
+from app.models.enums import RequestStatus
+
 
 class AssignedCleanerResponse(BaseModel):
     id: UUID
@@ -17,3 +19,7 @@ class CleaningTaskResponse(BaseModel):
     title: str
     status: str
     assigned_staff: AssignedCleanerResponse
+
+
+class CleaningStatusUpdateRequest(BaseModel):
+    status: RequestStatus
