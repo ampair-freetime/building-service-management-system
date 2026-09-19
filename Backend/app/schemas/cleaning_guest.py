@@ -1,7 +1,7 @@
 from datetime import datetime
+from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
-
 from app.models.enums import PriorityLevel, RequestStatus, RequestType
 
 
@@ -39,6 +39,14 @@ class GuestCleaningCreateResponse(BaseModel):
     message: str
 
 
+class GuestCompletionPhotoResponse(BaseModel):
+    id: UUID
+    url: str
+    content_type: str | None
+    width: int | None
+    height: int | None
+
+
 # สำหรับติดตามสถานะ
 class GuestTrackingResponse(BaseModel):
     request_type: RequestType
@@ -47,3 +55,6 @@ class GuestTrackingResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     completed_at: datetime | None
+    completion_photos: list[GuestCompletionPhotoResponse] = Field(
+        default_factory=list
+    )

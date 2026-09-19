@@ -1,12 +1,18 @@
 """Business logic สำหรับ Cleaning Staff."""
 
-from uuid import UUID
+from dataclasses import dataclass
+from uuid import UUID, uuid4
 
+from fastapi import UploadFile
 from sqlalchemy import select, update
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.enums import RequestAction, RequestStatus, RequestType
+from app.models.enums import ImageType, RequestAction, RequestStatus, RequestType
+from app.models.image import Image
 from app.models.service_request import RequestHistory, ServiceRequest
+from app.services.images import ProcessedImage, prepare_guest_image
+from app.services.object_storage import ObjectStorage, StoredObject
 
 
 class CleaningTaskNotFoundError(LookupError):
@@ -20,6 +26,16 @@ class CleaningTaskAlreadyAssignedError(RuntimeError):
 class InvalidCleaningStatusTransitionError(RuntimeError):
     """เปลี่ยนสถานะ cleaning task ไม่ถูกลำดับ."""
 
+
+class CleaningTaskNotCompletedError(RuntimeError):
+    """Cleaning task ยังไม่เสร็จ จึงอัปโหลด completion photo ไม่ได้."""
+
+
+@dataclass(frozen=True)
+class _PreparedCompletionPhoto:
+    image_id: UUID
+    processed: ProcessedImage
+    stored: StoredObject
 
 async def accept_cleaning_task(
     session: AsyncSession,
@@ -150,3 +166,116 @@ async def update_cleaning_task_status(
     await session.refresh(service_request)
 
     return service_request
+
+
+async def upload_completion_photos(
+    session: AsyncSession,
+    *,
+    request_id: UUID,
+    staff_id: UUID,
+    uploads: list[UploadFile],
+    storage: ObjectStorage,
+) -> list[Image]:
+    """อัปโหลดรูปหลังทำความสะอาดสำหรับงานที่เสร็จแล้ว."""
+
+    service_request = await session.scalar(
+        select(ServiceRequest).where(
+            ServiceRequest.id == request_id,
+            ServiceRequest.request_type == RequestType.CLEANING,
+        )
+    )
+
+    if service_request is None:
+        raise CleaningTaskNotFoundError("Cleaning task not found")
+
+    # อัปโหลดได้เฉพาะ cleaner ที่รับงานนี้
+    if service_request.assigned_staff_id != staff_id:
+        raise CleaningTaskAlreadyAssignedError(
+            "Cleaning task is assigned to another cleaner"
+        )
+
+    # Completion photos อัปโหลดได้หลังงานเสร็จเท่านั้น
+    if service_request.status != RequestStatus.COMPLETED:
+        raise CleaningTaskNotCompletedError(
+            "Cleaning task must be completed before uploading completion photos"
+        )
+
+    # ต้องมีอย่างน้อย 1 รูป
+    if not uploads:
+        raise ValueError("At least one completion photo is required")
+
+    # Validate/ประมวลผลรูปทั้งหมดก่อน
+    # เพื่อไม่ให้อัปโหลดบางรูปไป R2 แล้วค่อยพบว่ารูปถัดไป invalid
+    processed_uploads: list[ProcessedImage] = []
+
+    for upload in uploads:
+        processed_uploads.append(
+            await prepare_guest_image(upload)
+        )
+
+    prepared: list[_PreparedCompletionPhoto] = []
+    images: list[Image] = []
+    committed = False
+
+    try:
+        for processed in processed_uploads:
+            image_id = uuid4()
+
+            stored = await storage.put(
+                object_key=f"cleaning/{request_id}/completion/{image_id}.webp",
+                data=processed.data,
+                content_type=processed.content_type,
+            )
+
+            prepared.append(
+                _PreparedCompletionPhoto(
+                    image_id=image_id,
+                    processed=processed,
+                    stored=stored,
+                )
+            )
+
+        for item in prepared:
+            image = Image(
+                id=item.image_id,
+                request_id=request_id,
+                lost_item_id=None,
+                object_key=item.stored.object_key,
+                storage_provider="r2",
+                bucket_name=item.stored.bucket_name,
+                content_type=item.processed.content_type,
+                size_bytes=len(item.processed.data),
+                etag=item.stored.etag,
+                width=item.processed.width,
+                height=item.processed.height,
+                image_type=ImageType.AFTER,
+                uploaded_by_staff_id=staff_id,
+            )
+
+            session.add(image)
+            images.append(image)
+
+        await session.flush()
+
+        # เอา created_at ที่ DB สร้างให้กลับมาใช้ใน response
+        for image in images:
+            await session.refresh(image)
+
+        await session.commit()
+        committed = True
+
+    except SQLAlchemyError:
+        raise
+    finally:
+        if not committed:
+            try:
+                await session.rollback()
+            finally:
+                for item in prepared:
+                    try:
+                        await storage.delete(item.stored.object_key)
+                    except Exception:
+                        # cleanup failure ไม่ควรกลบ error หลัก
+                        pass
+
+    return images

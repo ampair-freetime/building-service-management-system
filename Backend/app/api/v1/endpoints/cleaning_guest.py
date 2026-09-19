@@ -5,7 +5,11 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, File, HTTPException, Path, Query, UploadFile, status
 from pydantic import EmailStr
 
-from app.api.dependencies import DbSession, OptionalObjectStorageClient
+from app.api.dependencies import (
+    DbSession,
+    ObjectStorageClient,
+    OptionalObjectStorageClient,
+)
 from app.api.v1.forms import parse_guest_cleaning_form
 from app.schemas.cleaning_guest import (
     GuestCleaningCreate,
@@ -97,6 +101,7 @@ async def create_cleaning_request(
 async def read_cleaning_request(
     request_code: Annotated[str, Path(min_length=1, max_length=32)],
     session: DbSession,
+    storage: ObjectStorageClient,
     reporter_email: Annotated[EmailStr, Query()],
 ) -> GuestTrackingResponse:
     """ติดตามคำร้องด้วยรหัสและอีเมลของผู้แจ้ง."""
@@ -105,6 +110,10 @@ async def read_cleaning_request(
             session,
             request_code=request_code,
             reporter_email=str(reporter_email),
+            storage=storage,
         )
     except RequestNotFoundError as exc:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+        raise HTTPException(
+            status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
