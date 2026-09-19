@@ -5,9 +5,11 @@ from fastapi import APIRouter
 from app.api.v1.endpoints import (
     auth,
     cleaning_guest,
+    cleaning_staff,
     found_item,
     lost_found_clerk,
     lost_item,
+    notification,
     repair_guest,
     staff,
 )
@@ -43,4 +45,18 @@ api_router.include_router(
     lost_found_clerk.router,
     prefix="/lost-found",
     tags=["lost-found"],
+)
+
+
+api_router.include_router(
+    notification.router,
+    prefix="/notifications",
+    tags=["notifications"],
+)
+
+
+api_router.include_router(
+    cleaning_staff.router,
+    prefix="/cleaning-tasks",
+    tags=["cleaning staff"],
 )

@@ -32,6 +32,7 @@ class Settings(BaseSettings):
 
     # จำกัดทั้งขนาดไฟล์และจำนวน pixel เพื่อลดความเสี่ยงจากไฟล์ภาพผิดปกติ
     max_image_upload_bytes: int = 5 * 1024 * 1024
+    max_guest_images: int = 5
     max_image_pixels: int = 25_000_000
 
     @property

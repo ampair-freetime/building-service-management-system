@@ -3,11 +3,11 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, status
 from pydantic import EmailStr
 
 from app.api.dependencies import DbSession, ObjectStorageClient
-from app.api.v1.forms import parse_guest_found_item_form
+from app.api.v1.forms import parse_guest_found_item_form, parse_guest_image_uploads
 from app.models.enums import LostType
 from app.schemas.lost_found_item import (
     GuestClaimCreatedResponse,
@@ -50,7 +50,7 @@ async def add_found_item(
     payload: Annotated[GuestFoundItemCreate, Depends(parse_guest_found_item_form)],
     session: DbSession,
     storage: ObjectStorageClient,
-    image: Annotated[UploadFile | None, File()] = None,
+    images: Annotated[list[UploadFile], Depends(parse_guest_image_uploads)],
 ) -> GuestItemCreatedResponse:
     """รับรายงานพบของ โดยเก็บข้อมูลยืนยันไว้ private และส่งรูปไป R2."""
     try:
@@ -58,7 +58,7 @@ async def add_found_item(
             session,
             payload=payload,
             report_type=LostType.FOUND,
-            image_upload=image,
+            image_uploads=images,
             storage=storage,
         )
     except (InvalidImageError, LocationNotFoundError) as exc:

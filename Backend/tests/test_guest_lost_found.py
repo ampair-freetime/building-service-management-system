@@ -965,3 +965,87 @@ def test_guest_can_view_latest_return_status(test_context):
     assert data["status"] == "approved"
     assert data["return_status"] == "ready_for_pickup"
     assert data["custody_location"] == "Clerk Office"
+
+
+def test_guest_lost_item_saves_five_images_in_attachment_order(
+    test_context: tuple[TestClient, async_sessionmaker[AsyncSession]],
+    fake_storage: FakeObjectStorage,
+) -> None:
+    client, session_factory = test_context
+    files = [
+        ("image", (f"item-{index}.png", make_png(), "image/png"))
+        for index in range(5)
+    ]
+    files.append(("image", ("", b"", "application/octet-stream")))
+
+    response = client.post(
+        "/api/v1/guest/lost-items",
+        data=lost_form(),
+        files=files,
+    )
+
+    assert response.status_code == 201
+    assert response.json()["image_count"] == 5
+    assert len(fake_storage.objects) == 5
+
+    async def read_sort_orders() -> list[int | None]:
+        async with session_factory() as session:
+            return list(
+                await session.scalars(select(Image.sort_order).order_by(Image.sort_order))
+            )
+
+    assert asyncio.run(read_sort_orders()) == [0, 1, 2, 3, 4]
+
+
+def test_guest_lost_item_rejects_six_images_before_storage(
+    test_context: tuple[TestClient, async_sessionmaker[AsyncSession]],
+    fake_storage: FakeObjectStorage,
+) -> None:
+    client, session_factory = test_context
+    response = client.post(
+        "/api/v1/guest/lost-items",
+        data=lost_form(),
+        files=[
+            ("image", (f"item-{index}.png", make_png(), "image/png"))
+            for index in range(6)
+        ],
+    )
+
+    assert response.status_code == 422
+    assert response.json()["detail"][0]["loc"] == ["body", "image"]
+    assert not fake_storage.objects
+
+    async def row_counts() -> tuple[int, int]:
+        async with session_factory() as session:
+            item_count = await session.scalar(select(func.count()).select_from(LostItem))
+            image_count = await session.scalar(select(func.count()).select_from(Image))
+            return int(item_count or 0), int(image_count or 0)
+
+    assert asyncio.run(row_counts()) == (0, 0)
+
+
+def test_guest_lost_item_invalid_third_image_removes_previous_objects(
+    test_context: tuple[TestClient, async_sessionmaker[AsyncSession]],
+    fake_storage: FakeObjectStorage,
+) -> None:
+    client, session_factory = test_context
+    response = client.post(
+        "/api/v1/guest/lost-items",
+        data=lost_form(),
+        files=[
+            ("image", ("first.png", make_png(), "image/png")),
+            ("image", ("second.png", make_png(), "image/png")),
+            ("image", ("invalid.png", b"not-an-image", "image/png")),
+        ],
+    )
+
+    assert response.status_code == 422
+    assert not fake_storage.objects
+
+    async def row_counts() -> tuple[int, int]:
+        async with session_factory() as session:
+            item_count = await session.scalar(select(func.count()).select_from(LostItem))
+            image_count = await session.scalar(select(func.count()).select_from(Image))
+            return int(item_count or 0), int(image_count or 0)
+
+    assert asyncio.run(row_counts()) == (0, 0)

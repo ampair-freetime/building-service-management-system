@@ -17,10 +17,9 @@ class Location(Base):
     __tablename__ = "locations"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    building: Mapped[str] = mapped_column(String(100))
     floor: Mapped[str | None] = mapped_column(String(30), nullable=True)
-    room: Mapped[str | None] = mapped_column(String(100), nullable=True)
-    area_type: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    # ข้อความอธิบายพื้นที่ เช่น "ห้อง 101" หรือ "ห้องน้ำหญิง" ใช้แสดงผลตรงๆ ไม่ประกอบคำนำหน้าเพิ่ม
+    area: Mapped[str] = mapped_column(String(100))
     qr_token: Mapped[str] = mapped_column(String(255), unique=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
     created_at: Mapped[datetime] = mapped_column(

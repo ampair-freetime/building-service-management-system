@@ -22,6 +22,11 @@ class Notification(Base):
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
     staff_id: Mapped[UUID] = mapped_column(ForeignKey("staff.id"))
+    request_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("service_requests.id"),
+        nullable=True,
+        index=True,
+    )
     title: Mapped[str] = mapped_column(String(200))
     message: Mapped[str] = mapped_column(Text)
     is_read: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
