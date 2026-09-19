@@ -35,6 +35,10 @@ import {
   fetchStaffAccounts,
   toDashboardStaff,
 } from "./staff-dashboard/staff-accounts.js";
+import {
+  getStaffNotifications,
+  markStaffNotificationRead,
+} from "../services/housekeeperAPI.js";
 
 export function useStaffDashboard() {
   // ---------------------------------------------------------------------------
