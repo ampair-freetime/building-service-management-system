@@ -56,7 +56,7 @@ def image_upload():
 
 async def seed_location(factory):
     async with factory() as session:
-        session.add(Location(id=1, building="A", qr_token="active"))
+        session.add(Location(id=1, area="ห้อง 101", qr_token="active"))
         await session.commit()
 
 
@@ -111,8 +111,8 @@ def test_create_list_qr_and_tracking(test_context):
         async with factory() as session:
             session.add_all(
                 [
-                    Location(id=1, building="A", floor="2", room="201", qr_token="active"),
-                    Location(id=2, building="B", qr_token="inactive", is_active=False),
+                    Location(id=1, floor="2", area="ห้อง 201", qr_token="active"),
+                    Location(id=2, area="ห้องน้ำ", qr_token="inactive", is_active=False),
                 ]
             )
             await session.commit()
@@ -126,12 +126,12 @@ def test_create_list_qr_and_tracking(test_context):
             response = await create_guest_repair_request(
                 session,
                 payload=payload(),
-                image_upload=None,
+                image_uploads=[],
                 storage=None,
             )
             assert response.request_type == RequestType.REPAIR
             assert response.request_code.startswith("RPR-")
-            assert response.location == "A ชั้น 2 ห้อง 201"
+            assert response.location == "ชั้น 2 ห้อง 201"
             assert response.image_count == 0
             request = await session.scalar(select(ServiceRequest))
             assert request.location_id == 1
@@ -167,7 +167,7 @@ def test_create_list_qr_and_tracking(test_context):
                     await create_guest_repair_request(
                         session,
                         payload=payload(location_id=location_id),
-                        image_upload=None,
+                        image_uploads=[],
                         storage=None,
                     )
             assert await session.scalar(select(func.count()).select_from(ServiceRequest)) == 1
@@ -216,7 +216,7 @@ def test_uncertain_commit_preserves_or_removes_image(test_context, monkeypatch, 
 
             if outcome == "saved":
                 response = await create_guest_repair_request(
-                    session, payload=payload(), image_upload=image_upload(), storage=storage
+                    session, payload=payload(), image_uploads=[image_upload()], storage=storage
                 )
                 assert response.request_code.startswith("RPR-")
                 assert response.image_count == 1
@@ -228,7 +228,7 @@ def test_uncertain_commit_preserves_or_removes_image(test_context, monkeypatch, 
                 )
                 with pytest.raises(expected):
                     await create_guest_repair_request(
-                        session, payload=payload(), image_upload=image_upload(), storage=storage
+                        session, payload=payload(), image_uploads=[image_upload()], storage=storage
                     )
             assert not session.in_transaction()
 
@@ -256,12 +256,12 @@ def test_empty_locations_and_ordered_public_location_fields(test_context):
             assert await list_guest_repair_locations(session) == []
             session.add_all(
                 [
-                    Location(id=4, building="B", floor="1", room="101", qr_token="b"),
-                    Location(id=3, building="A", floor="2", room="201", qr_token="a3"),
-                    Location(id=2, building="A", floor="1", room="102", qr_token="a2"),
-                    Location(id=1, building="A", floor="1", room="101", qr_token="a1"),
-                    Location(id=5, building="A", floor="1", room="101", qr_token="a5"),
-                    Location(id=6, building="A", qr_token="closed", is_active=False),
+                    Location(id=4, floor="3", area="ห้อง 101", qr_token="b"),
+                    Location(id=3, floor="2", area="ห้อง 201", qr_token="a3"),
+                    Location(id=2, floor="1", area="ห้อง 102", qr_token="a2"),
+                    Location(id=1, floor="1", area="ห้อง 101", qr_token="a1"),
+                    Location(id=5, floor="1", area="ห้อง 101", qr_token="a5"),
+                    Location(id=6, floor="1", area="ห้อง 101", qr_token="closed", is_active=False),
                 ]
             )
             await session.commit()
@@ -299,12 +299,12 @@ def test_one_image_commits_with_response_ready_before_commit(
             monkeypatch.setattr(session, "commit", commit)
             monkeypatch.setattr(session, "refresh", refresh)
             response = await create_guest_repair_request(
-                session, payload=payload(), image_upload=image_upload(), storage=storage
+                session, payload=payload(), image_uploads=[image_upload()], storage=storage
             )
             assert committed
             assert response.created_at is not None
             assert response.image_count == 1
-            assert response.location == "A"
+            assert response.location == "ห้อง 101"
             assert not session.in_transaction()
 
         async with factory() as session:
@@ -366,7 +366,7 @@ def test_failure_before_commit_rolls_back_and_deletes_image(
 
             with pytest.raises(expected_error):
                 await create_guest_repair_request(
-                    session, payload=payload(), image_upload=image_upload(), storage=storage
+                    session, payload=payload(), image_uploads=[image_upload()], storage=storage
                 )
             assert not session.in_transaction()
         await assert_no_requests(factory)
@@ -398,7 +398,7 @@ def test_upload_failure_leaves_no_request(test_context, monkeypatch, failure_poi
         async with factory() as session:
             with pytest.raises(expected_error):
                 await create_guest_repair_request(
-                    session, payload=payload(), image_upload=upload, storage=storage
+                    session, payload=payload(), image_uploads=[upload], storage=storage
                 )
             assert not session.in_transaction()
         await assert_no_requests(factory)
@@ -421,7 +421,7 @@ def test_database_enforces_location_and_type(test_context, location_id, request_
 
     async def run():
         async with factory() as session:
-            session.add(Location(id=1, building="A", qr_token="active"))
+            session.add(Location(id=1, area="ห้อง 101", qr_token="active"))
             await session.commit()
             session.add(
                 ServiceRequest(

@@ -24,10 +24,8 @@ finally:
 
 LOCATIONS = [
     {
-        "building": "A",
         "floor": "1",
-        "room": "101",
-        "area_type": "ห้องเรียน",
+        "area": "ห้อง 101",
     },
 ]
 
@@ -51,21 +49,12 @@ async def seed_locations(base_url: str) -> list[Location]:
         result = await session.scalars(
             select(Location)
             .where(Location.is_active.is_(True))
-            .order_by(Location.building, Location.floor, Location.room, Location.id)
+            .order_by(Location.floor, Location.area, Location.id)
         )
         locations = list(result)
 
     for location in locations:
-        label = " ".join(
-            part
-            for part in (
-                location.building,
-                f"ชั้น {location.floor}" if location.floor else None,
-                f"ห้อง {location.room}" if location.room else None,
-                location.area_type,
-            )
-            if part
-        )
+        label = f"ชั้น {location.floor} {location.area}" if location.floor else location.area
         url = f"{base_url}/cleaning?token={quote(location.qr_token, safe='')}"
         print(f"{location.id}\t{label}\t{url}")
     return locations

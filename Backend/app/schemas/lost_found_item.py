@@ -86,6 +86,7 @@ class GuestItemCreatedResponse(BaseModel):
     item_code: str
     report_type: LostType
     status: LostStatus
+    image_count: int
     message: str
 
 

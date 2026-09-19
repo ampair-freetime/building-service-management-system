@@ -3,9 +3,11 @@
 from datetime import datetime
 from typing import Annotated
 
-from fastapi import Form, HTTPException, Request, status
+from fastapi import Form, HTTPException, Request, UploadFile, status
 from pydantic import EmailStr, ValidationError
+from starlette.datastructures import UploadFile as StarletteUploadFile
 
+from app.core.config import settings
 from app.models.enums import PriorityLevel
 from app.schemas.cleaning_guest import GuestCleaningCreate
 from app.schemas.lost_found_item import GuestFoundItemCreate, GuestLostItemCreate
@@ -33,14 +35,14 @@ async def parse_guest_repair_form(
     ]
     if errors:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, detail=errors)
-    # Scalar Form fields อาจเลือกค่าสุดท้ายเมื่อส่งซ้ำ จึงตรวจจำนวนเองทุกช่อง
+    # Scalar Form fields อาจเลือกค่าสุดท้ายเมื่อส่งซ้ำ จึงตรวจจำนวนเองเฉพาะช่องข้อความ
     duplicates = [
         {
             "type": "value_error",
             "loc": ["body", field],
             "msg": "Only one value is permitted",
         }
-        for field in sorted(allowed_fields)
+        for field in sorted(allowed_fields - {"image"})
         if len(form.getlist(field)) > 1
     ]
     if duplicates:
@@ -59,6 +61,30 @@ async def parse_guest_repair_form(
         for error in exc.detail:
             error["loc"] = ["body", *error["loc"]]
         raise
+
+
+async def parse_guest_image_uploads(request: Request) -> list[UploadFile]:
+    """อ่านช่อง image ซ้ำจาก multipart แล้วคืนเฉพาะไฟล์จริงไม่เกินค่าที่กำหนด."""
+    form = await request.form()
+    uploads = [
+        entry
+        for entry in form.getlist("image")
+        if isinstance(entry, StarletteUploadFile) and bool(entry.filename)
+    ]
+    if len(uploads) > settings.max_guest_images:
+        for upload in uploads:
+            await upload.close()
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=[
+                {
+                    "type": "value_error",
+                    "loc": ["body", "image"],
+                    "msg": f"แนบรูปได้ไม่เกิน {settings.max_guest_images} รูป",
+                }
+            ],
+        )
+    return uploads
 
 
 async def parse_guest_cleaning_form(

@@ -2,15 +2,17 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, File, HTTPException, Path, Query, UploadFile, status
+from fastapi import APIRouter, Depends, HTTPException, Path, Query, UploadFile, status
 from pydantic import EmailStr
-
 from app.api.dependencies import (
     DbSession,
     ObjectStorageClient,
     OptionalObjectStorageClient,
 )
-from app.api.v1.forms import parse_guest_cleaning_form
+from app.api.v1.forms import (
+    parse_guest_cleaning_form,
+    parse_guest_image_uploads,
+)
 from app.schemas.cleaning_guest import (
     GuestCleaningCreate,
     GuestCleaningCreateResponse,
@@ -59,11 +61,12 @@ async def create_cleaning_request(
     payload: Annotated[GuestCleaningCreate, Depends(parse_guest_cleaning_form)],
     session: DbSession,
     storage: OptionalObjectStorageClient,
-    image: Annotated[UploadFile | None, File()] = None,
+    images: Annotated[list[UploadFile], Depends(parse_guest_image_uploads)],
 ) -> GuestCleaningCreateResponse:
-    """สร้างคำร้อง Cleaning จาก multipart form และรับรูปได้ไม่เกินหนึ่งไฟล์."""
-    if image is not None and image.filename and storage is None:
-        await image.close()
+    """สร้างคำร้อง Cleaning จาก multipart form และรับรูปได้ไม่เกินห้าไฟล์."""
+    if images and storage is None:
+        for image in images:
+            await image.close()
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="ระบบจัดเก็บรูปภาพยังไม่ได้ตั้งค่า",
@@ -72,7 +75,7 @@ async def create_cleaning_request(
         return await create_guest_cleaning_request(
             session,
             payload=payload,
-            image_upload=image,
+            image_uploads=images,
             storage=storage,
         )
     except (InvalidImageError, LocationNotFoundError) as exc:

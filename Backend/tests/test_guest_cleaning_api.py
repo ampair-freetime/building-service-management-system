@@ -64,14 +64,12 @@ def seed_locations(factory: async_sessionmaker[AsyncSession]) -> None:
                 [
                     Location(
                         id=1,
-                        building="A",
                         floor="2",
-                        room="201",
-                        area_type="ห้องเรียน",
+                        area="ห้อง 201",
                         qr_token="active",
                     ),
-                    Location(id=2, building="B", qr_token="inactive", is_active=False),
-                    Location(id=3, building="A", floor="1", qr_token="first"),
+                    Location(id=2, area="ห้องน้ำ", qr_token="inactive", is_active=False),
+                    Location(id=3, floor="1", area="โถง", qr_token="first"),
                 ]
             )
             await session.commit()
@@ -120,7 +118,7 @@ def test_qr_flow_create_and_track(test_context, fake_storage) -> None:
     assert created.status_code == 201
     body = created.json()
     assert body["request_code"].startswith("CLN-")
-    assert body["location"] == "A ชั้น 2 ห้อง 201 ห้องเรียน"
+    assert body["location"] == "ชั้น 2 ห้อง 201"
     assert body["image_count"] == 0
 
     tracked = client.get(
@@ -237,4 +235,69 @@ def test_storage_failure_returns_502_and_rolls_back(test_context, fake_storage) 
         files={"image": ("floor.png", make_png(), "image/png")},
     )
     assert response.status_code == 502
+    assert row_counts(factory) == (0, 0, 0)
+
+
+def test_five_images_and_empty_field_are_saved_in_order(test_context, fake_storage) -> None:
+    client, factory = test_context
+    seed_locations(factory)
+    files = [
+        ("image", (f"floor-{index}.png", make_png(), "image/png"))
+        for index in range(5)
+    ]
+    files.append(("image", ("", b"", "application/octet-stream")))
+
+    response = client.post(
+        "/api/v1/guest/cleaning-requests",
+        data=cleaning_form(),
+        files=files,
+    )
+
+    assert response.status_code == 201
+    assert response.json()["image_count"] == 5
+    assert len(fake_storage.objects) == 5
+    assert row_counts(factory) == (1, 1, 5)
+
+    async def read_sort_orders() -> list[int | None]:
+        async with factory() as session:
+            return list(
+                await session.scalars(select(Image.sort_order).order_by(Image.sort_order))
+            )
+
+    assert asyncio.run(read_sort_orders()) == [0, 1, 2, 3, 4]
+
+
+def test_six_images_are_rejected_before_storage(test_context, fake_storage) -> None:
+    client, factory = test_context
+    seed_locations(factory)
+    response = client.post(
+        "/api/v1/guest/cleaning-requests",
+        data=cleaning_form(),
+        files=[
+            ("image", (f"floor-{index}.png", make_png(), "image/png"))
+            for index in range(6)
+        ],
+    )
+
+    assert response.status_code == 422
+    assert response.json()["detail"][0]["loc"] == ["body", "image"]
+    assert not fake_storage.objects
+    assert row_counts(factory) == (0, 0, 0)
+
+
+def test_invalid_third_image_removes_previous_objects(test_context, fake_storage) -> None:
+    client, factory = test_context
+    seed_locations(factory)
+    response = client.post(
+        "/api/v1/guest/cleaning-requests",
+        data=cleaning_form(),
+        files=[
+            ("image", ("first.png", make_png(), "image/png")),
+            ("image", ("second.png", make_png(), "image/png")),
+            ("image", ("invalid.png", b"not-an-image", "image/png")),
+        ],
+    )
+
+    assert response.status_code == 422
+    assert not fake_storage.objects
     assert row_counts(factory) == (0, 0, 0)
