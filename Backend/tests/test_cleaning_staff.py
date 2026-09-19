@@ -322,3 +322,245 @@ def test_housekeeper_cannot_accept_nonexistent_cleaning_task(
 
     assert response.status_code == 404
     assert response.json()["detail"] == "Cleaning task not found"
+
+
+def test_housekeeper_can_update_cleaning_status_in_order(
+    test_context: tuple[TestClient, async_sessionmaker[AsyncSession]],
+) -> None:
+    client, session_factory = test_context
+
+    seed_location(session_factory)
+
+    seed_staff(
+        session_factory,
+        staff_code="HK001",
+        email="status-housekeeper@example.com",
+        password="correct-password",
+        role="housekeeper",
+        full_name="House Keeper",
+    )
+
+    headers = login_staff(
+        client,
+        "HK001",
+        "correct-password",
+    )
+
+    created = client.post(
+        "/api/v1/guest/cleaning-requests",
+        data={
+            "title": "ทำความสะอาดพื้น",
+            "description": "หน้าห้อง 201",
+            "priority": "normal",
+            "reporter_email": "guest@example.com",
+            "location_id": "1",
+        },
+    )
+
+    assert created.status_code == 201
+
+    request_id = get_request_id(
+        session_factory,
+        created.json()["request_code"],
+    )
+
+    # ก่อนเปลี่ยนสถานะ Cleaner ต้องรับงานก่อน
+    accepted = client.patch(
+        f"/api/v1/cleaning-tasks/{request_id}/accept",
+        headers=headers,
+    )
+
+    assert accepted.status_code == 200
+    assert accepted.json()["status"] == "assigned"
+
+    # assigned -> received
+    received = client.patch(
+        f"/api/v1/cleaning-tasks/{request_id}/status",
+        headers=headers,
+        json={"status": "received"},
+    )
+
+    assert received.status_code == 200
+    assert received.json()["status"] == "received"
+
+    # received -> in_progress
+    in_progress = client.patch(
+        f"/api/v1/cleaning-tasks/{request_id}/status",
+        headers=headers,
+        json={"status": "in_progress"},
+    )
+
+    assert in_progress.status_code == 200
+    assert in_progress.json()["status"] == "in_progress"
+
+    # in_progress -> completed
+    completed = client.patch(
+        f"/api/v1/cleaning-tasks/{request_id}/status",
+        headers=headers,
+        json={"status": "completed"},
+    )
+
+    assert completed.status_code == 200
+    assert completed.json()["status"] == "completed"
+
+    # ตรวจสถานะในฐานข้อมูลจริง
+    async def verify_database() -> None:
+        async with session_factory() as session:
+            task = await session.get(ServiceRequest, request_id)
+
+            assert task is not None
+            assert task.status == RequestStatus.COMPLETED
+
+    asyncio.run(verify_database())
+
+
+def test_housekeeper_cannot_skip_cleaning_status(
+    test_context: tuple[TestClient, async_sessionmaker[AsyncSession]],
+) -> None:
+    client, session_factory = test_context
+
+    seed_location(session_factory)
+
+    seed_staff(
+        session_factory,
+        staff_code="HK001",
+        email="invalid-status-housekeeper@example.com",
+        password="correct-password",
+        role="housekeeper",
+        full_name="House Keeper",
+    )
+
+    headers = login_staff(
+        client,
+        "HK001",
+        "correct-password",
+    )
+
+    created = client.post(
+        "/api/v1/guest/cleaning-requests",
+        data={
+            "title": "เก็บขยะ",
+            "description": "หน้าห้อง 201",
+            "priority": "normal",
+            "reporter_email": "guest@example.com",
+            "location_id": "1",
+        },
+    )
+
+    assert created.status_code == 201
+
+    request_id = get_request_id(
+        session_factory,
+        created.json()["request_code"],
+    )
+
+    accepted = client.patch(
+        f"/api/v1/cleaning-tasks/{request_id}/accept",
+        headers=headers,
+    )
+
+    assert accepted.status_code == 200
+    assert accepted.json()["status"] == "assigned"
+
+    # ห้ามข้าม assigned -> completed
+    response = client.patch(
+        f"/api/v1/cleaning-tasks/{request_id}/status",
+        headers=headers,
+        json={"status": "completed"},
+    )
+
+    assert response.status_code == 409
+
+    # หลังถูกปฏิเสธ สถานะต้องยังเป็น assigned
+    async def verify_database() -> None:
+        async with session_factory() as session:
+            task = await session.get(ServiceRequest, request_id)
+
+            assert task is not None
+            assert task.status == RequestStatus.ASSIGNED
+
+    asyncio.run(verify_database())
+
+
+def test_guest_can_view_updated_cleaning_status(
+    test_context: tuple[TestClient, async_sessionmaker[AsyncSession]],
+) -> None:
+    client, session_factory = test_context
+
+    seed_location(session_factory)
+
+    seed_staff(
+        session_factory,
+        staff_code="HK001",
+        email="progress-housekeeper@example.com",
+        password="correct-password",
+        role="housekeeper",
+        full_name="House Keeper",
+    )
+
+    headers = login_staff(
+        client,
+        "HK001",
+        "correct-password",
+    )
+
+    reporter_email = "guest@example.com"
+
+    created = client.post(
+        "/api/v1/guest/cleaning-requests",
+        data={
+            "title": "ทำความสะอาดห้อง",
+            "description": "ห้อง 201",
+            "priority": "normal",
+            "reporter_email": reporter_email,
+            "location_id": "1",
+        },
+    )
+
+    assert created.status_code == 201
+
+    request_code = created.json()["request_code"]
+    request_id = get_request_id(session_factory, request_code)
+
+    # Cleaner รับงาน
+    accepted = client.patch(
+        f"/api/v1/cleaning-tasks/{request_id}/accept",
+        headers=headers,
+    )
+    assert accepted.status_code == 200
+
+    # Cleaner เปลี่ยนเป็น received
+    updated = client.patch(
+        f"/api/v1/cleaning-tasks/{request_id}/status",
+        headers=headers,
+        json={"status": "received"},
+    )
+
+    assert updated.status_code == 200
+
+    # Guest เข้ามาดูคำร้องของตัวเอง
+    tracking = client.get(
+        f"/api/v1/guest/cleaning-requests/{request_code}",
+        params={"reporter_email": reporter_email},
+    )
+
+    assert tracking.status_code == 200
+    assert tracking.json()["status"] == "received"
+
+    # Cleaner เปลี่ยนต่อเป็น in_progress
+    updated = client.patch(
+        f"/api/v1/cleaning-tasks/{request_id}/status",
+        headers=headers,
+        json={"status": "in_progress"},
+    )
+
+    assert updated.status_code == 200
+
+    # Guest ต้องเห็นสถานะล่าสุด
+    tracking = client.get(
+        f"/api/v1/guest/cleaning-requests/{request_code}",
+        params={"reporter_email": reporter_email},
+    )
+
+    assert tracking.status_code == 200
+    assert tracking.json()["status"] == "in_progress"

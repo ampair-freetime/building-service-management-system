@@ -23,6 +23,7 @@ class RequestType(str, Enum):
 class RequestStatus(str, Enum):
     WAITING = "waiting"
     ASSIGNED = "assigned"
+    RECEIVED = "received"
     IN_PROGRESS = "in_progress"
     COMPLETED = "completed"
     CANCELLED = "cancelled"
