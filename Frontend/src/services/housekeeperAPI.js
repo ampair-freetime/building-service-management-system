@@ -51,3 +51,19 @@ export async function acceptCleaningTask(requestId) {
   );
   return parseResponse(response, "ไม่สามารถรับงานทำความสะอาดได้");
 }
+
+/** อัปเดต Cleaning Task ตามลำดับสถานะที่ Backend อนุญาต */
+export async function updateCleaningTaskStatus(requestId, status) {
+  const response = await fetch(
+    `${API_BASE_URL}/cleaning-tasks/${encodeURIComponent(requestId)}/status`,
+    {
+      method: "PATCH",
+      headers: {
+        ...authHeaders(),
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ status }),
+    },
+  );
+  return parseResponse(response, "ไม่สามารถอัปเดตสถานะงานทำความสะอาดได้");
+}

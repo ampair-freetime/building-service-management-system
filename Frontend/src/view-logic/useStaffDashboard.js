@@ -39,6 +39,7 @@ import {
   acceptCleaningTask,
   getStaffNotifications,
   markStaffNotificationRead,
+  updateCleaningTaskStatus,
 } from "../services/housekeeperAPI.js";
 
 export function useStaffDashboard() {
@@ -101,6 +102,18 @@ export function useStaffDashboard() {
     } catch (error) {
       console.warn("Stored staff profile is invalid:", error);
     }
+
+    // ผูกข้อมูลจำลองกับชื่อบัญชีแม่บ้านที่ login เพื่อทดสอบแท็บ "งานของฉัน"
+    allJobs.forEach((job) => {
+      if (job.assignee === "__CURRENT_HOUSEKEEPER__") {
+        job.assignee = currentUserName.housekeeper;
+      }
+    });
+    workHistory.forEach((record) => {
+      if (record.staff === "__CURRENT_HOUSEKEEPER__") {
+        record.staff = currentUserName.housekeeper;
+      }
+    });
     let currentLostTab = "inventory";
     let currentClerkCenterView = "approvals";
     const readClaimNotifications = new Set();
@@ -395,6 +408,25 @@ export function useStaffDashboard() {
       return job.assigneeCode
         ? `${job.assignee} (${job.assigneeCode})`
         : job.assignee;
+    }
+
+    const cleaningStatusLabels = {
+      assigned: "รับงานแล้ว",
+      received: "รับทราบงาน",
+      in_progress: "กำลังดำเนินการ",
+      completed: "เสร็จสิ้น",
+    };
+    const nextCleaningStatuses = {
+      assigned: "received",
+      received: "in_progress",
+      in_progress: "completed",
+    };
+
+    function nextCleaningStatus(job) {
+      const backendStatus = nextCleaningStatuses[job.backendStatus];
+      return backendStatus
+        ? { backendStatus, label: cleaningStatusLabels[backendStatus] }
+        : null;
     }
     function populateCategoryFilter() {
       const select = $("#categoryFilter");
@@ -834,11 +866,14 @@ export function useStaffDashboard() {
                   j.assignee
                 )}</div>`;
               const icon = j.type === "repair" ? "#i-tools" : "#i-broom";
+              const photo = j.completionPhotoUrl
+                ? `<div class="job-photo has-image"><img src="${escapeHtml(j.completionPhotoUrl)}" alt="รูปหลังดำเนินการ ${escapeHtml(j.title)}" /></div>`
+                : `<div class="job-photo"><svg class="icon"><use href="${icon}"/></svg></div>`;
               return `<article class="job-card ${
                 isMine ? "owned" : ""
               }" tabindex="0" data-job-card="${
                 j.id
-              }"><div class="job-photo"><svg class="icon"><use href="${icon}"/></svg></div><div><div class="job-meta"><span class="badge ${
+              }">${photo}<div><div class="job-meta"><span class="badge ${
                 j.priority === "เร่งด่วน" ? "danger" : "wait"
               }">${j.priority}</span><span class="badge neutral">${
                 j.category
@@ -1910,7 +1945,10 @@ export function useStaffDashboard() {
     async function loadStaffNotifications() {
       try {
         const notifications = await getStaffNotifications();
-        notificationSets[currentRole] = notifications.map((notification) => ({
+        const mockNotifications = notificationSets[currentRole].filter(
+          (notification) => notification.isMock,
+        );
+        notificationSets[currentRole] = [...notifications.map((notification) => ({
           id: notification.id,
           requestId: notification.request_id,
           title: notification.title,
@@ -1921,7 +1959,7 @@ export function useStaffDashboard() {
           }),
           unread: !notification.is_read,
           backend: true,
-        }));
+        })), ...mockNotifications];
         renderNotifications();
       } catch (error) {
         if (await handleUnauthorizedResponse(error.status)) return;
@@ -2376,13 +2414,25 @@ export function useStaffDashboard() {
       if (!job.assignee && currentRole === "admin")
         buttons.push(["assign", "มอบหมายงาน", "primary-action"]);
       if (canEdit && !isTerminalStatus(job.status)) {
-        buttons.push(
-          ["start", "เริ่มดำเนินการ", "primary-action"],
-          ["status", "อัปเดตสถานะ", ""],
-          ["note", "เพิ่มหมายเหตุ", ""],
-          ["upload", "เพิ่มรูป", ""],
-          ["complete", "เสร็จสิ้น", ""]
-        );
+        const cleaningNext = job.backendId ? nextCleaningStatus(job) : null;
+        if (job.type === "cleaning" && job.backendId) {
+          if (cleaningNext) {
+            buttons.push([
+              "status",
+              `เปลี่ยนเป็น ${cleaningNext.label}`,
+              "primary-action",
+            ]);
+          }
+          buttons.push(["note", "เพิ่มหมายเหตุ", ""], ["upload", "เพิ่มรูป", ""]);
+        } else {
+          buttons.push(
+            ["start", "เริ่มดำเนินการ", "primary-action"],
+            ["status", "อัปเดตสถานะ", ""],
+            ["note", "เพิ่มหมายเหตุ", ""],
+            ["upload", "เพิ่มรูป", ""],
+            ["complete", "เสร็จสิ้น", ""]
+          );
+        }
         if (isMine && currentRole !== "admin")
           buttons.push(["return", "คืนงานเข้าคิวกลาง", ""]);
         if (currentRole === "admin")
@@ -2419,6 +2469,20 @@ export function useStaffDashboard() {
         "href",
         job.type === "repair" ? "#i-tools" : "#i-broom"
       );
+      const detailImage = $("#jobDetailImage");
+      const detailIcon = $("#jobDetailIcon");
+      if (detailImage && job.completionPhotoUrl) {
+        detailImage.src = job.completionPhotoUrl;
+        detailImage.alt = `รูปหลังดำเนินการ ${job.title}`;
+        detailImage.hidden = false;
+        if (detailIcon) detailIcon.hidden = true;
+      } else {
+        if (detailImage) {
+          detailImage.hidden = true;
+          detailImage.removeAttribute("src");
+        }
+        if (detailIcon) detailIcon.hidden = false;
+      }
       $("#jobTimeline").innerHTML = jobTimeline(job);
       $("#jobDetailNotes").textContent = job.note || "ยังไม่มีหมายเหตุ";
       renderJobQuickActions(job);
@@ -2476,7 +2540,10 @@ export function useStaffDashboard() {
     function openStatusUpdate(id, trigger = document.activeElement) {
       const job = allJobs.find((item) => item.id === id);
       if (!job) return;
-      const options =
+      const cleaningNext = job.backendId ? nextCleaningStatus(job) : null;
+      const options = cleaningNext
+        ? [cleaningNext.label]
+        :
         currentRole === "technician"
           ? ["กำลังดำเนินการ", "รอข้อมูลเพิ่มเติม", "รออะไหล่", "เสร็จสิ้น"]
           : currentRole === "housekeeper"
@@ -2521,6 +2588,7 @@ export function useStaffDashboard() {
       $("#completeResult").value = "";
       $("#completeNote").value = "";
       $("#completeImage").value = "";
+      resetCompletionPreview();
       $("#completeDate").value = todayISO();
       openModal("completeModal", trigger);
     }
@@ -2557,16 +2625,50 @@ export function useStaffDashboard() {
         return;
       }
       if (action === "start") {
+        const cleaningNext = job.backendId ? nextCleaningStatus(job) : null;
+        const nextStatus = cleaningNext?.label || "กำลังดำเนินการ";
         requestConfirmation(
           "ยืนยันเริ่มดำเนินการ",
-          `เริ่มดำเนินการงาน ${job.id} หรือไม่?`,
-          () => applyJobStatus(job, "กำลังดำเนินการ", "เริ่มดำเนินการ")
+          `เปลี่ยนสถานะงาน ${job.id} เป็น “${nextStatus}” หรือไม่?`,
+          () => applyJobStatus(job, nextStatus, "อัปเดตจากหน้ารายละเอียดงาน")
         );
         return;
       }
     }
-    function applyJobStatus(job, next, note) {
+    async function applyJobStatus(job, next, note) {
       const previous = job.status;
+      const isBackendCleaning = job.type === "cleaning" && job.backendId;
+      if (isBackendCleaning) {
+        const transition = nextCleaningStatus(job);
+        if (!transition || transition.label !== next) {
+          toast("ไม่สามารถเปลี่ยนไปยังสถานะนี้ได้ กรุณาโหลดข้อมูลใหม่");
+          return false;
+        }
+        try {
+          const updatedTask = await updateCleaningTaskStatus(
+            job.backendId,
+            transition.backendStatus,
+          );
+          job.backendStatus = updatedTask.status;
+          job.assignee =
+            updatedTask.assigned_staff?.full_name || job.assignee;
+          job.assigneeCode =
+            updatedTask.assigned_staff?.staff_code || job.assigneeCode;
+          job.assigneeId = updatedTask.assigned_staff?.id || job.assigneeId;
+          next = cleaningStatusLabels[updatedTask.status] || next;
+        } catch (error) {
+          if (await handleUnauthorizedResponse(error.status)) return false;
+          console.error("Updating cleaning task status failed:", error);
+          toast(
+            error.status === 409
+              ? "ลำดับสถานะไม่ถูกต้อง กรุณาโหลดข้อมูลใหม่"
+              : error.status === 403
+                ? "เฉพาะแม่บ้านผู้รับผิดชอบเท่านั้นที่อัปเดตสถานะได้"
+                : error.message || "ไม่สามารถอัปเดตสถานะงานได้",
+          );
+          return false;
+        }
+      }
       job.status = next;
       job.note = note || job.note;
       appendJobTimeline(
@@ -2593,6 +2695,13 @@ export function useStaffDashboard() {
       renderMetrics();
       renderQueue();
       renderStaffOverview();
+      if (isBackendCleaning && job.backendStatus !== "completed") {
+        showSuccess(
+          `เลขงาน: ${job.id}\nสถานะล่าสุด: ${job.status}\nผู้รับผิดชอบ: ${assignedCleanerLabel(job)}`,
+          "อัปเดตสถานะงานสำเร็จ",
+        );
+      }
+      return true;
     }
 
     // -------------------------------------------------------------------------
@@ -3397,12 +3506,51 @@ export function useStaffDashboard() {
       preview.classList.add("visible");
       return true;
     }
+
+    function resetCompletionPreview() {
+      const preview = $("#completionPreview");
+      if (!preview) return;
+      const image = preview.querySelector("img");
+      if (image?.src?.startsWith("blob:")) URL.revokeObjectURL(image.src);
+      image?.removeAttribute("src");
+      const fileName = preview.querySelector("span");
+      if (fileName) fileName.textContent = "";
+      preview.classList.remove("visible");
+    }
+
+    function previewCompletionFile(file) {
+      if (!validImage(file)) {
+        toast("รองรับ JPG, PNG หรือ WebP ไม่เกิน 5 MB");
+        $("#completeImage").value = "";
+        resetCompletionPreview();
+        return false;
+      }
+      const preview = $("#completionPreview");
+      if (!preview) return true;
+      const image = preview.querySelector("img");
+      if (image.src?.startsWith("blob:")) URL.revokeObjectURL(image.src);
+      image.src = URL.createObjectURL(file);
+      preview.querySelector("span").textContent = `${file.name} · ${(
+        file.size / 1048576
+      ).toFixed(1)} MB`;
+      preview.classList.add("visible");
+      return true;
+    }
     $("#progressImage")?.addEventListener("change", (event) => {
       if (event.target.files[0]) previewProgressFile(event.target.files[0]);
     });
     $("#removeProgressImage")?.addEventListener("click", () => {
       $("#progressImage").value = "";
       resetUploadPreview();
+    });
+    $("#completeImage")?.addEventListener("change", (event) => {
+      const file = event.target.files[0];
+      if (file) previewCompletionFile(file);
+      else resetCompletionPreview();
+    });
+    $("#removeCompletionImage")?.addEventListener("click", () => {
+      $("#completeImage").value = "";
+      resetCompletionPreview();
     });
     ["dragenter", "dragover"].forEach((type) =>
       $("#uploadDropZone")?.addEventListener(type, (event) => {
@@ -3427,7 +3575,26 @@ export function useStaffDashboard() {
       $("#progressImage").files = transfer.files;
       previewProgressFile(file);
     });
-    $("#statusUpdateForm")?.addEventListener("submit", (event) => {
+    ["dragenter", "dragover"].forEach((type) =>
+      $("#completionDropZone")?.addEventListener(type, (event) => {
+        event.preventDefault();
+        $("#completionDropZone").classList.add("dragging");
+      })
+    );
+    ["dragleave", "drop"].forEach((type) =>
+      $("#completionDropZone")?.addEventListener(type, (event) => {
+        event.preventDefault();
+        $("#completionDropZone").classList.remove("dragging");
+      })
+    );
+    $("#completionDropZone")?.addEventListener("drop", (event) => {
+      const file = event.dataTransfer.files[0];
+      if (!previewCompletionFile(file)) return;
+      const transfer = new DataTransfer();
+      transfer.items.add(file);
+      $("#completeImage").files = transfer.files;
+    });
+    $("#statusUpdateForm")?.addEventListener("submit", async (event) => {
       event.preventDefault();
       if (!event.currentTarget.checkValidity()) {
         event.currentTarget.reportValidity();
@@ -3448,8 +3615,10 @@ export function useStaffDashboard() {
         $("#completeResult").value = note;
         return;
       }
-      applyJobStatus(job, next, note);
-      toast("บันทึกสถานะเรียบร้อย");
+      const updated = await applyJobStatus(job, next, note);
+      if (updated && !(job.type === "cleaning" && job.backendId)) {
+        toast("บันทึกสถานะเรียบร้อย");
+      }
     });
     $("#noteForm")?.addEventListener("submit", (event) => {
       event.preventDefault();
@@ -3509,7 +3678,7 @@ export function useStaffDashboard() {
       closeModal("uploadModal", false);
       toast("อัปโหลดรูปเรียบร้อย");
     });
-    $("#completeForm")?.addEventListener("submit", (event) => {
+    $("#completeForm")?.addEventListener("submit", async (event) => {
       event.preventDefault();
       if (!event.currentTarget.checkValidity()) {
         event.currentTarget.reportValidity();
@@ -3525,8 +3694,15 @@ export function useStaffDashboard() {
       const summary = `${$("#completeResult").value.trim()} · ${$(
         "#completeNote"
       ).value.trim()}`;
-      applyJobStatus(job, "เสร็จสิ้น", summary);
+      const updated = await applyJobStatus(job, "เสร็จสิ้น", summary);
+      if (!updated) return;
+      if (job.completionPhotoUrl?.startsWith("blob:")) {
+        URL.revokeObjectURL(job.completionPhotoUrl);
+      }
+      job.completionPhotoUrl = URL.createObjectURL(file);
+      job.completionPhotoName = file.name;
       appendJobTimeline(job, "ปิดงาน", `เสร็จวันที่ ${$("#completeDate").value}`);
+      renderJobs();
       closeModal("completeModal", false);
       showSuccess(`ปิดงาน ${job.id} เรียบร้อย งานถูกย้ายไปประวัติแล้ว`);
     });
