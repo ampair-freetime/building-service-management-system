@@ -1,6 +1,7 @@
 """Business logic ร่วมของ guest lost/found endpoints."""
 
 import logging
+from dataclasses import dataclass
 from datetime import datetime
 from uuid import UUID, uuid4
 
@@ -22,7 +23,7 @@ from app.schemas.lost_found_item import (
     GuestItemListResponse,
     GuestItemPublicResponse,
 )
-from app.services.images import prepare_guest_image
+from app.services.images import ProcessedImage, prepare_guest_image
 from app.services.object_storage import (
     ObjectStorage,
     StorageOperationError,
@@ -44,12 +45,22 @@ class ItemPersistenceError(RuntimeError):
     """ไม่สามารถบันทึกรายงานลงฐานข้อมูลได้."""
 
 
+@dataclass(frozen=True)
+class _PreparedImage:
+    """รูปที่อัปขึ้น R2 แล้วแต่ยังไม่มีแถวในฐานข้อมูลอ้างถึง."""
+
+    image_id: UUID
+    processed: ProcessedImage
+    stored: StoredObject
+    sort_order: int
+
+
 async def create_guest_item(
     session: AsyncSession,
     *,
     payload: GuestItemCreateBase,
     report_type: LostType,
-    image_upload: UploadFile | None,
+    image_uploads: list[UploadFile],
     storage: ObjectStorage,
 ) -> GuestItemCreatedResponse:
     """ตรวจข้อมูล อัปโหลดรูป แล้ว commit ประกาศกับ image metadata พร้อมกัน."""
@@ -60,19 +71,7 @@ async def create_guest_item(
 
     item_id = uuid4()
     item_code = _make_item_code(report_type, item_id)
-    processed = None
-    stored: StoredObject | None = None
-    image_id: UUID | None = None
-
-    if _has_uploaded_file(image_upload):
-        processed = await prepare_guest_image(image_upload)
-        image_id = uuid4()
-        object_key = f"lost-found/{report_type.value}/{item_id}/{image_id}.webp"
-        stored = await storage.put(
-            object_key=object_key,
-            data=processed.data,
-            content_type=processed.content_type,
-        )
+    prepared: list[_PreparedImage] = []
 
     private_verification_detail = None
     custody_location = None
@@ -97,6 +96,24 @@ async def create_guest_item(
     )
     committed = False
     try:
+        for sort_order, upload in enumerate(image_uploads):
+            processed = await prepare_guest_image(upload)
+            image_id = uuid4()
+            stored = await storage.put(
+                object_key=(
+                    f"lost-found/{report_type.value}/{item_id}/{image_id}.webp"
+                ),
+                data=processed.data,
+                content_type=processed.content_type,
+            )
+            prepared.append(
+                _PreparedImage(
+                    image_id=image_id,
+                    processed=processed,
+                    stored=stored,
+                    sort_order=sort_order,
+                )
+            )
         session.add(item)
         await session.flush()
         session.add(
@@ -107,20 +124,21 @@ async def create_guest_item(
                 note="Guest submitted report",
             )
         )
-        if stored is not None and processed is not None and image_id is not None:
+        for prepared_image in prepared:
             session.add(
                 Image(
-                    id=image_id,
+                    id=prepared_image.image_id,
                     lost_item_id=item_id,
                     request_id=None,
-                    object_key=stored.object_key,
+                    object_key=prepared_image.stored.object_key,
                     storage_provider="r2",
-                    bucket_name=stored.bucket_name,
-                    content_type=processed.content_type,
-                    size_bytes=len(processed.data),
-                    etag=stored.etag,
-                    width=processed.width,
-                    height=processed.height,
+                    bucket_name=prepared_image.stored.bucket_name,
+                    content_type=prepared_image.processed.content_type,
+                    size_bytes=len(prepared_image.processed.data),
+                    etag=prepared_image.stored.etag,
+                    width=prepared_image.processed.width,
+                    height=prepared_image.processed.height,
+                    sort_order=prepared_image.sort_order,
                     image_type=None,
                     uploaded_by_staff_id=None,
                 )
@@ -133,20 +151,15 @@ async def create_guest_item(
     finally:
         # asyncio.CancelledError สืบทอดจาก BaseException จึงไม่ถูก except ด้านบนจับ
         # ต้องเก็บกวาดใน finally เท่านั้น ไม่งั้นไฟล์ค้างใน R2 โดยไม่มีแถวอ้างถึง
-        if not committed and stored is not None:
-            try:
-                await storage.delete(stored.object_key)
-            except StorageOperationError:
-                logger.exception(
-                    "Failed to remove orphaned R2 object %s after DB rollback",
-                    stored.object_key,
-                )
+        if not committed:
+            await _discard_stored_objects(storage, prepared)
 
     return GuestItemCreatedResponse(
         id=item.id,
         item_code=item.item_code,
         report_type=item.report_type,
         status=item.status,
+        image_count=len(prepared),
         message="รับรายงานแล้ว กรุณารอเจ้าหน้าที่ตรวจสอบก่อนเผยแพร่",
     )
 
@@ -249,7 +262,11 @@ async def _load_image_map(
             Image.lost_item_id.in_(item_ids),
             Image.deleted_at.is_(None),
         )
-        .order_by(Image.created_at, Image.id)
+        .order_by(
+            Image.sort_order.asc().nulls_last(),
+            Image.created_at,
+            Image.id,
+        )
     )
     image_map: dict[UUID, list[Image]] = {}
     for image in result:
@@ -288,9 +305,20 @@ def _to_public_response(
         ],
     )
 
-def _has_uploaded_file(upload: UploadFile | None) -> bool:
-    """input type=file ที่ว่างเปล่ามาถึงเป็น UploadFile ที่ filename เป็นค่าว่าง ไม่ใช่ None."""
-    return upload is not None and bool(upload.filename)
+
+async def _discard_stored_objects(
+    storage: ObjectStorage,
+    prepared: list[_PreparedImage],
+) -> None:
+    """ลบทุก object ที่อัปแล้วเมื่อบันทึกคำร้องไม่สำเร็จ."""
+    for item in prepared:
+        try:
+            await storage.delete(item.stored.object_key)
+        except StorageOperationError:
+            logger.exception(
+                "Failed to remove orphaned R2 object %s after DB rollback",
+                item.stored.object_key,
+            )
 
 
 def _make_item_code(report_type: LostType, item_id: UUID) -> str:

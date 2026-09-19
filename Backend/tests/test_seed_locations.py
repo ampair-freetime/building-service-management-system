@@ -22,8 +22,8 @@ def test_seed_locations_is_idempotent_and_preserves_tokens(
 ) -> None:
     _, factory = test_context
     locations = [
-        {"building": "A", "floor": "1", "room": "101", "area_type": "ห้องเรียน"},
-        {"building": "B", "floor": None, "room": None, "area_type": "โถง"},
+        {"floor": "1", "area": "ห้อง 101"},
+        {"floor": None, "area": "โถง"},
     ]
     monkeypatch.setattr(location_seed, "AsyncSessionLocal", factory)
     monkeypatch.setattr(location_seed, "LOCATIONS", locations)

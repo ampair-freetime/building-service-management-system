@@ -10,6 +10,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    SmallInteger,
     String,
     Text,
     Uuid,
@@ -53,6 +54,8 @@ class Image(Base):
     etag: Mapped[str | None] = mapped_column(String(128), nullable=True)
     width: Mapped[int | None] = mapped_column(Integer, nullable=True)
     height: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # ลำดับที่ guest แนบรูป ค่า NULL ใช้กับข้อมูลเก่าและรูปจาก staff ที่ไม่ได้กำหนดลำดับ
+    sort_order: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
     image_type: Mapped[ImageType | None] = mapped_column(
         SqlEnum(
             ImageType,

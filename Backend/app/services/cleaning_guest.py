@@ -54,6 +54,7 @@ class _PreparedImage:
     image_id: UUID
     processed: ProcessedImage
     stored: StoredObject
+    sort_order: int
 
 
 async def list_guest_locations(session: AsyncSession) -> list[GuestLocationResponse]:
@@ -61,15 +62,13 @@ async def list_guest_locations(session: AsyncSession) -> list[GuestLocationRespo
     locations = await session.scalars(
         select(Location)
         .where(Location.is_active.is_(True))
-        .order_by(Location.building, Location.floor, Location.room, Location.id)
+        .order_by(Location.floor, Location.area, Location.id)
     )
     return [
         GuestLocationResponse(
             id=location.id,
-            building=location.building,
             floor=location.floor,
-            room=location.room,
-            area_type=location.area_type,
+            area=location.area,
         )
         for location in locations
     ]
@@ -96,10 +95,8 @@ async def resolve_location_by_qr(
 
     return GuestLocationResponse(
         id=location.id,
-        building=location.building,
         floor=location.floor,
-        room=location.room,
-        area_type=location.area_type,
+        area=location.area,
     )
 
 
@@ -107,7 +104,7 @@ async def create_guest_cleaning_request(
     session: AsyncSession,
     *,
     payload: GuestCleaningCreate,
-    image_upload: UploadFile | None,
+    image_uploads: list[UploadFile],
     storage: ObjectStorage | None,
 ) -> GuestCleaningCreateResponse:
     """เตรียมคำร้อง รูป และ response ให้ครบก่อน commit ฐานข้อมูล."""
@@ -133,17 +130,25 @@ async def create_guest_cleaning_request(
     )
     committed = False
     try:
-        if _has_uploaded_file(image_upload):
+        if image_uploads:
             if storage is None:
                 raise StorageConfigurationError("Object storage is not configured")
-            processed = await prepare_guest_image(image_upload)
-            image_id = uuid4()
-            stored = await storage.put(
-                object_key=f"cleaning/{request_id}/{image_id}.webp",
-                data=processed.data,
-                content_type=processed.content_type,
-            )
-            prepared.append(_PreparedImage(image_id=image_id, processed=processed, stored=stored))
+            for sort_order, upload in enumerate(image_uploads):
+                processed = await prepare_guest_image(upload)
+                image_id = uuid4()
+                stored = await storage.put(
+                    object_key=f"cleaning/{request_id}/{image_id}.webp",
+                    data=processed.data,
+                    content_type=processed.content_type,
+                )
+                prepared.append(
+                    _PreparedImage(
+                        image_id=image_id,
+                        processed=processed,
+                        stored=stored,
+                        sort_order=sort_order,
+                    )
+                )
 
         session.add(service_request)
         await session.flush()
@@ -178,6 +183,7 @@ async def create_guest_cleaning_request(
                     etag=item.stored.etag,
                     width=item.processed.width,
                     height=item.processed.height,
+                    sort_order=item.sort_order,
                     # CheckConstraint image_parent_check บังคับว่ารูปที่ผูกกับ request_id
                     # ต้องมี image_type เสมอ ต่างจากรูปของ lost item ที่ต้องเป็น NULL
                     image_type=ImageType.BEFORE,
@@ -266,19 +272,9 @@ async def _discard_stored_objects(
 
 def _format_location(location: Location) -> str:
     """ประกอบชื่อสถานที่ที่ลงทะเบียนไว้สำหรับแสดงผล."""
-    parts = [location.building]
     if location.floor:
-        parts.append(f"ชั้น {location.floor}")
-    if location.room:
-        parts.append(f"ห้อง {location.room}")
-    if location.area_type:
-        parts.append(location.area_type)
-    return " ".join(parts)
-
-
-def _has_uploaded_file(upload: UploadFile | None) -> bool:
-    """input type=file ที่ว่างเปล่ามาถึงเป็น UploadFile ที่ filename เป็นค่าว่าง ไม่ใช่ None."""
-    return upload is not None and bool(upload.filename)
+        return f"ชั้น {location.floor} {location.area}"
+    return location.area
 
 
 def _make_request_code(request_id: UUID) -> str:

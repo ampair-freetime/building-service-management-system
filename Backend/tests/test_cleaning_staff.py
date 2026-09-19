@@ -18,10 +18,8 @@ def seed_location(
             session.add(
                 Location(
                     id=1,
-                    building="A",
                     floor="2",
-                    room="201",
-                    area_type="ห้องเรียน",
+                    area="ห้อง 201",
                     qr_token="cleaning-staff-test",
                 )
             )

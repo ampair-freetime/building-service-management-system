@@ -23,10 +23,8 @@ class GuestCleaningCreate(BaseModel):
 # จากการแสกน QR code
 class GuestLocationResponse(BaseModel):
     id: int
-    building: str
     floor: str | None
-    room: str | None
-    area_type: str | None
+    area: str
 
 
 class GuestCleaningCreateResponse(BaseModel):
