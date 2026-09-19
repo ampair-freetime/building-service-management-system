@@ -1,7 +1,7 @@
 /**
  * สร้าง state เริ่มต้นสำหรับ Staff Dashboard
- * เก็บเฉพาะ configuration ของหน้าจอและ collection ว่างเท่านั้น
- * ข้อมูลรายการจริงต้องถูกโหลดจาก Backend ภายใน useStaffDashboard.js
+ * ข้อมูลจริงจะถูกโหลดจาก Backend ภายใน useStaffDashboard.js
+ * MOCK-CLEAN-001 ใช้ทดสอบหน้าจอแม่บ้านเฉพาะฝั่ง Frontend
  */
 export function createStaffDashboardData() {
   // ข้อความ สี และเมนูประจำ role เป็น UI configuration ไม่ใช่ข้อมูลจำลอง
@@ -76,8 +76,25 @@ export function createStaffDashboardData() {
     admin: "แอดมิน",
   };
 
-  // ข้อมูลจริงจะถูกเติมจาก API เท่านั้น
-  const allJobs = [];
+  // ไม่มี backendId เพื่อให้ปุ่มรับงานทำงานแบบ local และไม่เรียก API ด้วย UUID ปลอม
+  const allJobs = [
+    {
+      id: "MOCK-CLEAN-001",
+      type: "cleaning",
+      category: "พื้นเปียก/คราบสกปรก",
+      title: "พื้นบริเวณโถงชั้น 1 มีคราบน้ำ",
+      room: "โถงอาคาร CSB ชั้น 1",
+      reporter: "ผู้ใช้งานทดสอบ",
+      reporterContact: "tester@example.com",
+      time: "เมื่อสักครู่",
+      status: "รอรับงาน",
+      priority: "เร่งด่วน",
+      detail: "พบคราบน้ำใกล้ทางเข้าหลัก กรุณาตรวจสอบและทำความสะอาด",
+      assignee: null,
+      timeline: [],
+      isMock: true,
+    },
+  ];
   const staffData = [];
   const lostSets = {
     inventory: [],

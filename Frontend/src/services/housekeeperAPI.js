@@ -27,6 +27,7 @@ async function parseResponse(response, fallbackMessage) {
 /** โหลดการแจ้งเตือนของ Staff ที่กำลังเข้าสู่ระบบ */
 export async function getStaffNotifications() {
   const response = await fetch(`${API_BASE_URL}/notifications`, {
+    method: "GET",
     headers: authHeaders(),
   });
   return parseResponse(response, "ไม่สามารถโหลดการแจ้งเตือนได้");
@@ -35,8 +36,18 @@ export async function getStaffNotifications() {
 /** บันทึกว่าการแจ้งเตือนหนึ่งรายการถูกอ่านแล้ว */
 export async function markStaffNotificationRead(notificationId) {
   const response = await fetch(
-    `${API_BASE_URL}/notifications/${encodeURIComponent(notificationId)}/read`,
-    { method: "PATCH", headers: authHeaders() },
+    `${API_BASE_URL}/notifications/${encodeURIComponent(notificationId)}/read`,{
+        method: "PATCH",
+        headers: authHeaders() },
   );
   return parseResponse(response, "ไม่สามารถอัปเดตการแจ้งเตือนได้");
+}
+
+/** ให้แม่บ้านที่ login รับ Cleaning Task ที่ยังไม่มีผู้รับผิดชอบ */
+export async function acceptCleaningTask(requestId) {
+  const response = await fetch(
+    `${API_BASE_URL}/cleaning-tasks/${encodeURIComponent(requestId)}/accept`,
+    { method: "PATCH", headers: authHeaders() },
+  );
+  return parseResponse(response, "ไม่สามารถรับงานทำความสะอาดได้");
 }

@@ -624,6 +624,12 @@ body {
   place-items: center;
   border: 2px solid #fff;
 }
+.notification-count[hidden] {
+  display: none;
+}
+#successModalText {
+  white-space: pre-line;
+}
 .notification-wrap {
   position: relative;
 }

@@ -187,7 +187,12 @@ const { activeRole } = useStaffDashboard();
                   ></path>
                   <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
                 </svg>
-                <span class="notification-count" id="notificationCount">3</span>
+                <span
+                  class="notification-count"
+                  id="notificationCount"
+                  aria-live="polite"
+                  hidden
+                ></span>
               </button>
               <Teleport to="body">
                 <section
@@ -234,7 +239,12 @@ const { activeRole } = useStaffDashboard();
       </button>
       <button type="button" id="mobileNotification">
         <svg class="icon"><use href="#i-bell" /></svg><span>แจ้งเตือน</span
-        ><span class="notification-count" id="mobileNotificationCount">3</span>
+        ><span
+          class="notification-count"
+          id="mobileNotificationCount"
+          aria-live="polite"
+          hidden
+        ></span>
       </button>
       <button type="button" id="mobileProfile">
         <svg class="icon"><use href="#i-user" /></svg><span>โปรไฟล์</span>

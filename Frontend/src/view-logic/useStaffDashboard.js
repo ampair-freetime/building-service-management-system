@@ -36,6 +36,7 @@ import {
   toDashboardStaff,
 } from "./staff-dashboard/staff-accounts.js";
 import {
+  acceptCleaningTask,
   getStaffNotifications,
   markStaffNotificationRead,
 } from "../services/housekeeperAPI.js";
@@ -386,6 +387,14 @@ export function useStaffDashboard() {
     }
     function activeStaffName() {
       return currentUserName[currentRole];
+    }
+
+    // แสดงชื่อและรหัสพนักงานจาก assigned_staff ที่ Backend ส่งกลับมา
+    function assignedCleanerLabel(job) {
+      if (!job.assignee) return "ยังไม่มีผู้รับผิดชอบ";
+      return job.assigneeCode
+        ? `${job.assignee} (${job.assigneeCode})`
+        : job.assignee;
     }
     function populateCategoryFilter() {
       const select = $("#categoryFilter");
@@ -842,7 +851,7 @@ export function useStaffDashboard() {
               }</span><span>${
                 j.time
               }</span><span class="assignee"><span class="assignee-dot"></span>${
-                j.assignee || "ยังไม่มีผู้รับผิดชอบ"
+                escapeHtml(assignedCleanerLabel(j))
               }</span></div></div><div class="job-actions">${actions}<button class="small-btn" type="button" data-job-action="detail" data-job-id="${
                 j.id
               }">ดูรายละเอียด</button></div></article>`;
@@ -863,23 +872,54 @@ export function useStaffDashboard() {
       requestConfirmation(
         "ยืนยันการรับงาน",
         "เมื่อรับงานแล้ว งานนี้จะย้ายไปอยู่ในงานของฉัน และ Staff คนอื่นจะไม่สามารถแก้ไขงานนี้ได้",
-        () => {
-          acceptJob(id);
+        async () => {
+          const acceptedJob = await acceptJob(id);
+          if (!acceptedJob) return;
           appendJobTimeline(job, "รับงาน", `รับผิดชอบโดย ${activeStaffName()}`);
-          toast("รับงานเรียบร้อย");
+          if (selectedJobId === id) {
+            $("#jobTimeline").innerHTML = jobTimeline(job);
+          }
+          showSuccess(
+            `เลขงาน: ${acceptedJob.id}\nสถานะ: ${acceptedJob.status}\nผู้รับผิดชอบ: ${assignedCleanerLabel(acceptedJob)}`,
+            "รับงานทำความสะอาดสำเร็จ",
+          );
         },
         "ยืนยันรับงาน"
       );
     }
-    function acceptJob(id) {
+    async function acceptJob(id) {
       const job = allJobs.find((j) => j.id === id);
       if (!job || job.assignee) {
         toast("งานนี้มีเจ้าหน้าที่คนอื่นรับแล้ว");
         renderJobs();
-        return;
+        return false;
       }
-      job.assignee = activeStaffName();
-      job.status = "รับงานแล้ว";
+
+      // งานที่เปิดจาก notification ต้องให้ Backend ยืนยันก่อนเปลี่ยน UI
+      if (job.type === "cleaning" && job.backendId) {
+        try {
+          const acceptedTask = await acceptCleaningTask(job.backendId);
+          job.assignee =
+            acceptedTask.assigned_staff?.full_name || activeStaffName();
+          job.assigneeCode = acceptedTask.assigned_staff?.staff_code || "";
+          job.assigneeId = acceptedTask.assigned_staff?.id || "";
+          job.backendStatus = acceptedTask.status;
+          job.status = "รับงานแล้ว";
+        } catch (error) {
+          if (await handleUnauthorizedResponse(error.status)) return false;
+          console.error("Accepting cleaning task failed:", error);
+          toast(
+            error.status === 409
+              ? "งานนี้มีแม่บ้านคนอื่นรับไปแล้ว"
+              : error.message || "ไม่สามารถรับงานทำความสะอาดได้",
+          );
+          await loadStaffNotifications();
+          return false;
+        }
+      } else {
+        job.assignee = activeStaffName();
+        job.status = "รับงานแล้ว";
+      }
       job.returnReason = "";
       currentBoardView = "mine";
       $$("#boardTabs .board-tab").forEach((t) =>
@@ -894,15 +934,20 @@ export function useStaffDashboard() {
         status: job.status,
         detail: `รับงานจากคิวร่วม · ${job.room}`,
       });
-      toast(`รับงาน ${id} แล้ว งานย้ายไป “งานของฉัน”`);
       renderJobs();
       renderMetrics();
       renderQueue();
+      if (selectedJobId === id) {
+        $("#jobDetailAssignee").textContent = assignedCleanerLabel(job);
+        $("#jobTimeline").innerHTML = jobTimeline(job);
+        renderJobQuickActions(job);
+      }
       addNotification(
         currentRole,
         `รับงาน ${id} สำเร็จ`,
         `คุณเป็นผู้รับผิดชอบงาน “${job.title}” แล้ว`
       );
+      return job;
     }
     function updateJob(id, button) {
       const job = allJobs.find((j) => j.id === id);
@@ -1861,6 +1906,60 @@ export function useStaffDashboard() {
     // 9) ระบบ Notification
     // -------------------------------------------------------------------------
 
+    // โหลด notification ของบัญชีที่ login จาก Backend แล้วแปลงให้ตรงกับ UI
+    async function loadStaffNotifications() {
+      try {
+        const notifications = await getStaffNotifications();
+        notificationSets[currentRole] = notifications.map((notification) => ({
+          id: notification.id,
+          requestId: notification.request_id,
+          title: notification.title,
+          text: notification.message,
+          time: new Date(notification.created_at).toLocaleString("th-TH", {
+            dateStyle: "short",
+            timeStyle: "short",
+          }),
+          unread: !notification.is_read,
+          backend: true,
+        }));
+        renderNotifications();
+      } catch (error) {
+        if (await handleUnauthorizedResponse(error.status)) return;
+        console.error("Loading staff notifications failed:", error);
+        toast(error.message || "ไม่สามารถโหลดการแจ้งเตือนได้");
+      }
+    }
+
+    // อัปเดต badge ทั้ง Desktop/Mobile และซ่อนเมื่อไม่มีรายการที่ยังไม่อ่าน
+    function updateUnreadNotificationCount(unreadCount) {
+      const visibleCount = unreadCount > 99 ? "99+" : String(unreadCount);
+      [$("#notificationCount"), $("#mobileNotificationCount")].forEach(
+        (badge) => {
+          if (!badge) return;
+          badge.textContent = visibleCount;
+          badge.hidden = unreadCount === 0;
+          badge.style.display = unreadCount > 0 ? "grid" : "none";
+          badge.setAttribute("aria-label", `${unreadCount} การแจ้งเตือนที่ยังไม่ได้อ่าน`);
+        },
+      );
+
+      $("#notificationButton")?.setAttribute(
+        "aria-label",
+        unreadCount > 0
+          ? `เปิดการแจ้งเตือน มี ${unreadCount} รายการที่ยังไม่ได้อ่าน`
+          : "เปิดการแจ้งเตือน",
+      );
+      $("#mobileNotification")?.setAttribute(
+        "aria-label",
+        unreadCount > 0
+          ? `เปิดการแจ้งเตือน มี ${unreadCount} รายการที่ยังไม่ได้อ่าน`
+          : "เปิดการแจ้งเตือน",
+      );
+
+      const markAllButton = $("#markAllRead");
+      if (markAllButton) markAllButton.disabled = unreadCount === 0;
+    }
+
     // รวม notification ของ role ปัจจุบันและคำร้องใหม่ก่อน render
     function renderNotifications() {
       const list = notificationSets[currentRole] || [];
@@ -1868,12 +1967,7 @@ export function useStaffDashboard() {
       const claims = currentRole === "clerk" ? activeClaimNotifications() : [];
       const unread = list.filter((n) => n.unread).length + approvals.length + claims.filter((n) => n.unread).length;
       $("#notificationTitle").textContent = currentRole === "clerk" ? "การแจ้งเตือนของธุรการ" : `การแจ้งเตือนของ${roleConfig[currentRole].label}`;
-      [$("#notificationCount"), $("#mobileNotificationCount")].forEach(
-        (badge) => {
-          badge.textContent = unread;
-          badge.style.display = unread ? "grid" : "none";
-        }
-      );
+      updateUnreadNotificationCount(unread);
       if (!list.length && !approvals.length && !claims.length) {
         $("#notificationList").innerHTML =
           '<div class="notification-empty">ไม่มีการแจ้งเตือน</div>';
@@ -1920,11 +2014,30 @@ export function useStaffDashboard() {
         text,
         time: "เมื่อสักครู่",
         unread,
+        backend: false,
       });
       if (role === currentRole) renderNotifications();
     }
-    function markNotificationsRead() {
-      notificationSets[currentRole].forEach((n) => (n.unread = false));
+    async function markNotificationsRead() {
+      const notifications = notificationSets[currentRole];
+      const backendUnread = notifications.filter(
+        (notification) => notification.unread && notification.backend,
+      );
+      try {
+        await Promise.all(
+          backendUnread.map((notification) =>
+            markStaffNotificationRead(notification.id),
+          ),
+        );
+        notifications.forEach((notification) => {
+          notification.unread = false;
+        });
+      } catch (error) {
+        if (await handleUnauthorizedResponse(error.status)) return;
+        console.error("Marking notifications as read failed:", error);
+        toast(error.message || "ไม่สามารถอัปเดตการแจ้งเตือนได้");
+        return;
+      }
       if (currentRole === "clerk") lostSets.claims.filter((item) => item.status !== "คืนของแล้ว").forEach((item) => readClaimNotifications.add(item.id));
       renderNotifications();
       toast("ทำเครื่องหมายว่าอ่านทั้งหมดแล้ว");
@@ -2238,7 +2351,7 @@ export function useStaffDashboard() {
     function jobTimeline(job) {
       const steps = [
         ["สร้างคำร้อง", job.time],
-        ["ผู้รับผิดชอบ", job.assignee || "ยังไม่มีผู้รับผิดชอบ"],
+        ["ผู้รับผิดชอบ", assignedCleanerLabel(job)],
         ...(job.timeline || []).map((item) => [
           item.title,
           `${item.detail} · ${item.time}`,
@@ -2293,9 +2406,10 @@ export function useStaffDashboard() {
       $("#jobDetailDescription").textContent = job.detail;
       $("#jobDetailRoom").textContent = job.room;
       $("#jobDetailReporter").textContent = job.reporter;
-      $("#jobDetailContact").textContent = "building.user@cmu.ac.th";
+      $("#jobDetailContact").textContent =
+        job.reporterContact || "ติดต่อผ่านระบบ CS Building Care";
       $("#jobDetailAssignee").textContent =
-        job.assignee || "ยังไม่มีผู้รับผิดชอบ";
+        assignedCleanerLabel(job);
       $("#jobDetailBadges").innerHTML = `<span class="badge ${
         job.priority === "เร่งด่วน" ? "danger" : "wait"
       }">${job.priority}</span><span class="badge ${badgeClass(job.status)}">${
@@ -2309,6 +2423,55 @@ export function useStaffDashboard() {
       $("#jobDetailNotes").textContent = job.note || "ยังไม่มีหมายเหตุ";
       renderJobQuickActions(job);
       openModal("jobDetailModal", trigger);
+    }
+
+    // Notification มี request_id และข้อความรูปแบบ "request_code: title"
+    // จึงสร้างรายการงานจากข้อมูลจริงที่ Backend ส่งมาแล้วเปิด modal รายละเอียด
+    function openCleaningRequestFromNotification(
+      notification,
+      trigger = document.activeElement,
+    ) {
+      if (!notification.requestId) return false;
+
+      const separatorIndex = notification.text.indexOf(":");
+      const requestCode =
+        separatorIndex > 0
+          ? notification.text.slice(0, separatorIndex).trim()
+          : `CLEAN-${notification.requestId.slice(0, 8).toUpperCase()}`;
+      const requestTitle =
+        separatorIndex > 0
+          ? notification.text.slice(separatorIndex + 1).trim()
+          : notification.title;
+
+      let job = allJobs.find(
+        (item) =>
+          item.backendId === notification.requestId || item.id === requestCode,
+      );
+      if (!job) {
+        job = {
+          backendId: notification.requestId,
+          id: requestCode,
+          type: "cleaning",
+          category: "งานทำความสะอาด",
+          title: requestTitle || notification.title,
+          room: "ดูสถานที่จากรายละเอียดคำร้อง",
+          reporter: "ผู้ใช้งานอาคาร",
+          reporterContact: "ติดต่อผ่านระบบ CS Building Care",
+          time: notification.time,
+          status: "รอรับงาน",
+          priority: "ปกติ",
+          detail: notification.text,
+          assignee: null,
+          timeline: [],
+        };
+        allJobs.unshift(job);
+      }
+
+      navigate("jobs");
+      renderJobs();
+      renderMetrics();
+      openJobDetail(job.id, trigger);
+      return true;
     }
     function openStatusUpdate(id, trigger = document.activeElement) {
       const job = allJobs.find((item) => item.id === id);
@@ -3475,7 +3638,7 @@ export function useStaffDashboard() {
       event.stopPropagation();
       toggleNotificationPanel(event.currentTarget);
     });
-    $("#notificationPanel")?.addEventListener("click", (event) => {
+    $("#notificationPanel")?.addEventListener("click", async (event) => {
       event.stopPropagation();
       const clerkTarget = event.target.closest("[data-clerk-notification-target]");
       if (clerkTarget) {
@@ -3504,9 +3667,27 @@ export function useStaffDashboard() {
         (entry) => entry.id === itemButton.dataset.notificationId
       );
       if (!item) return;
-      item.unread = false;
+      if (item.unread && item.backend) {
+        try {
+          await markStaffNotificationRead(item.id);
+          item.unread = false;
+        } catch (error) {
+          if (await handleUnauthorizedResponse(error.status)) return;
+          console.error("Marking notification as read failed:", error);
+          toast(error.message || "ไม่สามารถอัปเดตการแจ้งเตือนได้");
+          return;
+        }
+      } else {
+        item.unread = false;
+      }
       renderNotifications();
       $("#notificationPanel").classList.remove("open");
+      if (
+        currentRole === "housekeeper" &&
+        openCleaningRequestFromNotification(item, itemButton)
+      ) {
+        return;
+      }
       const match = item.text.match(/(?:CL|RP)-\d+/);
       if (match) openJobDetail(match[0], itemButton);
       else if (currentRole === "clerk") navigate("clerk-center");
@@ -3984,6 +4165,7 @@ export function useStaffDashboard() {
       await loadPendingLostItems();
       await loadApprovedLostFoundItems();
       await loadPendingOwnershipRequests();
+      await loadStaffNotifications();
       setRole(allowedRoles.includes(currentRole) ? currentRole : "admin");
     }
 
