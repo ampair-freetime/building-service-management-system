@@ -15,11 +15,27 @@ from app.schemas.repair_staff import (
     RepairRequestListItem,
     RepairRequestListResponse,
     RepairRequestLocationResponse,
+    AssignedTechnicianResponse,
+    RepairTaskResponse,
+    RepairStatusUpdateRequest,
+    RepairNoteRequest,
+    RepairNoteResponse,
+    RepairWorkHistoryItem,
+    RepairWorkHistoryResponse,
 )
 from app.services.repair_staff import (
     RepairRequestNotFoundError,
     get_repair_request_detail,
     list_repair_requests,
+    RepairTaskAlreadyAssignedError,
+    accept_repair_task,
+    InvalidRepairStatusTransitionError,
+    update_repair_task_status,
+    RepairTaskNotInProgressError,
+    complete_repair_task,
+    RepairTaskNotCompletedError,
+    add_repair_completion_note,
+    get_repair_work_history,
 )
 
 router = APIRouter()
@@ -125,4 +141,216 @@ async def read_repair_request_detail(
         created_at=request.created_at,
         updated_at=request.updated_at,
         completed_at=request.completed_at,
+    )
+
+
+@router.patch(
+    "/{request_id}/accept",
+    response_model=RepairTaskResponse,
+)
+async def accept_task(
+    request_id: UUID,
+    session: DbSession,
+    technician: TechnicianStaff,
+) -> RepairTaskResponse:
+    try:
+        task = await accept_repair_task(
+            session,
+            request_id=request_id,
+            staff_id=technician.id,
+        )
+    except RepairRequestNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
+    except RepairTaskAlreadyAssignedError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc),
+        ) from exc
+
+    return RepairTaskResponse(
+        id=task.id,
+        request_code=task.request_code,
+        title=task.title,
+        status=task.status.value,
+        assigned_staff=AssignedTechnicianResponse(
+            id=technician.id,
+            staff_code=technician.staff_code,
+            full_name=technician.full_name,
+        ),
+    )
+
+
+@router.patch(
+    "/{request_id}/status",
+    response_model=RepairTaskResponse,
+)
+async def update_task_status(
+    request_id: UUID,
+    payload: RepairStatusUpdateRequest,
+    session: DbSession,
+    technician: TechnicianStaff,
+) -> RepairTaskResponse:
+    try:
+        task = await update_repair_task_status(
+            session,
+            request_id=request_id,
+            staff_id=technician.id,
+            new_status=payload.status,
+        )
+    except RepairRequestNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
+    except RepairTaskAlreadyAssignedError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(exc),
+        ) from exc
+    except InvalidRepairStatusTransitionError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc),
+        ) from exc
+
+    return RepairTaskResponse(
+        id=task.id,
+        request_code=task.request_code,
+        title=task.title,
+        status=task.status.value,
+        assigned_staff=AssignedTechnicianResponse(
+            id=technician.id,
+            staff_code=technician.staff_code,
+            full_name=technician.full_name,
+        ),
+    )
+
+
+@router.patch(
+    "/{request_id}/complete",
+    response_model=RepairTaskResponse,
+)
+async def complete_task(
+    request_id: UUID,
+    session: DbSession,
+    technician: TechnicianStaff,
+) -> RepairTaskResponse:
+    try:
+        task = await complete_repair_task(
+            session,
+            request_id=request_id,
+            staff_id=technician.id,
+        )
+    except RepairRequestNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
+    except RepairTaskAlreadyAssignedError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(exc),
+        ) from exc
+    except RepairTaskNotInProgressError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc),
+        ) from exc
+
+    return RepairTaskResponse(
+        id=task.id,
+        request_code=task.request_code,
+        title=task.title,
+        status=task.status.value,
+        assigned_staff=AssignedTechnicianResponse(
+            id=technician.id,
+            staff_code=technician.staff_code,
+            full_name=technician.full_name,
+        ),
+    )
+
+
+@router.post(
+    "/{request_id}/completion-note",
+    response_model=RepairNoteResponse,
+)
+async def add_completion_note(
+    request_id: UUID,
+    payload: RepairNoteRequest,
+    session: DbSession,
+    technician: TechnicianStaff,
+) -> RepairNoteResponse:
+    try:
+        history = await add_repair_completion_note(
+            session,
+            request_id=request_id,
+            staff_id=technician.id,
+            note=payload.note,
+        )
+    except RepairRequestNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
+    except RepairTaskAlreadyAssignedError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(exc),
+        ) from exc
+    except RepairTaskNotCompletedError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc),
+        ) from exc
+
+    return RepairNoteResponse(
+        id=history.id,
+        request_id=history.request_id,
+        note=history.note or "",
+        created_at=history.created_at,
+    )
+
+
+@router.get(
+    "/{request_id}/history",
+    response_model=RepairWorkHistoryResponse,
+)
+async def get_work_history(
+    request_id: UUID,
+    session: DbSession,
+    technician: TechnicianStaff,
+) -> RepairWorkHistoryResponse:
+    try:
+        history = await get_repair_work_history(
+            session,
+            request_id=request_id,
+            staff_id=technician.id,
+        )
+    except RepairRequestNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
+    except RepairTaskAlreadyAssignedError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(exc),
+        ) from exc
+
+    return RepairWorkHistoryResponse(
+        request_id=request_id,
+        history=[
+            RepairWorkHistoryItem(
+                id=item.id,
+                action=item.action,
+                note=item.note,
+                old_status=item.old_status,
+                new_status=item.new_status,
+                created_at=item.created_at,
+            )
+            for item in history
+        ],
     )
