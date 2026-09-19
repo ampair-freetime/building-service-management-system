@@ -47,9 +47,7 @@ import {
 import {
   acceptRepairRequest,
   addRepairCompletionNote,
-  getRepairTaskHistory,
-  getStaffNotifications,
-  markStaffNotificationRead,
+  getRepairRequestHistory,
   updateRepairRequestStatus,
   uploadRepairCompletionPhotos,
 } from "../services/technicianAPI.js";

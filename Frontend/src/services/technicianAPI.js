@@ -95,8 +95,8 @@ export async function uploadRepairCompletionPhotos(requestId, files) {
   return parseResponse(response, "ไม่สามารถอัปโหลดรูปหลังดำเนินการได้");
 }
 
-/** โหลดประวัติของ Cleaning Task ที่แม่บ้านคนปัจจุบันรับผิดชอบ */
-export async function getCleaningTaskHistory(requestId) {
+/** โหลดประวัติของ Repair request ที่คนปัจจุบันรับผิดชอบ */
+export async function getRepairRequestHistory(requestId) {
   const response = await fetch(
     `${API_BASE_URL}/repair-requests/${encodeURIComponent(requestId)}/history`,
     { method: "GET", headers: authHeaders() },
