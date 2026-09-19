@@ -334,8 +334,14 @@
             ><textarea id="completeResult" required></textarea>
           </div>
           <div class="field">
-            <label for="completeNote">หมายเหตุปิดงาน</label
-            ><textarea id="completeNote" required></textarea>
+            <label for="completeNote">หมายเหตุปิดงาน</label>
+            <textarea
+              id="completeNote"
+              maxlength="2000"
+              placeholder="ระบุรายละเอียดเพิ่มเติม เช่น จุดที่ทำความสะอาดหรือสิ่งที่ควรติดตาม"
+              required
+            ></textarea>
+            <small>สูงสุด 2,000 ตัวอักษร</small>
           </div>
           <div class="field">
             <label for="completeImage">รูปหลังดำเนินการ</label>

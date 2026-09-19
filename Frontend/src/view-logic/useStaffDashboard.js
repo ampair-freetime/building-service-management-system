@@ -37,10 +37,22 @@ import {
 } from "./staff-dashboard/staff-accounts.js";
 import {
   acceptCleaningTask,
+  addCleaningCompletionNote,
+  getCleaningTaskHistory,
   getStaffNotifications,
   markStaffNotificationRead,
   updateCleaningTaskStatus,
+  uploadCleaningCompletionPhotos,
 } from "../services/housekeeperAPI.js";
+import {
+  acceptRepairRequest,
+  addRepairCompletionNote,
+  getRepairTaskHistory,
+  getStaffNotifications,
+  markStaffNotificationRead,
+  updateRepairRequestStatus,
+  uploadRepairCompletionPhotos,
+} from "../services/technicianAPI.js";
 
 export function useStaffDashboard() {
   // ---------------------------------------------------------------------------
@@ -2447,7 +2459,7 @@ export function useStaffDashboard() {
             .join("")
         : '<div class="read-only" style="grid-column:1/-1">ดูรายละเอียดได้ แต่ไม่มีสิทธิ์แก้ไขงานนี้</div>';
     }
-    function openJobDetail(id, trigger = document.activeElement) {
+    async function openJobDetail(id, trigger = document.activeElement) {
       const job = allJobs.find((item) => item.id === id);
       if (!job) return;
       selectedJobId = id;
@@ -2487,6 +2499,59 @@ export function useStaffDashboard() {
       $("#jobDetailNotes").textContent = job.note || "ยังไม่มีหมายเหตุ";
       renderJobQuickActions(job);
       openModal("jobDetailModal", trigger);
+
+      // งานจริงที่รับแล้วสามารถโหลด timeline จาก Backend ได้
+      if (job.backendId && job.assignee) {
+        try {
+          const result = await getCleaningTaskHistory(job.backendId);
+          const actionLabels = {
+            created: "สร้างคำร้อง",
+            assigned: "มอบหมายงาน",
+            accepted: "รับงาน",
+            status_changed: "อัปเดตสถานะ",
+            returned: "คืนงาน",
+            reassigned: "เปลี่ยนผู้รับผิดชอบ",
+            completed: "ปิดงาน",
+            cancelled: "ยกเลิกงาน",
+            completion_note_added: "หมายเหตุปิดงาน",
+          };
+          const history = Array.isArray(result.history) ? result.history : [];
+          job.timeline = history.map((entry) => {
+            const statusChange = `${
+              cleaningStatusLabels[entry.old_status] ||
+              entry.old_status ||
+              "เริ่มต้น"
+            } → ${
+              cleaningStatusLabels[entry.new_status] ||
+              entry.new_status ||
+              "ไม่ระบุ"
+            }`;
+            return {
+              title: actionLabels[entry.action] || "อัปเดตงาน",
+              detail:
+                entry.action === "completion_note_added"
+                  ? entry.note || "ไม่ได้ระบุหมายเหตุ"
+                  : statusChange,
+              time: new Date(entry.created_at).toLocaleString("th-TH"),
+            };
+          });
+
+          const latestCompletionNote = history
+            .filter(
+              (entry) =>
+                entry.action === "completion_note_added" && entry.note,
+            )
+            .at(-1);
+          if (latestCompletionNote) {
+            job.note = latestCompletionNote.note;
+            $("#jobDetailNotes").textContent = latestCompletionNote.note;
+          }
+          $("#jobTimeline").innerHTML = jobTimeline(job);
+        } catch (error) {
+          if (await handleUnauthorizedResponse(error.status)) return;
+          console.error("Loading cleaning task history failed:", error);
+        }
+      }
     }
 
     // Notification มี request_id และข้อความรูปแบบ "request_code: title"
@@ -3552,6 +3617,9 @@ export function useStaffDashboard() {
       $("#completeImage").value = "";
       resetCompletionPreview();
     });
+    $("#completeNote")?.addEventListener("input", (event) => {
+      event.currentTarget.setCustomValidity("");
+    });
     ["dragenter", "dragover"].forEach((type) =>
       $("#uploadDropZone")?.addEventListener(type, (event) => {
         event.preventDefault();
@@ -3691,11 +3759,54 @@ export function useStaffDashboard() {
         toast("รองรับ JPG, PNG หรือ WebP ไม่เกิน 5 MB");
         return;
       }
-      const summary = `${$("#completeResult").value.trim()} · ${$(
-        "#completeNote"
-      ).value.trim()}`;
-      const updated = await applyJobStatus(job, "เสร็จสิ้น", summary);
-      if (!updated) return;
+      const completionNoteInput = $("#completeNote");
+      const completionNote = completionNoteInput.value.trim();
+      if (!completionNote) {
+        completionNoteInput.setCustomValidity("กรุณากรอกหมายเหตุปิดงาน");
+        completionNoteInput.reportValidity();
+        completionNoteInput.focus();
+        return;
+      }
+      if (completionNote.length > 2000) {
+        completionNoteInput.setCustomValidity(
+          "หมายเหตุปิดงานต้องไม่เกิน 2,000 ตัวอักษร"
+        );
+        completionNoteInput.reportValidity();
+        completionNoteInput.focus();
+        return;
+      }
+      completionNoteInput.setCustomValidity("");
+      const summary = `${$("#completeResult").value.trim()} · ${completionNote}`;
+      if (!(job.backendId && job.backendStatus === "completed")) {
+        const updated = await applyJobStatus(job, "เสร็จสิ้น", summary);
+        if (!updated) return;
+      }
+
+      // Backend อนุญาตให้เพิ่ม note และรูปได้หลังเปลี่ยนสถานะเป็น completed แล้ว
+      if (job.backendId) {
+        try {
+          // บันทึกผลทันทีเพื่อไม่สร้างหมายเหตุซ้ำ หากรูปอัปโหลดไม่สำเร็จ
+          if (!job.completionNoteId) {
+            const noteResult = await addCleaningCompletionNote(
+              job.backendId,
+              completionNote,
+            );
+            job.completionNoteId = noteResult.id;
+            job.note = noteResult.note;
+          }
+          const photoResult = await uploadCleaningCompletionPhotos(
+            job.backendId,
+            [file],
+          );
+          job.completionPhotos = photoResult.photos;
+          job.completionPhotoCount = photoResult.image_count;
+        } catch (error) {
+          if (await handleUnauthorizedResponse(error.status)) return;
+          console.error("Saving cleaning completion details failed:", error);
+          toast(error.message || "บันทึกรายละเอียดปิดงานไม่สำเร็จ กรุณาลองใหม่");
+          return;
+        }
+      }
       if (job.completionPhotoUrl?.startsWith("blob:")) {
         URL.revokeObjectURL(job.completionPhotoUrl);
       }

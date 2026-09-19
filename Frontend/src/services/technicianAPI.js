@@ -2,10 +2,10 @@ const API_BASE_URL = (
   import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000/api/v1"
 ).replace(/\/+$/, "");
 
-export class HousekeeperApiError extends Error {
+export class TechnicianApiError extends Error {
   constructor(message, status) {
     super(message);
-    this.name = "HousekeeperApiError";
+    this.name = "TechnicianApiError";
     this.status = status;
   }
 }
@@ -19,7 +19,7 @@ function authHeaders() {
 async function parseResponse(response, fallbackMessage) {
   const body = await response.json().catch(() => ({}));
   if (!response.ok) {
-    throw new HousekeeperApiError(body.detail || fallbackMessage, response.status);
+    throw new TechnicianApiError(body.detail || fallbackMessage, response.status);
   }
   return body;
 }
@@ -42,19 +42,19 @@ export async function markStaffNotificationRead(notificationId) {
   return parseResponse(response, "ไม่สามารถอัปเดตการแจ้งเตือนได้");
 }
 
-/** ให้แม่บ้านที่ login รับ Cleaning Task ที่ยังไม่มีผู้รับผิดชอบ */
-export async function acceptCleaningTask(requestId) {
+/** ให้ช่างที่ login รับ Repair Requests ที่ยังไม่มีผู้รับผิดชอบ */
+export async function acceptRepairRequest(requestId) {
   const response = await fetch(
-    `${API_BASE_URL}/cleaning-tasks/${encodeURIComponent(requestId)}/accept`,
+    `${API_BASE_URL}/repair-requests/${encodeURIComponent(requestId)}/accept`,
     { method: "PATCH", headers: authHeaders() },
   );
   return parseResponse(response, "ไม่สามารถรับงานทำความสะอาดได้");
 }
 
-/** อัปเดต Cleaning Task ตามลำดับสถานะที่ Backend อนุญาต */
-export async function updateCleaningTaskStatus(requestId, status) {
+/** อัปเดต Repair Requests ตามลำดับสถานะที่ Backend อนุญาต */
+export async function updateRepairRequestStatus(requestId, status) {
   const response = await fetch(
-    `${API_BASE_URL}/cleaning-tasks/${encodeURIComponent(requestId)}/status`,
+    `${API_BASE_URL}/repair-requests/${encodeURIComponent(requestId)}/status`,
     {
       method: "PATCH",
       headers: {
@@ -68,9 +68,9 @@ export async function updateCleaningTaskStatus(requestId, status) {
 }
 
 /** บันทึกหมายเหตุสรุปหลังงานเสร็จ */
-export async function addCleaningCompletionNote(requestId, note) {
+export async function addRepairCompletionNote(requestId, note) {
   const response = await fetch(
-    `${API_BASE_URL}/cleaning-tasks/${encodeURIComponent(requestId)}/completion-note`,
+    `${API_BASE_URL}/repair-requests/${encodeURIComponent(requestId)}/completion-note`,
     {
       method: "POST",
       headers: { ...authHeaders(), "Content-Type": "application/json" },
@@ -81,11 +81,11 @@ export async function addCleaningCompletionNote(requestId, note) {
 }
 
 /** อัปโหลดรูปหลังดำเนินการหนึ่งหรือหลายรูป */
-export async function uploadCleaningCompletionPhotos(requestId, files) {
+export async function uploadRepairCompletionPhotos(requestId, files) {
   const formData = new FormData();
   files.forEach((file) => formData.append("files", file));
   const response = await fetch(
-    `${API_BASE_URL}/cleaning-tasks/${encodeURIComponent(requestId)}/completion-photos`,
+    `${API_BASE_URL}/repair-requests/${encodeURIComponent(requestId)}/completion-photos`,
     {
       method: "POST",
       headers: authHeaders(),
@@ -98,7 +98,7 @@ export async function uploadCleaningCompletionPhotos(requestId, files) {
 /** โหลดประวัติของ Cleaning Task ที่แม่บ้านคนปัจจุบันรับผิดชอบ */
 export async function getCleaningTaskHistory(requestId) {
   const response = await fetch(
-    `${API_BASE_URL}/cleaning-tasks/${encodeURIComponent(requestId)}/history`,
+    `${API_BASE_URL}/repair-requests/${encodeURIComponent(requestId)}/history`,
     { method: "GET", headers: authHeaders() },
   );
   return parseResponse(response, "ไม่สามารถโหลดประวัติงานได้");
