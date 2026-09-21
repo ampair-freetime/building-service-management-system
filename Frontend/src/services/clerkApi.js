@@ -156,31 +156,37 @@ export async function getLostItemDetail(itemId) {
   }
 }
 
+// โหลดคำร้องขอรับของคืนทั้งหมดที่รอให้เจ้าหน้าที่ตรวจสอบ
 export async function getPendingOwnershipRequests() {
   const controller = new AbortController();
 
-  try{
-    const response = await fetch(`${API_BASE_URL}/lost-found/ownership-requests`,{
-      method : "GET",
-      headers: {
+  try {
+    const response = await fetch(
+      `${API_BASE_URL}/lost-found/ownership-requests`,
+      {
+        method: "GET",
+        headers: {
           Authorization: `Bearer ${localStorage.getItem("buildingCareAccessToken") || ""}`,
         },
         signal: controller.signal,
-    });
+      },
+    );
+
     return await parseResponse(
       response,
-      "ไม่สามารถโหลดรายละเอียดประกาศของหายได้",
+      "ไม่สามารถโหลดคำขอแสดงความเป็นเจ้าของได้",
     );
-  }catch (error) {
+  } catch (error) {
     if (controller.signal.aborted) {
-      throw new ClerkApiError("ใช้เวลาโหลดคำขอนานเกินไป กรุณาลองใหม่",);
-  }
-  if (error instanceof TypeError) {
-      throw new ClerkApiError("เชื่อมต่อ Backend ไม่ได้ กรุณาลองใหม่",);
+      throw new ClerkApiError("ใช้เวลาโหลดคำขอนานเกินไป กรุณาลองใหม่");
+    }
+    if (error instanceof TypeError) {
+      throw new ClerkApiError("เชื่อมต่อ Backend ไม่ได้ กรุณาลองใหม่");
     }
     throw error;
   }
 }
+
 export async function getOwnershipRequestDetail(claimId) {
   const controller = new AbortController();
 
@@ -255,7 +261,7 @@ export async function updateOwnershipReturnStatus(claimId, returnStatus) {
 
 export async function scheduleOwnershipPickup(claimId, appointment) {
   const response = await fetch(
-    `${API_BASE_URL}/lost-found/ownership-requests/${encodeURIComponent(claimId)}/`,
+    `${API_BASE_URL}/lost-found/ownership-requests/${encodeURIComponent(claimId)}/schedule-pickup`,
     {
       method: "POST",
       headers: {

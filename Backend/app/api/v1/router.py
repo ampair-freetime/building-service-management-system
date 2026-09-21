@@ -11,6 +11,7 @@ from app.api.v1.endpoints import (
     lost_item,
     notification,
     repair_guest,
+    repair_staff,
     staff,
 )
 
@@ -59,4 +60,11 @@ api_router.include_router(
     cleaning_staff.router,
     prefix="/cleaning-tasks",
     tags=["cleaning staff"],
+)
+
+
+api_router.include_router(
+    repair_staff.router,
+    prefix="/repair-requests",
+    tags=["repair staff"],
 )

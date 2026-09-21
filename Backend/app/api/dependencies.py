@@ -98,6 +98,22 @@ HousekeeperStaff = Annotated[
 ]
 
 
+async def require_technician_staff(current_staff: CurrentStaff) -> Staff:
+    """อนุญาตให้ทำงานต่อเฉพาะพนักงานช่างซ่อม."""
+    if current_staff.role != StaffRole.TECHNICIAN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Technician access required",
+        )
+    return current_staff
+
+
+TechnicianStaff = Annotated[
+    Staff,
+    Depends(require_technician_staff),
+]
+
+
 def provide_object_storage() -> ObjectStorage:
     """คืน R2 client หรือแจ้ง 503 แบบชัดเจนเมื่อ environment ยังไม่พร้อม."""
     try:

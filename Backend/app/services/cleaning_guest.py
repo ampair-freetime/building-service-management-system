@@ -19,6 +19,7 @@ from app.models.service_request import RequestHistory, ServiceRequest
 from app.schemas.cleaning_guest import (
     GuestCleaningCreate,
     GuestCleaningCreateResponse,
+    GuestCompletionPhotoResponse,
     GuestLocationResponse,
     GuestTrackingResponse,
 )
@@ -30,7 +31,6 @@ from app.services.object_storage import (
     StoredObject,
 )
 from app.services.notification import create_cleaning_request_notifications
-
 logger = logging.getLogger(__name__)
 BANGKOK_TIMEZONE = ZoneInfo("Asia/Bangkok")
 
@@ -224,24 +224,63 @@ async def get_guest_request_status(
     *,
     request_code: str,
     reporter_email: str,
+    storage: ObjectStorage | None = None,
 ) -> GuestTrackingResponse:
     """ติดตามสถานะคำร้องโดยใช้รหัสคู่กับอีเมลผู้แจ้งเป็นการพิสูจน์ตัวตน."""
+
     service_request = await session.scalar(
         select(ServiceRequest)
-        # โหลดสถานที่ล่วงหน้า เพื่อไม่ให้การอ่าน relationship เรียก async I/O โดยไม่ await
         .options(
             selectinload(ServiceRequest.location),
         )
         .where(
             ServiceRequest.request_type == RequestType.CLEANING,
             ServiceRequest.request_code == request_code.strip().upper(),
-            # อีเมลถูก normalize เป็นตัวพิมพ์เล็กตั้งแต่ตอนสร้าง จึงต้องเทียบด้วยรูปแบบเดียวกัน
             ServiceRequest.reporter_email == reporter_email.strip().lower(),
         )
     )
+
     if service_request is None:
-        # ใช้ข้อความเดียวกันทั้งกรณีไม่มีรหัสนี้และกรณีอีเมลไม่ตรง เพื่อกันการไล่เดาอีเมลผู้แจ้ง
+        # ใช้ข้อความเดียวกันทั้งกรณีไม่มีรหัสและอีเมลไม่ตรง
+        # เพื่อป้องกันการไล่เดาอีเมลของผู้แจ้ง
         raise RequestNotFoundError("ไม่พบคำร้องนี้")
+
+    # ดึงเฉพาะรูปหลังทำความสะอาดเสร็จ
+    completion_images = (
+        await session.scalars(
+            select(Image)
+            .where(
+                Image.request_id == service_request.id,
+                Image.image_type == ImageType.AFTER,
+                Image.deleted_at.is_(None),
+            )
+            .order_by(
+                Image.created_at,
+                Image.id,
+            )
+        )
+    ).all()
+
+    # Request ที่ไม่มี completion photo ยังติดตามสถานะได้ตามปกติ
+    # แต่ถ้ามีรูป ต้องมี Object Storage เพื่อสร้าง URL สำหรับแสดงรูป
+    if completion_images and storage is None:
+        raise StorageConfigurationError(
+            "Object storage is required to access completion photos"
+        )
+
+    completion_photos: list[GuestCompletionPhotoResponse] = []
+
+    if storage is not None:
+        completion_photos = [
+            GuestCompletionPhotoResponse(
+                id=image.id,
+                url=storage.create_download_url(image.object_key),
+                content_type=image.content_type,
+                width=image.width,
+                height=image.height,
+            )
+            for image in completion_images
+        ]
 
     return GuestTrackingResponse(
         request_type=service_request.request_type,
@@ -250,6 +289,7 @@ async def get_guest_request_status(
         created_at=service_request.created_at,
         updated_at=service_request.updated_at,
         completed_at=service_request.completed_at,
+        completion_photos=completion_photos,
     )
 
 

@@ -1,14 +1,72 @@
 import asyncio
+from io import BytesIO
+
+import pytest
+from PIL import Image as PillowImage
 
 from conftest import seed_staff
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from app.models.enums import RequestAction, RequestStatus
+from app.api.dependencies import provide_object_storage
+from app.models.enums import ImageType, RequestAction, RequestStatus
+from app.models.image import Image
 from app.models.location import Location
 from app.models.service_request import RequestHistory, ServiceRequest
+from app.services.object_storage import StoredObject
 
+class FakeStorage:
+    """Object storage ปลอมสำหรับทดสอบ completion photos."""
+
+    def __init__(self) -> None:
+        self.objects: dict[str, tuple[bytes, str]] = {}
+        self.deleted: list[str] = []
+
+    async def put(
+        self,
+        *,
+        object_key: str,
+        data: bytes,
+        content_type: str,
+    ) -> StoredObject:
+        self.objects[object_key] = (data, content_type)
+
+        return StoredObject(
+            object_key=object_key,
+            bucket_name="test-images",
+            etag="test-etag",
+        )
+
+    async def delete(self, object_key: str) -> None:
+        self.deleted.append(object_key)
+        self.objects.pop(object_key, None)
+
+    def create_download_url(self, object_key: str) -> str:
+        return f"https://example.test/{object_key}"
+
+@pytest.fixture
+def fake_storage(test_context) -> FakeStorage:
+    client, _ = test_context
+    storage = FakeStorage()
+
+    client.app.dependency_overrides[provide_object_storage] = lambda: storage
+
+    yield storage
+
+    client.app.dependency_overrides.pop(provide_object_storage, None)
+
+
+def make_png() -> bytes:
+    output = BytesIO()
+
+    PillowImage.new(
+        "RGB",
+        (32, 24),
+        color="blue",
+    ).save(output, format="PNG")
+
+    return output.getvalue()
 
 def seed_location(
     session_factory: async_sessionmaker[AsyncSession],
@@ -63,6 +121,27 @@ def get_request_id(
             return request.id
 
     return asyncio.run(get_id())
+
+
+def complete_cleaning_task(
+    client: TestClient,
+    request_id,
+    headers: dict[str, str],
+) -> None:
+    accepted = client.patch(
+        f"/api/v1/cleaning-tasks/{request_id}/accept",
+        headers=headers,
+    )
+    assert accepted.status_code == 200
+
+    for new_status in ("received", "in_progress", "completed"):
+        response = client.patch(
+            f"/api/v1/cleaning-tasks/{request_id}/status",
+            headers=headers,
+            json={"status": new_status},
+        )
+        assert response.status_code == 200
+        assert response.json()["status"] == new_status
 
 
 def test_housekeeper_can_accept_cleaning_task(
@@ -562,3 +641,709 @@ def test_guest_can_view_updated_cleaning_status(
 
     assert tracking.status_code == 200
     assert tracking.json()["status"] == "in_progress"
+
+
+def test_housekeeper_can_upload_completion_photos(
+    test_context: tuple[TestClient, async_sessionmaker[AsyncSession]],
+    fake_storage: FakeStorage,
+) -> None:
+    client, session_factory = test_context
+
+    seed_location(session_factory)
+
+    seed_staff(
+        session_factory,
+        staff_code="HK001",
+        email="photo-housekeeper@example.com",
+        password="correct-password",
+        role="housekeeper",
+        full_name="House Keeper",
+    )
+
+    headers = login_staff(
+        client,
+        "HK001",
+        "correct-password",
+    )
+
+    # Guest สร้าง cleaning request
+    created = client.post(
+        "/api/v1/guest/cleaning-requests",
+        data={
+            "title": "ทำความสะอาดพื้น",
+            "description": "หน้าห้อง 201",
+            "priority": "normal",
+            "reporter_email": "guest@example.com",
+            "location_id": "1",
+        },
+    )
+
+    assert created.status_code == 201
+
+    request_id = get_request_id(
+        session_factory,
+        created.json()["request_code"],
+    )
+
+    # Cleaner รับงาน
+    accepted = client.patch(
+        f"/api/v1/cleaning-tasks/{request_id}/accept",
+        headers=headers,
+    )
+    assert accepted.status_code == 200
+
+    # assigned -> received -> in_progress -> completed
+    for new_status in ("received", "in_progress", "completed"):
+        response = client.patch(
+            f"/api/v1/cleaning-tasks/{request_id}/status",
+            headers=headers,
+            json={"status": new_status},
+        )
+        assert response.status_code == 200
+
+    # อัปโหลด completion photos 2 รูป
+    response = client.post(
+        f"/api/v1/cleaning-tasks/{request_id}/completion-photos",
+        headers=headers,
+        files=[
+            ("files", ("after-1.png", make_png(), "image/png")),
+            ("files", ("after-2.png", make_png(), "image/png")),
+        ],
+    )
+
+    assert response.status_code == 200
+
+    body = response.json()
+
+    assert body["request_id"] == str(request_id)
+    assert body["image_count"] == 2
+    assert len(body["photos"]) == 2
+
+    # รูปถูกแปลงเป็น WebP ก่อนเก็บ
+    assert all(
+        photo["content_type"] == "image/webp"
+        for photo in body["photos"]
+    )
+
+    # มีไฟล์อยู่ใน object storage 2 รูป
+    assert len(fake_storage.objects) == 2
+
+    async def verify_database() -> None:
+        async with session_factory() as session:
+            images = (
+                await session.scalars(
+                    select(Image).where(
+                        Image.request_id == request_id,
+                        Image.image_type == ImageType.AFTER,
+                    )
+                )
+            ).all()
+
+            assert len(images) == 2
+
+            for image in images:
+                assert image.uploaded_by_staff_id is not None
+                assert image.content_type == "image/webp"
+                assert image.width == 32
+                assert image.height == 24
+
+    asyncio.run(verify_database())
+
+
+def test_invalid_completion_photo_is_not_uploaded(
+    test_context: tuple[TestClient, async_sessionmaker[AsyncSession]],
+    fake_storage: FakeStorage,
+) -> None:
+    client, session_factory = test_context
+
+    seed_location(session_factory)
+
+    seed_staff(
+        session_factory,
+        staff_code="HK001",
+        email="invalid-photo@example.com",
+        password="correct-password",
+        role="housekeeper",
+        full_name="House Keeper",
+    )
+
+    headers = login_staff(
+        client,
+        "HK001",
+        "correct-password",
+    )
+
+    created = client.post(
+        "/api/v1/guest/cleaning-requests",
+        data={
+            "title": "ทำความสะอาดพื้น",
+            "description": "หน้าห้อง 201",
+            "priority": "normal",
+            "reporter_email": "guest@example.com",
+            "location_id": "1",
+        },
+    )
+
+    assert created.status_code == 201
+
+    request_id = get_request_id(
+        session_factory,
+        created.json()["request_code"],
+    )
+
+    complete_cleaning_task(
+        client,
+        request_id,
+        headers,
+    )
+
+    response = client.post(
+        f"/api/v1/cleaning-tasks/{request_id}/completion-photos",
+        headers=headers,
+        files=[
+            ("files", ("valid.png", make_png(), "image/png")),
+            (
+                "files",
+                ("invalid.png", b"this is not a real image", "image/png"),
+            ),
+        ],
+    )
+
+    assert response.status_code == 422
+
+    # เพราะ validate รูปทั้งหมดก่อน upload
+    # แม้รูปแรกจะถูกต้อง ก็ต้องยังไม่มีอะไรขึ้น storage
+    assert len(fake_storage.objects) == 0
+
+    async def verify_database() -> None:
+        async with session_factory() as session:
+            images = (
+                await session.scalars(
+                    select(Image).where(
+                        Image.request_id == request_id,
+                        Image.image_type == ImageType.AFTER,
+                    )
+                )
+            ).all()
+
+            assert len(images) == 0
+
+    asyncio.run(verify_database())
+
+
+def test_housekeeper_cannot_upload_completion_photos_before_completed(
+    test_context: tuple[TestClient, async_sessionmaker[AsyncSession]],
+    fake_storage: FakeStorage,
+) -> None:
+    client, session_factory = test_context
+
+    seed_location(session_factory)
+
+    seed_staff(
+        session_factory,
+        staff_code="HK001",
+        email="not-completed@example.com",
+        password="correct-password",
+        role="housekeeper",
+        full_name="House Keeper",
+    )
+
+    headers = login_staff(
+        client,
+        "HK001",
+        "correct-password",
+    )
+
+    created = client.post(
+        "/api/v1/guest/cleaning-requests",
+        data={
+            "title": "ทำความสะอาดพื้น",
+            "description": "หน้าห้อง 201",
+            "priority": "normal",
+            "reporter_email": "guest@example.com",
+            "location_id": "1",
+        },
+    )
+
+    assert created.status_code == 201
+
+    request_id = get_request_id(
+        session_factory,
+        created.json()["request_code"],
+    )
+
+    # รับงาน
+    accepted = client.patch(
+        f"/api/v1/cleaning-tasks/{request_id}/accept",
+        headers=headers,
+    )
+    assert accepted.status_code == 200
+
+    # ไปถึงแค่ in_progress ยังไม่ completed
+    for new_status in ("received", "in_progress"):
+        response = client.patch(
+            f"/api/v1/cleaning-tasks/{request_id}/status",
+            headers=headers,
+            json={"status": new_status},
+        )
+        assert response.status_code == 200
+
+    # พยายามอัปโหลดรูปก่อนงานเสร็จ
+    response = client.post(
+        f"/api/v1/cleaning-tasks/{request_id}/completion-photos",
+        headers=headers,
+        files=[
+            ("files", ("after.png", make_png(), "image/png")),
+        ],
+    )
+
+    assert response.status_code == 409
+
+    # ต้องไม่มีรูปถูก upload
+    assert len(fake_storage.objects) == 0
+
+
+def test_guest_can_view_completion_photos(
+    test_context: tuple[TestClient, async_sessionmaker[AsyncSession]],
+    fake_storage: FakeStorage,
+) -> None:
+    client, session_factory = test_context
+
+    seed_location(session_factory)
+
+    seed_staff(
+        session_factory,
+        staff_code="HK001",
+        email="guest-view-photo@example.com",
+        password="correct-password",
+        role="housekeeper",
+        full_name="House Keeper",
+    )
+
+    headers = login_staff(
+        client,
+        "HK001",
+        "correct-password",
+    )
+
+    # Guest สร้าง cleaning request
+    created = client.post(
+        "/api/v1/guest/cleaning-requests",
+        data={
+            "title": "ทำความสะอาดพื้น",
+            "description": "หน้าห้อง 201",
+            "priority": "normal",
+            "reporter_email": "guest@example.com",
+            "location_id": "1",
+        },
+    )
+
+    assert created.status_code == 201
+
+    request_code = created.json()["request_code"]
+
+    request_id = get_request_id(
+        session_factory,
+        request_code,
+    )
+
+    # Cleaner รับงานและทำจนเสร็จ
+    complete_cleaning_task(
+        client,
+        request_id,
+        headers,
+    )
+
+    # Cleaner อัปโหลดรูปหลังทำงานเสร็จ
+    uploaded = client.post(
+        f"/api/v1/cleaning-tasks/{request_id}/completion-photos",
+        headers=headers,
+        files=[
+            ("files", ("after-1.png", make_png(), "image/png")),
+            ("files", ("after-2.png", make_png(), "image/png")),
+        ],
+    )
+
+    assert uploaded.status_code == 200
+    assert uploaded.json()["image_count"] == 2
+
+    # Guest ติดตามคำร้อง
+    tracked = client.get(
+        f"/api/v1/guest/cleaning-requests/{request_code}",
+        params={
+            "reporter_email": "guest@example.com",
+        },
+    )
+
+    assert tracked.status_code == 200
+
+    body = tracked.json()
+
+    assert body["status"] == "completed"
+    assert len(body["completion_photos"]) == 2
+
+    for photo in body["completion_photos"]:
+        assert photo["content_type"] == "image/webp"
+        assert photo["width"] == 32
+        assert photo["height"] == 24
+        assert photo["url"].startswith("https://example.test/")
+
+
+def test_housekeeper_can_add_completion_note(
+    test_context: tuple[TestClient, async_sessionmaker[AsyncSession]],
+) -> None:
+    client, session_factory = test_context
+
+    seed_location(session_factory)
+
+    seed_staff(
+        session_factory,
+        staff_code="HK001",
+        email="completion-note@example.com",
+        password="correct-password",
+        role="housekeeper",
+        full_name="House Keeper",
+    )
+
+    headers = login_staff(
+        client,
+        "HK001",
+        "correct-password",
+    )
+
+    created = client.post(
+        "/api/v1/guest/cleaning-requests",
+        data={
+            "title": "ทำความสะอาดพื้น",
+            "description": "หน้าห้อง 201",
+            "priority": "normal",
+            "reporter_email": "guest@example.com",
+            "location_id": "1",
+        },
+    )
+
+    assert created.status_code == 201
+
+    request_id = get_request_id(
+        session_factory,
+        created.json()["request_code"],
+    )
+
+    complete_cleaning_task(
+        client,
+        request_id,
+        headers,
+    )
+
+    response = client.post(
+        f"/api/v1/cleaning-tasks/{request_id}/completion-note",
+        headers=headers,
+        json={
+            "note": "ทำความสะอาดพื้นและเก็บขยะเรียบร้อยแล้ว",
+        },
+    )
+
+    assert response.status_code == 200
+
+    body = response.json()
+
+    assert body["request_id"] == str(request_id)
+    assert body["note"] == "ทำความสะอาดพื้นและเก็บขยะเรียบร้อยแล้ว"
+    assert body["created_at"] is not None
+
+    async def verify_database() -> None:
+        async with session_factory() as session:
+            history = await session.scalar(
+                select(RequestHistory).where(
+                    RequestHistory.request_id == request_id,
+                    RequestHistory.action
+                    == RequestAction.COMPLETION_NOTE_ADDED,
+                )
+            )
+
+            assert history is not None
+            assert history.note == (
+                "ทำความสะอาดพื้นและเก็บขยะเรียบร้อยแล้ว"
+            )
+
+    asyncio.run(verify_database())
+
+
+def test_empty_completion_note_is_rejected(
+    test_context: tuple[TestClient, async_sessionmaker[AsyncSession]],
+) -> None:
+    client, session_factory = test_context
+
+    seed_location(session_factory)
+
+    seed_staff(
+        session_factory,
+        staff_code="HK001",
+        email="empty-note@example.com",
+        password="correct-password",
+        role="housekeeper",
+        full_name="House Keeper",
+    )
+
+    headers = login_staff(
+        client,
+        "HK001",
+        "correct-password",
+    )
+
+    created = client.post(
+        "/api/v1/guest/cleaning-requests",
+        data={
+            "title": "ทำความสะอาดพื้น",
+            "description": "หน้าห้อง 201",
+            "priority": "normal",
+            "reporter_email": "guest@example.com",
+            "location_id": "1",
+        },
+    )
+
+    assert created.status_code == 201
+
+    request_id = get_request_id(
+        session_factory,
+        created.json()["request_code"],
+    )
+
+    complete_cleaning_task(
+        client,
+        request_id,
+        headers,
+    )
+
+    response = client.post(
+        f"/api/v1/cleaning-tasks/{request_id}/completion-note",
+        headers=headers,
+        json={"note": "     "},
+    )
+
+    assert response.status_code == 422
+
+    async def verify_database() -> None:
+        async with session_factory() as session:
+            history = await session.scalar(
+                select(RequestHistory).where(
+                    RequestHistory.request_id == request_id,
+                    RequestHistory.action
+                    == RequestAction.COMPLETION_NOTE_ADDED,
+                )
+            )
+
+            assert history is None
+
+    asyncio.run(verify_database())
+
+
+def test_housekeeper_cannot_add_completion_note_before_completed(
+    test_context: tuple[TestClient, async_sessionmaker[AsyncSession]],
+) -> None:
+    client, session_factory = test_context
+
+    seed_location(session_factory)
+
+    seed_staff(
+        session_factory,
+        staff_code="HK001",
+        email="note-before-completed@example.com",
+        password="correct-password",
+        role="housekeeper",
+        full_name="House Keeper",
+    )
+
+    headers = login_staff(
+        client,
+        "HK001",
+        "correct-password",
+    )
+
+    created = client.post(
+        "/api/v1/guest/cleaning-requests",
+        data={
+            "title": "ทำความสะอาดพื้น",
+            "description": "หน้าห้อง 201",
+            "priority": "normal",
+            "reporter_email": "guest@example.com",
+            "location_id": "1",
+        },
+    )
+
+    assert created.status_code == 201
+
+    request_id = get_request_id(
+        session_factory,
+        created.json()["request_code"],
+    )
+
+    accepted = client.patch(
+        f"/api/v1/cleaning-tasks/{request_id}/accept",
+        headers=headers,
+    )
+
+    assert accepted.status_code == 200
+
+    response = client.post(
+        f"/api/v1/cleaning-tasks/{request_id}/completion-note",
+        headers=headers,
+        json={"note": "ยังทำงานไม่เสร็จ"},
+    )
+
+    assert response.status_code == 409
+
+
+def test_other_housekeeper_cannot_add_completion_note(
+    test_context: tuple[TestClient, async_sessionmaker[AsyncSession]],
+) -> None:
+    client, session_factory = test_context
+
+    seed_location(session_factory)
+
+    seed_staff(
+        session_factory,
+        staff_code="HK001",
+        email="owner-note@example.com",
+        password="correct-password",
+        role="housekeeper",
+        full_name="Owner Housekeeper",
+    )
+
+    seed_staff(
+        session_factory,
+        staff_code="HK002",
+        email="other-note@example.com",
+        password="correct-password",
+        role="housekeeper",
+        full_name="Other Housekeeper",
+    )
+
+    owner_headers = login_staff(
+        client,
+        "HK001",
+        "correct-password",
+    )
+
+    other_headers = login_staff(
+        client,
+        "HK002",
+        "correct-password",
+    )
+
+    created = client.post(
+        "/api/v1/guest/cleaning-requests",
+        data={
+            "title": "ทำความสะอาดพื้น",
+            "description": "หน้าห้อง 201",
+            "priority": "normal",
+            "reporter_email": "guest@example.com",
+            "location_id": "1",
+        },
+    )
+
+    assert created.status_code == 201
+
+    request_id = get_request_id(
+        session_factory,
+        created.json()["request_code"],
+    )
+
+    complete_cleaning_task(
+        client,
+        request_id,
+        owner_headers,
+    )
+
+    response = client.post(
+        f"/api/v1/cleaning-tasks/{request_id}/completion-note",
+        headers=other_headers,
+        json={"note": "พยายามเพิ่ม note ของงานคนอื่น"},
+    )
+
+    assert response.status_code == 403
+
+
+def test_completion_note_appears_in_work_history(
+    test_context: tuple[TestClient, async_sessionmaker[AsyncSession]],
+) -> None:
+    client, session_factory = test_context
+
+    seed_location(session_factory)
+
+    seed_staff(
+        session_factory,
+        staff_code="HK001",
+        email="history-note@example.com",
+        password="correct-password",
+        role="housekeeper",
+        full_name="House Keeper",
+    )
+
+    headers = login_staff(
+        client,
+        "HK001",
+        "correct-password",
+    )
+
+    created = client.post(
+        "/api/v1/guest/cleaning-requests",
+        data={
+            "title": "ทำความสะอาดพื้น",
+            "description": "หน้าห้อง 201",
+            "priority": "normal",
+            "reporter_email": "guest@example.com",
+            "location_id": "1",
+        },
+    )
+
+    assert created.status_code == 201
+
+    request_id = get_request_id(
+        session_factory,
+        created.json()["request_code"],
+    )
+
+    # Cleaner รับงานและทำจน completed
+    complete_cleaning_task(
+        client,
+        request_id,
+        headers,
+    )
+
+    # บันทึก completion note
+    note_response = client.post(
+        f"/api/v1/cleaning-tasks/{request_id}/completion-note",
+        headers=headers,
+        json={
+            "note": "ทำความสะอาดพื้นและนำขยะออกเรียบร้อยแล้ว",
+        },
+    )
+
+    assert note_response.status_code == 200
+
+    # เปิดดู work history
+    history_response = client.get(
+        f"/api/v1/cleaning-tasks/{request_id}/history",
+        headers=headers,
+    )
+
+    assert history_response.status_code == 200
+
+    body = history_response.json()
+
+    assert body["request_id"] == str(request_id)
+
+    completion_notes = [
+        item
+        for item in body["history"]
+        if item["action"] == "completion_note_added"
+    ]
+
+    assert len(completion_notes) == 1
+    assert completion_notes[0]["note"] == (
+        "ทำความสะอาดพื้นและนำขยะออกเรียบร้อยแล้ว"
+    )
+    assert completion_notes[0]["old_status"] == "completed"
+    assert completion_notes[0]["new_status"] == "completed"
+    assert completion_notes[0]["created_at"] is not None
