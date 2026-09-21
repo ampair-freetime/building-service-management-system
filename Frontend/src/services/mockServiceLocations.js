@@ -1,8 +1,9 @@
 export const mockServiceLocations = [
-  { id: 1, building: "CSB", floor: "1", room: "ห้องน้ำ", area_type: "ห้องน้ำ" },
-  { id: 2, building: "CSB", floor: "1", room: "โถงทางเดิน", area_type: "ทางเดิน" },
-  { id: 3, building: "CSB", floor: "1", room: "CSB100", area_type: "ห้องเรียน" },
-  { id: 4, building: "CSB", floor: "2", room: "CSB201", area_type: "ห้องเรียน" },
-  { id: 5, building: "CSB", floor: "3", room: "CSB307", area_type: "ห้องเรียน" },
-  { id: 6, building: "CSB", floor: "2", room: "CSB209", area_type: "ห้องเรียน" },
+  { floor: "1", area: "CSB101" },
+  { floor: "1", area: "พื้นที่ส่วนกลาง" },
+  { floor: "1", area: "ห้องน้ำ" },
+  { floor: "1", area: "โถงทางเดิน" },
+  { floor: "2", area: "CSB201" },
+  { floor: "2", area: "CSB209" },
+  { floor: "3", area: "CSB307" },
 ];

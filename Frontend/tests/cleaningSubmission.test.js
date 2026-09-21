@@ -86,7 +86,9 @@ test('uses the backend cleaning endpoint by default', async () => {
 
 test('adapter sends multipart and idempotency key and requires a receipt', async () => {
   const data = payload();
-  data.append('image', new File(['photo'], 'floor.png', { type: 'image/png' }));
+  for (let index = 1; index <= 5; index++) {
+    data.append('image', new File(['photo'], `floor-${index}.png`, { type: 'image/png' }));
+  }
   const result = await uploadCleaningRequest(data, {
     endpoint: '/test', requestId: 'same-key',
     fetchImpl: async (url, options) => {
@@ -95,9 +97,10 @@ test('adapter sends multipart and idempotency key and requires a receipt', async
       assert.equal(options.headers['Idempotency-Key'], 'same-key');
       assert.equal(options.headers['Content-Type'], undefined);
       assert.deepEqual([...options.body.keys()], [
-        'title', 'description', 'priority', 'reporter_email', 'location_id', 'image',
+        'title', 'description', 'priority', 'reporter_email', 'location_id',
+        'image', 'image', 'image', 'image', 'image',
       ]);
-      assert.equal(options.body.getAll('image').length, 1);
+      assert.equal(options.body.getAll('image').length, 5);
       return new Response(JSON.stringify({ request_code: 'CL-3' }), { status: 201 });
     },
   });

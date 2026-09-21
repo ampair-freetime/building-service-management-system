@@ -1,3 +1,9 @@
+<script setup>
+const params = new URLSearchParams(window.location.search);
+const hasQrWithoutService = Boolean(params.get("token")?.trim()) &&
+  !["clean", "repair"].includes(params.get("service"));
+</script>
+
 <template>
 <section class="page active" id="dashboard">
           <header class="mobile-hero">
@@ -33,6 +39,10 @@
               ><strong>อาคาร วิทยาศาสตร์คอมพิวเตอร์ (CS)</strong>
             </div>
           </section>
+
+          <p v-if="hasQrWithoutService" class="qr-location-message" role="status">
+            เปิดจาก QR แล้ว กรุณาเลือกแจ้งซ่อมหรือแจ้งทำความสะอาด ระบบจะเลือกสถานที่ให้ในฟอร์ม
+          </p>
 
           <section class="dashboard-section">
             <div class="section-head">

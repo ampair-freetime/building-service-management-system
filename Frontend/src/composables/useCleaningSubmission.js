@@ -15,7 +15,7 @@ export function useCleaningSubmission(upload = uploadCleaningRequest) {
     message.value = "";
   }
 
-  async function submit(payload, onSuccess) {
+  async function submit(payload, onSuccess, onFailure) {
     if (isSubmitting.value) return;
     isSubmitting.value = true;
     status.value = "uploading";
@@ -38,6 +38,7 @@ export function useCleaningSubmission(upload = uploadCleaningRequest) {
     } catch (error) {
       status.value = "error";
       message.value = error.message || "ส่งไม่สำเร็จ กรุณาลองส่งอีกครั้ง";
+      onFailure?.(error);
     } finally {
       isSubmitting.value = false;
     }

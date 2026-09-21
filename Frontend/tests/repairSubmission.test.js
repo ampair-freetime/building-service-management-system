@@ -73,7 +73,9 @@ test("repair adapter uses the backend repair endpoint by default", async () => {
 
 test("repair adapter sends multipart data and requires a receipt", async () => {
   const data = payload();
-  data.append("image", new File(["photo"], "damage.png", { type: "image/png" }));
+  for (let index = 1; index <= 5; index++) {
+    data.append("image", new File(["photo"], `damage-${index}.png`, { type: "image/png" }));
+  }
   const result = await uploadRepairRequest(data, {
     endpoint: "/repair-test",
     requestId: "same-key",
@@ -84,9 +86,10 @@ test("repair adapter sends multipart data and requires a receipt", async () => {
       assert.equal(options.headers["Idempotency-Key"], "same-key");
       assert.equal(options.headers["Content-Type"], undefined);
       assert.deepEqual([...options.body.keys()], [
-        "title", "description", "priority", "reporter_email", "location_id", "image",
+        "title", "description", "priority", "reporter_email", "location_id",
+        "image", "image", "image", "image", "image",
       ]);
-      assert.equal(options.body.getAll("image").length, 1);
+      assert.equal(options.body.getAll("image").length, 5);
       return new Response(JSON.stringify({ request_code: "RPR-2" }), { status: 201 });
     },
   });

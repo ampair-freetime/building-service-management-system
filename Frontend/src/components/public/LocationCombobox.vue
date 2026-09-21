@@ -126,7 +126,6 @@ onBeforeUnmount(() => {
         :name="name || undefined"
         type="text"
         :value="query"
-        :readonly="!allowCustom"
         :placeholder="placeholder"
         autocomplete="off"
         role="combobox"
@@ -168,6 +167,7 @@ onBeforeUnmount(() => {
         :aria-selected="query === option"
         @mouseenter="activeIndex = index"
         @mousedown.prevent="selectOption(option)"
+        @click="selectOption(option)"
       >
         <span>{{ option }}</span>
         <svg v-if="query === option" viewBox="0 0 20 20" aria-hidden="true">
@@ -175,7 +175,7 @@ onBeforeUnmount(() => {
         </svg>
       </button>
       <p v-if="!filteredOptions.length" class="location-suggestions-empty">
-        ไม่พบรายการแนะนำ สามารถใช้ข้อความที่พิมพ์ได้
+        {{ allowCustom ? "ไม่พบรายการแนะนำ สามารถใช้ข้อความที่พิมพ์ได้" : "ไม่พบรายการที่ตรงกับคำค้น" }}
       </p>
     </div>
     </div>

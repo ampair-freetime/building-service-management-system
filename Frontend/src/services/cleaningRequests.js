@@ -3,6 +3,35 @@ const API_BASE_URL = (import.meta.env?.VITE_API_BASE_URL ?? "http://localhost:80
 const CLEANING_REQUEST_URL = import.meta.env?.VITE_CLEANING_REQUEST_URL
   || `${API_BASE_URL}/guest/cleaning-requests`;
 
+// สถานที่ที่เปิดใช้งาน สำหรับให้ผู้ใช้เลือกเอง
+export async function listCleaningLocations({ fetchImpl = fetch } = {}) {
+  const response = await fetchImpl(`${CLEANING_REQUEST_URL}/locations`);
+
+  if (!response.ok) {
+    throw new Error("โหลดรายการสถานที่ไม่สำเร็จ");
+  }
+
+  return response.json();
+}
+
+// แปลง token จาก URL ของ QR เป็น { id, floor, area }
+// 404/422 หมายถึง QR ใช้ไม่ได้ ให้ผู้ใช้เลือกสถานที่เอง
+export async function resolveCleaningLocationByQr(token, { fetchImpl = fetch } = {}) {
+  const response = await fetchImpl(
+    `${CLEANING_REQUEST_URL}/locations/by-qr/${encodeURIComponent(token)}`,
+  );
+
+  if (response.status === 404 || response.status === 422) {
+    return null;
+  }
+
+  if (!response.ok) {
+    throw new Error("ตรวจสอบสถานที่จาก QR ไม่สำเร็จ");
+  }
+
+  return response.json();
+}
+
 export async function uploadCleaningRequest(payload, {
   requestId,
   endpoint = CLEANING_REQUEST_URL,
@@ -23,9 +52,11 @@ export async function uploadCleaningRequest(payload, {
       const detail = body?.detail;
       const message = typeof detail === "string" ? detail
         : Array.isArray(detail) ? detail.map(issue => issue.msg).filter(Boolean).join(" / ") : "";
-      throw new Error(message || (response.status === 413
+      const failure = new Error(message || (response.status === 413
         ? "ไฟล์แนบมีขนาดรวมเกินที่ระบบรองรับ กรุณาลดจำนวนหรือขนาดรูปแล้วลองใหม่"
         : "ส่งคำขอไม่สำเร็จ ข้อมูลและรูปยังอยู่ กรุณาลองส่งอีกครั้ง"));
+      failure.status = response.status;
+      throw failure;
     }
     // Require a receipt: an HTML fallback or empty response is not confirmation.
     if (!body?.request_code || typeof body.request_code !== "string") {

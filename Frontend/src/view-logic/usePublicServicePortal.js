@@ -19,9 +19,15 @@ import {
 export function usePublicServicePortal() {
   const validationCleanups = [];
   const sidebarOpen = ref(false);
-  const closeSidebar = () => { sidebarOpen.value = false; };
-  const toggleSidebar = () => { sidebarOpen.value = !sidebarOpen.value; };
-  const compactSidebar = window.matchMedia("(min-width: 681px) and (max-width: 980px)");
+  const closeSidebar = () => {
+    sidebarOpen.value = false;
+  };
+  const toggleSidebar = () => {
+    sidebarOpen.value = !sidebarOpen.value;
+  };
+  const compactSidebar = window.matchMedia(
+    "(min-width: 681px) and (max-width: 980px)",
+  );
   onMounted(() => compactSidebar.addEventListener("change", closeSidebar));
   onUnmounted(() => compactSidebar.removeEventListener("change", closeSidebar));
   // รอ Vue สร้าง DOM ก่อนผูก event เพราะหน้านี้ควบคุมองค์ประกอบผ่าน querySelector
@@ -45,7 +51,6 @@ export function usePublicServicePortal() {
     let selectedClaimItemCode = "";
     // เก็บเฉพาะคำร้องที่ผู้ใช้ส่งจริงในรอบการเปิดหน้านี้ ไม่มีข้อมูลตัวอย่างปะปน
     const trackedRequests = new Map();
-
 
     function syncBottomNavigation(modalId = "") {
       bottomButtons.forEach((button) => {
@@ -96,7 +101,6 @@ export function usePublicServicePortal() {
         openLostView("browse", false);
         void filterPosts();
       }
-
     }
 
     navItems.forEach((item) =>
@@ -171,33 +175,29 @@ export function usePublicServicePortal() {
       }
     }
 
-    document
-      .querySelectorAll("[data-lost-view]")
-      .forEach((tab) =>
-        // แถบแท็บใช้สลับเนื้อหาเท่านั้น จึงไม่เลื่อนหน้าจอไปยังฟอร์ม
-        tab.addEventListener("click", () =>
-          openLostView(tab.dataset.lostView, false),
-        ),
-      );
-    document
-      .querySelectorAll("[data-open-lost-view]")
-      .forEach((button) =>
-        button.addEventListener("click", () => {
-          const viewName = button.dataset.openLostView;
-          if (viewName === "browse") {
-            void filterPosts();
-          } else {
-            openLostView(viewName, false);
-          }
+    document.querySelectorAll("[data-lost-view]").forEach((tab) =>
+      // แถบแท็บใช้สลับเนื้อหาเท่านั้น จึงไม่เลื่อนหน้าจอไปยังฟอร์ม
+      tab.addEventListener("click", () =>
+        openLostView(tab.dataset.lostView, false),
+      ),
+    );
+    document.querySelectorAll("[data-open-lost-view]").forEach((button) =>
+      button.addEventListener("click", () => {
+        const viewName = button.dataset.openLostView;
+        if (viewName === "browse") {
+          void filterPosts();
+        } else {
+          openLostView(viewName, false);
+        }
 
-          window.requestAnimationFrame(() => {
-            document.querySelector(".lost-tabs")?.scrollIntoView({
-              behavior: prefersReducedMotion ? "auto" : "smooth",
-              block: "start",
-            });
+        window.requestAnimationFrame(() => {
+          document.querySelector(".lost-tabs")?.scrollIntoView({
+            behavior: prefersReducedMotion ? "auto" : "smooth",
+            block: "start",
           });
-        }),
-      );
+        });
+      }),
+    );
 
     function showToast(message) {
       const toast = document.getElementById("toastMessage");
@@ -650,12 +650,21 @@ export function usePublicServicePortal() {
       });
 
     function showConfirmationDetails(details = {}) {
-      document.getElementById("successLocation").textContent = details.location || "";
-      document.getElementById("successProblem").textContent = details.problem || "";
-      document.getElementById("successRequestDetails").hidden = !(details.location || details.problem);
+      document.getElementById("successLocation").textContent =
+        details.location || "";
+      document.getElementById("successProblem").textContent =
+        details.problem || "";
+      document.getElementById("successRequestDetails").hidden = !(
+        details.location || details.problem
+      );
     }
 
-    function showSuccess(type, recipientEmail = "", requestId = "", details = {}) {
+    function showSuccess(
+      type,
+      recipientEmail = "",
+      requestId = "",
+      details = {},
+    ) {
       showConfirmationDetails(details);
       const trackingCode =
         requestId || `BC-${Math.floor(1000 + Math.random() * 9000)}`;
@@ -716,25 +725,30 @@ export function usePublicServicePortal() {
 
     // blob URL ของพรีวิวใช้หน่วยความจำในเบราว์เซอร์ ต้องคืนด้วย revokeObjectURL เมื่อเลิกใช้
     function clearImagePreviews(form) {
-      form.querySelectorAll(".image-preview").forEach((preview) => {
-        const image = preview.querySelector("img");
-        if (image.src.startsWith("blob:")) URL.revokeObjectURL(image.src);
-        image.removeAttribute("src");
-        preview.querySelector("span").textContent = "";
-        preview.classList.remove("visible");
+      form.querySelectorAll(".image-input").forEach((input) => {
+        input.dispatchEvent(new Event("clear-image-selection"));
       });
     }
 
     function createDemoRequestCode(prefix) {
       const today = new Date();
-      const date = [today.getFullYear(), String(today.getMonth() + 1).padStart(2, "0"), String(today.getDate()).padStart(2, "0")].join("");
-      const suffix = crypto.randomUUID().replaceAll("-", "").slice(0, 8).toUpperCase();
+      const date = [
+        today.getFullYear(),
+        String(today.getMonth() + 1).padStart(2, "0"),
+        String(today.getDate()).padStart(2, "0"),
+      ].join("");
+      const suffix = crypto
+        .randomUUID()
+        .replaceAll("-", "")
+        .slice(0, 8)
+        .toUpperCase();
       return `${prefix}-${date}-${suffix}`;
     }
 
     const cleaningForm = document.querySelector("#clean form");
     const confirmCleaningRequest = (event) => {
-      const { demo, request_code, recipientEmail, location, problem, status } = event.detail;
+      const { demo, request_code, recipientEmail, location, problem, status } =
+        event.detail;
       showSuccess(
         "แจ้งทำความสะอาดเรียบร้อยแล้ว",
         recipientEmail,
@@ -742,12 +756,21 @@ export function usePublicServicePortal() {
         { location, problem, status, demo },
       );
     };
-    cleaningForm?.addEventListener("cleaning-request-confirmed", confirmCleaningRequest);
-    validationCleanups.push(() => cleaningForm?.removeEventListener("cleaning-request-confirmed", confirmCleaningRequest));
+    cleaningForm?.addEventListener(
+      "cleaning-request-confirmed",
+      confirmCleaningRequest,
+    );
+    validationCleanups.push(() =>
+      cleaningForm?.removeEventListener(
+        "cleaning-request-confirmed",
+        confirmCleaningRequest,
+      ),
+    );
 
     const repairForm = document.querySelector("#repair form");
     const confirmRepairRequest = (event) => {
-      const { demo, request_code, recipientEmail, location, problem, status } = event.detail;
+      const { demo, request_code, recipientEmail, location, problem, status } =
+        event.detail;
       showSuccess(
         "แจ้งซ่อมเรียบร้อยแล้ว",
         recipientEmail,
@@ -755,10 +778,18 @@ export function usePublicServicePortal() {
         { location, problem, status, demo },
       );
     };
-    repairForm?.addEventListener("repair-request-confirmed", confirmRepairRequest);
-    validationCleanups.push(() => repairForm?.removeEventListener("repair-request-confirmed", confirmRepairRequest));
+    repairForm?.addEventListener(
+      "repair-request-confirmed",
+      confirmRepairRequest,
+    );
+    validationCleanups.push(() =>
+      repairForm?.removeEventListener(
+        "repair-request-confirmed",
+        confirmRepairRequest,
+      ),
+    );
 
-    document.querySelectorAll("[data-service-validation]").forEach(form => {
+    document.querySelectorAll("[data-service-validation]").forEach((form) => {
       validationCleanups.push(installServiceFormValidation(form));
     });
 
@@ -1006,61 +1037,107 @@ export function usePublicServicePortal() {
 
     document.querySelectorAll(".image-input").forEach((input) => {
       const container = input.closest(".upload-field");
-      const preview = container.querySelector(".image-preview");
-      const image = preview.querySelector("img");
-      const fileName = preview.querySelector(".image-file-name");
-      const removeButton = preview.querySelector(".remove-image");
+      const previewList = container.querySelector(".image-preview-list");
+      const uploadAction = container.querySelector(".image-upload-action");
       const fileError = document.getElementById(input.dataset.errorId);
       const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
       const maxSize = Number(input.dataset.maxSize) || 5 * 1024 * 1024;
+      const maxFiles = Number(input.dataset.maxFiles) || 5;
       const maxSizeMB = maxSize / (1024 * 1024);
+      const selectedPhotos = [];
 
       const setFileError = (message = "") => {
-        // เมื่อมีข้อความ ฟอร์มจะไม่ผ่าน checkValidity()
-        input.setCustomValidity(message);
+        // ไฟล์ที่ไม่ผ่านจะไม่ถูกส่ง จึงแจ้งเตือนโดยไม่ขวางการส่งไฟล์ที่ผ่านแล้ว
+        input.setCustomValidity("");
         input.setAttribute("aria-invalid", String(Boolean(message)));
         if (fileError) fileError.textContent = message;
       };
-      function clearPreview() {
-        // คืนหน่วยความจำของรูปเดิมก่อนล้างหรือเปลี่ยนพรีวิว
-        if (image.src.startsWith("blob:")) URL.revokeObjectURL(image.src);
-        image.removeAttribute("src");
-        fileName.textContent = "";
-        preview.classList.remove("visible");
+
+      function syncPhotoFiles() {
+        const transfer = new DataTransfer();
+        selectedPhotos.forEach(({ file }) => transfer.items.add(file));
+        input.files = transfer.files;
+      }
+
+      function renderPreviews() {
+        previewList.replaceChildren();
+        selectedPhotos.forEach((photo, index) => {
+          const item = document.createElement("li");
+          item.className = "image-preview";
+
+          const image = document.createElement("img");
+          image.src = photo.url;
+          image.alt = `ตัวอย่างรูป ${photo.file.name}`;
+
+          const fileName = document.createElement("span");
+          fileName.textContent = photo.file.name;
+
+          const removeButton = document.createElement("button");
+          removeButton.type = "button";
+          removeButton.className = "remove-image";
+          removeButton.textContent = "ลบ";
+          removeButton.setAttribute("aria-label", `ลบรูป ${photo.file.name}`);
+          removeButton.addEventListener("click", () => {
+            URL.revokeObjectURL(selectedPhotos[index].url);
+            selectedPhotos.splice(index, 1);
+            syncPhotoFiles();
+            renderPreviews();
+            setFileError();
+            input.focus();
+          });
+
+          item.append(image, fileName, removeButton);
+          previewList.append(item);
+        });
+        if (uploadAction) {
+          uploadAction.textContent = selectedPhotos.length
+            ? "เพิ่มรูปภาพ"
+            : "เลือกรูปภาพ";
+        }
+      }
+
+      function clearPhotos() {
+        selectedPhotos.forEach(({ url }) => URL.revokeObjectURL(url));
+        selectedPhotos.splice(0);
+        input.value = "";
+        previewList.replaceChildren();
+        if (uploadAction) uploadAction.textContent = "เลือกรูปภาพ";
+        setFileError();
       }
 
       input.addEventListener("change", () => {
-        const file = input.files[0];
-        clearPreview();
-        setFileError();
-        if (!file) return;
-
-        let message = "";
-        if (!allowedTypes.includes(file.type)) {
-          message = "รองรับเฉพาะไฟล์ JPG, PNG หรือ WebP";
-        } else if (file.size === 0) {
-          message = "ไฟล์รูปภาพว่างเปล่า กรุณาเลือกไฟล์ใหม่";
-        } else if (file.size > maxSize) {
-          message = `รูปภาพต้องมีขนาดไม่เกิน ${maxSizeMB} MB`;
+        const errors = [];
+        for (const file of Array.from(input.files)) {
+          const duplicate = selectedPhotos.some(
+            ({ file: existing }) =>
+              existing.name === file.name &&
+              existing.size === file.size &&
+              existing.type === file.type &&
+              existing.lastModified === file.lastModified,
+          );
+          if (!allowedTypes.includes(file.type)) {
+            errors.push(`${file.name}: รองรับเฉพาะไฟล์ JPG, PNG หรือ WebP`);
+          } else if (file.size === 0) {
+            errors.push(`${file.name}: ไฟล์รูปภาพว่างเปล่า กรุณาเลือกไฟล์ใหม่`);
+          } else if (file.size > maxSize) {
+            errors.push(
+              `${file.name}: รูปภาพต้องมีขนาดไม่เกิน ${maxSizeMB} MB`,
+            );
+          } else if (duplicate) {
+            errors.push(`${file.name}: รูปนี้ถูกแนบแล้ว`);
+          } else if (selectedPhotos.length >= maxFiles) {
+            errors.push(`${file.name}: แนบได้สูงสุด ${maxFiles} รูป`);
+          } else {
+            selectedPhotos.push({ file, url: URL.createObjectURL(file) });
+          }
         }
-
-        if (message) {
-          input.value = "";
-          setFileError(message);
-          showToast(message);
-          return;
-        }
-        // สร้างพรีวิวเฉพาะไฟล์ที่ผ่านการตรวจแล้ว
-        image.src = URL.createObjectURL(file);
-        fileName.textContent = file.name;
-        preview.classList.add("visible");
+        syncPhotoFiles();
+        renderPreviews();
+        const message = errors.join(" / ");
+        setFileError(message);
+        if (message) showToast(message);
       });
-      removeButton.addEventListener("click", () => {
-        input.value = "";
-        clearPreview();
-        setFileError();
-        input.focus();
-      });
+      input.addEventListener("clear-image-selection", clearPhotos);
     });
 
     function validateTrackingField(field) {
@@ -1121,7 +1198,8 @@ export function usePublicServicePortal() {
         const marker = document.createElement("span");
         marker.className = "tracking-progress-marker";
         marker.setAttribute("aria-hidden", "true");
-        marker.textContent = index < progress.currentIndex ? "✓" : String(index + 1);
+        marker.textContent =
+          index < progress.currentIndex ? "✓" : String(index + 1);
 
         const label = document.createElement("span");
         label.className = "tracking-progress-label";
@@ -1198,8 +1276,12 @@ export function usePublicServicePortal() {
     }
 
     const trackingForm = document.getElementById("trackingForm");
-    const trackingSubmitButton = trackingForm.querySelector('button[type="submit"]');
-    const refreshTrackingButton = document.getElementById("refreshTrackingStatus");
+    const trackingSubmitButton = trackingForm.querySelector(
+      'button[type="submit"]',
+    );
+    const refreshTrackingButton = document.getElementById(
+      "refreshTrackingStatus",
+    );
     const trackingResult = document.getElementById("trackingResult");
     const trackingIds = {
       result: "trackingResult",
@@ -1264,17 +1346,20 @@ export function usePublicServicePortal() {
           const remoteItem = await trackServiceRequest(code, email);
           const hasMatchingLocalItem =
             localItem && (!localItem.email || localItem.email === email);
-          item = remoteItem && hasMatchingLocalItem
-            ? {
-                ...localItem,
-                ...remoteItem,
-                title: remoteItem.title || localItem.title || localItem.itemName,
-              }
-            : remoteItem;
+          item =
+            remoteItem && hasMatchingLocalItem
+              ? {
+                  ...localItem,
+                  ...remoteItem,
+                  title:
+                    remoteItem.title || localItem.title || localItem.itemName,
+                }
+              : remoteItem;
         } else {
-          item = localItem && (!localItem.email || localItem.email === email)
-            ? localItem
-            : null;
+          item =
+            localItem && (!localItem.email || localItem.email === email)
+              ? localItem
+              : null;
         }
         renderTrackingResult(item, code, trackingIds, { refreshed });
         document.getElementById("trackingRefreshTime").textContent =
@@ -1443,6 +1528,11 @@ export function usePublicServicePortal() {
         submitButton.disabled = false;
         submitButton.textContent = "ส่งคำขอรับคืน";
       }
+      const urlParams = new URLSearchParams(window.location.search);
+
+      if (urlParams.get("service") === "clean") {
+        navigate("clean");
+      }
     });
 
     const viewStatusButton = document.getElementById("viewStatusButton");
@@ -1450,19 +1540,16 @@ export function usePublicServicePortal() {
       closeUiModal("successModal", false);
       navigate("dashboard");
 
-      window.setTimeout(
-        () => {
-          document.getElementById("trackingSection").scrollIntoView({
-            behavior: prefersReducedMotion ? "auto" : "smooth",
-            block: "center",
-          });
-          // รหัสและอีเมลถูกกรอกไว้ตั้งแต่ได้รับผลสำเร็จ เหลือเพียงกดตรวจสอบสถานะ
-          document.getElementById("trackingCode").focus({
-            preventScroll: true,
-          });
-        },
-        80,
-      );
+      window.setTimeout(() => {
+        document.getElementById("trackingSection").scrollIntoView({
+          behavior: prefersReducedMotion ? "auto" : "smooth",
+          block: "center",
+        });
+        // รหัสและอีเมลถูกกรอกไว้ตั้งแต่ได้รับผลสำเร็จ เหลือเพียงกดตรวจสอบสถานะ
+        document.getElementById("trackingCode").focus({
+          preventScroll: true,
+        });
+      }, 80);
     });
 
     document.getElementById("backHomeButton")?.addEventListener("click", () => {
@@ -1486,10 +1573,15 @@ export function usePublicServicePortal() {
       () => document.querySelector(".loading-mask")?.remove(),
       320,
     );
+
+    const qrService = new URLSearchParams(window.location.search).get("service");
+    if (qrService === "clean" || qrService === "repair") {
+      navigate(qrService);
+    }
   });
 
   onUnmounted(() => {
-    validationCleanups.forEach(cleanup => cleanup());
+    validationCleanups.forEach((cleanup) => cleanup());
     document.body.classList.remove("modal-open", "offline");
   });
   return { sidebarOpen, closeSidebar, toggleSidebar };

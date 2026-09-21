@@ -1204,6 +1204,17 @@ main {
 .repair-location-row > .field {
   min-width: 0;
 }
+.qr-location-message {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 12px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: var(--primary-soft);
+  color: var(--ink);
+}
 .location-combobox {
   position: relative;
 }
@@ -1323,14 +1334,21 @@ main {
 .upload-copy small {
   color: var(--muted);
 }
-.image-preview {
+.image-preview-list {
+  display: grid;
+  gap: 9px;
+  margin: 9px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.image-preview-list:empty {
   display: none;
+}
+.image-preview {
+  display: flex;
   margin-top: 9px;
   align-items: center;
   gap: 10px;
-}
-.image-preview.visible {
-  display: flex;
 }
 .image-preview img {
   display: block;

@@ -1,8 +1,12 @@
 <script setup>
-import { computed, onBeforeUnmount, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRepairSubmission } from "../../../composables/useRepairSubmission.js";
-import { mockServiceLocations as mockLocations } from "../../../services/mockServiceLocations.js";
-import { uploadRepairRequest } from "../../../services/repairRequests.js";
+import {
+  listRepairLocations,
+  resolveRepairLocationByQr,
+  uploadRepairRequest,
+} from "../../../services/repairRequests.js";
+import { mockServiceLocations } from "../../../services/mockServiceLocations.js";
 import LocationCombobox from "../LocationCombobox.vue";
 
 const priorityValues = {
@@ -18,7 +22,7 @@ async function submitRepair(event) {
   const form = event.currentTarget;
   if (!form.checkValidity()) return;
   if (!selectedLocation.value) {
-    locationError.value = "กรุณาเลือกชั้นและห้องจากรายการ";
+    locationError.value = "ยังระบุสถานที่จริงไม่ได้ กรุณาตรวจสอบชั้นและห้อง/สถานที่";
     return;
   }
 
@@ -29,29 +33,47 @@ async function submitRepair(event) {
   photos.value.forEach(({ file }) => payload.append("image", file));
   await submit(payload, (result) => {
     const recipientEmail = payload.get("reporter_email") || "";
+    const submittedLocation = formatLocation(selectedLocation.value);
+    const keptFloor = selectedFloor.value;
+    const keptArea = selectedArea.value;
     form.reset();
+    window.setTimeout(() => {
+      selectedFloor.value = keptFloor;
+      void nextTick().then(() => { selectedArea.value = keptArea; });
+    }, 0);
     form.dispatchEvent(new CustomEvent("repair-request-confirmed", {
       bubbles: true,
       detail: {
         ...result,
         recipientEmail,
-        location: [selectedFloor.value, selectedRoom.value]
-          .filter(Boolean)
-          .join(" · "),
+        location: submittedLocation,
         problem: payload.get("title") || "",
       },
     }));
+  }, (error) => {
+    if (error.status === 422 && error.message.includes("สถานที่")) {
+      selectedFloor.value = "";
+      selectedArea.value = "";
+      qrLocation.value = null;
+      qrMessage.value = "สถานที่นี้ไม่เปิดใช้งานแล้ว กรุณาเลือกสถานที่ใหม่";
+      void loadLocations();
+    }
   });
 }
 
+const locations = ref([]);
 const selectedFloor = ref("");
-const selectedRoom = ref("");
+const selectedArea = ref("");
+const qrLocation = ref(null);
+const qrMessage = ref("");
+const qrRetry = ref(false);
+const locationLoadError = ref("");
 const selectedWorkType = ref("");
 const locationError = ref("");
 const photoInput = ref(null);
 const photos = ref([]);
 const photoErrors = ref([]);
-const MAX_PHOTOS = 1;
+const MAX_PHOTOS = 5;
 const MAX_PHOTO_BYTES = 5 * 1024 * 1024;
 const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
 
@@ -71,8 +93,15 @@ function addPhotos(event) {
       errors.push(`${file.name}: ไฟล์ว่างเปล่า กรุณาเลือกไฟล์ใหม่`);
     } else if (file.size > MAX_PHOTO_BYTES) {
       errors.push(`${file.name}: ขนาดเกิน 5 MB`);
+    } else if (photos.value.some(({ file: existing }) =>
+      existing.name === file.name &&
+      existing.size === file.size &&
+      existing.type === file.type &&
+      existing.lastModified === file.lastModified)) {
+      errors.push(`${file.name}: รูปนี้ถูกแนบแล้ว`);
+    } else if (photos.value.length >= MAX_PHOTOS) {
+      errors.push(`${file.name}: แนบได้สูงสุด ${MAX_PHOTOS} รูป`);
     } else {
-      clearPhotos();
       photos.value.push({ file, url: URL.createObjectURL(file) });
     }
   }
@@ -97,23 +126,89 @@ function clearPhotos() {
 
 onBeforeUnmount(clearPhotos);
 
-const floorSuggestions = [...new Set(
-  mockLocations.map(({ floor }) => `ชั้น ${floor}`),
-)];
-const roomSuggestions = computed(() => mockLocations
-  .filter(({ floor }) => `ชั้น ${floor}` === selectedFloor.value)
-  .map(({ room }) => room));
-const selectedLocation = computed(() => mockLocations.find(
-  ({ floor, room }) => `ชั้น ${floor}` === selectedFloor.value && room === selectedRoom.value,
-));
+const floorOptions = computed(() => [...new Set([
+  ...mockServiceLocations.map((location) => location.floor || "ไม่ระบุชั้น"),
+  ...(qrLocation.value ? [qrLocation.value.floor || "ไม่ระบุชั้น"] : []),
+])].map((floor) => floor === "ไม่ระบุชั้น" ? floor : `ชั้น ${floor}`));
+const areaOptions = computed(() => [...new Set([
+  ...mockServiceLocations,
+  ...(qrLocation.value ? [qrLocation.value] : []),
+].filter((location) => (location.floor || "ไม่ระบุชั้น") === selectedFloor.value.replace(/^ชั้น /, ""))
+  .map((location) => location.area))]);
+const selectedLocation = computed(() => {
+  const floor = selectedFloor.value.replace(/^ชั้น /, "");
+  if (!floor || !selectedArea.value) return null;
+  if (qrLocation.value && (qrLocation.value.floor || "ไม่ระบุชั้น") === floor &&
+      qrLocation.value.area === selectedArea.value) return qrLocation.value;
+  const matches = locations.value.filter((location) =>
+    (location.floor || "ไม่ระบุชั้น") === floor && location.area === selectedArea.value);
+  return matches.length === 1 ? matches[0] : null;
+});
+const isQrLocation = computed(() =>
+  qrLocation.value !== null &&
+  selectedFloor.value.replace(/^ชั้น /, "") === (qrLocation.value.floor || "ไม่ระบุชั้น") &&
+  selectedArea.value === qrLocation.value.area,
+);
 const workTypeSuggestions = Object.keys(priorityValues);
 
+function formatLocation(location) {
+  if (!location) return "";
+  return location.floor ? `ชั้น ${location.floor} · ${location.area}` : location.area;
+}
+
 watch(selectedFloor, () => {
-  selectedRoom.value = "";
+  selectedArea.value = "";
   locationError.value = "";
 });
-watch(selectedRoom, () => {
-  locationError.value = "";
+watch(selectedArea, () => { locationError.value = ""; });
+
+async function loadLocations() {
+  locationLoadError.value = "";
+  try {
+    locations.value = await listRepairLocations();
+  } catch {
+    locationLoadError.value = "โหลดข้อมูลสถานที่จริงไม่สำเร็จ กรุณาลองใหม่ภายหลัง";
+  }
+}
+
+async function loadQrLocation() {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get("service") === "clean") return;
+  const token = params.get("token")?.trim() ?? "";
+  if (!token) return;
+
+  qrMessage.value = "";
+  qrRetry.value = false;
+  if (token.length > 255) {
+    qrMessage.value = "QR นี้ใช้ไม่ได้ กรุณาเลือกสถานที่เอง";
+    return;
+  }
+
+  try {
+    const location = await resolveRepairLocationByQr(token);
+    if (!location) {
+      qrMessage.value = "QR นี้ใช้ไม่ได้หรือสถานที่ถูกปิด กรุณาเลือกสถานที่เอง";
+      return;
+    }
+    qrLocation.value = location;
+    if (!selectedFloor.value && !selectedArea.value) {
+      selectedFloor.value = location.floor ? `ชั้น ${location.floor}` : "ไม่ระบุชั้น";
+      await nextTick();
+      selectedArea.value = location.area;
+      await nextTick();
+      for (const id of ["repairFloor", "repairArea"]) {
+        document.getElementById(id)?.dispatchEvent(new Event("change", { bubbles: true }));
+      }
+    }
+  } catch {
+    qrMessage.value = "ตรวจสอบสถานที่จาก QR ไม่สำเร็จ";
+    qrRetry.value = true;
+  }
+}
+
+onMounted(() => {
+  void loadLocations();
+  void loadQrLocation();
 });
 </script>
 
@@ -137,20 +232,32 @@ watch(selectedRoom, () => {
                   v-model="selectedFloor"
                   id="repairFloor"
                   label="ชั้น"
-                  placeholder="เลือกชั้น"
-                  :options="floorSuggestions"
+                  placeholder="ชั้น"
+                  :options="floorOptions"
+                  :allow-custom="false"
                   required
                 />
                 <LocationCombobox
-                  v-model="selectedRoom"
-                  id="repairRoom"
-                  label="ห้อง"
-                  placeholder="เลือกห้อง"
-                  :options="roomSuggestions"
+                  v-model="selectedArea"
+                  id="repairArea"
+                  label="ห้อง/สถานที่"
+                  placeholder="ห้องหรือสถานที่"
+                  :options="areaOptions"
+                  :allow-custom="false"
                   required
                 />
                 <input type="hidden" name="location_id" :value="selectedLocation?.id || ''" />
               </div>
+              <p v-if="isQrLocation" class="qr-location-message" role="status" aria-live="polite">
+                📍 เลือก {{ formatLocation(qrLocation) }} จาก QR แล้ว · เปลี่ยนสถานที่ได้จากรายการ
+              </p>
+              <p v-if="qrMessage" class="qr-location-message" role="status" aria-live="polite">
+                {{ qrMessage }}
+                <button v-if="qrRetry" type="button" class="secondary" @click="loadQrLocation">ลองตรวจสอบ QR อีกครั้ง</button>
+              </p>
+              <p v-if="locationLoadError && !selectedLocation" class="field-error location-load-error" role="alert">
+                {{ locationLoadError }}
+              </p>
               <p v-if="locationError" class="field-error repair-location-error" aria-live="polite">
                 {{ locationError }}
               </p>
@@ -198,14 +305,15 @@ watch(selectedRoom, () => {
                       ref="photoInput"
                       name="image"
                       type="file"
+                      multiple
                       accept="image/jpeg,image/png,image/webp"
                       aria-describedby="repairImageHint repairImageError"
                       @change="addPhotos"
                     />
                     <span class="upload-icon" aria-hidden="true">＋</span>
                     <span class="upload-copy">
-                      <strong>{{ photos.length ? "เปลี่ยนรูปภาพ" : "เลือกรูปภาพ" }}</strong>
-                      <small id="repairImageHint">JPG, PNG หรือ WebP ไม่เกิน 5 MB</small>
+                      <strong>{{ photos.length ? "เพิ่มรูปภาพ" : "เลือกรูปภาพ" }}</strong>
+                      <small id="repairImageHint">แนบได้สูงสุด {{ MAX_PHOTOS }} รูป · JPG, PNG หรือ WebP ไม่เกิน 5 MB ต่อรูป</small>
                     </span>
                   </label>
                   <ul v-if="photos.length" class="repair-photo-list" aria-label="รูปจุดชำรุดที่แนบ">

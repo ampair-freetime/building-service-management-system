@@ -321,23 +321,19 @@
                     name="image"
                     type="file"
                     class="image-input"
+                    multiple
                     accept="image/jpeg,image/png,image/webp"
                     data-max-size="5242880"
+                    data-max-files="5"
                     data-error-id="lostItemPhotoError"
                     aria-describedby="lostItemPhotoError"
                   /><span class="upload-icon">＋</span
                   ><span class="upload-copy"
-                    ><strong>เลือกรูปภาพ</strong
-                    ><small>JPG, PNG หรือ WebP ไม่เกิน 5 MB</small></span
+                    ><strong class="image-upload-action">เลือกรูปภาพ</strong
+                    ><small>แนบได้สูงสุด 5 รูป · JPG, PNG หรือ WebP ไม่เกิน 5 MB ต่อรูป</small></span
                   ></label
                 >
-                <div class="image-preview">
-                  <img
-                    src="data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs="
-                    alt="ตัวอย่างรูปที่แนบ"
-                  /><span class="image-file-name"></span
-                  ><button type="button" class="remove-image">ลบ</button>
-                </div>
+                <ul class="image-preview-list" aria-label="รูปภาพสิ่งของที่แนบ"></ul>
                 <p
                   id="lostItemPhotoError"
                   class="field-error"
@@ -501,23 +497,19 @@
                     name="image"
                     type="file"
                     class="image-input"
+                    multiple
                     accept="image/jpeg,image/png,image/webp"
                     data-max-size="5242880"
+                    data-max-files="5"
                     data-error-id="publicFoundPhotoError"
                     aria-describedby="publicFoundPhotoError"
                   /><span class="upload-icon">＋</span
                   ><span class="upload-copy"
-                    ><strong>เลือกรูปภาพ</strong
-                    ><small>JPG, PNG หรือ WebP ไม่เกิน 5 MB</small></span
+                    ><strong class="image-upload-action">เลือกรูปภาพ</strong
+                    ><small>แนบได้สูงสุด 5 รูป · JPG, PNG หรือ WebP ไม่เกิน 5 MB ต่อรูป</small></span
                   ></label
                 >
-                <div class="image-preview">
-                  <img
-                    src="data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs="
-                    alt="ตัวอย่างรูปที่แนบ"
-                  /><span class="image-file-name"></span
-                  ><button type="button" class="remove-image">ลบ</button>
-                </div>
+                <ul class="image-preview-list" aria-label="รูปภาพของที่พบที่แนบ"></ul>
               </div>
               <p
                 id="publicFoundPhotoError"
