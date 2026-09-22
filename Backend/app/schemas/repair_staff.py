@@ -72,6 +72,21 @@ class RepairTaskResponse(BaseModel):
     assigned_staff: AssignedTechnicianResponse
 
 
+class RepairCompletionPhotoResponse(BaseModel):
+    id: UUID
+    content_type: str
+    size_bytes: int
+    width: int
+    height: int
+    created_at: datetime
+
+
+class RepairCompletionPhotoUploadResponse(BaseModel):
+    request_id: UUID
+    image_count: int
+    photos: list[RepairCompletionPhotoResponse]
+
+
 class RepairStatusUpdateRequest(BaseModel):
     status: RequestStatus
 

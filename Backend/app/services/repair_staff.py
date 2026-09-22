@@ -1,13 +1,19 @@
 """Business logic สำหรับ Repair Staff."""
-from datetime import UTC, datetime
 
+from dataclasses import dataclass
+from datetime import UTC, datetime
+from uuid import UUID, uuid4
+
+from fastapi import UploadFile
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from uuid import UUID
-from app.models.enums import RequestAction, RequestStatus, RequestType
+from app.models.enums import ImageType, RequestAction, RequestStatus, RequestType
+from app.models.image import Image
 from app.models.service_request import RequestHistory, ServiceRequest
+from app.services.images import ProcessedImage, prepare_guest_image
+from app.services.object_storage import ObjectStorage, StoredObject
 
 
 async def list_repair_requests(
@@ -48,6 +54,13 @@ class RepairTaskNotInProgressError(RuntimeError):
 
 class RepairTaskNotCompletedError(RuntimeError):
     """Repair task ยังไม่เสร็จ จึงเพิ่ม repair note ไม่ได้."""
+
+
+@dataclass(frozen=True)
+class _PreparedCompletionPhoto:
+    image_id: UUID
+    processed: ProcessedImage
+    stored: StoredObject
 
 
 async def get_repair_request_detail(
@@ -108,9 +121,7 @@ async def accept_repair_task(
 
     if result.rowcount != 1:
         await session.rollback()
-        raise RepairTaskAlreadyAssignedError(
-            "Repair task has already been assigned"
-        )
+        raise RepairTaskAlreadyAssignedError("Repair task has already been assigned")
 
     session.add(
         RequestHistory(
@@ -127,9 +138,7 @@ async def accept_repair_task(
     await session.commit()
 
     service_request = await session.scalar(
-        select(ServiceRequest).where(
-            ServiceRequest.id == request_id
-        )
+        select(ServiceRequest).where(ServiceRequest.id == request_id)
     )
 
     if service_request is None:
@@ -159,9 +168,7 @@ async def update_repair_task_status(
 
     # Technician เปลี่ยนสถานะได้เฉพาะงานที่ตัวเองรับไว้
     if service_request.assigned_staff_id != staff_id:
-        raise RepairTaskAlreadyAssignedError(
-            "Repair task is assigned to another technician"
-        )
+        raise RepairTaskAlreadyAssignedError("Repair task is assigned to another technician")
 
     valid_transitions = {
         RequestStatus.ASSIGNED: RequestStatus.RECEIVED,
@@ -217,15 +224,11 @@ async def complete_repair_task(
 
     # Complete ได้เฉพาะ technician ที่รับงานนี้
     if service_request.assigned_staff_id != staff_id:
-        raise RepairTaskAlreadyAssignedError(
-            "Repair task is assigned to another technician"
-        )
+        raise RepairTaskAlreadyAssignedError("Repair task is assigned to another technician")
 
     # ต้องผ่านขั้น IN_PROGRESS ก่อน
     if service_request.status != RequestStatus.IN_PROGRESS:
-        raise RepairTaskNotInProgressError(
-            "Repair task must be in progress before completion"
-        )
+        raise RepairTaskNotInProgressError("Repair task must be in progress before completion")
 
     old_status = service_request.status
     service_request.status = RequestStatus.COMPLETED
@@ -269,14 +272,10 @@ async def add_repair_completion_note(
         raise RepairRequestNotFoundError("Repair request not found")
 
     if service_request.assigned_staff_id != staff_id:
-        raise RepairTaskAlreadyAssignedError(
-            "Repair task is assigned to another technician"
-        )
+        raise RepairTaskAlreadyAssignedError("Repair task is assigned to another technician")
 
     if service_request.status != RequestStatus.COMPLETED:
-        raise RepairTaskNotCompletedError(
-            "Repair task must be completed before adding a note"
-        )
+        raise RepairTaskNotCompletedError("Repair task must be completed before adding a note")
 
     cleaned_note = note.strip()
 
@@ -300,6 +299,88 @@ async def add_repair_completion_note(
     return history
 
 
+async def upload_repair_completion_photos(
+    session: AsyncSession,
+    *,
+    request_id: UUID,
+    staff_id: UUID,
+    uploads: list[UploadFile],
+    storage: ObjectStorage,
+) -> list[Image]:
+    """อัปโหลดรูปหลังซ่อมสำหรับงาน repair ที่เสร็จแล้ว."""
+
+    service_request = await session.scalar(
+        select(ServiceRequest).where(
+            ServiceRequest.id == request_id,
+            ServiceRequest.request_type == RequestType.REPAIR,
+        )
+    )
+
+    if service_request is None:
+        raise RepairRequestNotFoundError("Repair request not found")
+    if service_request.assigned_staff_id != staff_id:
+        raise RepairTaskAlreadyAssignedError("Repair task is assigned to another technician")
+    if service_request.status != RequestStatus.COMPLETED:
+        raise RepairTaskNotCompletedError(
+            "Repair task must be completed before uploading completion photos"
+        )
+    if not uploads:
+        raise ValueError("At least one completion photo is required")
+
+    # Validate ทุกไฟล์ก่อนอัปโหลด เพื่อไม่ให้มีไฟล์ค้างใน storage จากชุดที่ invalid.
+    processed_uploads = [await prepare_guest_image(upload) for upload in uploads]
+    prepared: list[_PreparedCompletionPhoto] = []
+    images: list[Image] = []
+    committed = False
+
+    try:
+        for processed in processed_uploads:
+            image_id = uuid4()
+            stored = await storage.put(
+                object_key=f"repair/{request_id}/completion/{image_id}.webp",
+                data=processed.data,
+                content_type=processed.content_type,
+            )
+            prepared.append(_PreparedCompletionPhoto(image_id, processed, stored))
+
+        for item in prepared:
+            image = Image(
+                id=item.image_id,
+                request_id=request_id,
+                lost_item_id=None,
+                object_key=item.stored.object_key,
+                storage_provider="r2",
+                bucket_name=item.stored.bucket_name,
+                content_type=item.processed.content_type,
+                size_bytes=len(item.processed.data),
+                etag=item.stored.etag,
+                width=item.processed.width,
+                height=item.processed.height,
+                image_type=ImageType.AFTER,
+                uploaded_by_staff_id=staff_id,
+            )
+            session.add(image)
+            images.append(image)
+
+        await session.flush()
+        for image in images:
+            await session.refresh(image)
+        await session.commit()
+        committed = True
+    finally:
+        if not committed:
+            try:
+                await session.rollback()
+            finally:
+                for item in prepared:
+                    try:
+                        await storage.delete(item.stored.object_key)
+                    except Exception:  # noqa: BLE001, S110 - cleanup must not hide the original error
+                        pass
+
+    return images
+
+
 async def get_repair_work_history(
     session: AsyncSession,
     *,
@@ -319,9 +400,7 @@ async def get_repair_work_history(
         raise RepairRequestNotFoundError("Repair request not found")
 
     if service_request.assigned_staff_id != staff_id:
-        raise RepairTaskAlreadyAssignedError(
-            "Repair task is assigned to another technician"
-        )
+        raise RepairTaskAlreadyAssignedError("Repair task is assigned to another technician")
 
     history = (
         await session.scalars(

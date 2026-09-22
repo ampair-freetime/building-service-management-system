@@ -2,40 +2,46 @@
 
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, File, HTTPException, UploadFile, status
 
 from app.api.dependencies import (
     DbSession,
+    ObjectStorageClient,
     OptionalObjectStorageClient,
     TechnicianStaff,
 )
 from app.schemas.repair_staff import (
+    AssignedTechnicianResponse,
+    RepairCompletionPhotoResponse,
+    RepairCompletionPhotoUploadResponse,
+    RepairNoteRequest,
+    RepairNoteResponse,
     RepairRequestDetailResponse,
     RepairRequestImageResponse,
     RepairRequestListItem,
     RepairRequestListResponse,
     RepairRequestLocationResponse,
-    AssignedTechnicianResponse,
-    RepairTaskResponse,
     RepairStatusUpdateRequest,
-    RepairNoteRequest,
-    RepairNoteResponse,
+    RepairTaskResponse,
     RepairWorkHistoryItem,
     RepairWorkHistoryResponse,
 )
+from app.services.images import InvalidImageError
+from app.services.object_storage import StorageOperationError
 from app.services.repair_staff import (
-    RepairRequestNotFoundError,
-    get_repair_request_detail,
-    list_repair_requests,
-    RepairTaskAlreadyAssignedError,
-    accept_repair_task,
     InvalidRepairStatusTransitionError,
-    update_repair_task_status,
-    RepairTaskNotInProgressError,
-    complete_repair_task,
+    RepairRequestNotFoundError,
+    RepairTaskAlreadyAssignedError,
     RepairTaskNotCompletedError,
+    RepairTaskNotInProgressError,
+    accept_repair_task,
     add_repair_completion_note,
+    complete_repair_task,
+    get_repair_request_detail,
     get_repair_work_history,
+    list_repair_requests,
+    update_repair_task_status,
+    upload_repair_completion_photos,
 )
 
 router = APIRouter()
@@ -110,11 +116,7 @@ async def read_repair_request_detail(
                 created_at=image.created_at,
             )
             for image in sorted(
-                (
-                    image
-                    for image in request.images
-                    if image.deleted_at is None
-                ),
+                (image for image in request.images if image.deleted_at is None),
                 key=lambda image: (
                     image.sort_order is None,
                     image.sort_order or 0,
@@ -311,6 +313,62 @@ async def add_completion_note(
         request_id=history.request_id,
         note=history.note or "",
         created_at=history.created_at,
+    )
+
+
+@router.post(
+    "/{request_id}/completion-photos",
+    response_model=RepairCompletionPhotoUploadResponse,
+)
+async def upload_task_completion_photos(
+    request_id: UUID,
+    session: DbSession,
+    technician: TechnicianStaff,
+    storage: ObjectStorageClient,
+    files: list[UploadFile] = File(...),  # noqa: B008 - FastAPI dependency declaration
+) -> RepairCompletionPhotoUploadResponse:
+    try:
+        images = await upload_repair_completion_photos(
+            session,
+            request_id=request_id,
+            staff_id=technician.id,
+            uploads=files,
+            storage=storage,
+        )
+    except RepairRequestNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except RepairTaskAlreadyAssignedError as exc:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
+    except RepairTaskNotCompletedError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    except InvalidImageError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)
+        ) from exc
+    except StorageOperationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="ไม่สามารถอัปโหลดรูปภาพได้",
+        ) from exc
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)
+        ) from exc
+
+    return RepairCompletionPhotoUploadResponse(
+        request_id=request_id,
+        image_count=len(images),
+        photos=[
+            RepairCompletionPhotoResponse(
+                id=image.id,
+                content_type=image.content_type,
+                size_bytes=image.size_bytes,
+                width=image.width,
+                height=image.height,
+                created_at=image.created_at,
+            )
+            for image in images
+        ],
     )
 
 
