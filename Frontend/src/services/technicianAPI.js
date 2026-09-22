@@ -33,6 +33,23 @@ export async function getStaffNotifications() {
   return parseResponse(response, "ไม่สามารถโหลดการแจ้งเตือนได้");
 }
 
+/** โหลดคิวงานซ่อมและรายละเอียดงานจาก Backend */
+export async function getRepairRequests() {
+  const response = await fetch(`${API_BASE_URL}/repair-requests`, {
+    method: "GET",
+    headers: authHeaders(),
+  });
+  return parseResponse(response, "ไม่สามารถโหลดรายการงานซ่อมได้");
+}
+
+export async function getRepairRequestDetail(requestId) {
+  const response = await fetch(
+    `${API_BASE_URL}/repair-requests/${encodeURIComponent(requestId)}`,
+    { method: "GET", headers: authHeaders() },
+  );
+  return parseResponse(response, "ไม่สามารถโหลดรายละเอียดงานซ่อมได้");
+}
+
 /** บันทึกว่าการแจ้งเตือนหนึ่งรายการถูกอ่านแล้ว */
 export async function markStaffNotificationRead(notificationId) {
   const response = await fetch(
@@ -48,7 +65,7 @@ export async function acceptRepairRequest(requestId) {
     `${API_BASE_URL}/repair-requests/${encodeURIComponent(requestId)}/accept`,
     { method: "PATCH", headers: authHeaders() },
   );
-  return parseResponse(response, "ไม่สามารถรับงานทำความสะอาดได้");
+  return parseResponse(response, "ไม่สามารถรับงานซ่อมได้");
 }
 
 /** อัปเดต Repair Requests ตามลำดับสถานะที่ Backend อนุญาต */
@@ -64,7 +81,16 @@ export async function updateRepairRequestStatus(requestId, status) {
       body: JSON.stringify({ status }),
     },
   );
-  return parseResponse(response, "ไม่สามารถอัปเดตสถานะงานทำความสะอาดได้");
+  return parseResponse(response, "ไม่สามารถอัปเดตสถานะงานซ่อมได้");
+}
+
+/** งานซ่อมต้องปิดผ่าน endpoint แยกหลังเข้าสู่ in_progress */
+export async function completeRepairRequest(requestId) {
+  const response = await fetch(
+    `${API_BASE_URL}/repair-requests/${encodeURIComponent(requestId)}/complete`,
+    { method: "PATCH", headers: authHeaders() },
+  );
+  return parseResponse(response, "ไม่สามารถปิดงานซ่อมได้");
 }
 
 /** บันทึกหมายเหตุสรุปหลังงานเสร็จ */
