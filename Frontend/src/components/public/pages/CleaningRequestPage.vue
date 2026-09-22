@@ -334,6 +334,7 @@ onBeforeUnmount(clearPhotos);
             placeholder="เลือกประเภทงาน"
             :options="workTypeSuggestions"
             :allow-custom="false"
+            :searchable="false"
             required
           />
           <input

@@ -1,7 +1,8 @@
 import { onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
+import { buildGuestQrUrl } from "../services/guestQrUrl.js";
 import { createStaffDashboardData } from "./staff-dashboard/data.js";
-import { canRoleOpenPage } from "../config/staff-role-pages.js";
+import { STAFF_ROLE_PAGES, canRoleOpenPage } from "../config/staff-role-pages.js";
 import {
   getFoundItemDetail,
   getLostItemDetail,
@@ -26,7 +27,6 @@ import {
   isTerminalStatus,
   loadQrCodeLibrary,
   nowThai,
-  sourceLabel,
   todayISO,
   validImage,
 } from "./staff-dashboard/utils.js";
@@ -82,9 +82,7 @@ export function useStaffDashboard() {
       auditHistory,
       workHistory,
       selectedOverviewStaff,
-      currentHistoryView,
       notificationSets,
-      announcements,
       categories,
     } = createStaffDashboardData();
     let currentRole = activeRole.value;
@@ -580,10 +578,9 @@ export function useStaffDashboard() {
         n.classList.toggle("role-hidden", !roleAllows(n, role))
       );
 
-      const active = $(".nav-item.active");
-
-      if (active && !roleAllows(active, role)) {
-        navigate("dashboard");
+      const activePage = $(".page.active")?.id.replace("page-", "");
+      if (!canRoleOpenPage(role, activePage)) {
+        navigate(STAFF_ROLE_PAGES[role][0].id);
       }
 
       populateCategoryFilter();
@@ -597,7 +594,6 @@ export function useStaffDashboard() {
       renderMyHistory();
       renderStaffOverview();
       renderHistory();
-      renderAnnouncements();
       renderMobileQuickActions();
       renderDashboardQuickActions();
     }
@@ -608,6 +604,10 @@ export function useStaffDashboard() {
 
     // เปลี่ยนหน้าภายใน Staff Dashboard โดยตรวจสิทธิ์ของ role ก่อนเสมอ
     function navigate(page) {
+      if (!canRoleOpenPage(currentRole, page)) {
+        toast("บทบาทนี้ไม่มีสิทธิ์เข้าถึงเมนูดังกล่าว");
+        return;
+      }
       const target = $(`.nav-item[data-page="${page}"]`);
       if (target && target.classList.contains("role-hidden")) {
         toast("บทบาทนี้ไม่มีสิทธิ์เข้าถึงเมนูดังกล่าว");
@@ -634,9 +634,8 @@ export function useStaffDashboard() {
         lost: "ศูนย์ของหายและรับฝาก",
         "staff-overview": "ภาพรวมงาน Staff",
         staff: "จัดการบัญชีเจ้าหน้าที่",
-        history: "ประวัติและรายการที่ลบ",
+        history: "ของหายและรับฝาก",
         qr: "QR ประจำห้อง",
-        announcements: "ประกาศอาคาร",
       };
       const pageTitle = $("#pageTitle");
       if (pageTitle) pageTitle.textContent = titles[page] || "Staff Operations";
@@ -644,7 +643,6 @@ export function useStaffDashboard() {
       if (page === "my-history") renderMyHistory();
       if (page === "staff-overview") renderStaffOverview();
       if (page === "history") renderHistory();
-      if (page === "announcements") renderAnnouncements();
       closeSidebar();
       window.scrollTo({
         top: 0,
@@ -654,6 +652,7 @@ export function useStaffDashboard() {
       });
     }
     function renderMetrics() {
+      if (!$("#metricGrid")) return;
       const jobs = roleJobs(),
         unassigned = jobs.filter((j) => !j.assignee).length,
         mine = jobs.filter((j) => j.assignee === activeStaffName()).length,
@@ -735,6 +734,7 @@ export function useStaffDashboard() {
         .join("");
     }
     function renderQueue() {
+      if (!$("#priorityQueue")) return;
       let items;
       if (currentRole === "clerk")
         items = lostSets.claims
@@ -766,6 +766,7 @@ export function useStaffDashboard() {
         : '<div class="empty">ไม่มีรายการรอรับในขณะนี้</div>';
     }
     function renderActivities() {
+      if (!$("#activityList")) return;
       const content =
         currentRole === "clerk"
           ? [
@@ -1091,11 +1092,11 @@ export function useStaffDashboard() {
       if (index < 0) return;
       requestConfirmation(
         "ยืนยันลบงาน",
-        `ลบงาน ${id} แบบ Soft Delete หรือไม่? รายการยังกู้คืนได้จากหน้าประวัติ`,
+        `ลบงาน ${id} หรือไม่?`,
         () => {
           const [record] = allJobs.splice(index, 1);
           storeDeletedRecord("jobs", record, "allJobs", record.title);
-          toast(`ย้ายงาน ${id} ไปยังรายการที่ลบแล้ว`);
+          toast(`ลบงาน ${id} แล้ว`);
           renderJobs();
           renderMetrics();
           renderQueue();
@@ -1127,8 +1128,9 @@ export function useStaffDashboard() {
     }
     function decisionButtons(tab, item) {
       if (tab === "claims") return "";
-      const approved = approvalGroup(item.status) === "approved";
-      if (approved) {
+      const decision = approvalGroup(item.status);
+      if (decision === "rejected") return "";
+      if (decision === "approved") {
         return `<div class="decision-strip completed"><button class="approve-btn" type="button" data-lost-action="complete" data-tab="${tab}" data-item-id="${item.id}">สำเร็จแล้ว</button></div>`;
       }
       return `<div class="decision-strip"><button class="approve-btn" type="button" data-lost-action="approve" data-tab="${tab}" data-item-id="${item.id}">อนุมัติ</button><button class="reject-btn" type="button" data-lost-action="reject" data-tab="${tab}" data-item-id="${item.id}">ไม่อนุมัติ</button></div>`;
@@ -1137,6 +1139,15 @@ export function useStaffDashboard() {
       if (status.includes("ไม่อนุมัติ") || status.includes("ไม่ผ่าน")) return "rejected";
       if (status.includes("รออนุมัติ")) return "pending";
       return "approved";
+    }
+    function lostDecisionGroup(tab, item) {
+      if (tab !== "claims") return approvalGroup(item.status);
+      if (item.backendStatus === "rejected" || item.status.includes("ไม่ผ่าน")) return "rejected";
+      if (
+        ["approved", "completed"].includes(item.backendStatus) ||
+        ["ผ่านการตรวจสอบ", "นัดหมายแล้ว", "คืนของแล้ว"].includes(item.status)
+      ) return "approved";
+      return "pending";
     }
     function completeLostFoundItem(tab, id) {
       const item = lostSets[tab]?.find((record) => record.id === id);
@@ -1284,13 +1295,62 @@ export function useStaffDashboard() {
     }
     function renderLost() {
       if (!$("#lostGrid")) return;
-      const data = currentLostTab === "claims"
-        ? lostSets.claims.filter((item) => item.status !== "คืนของแล้ว")
-        : lostSets[currentLostTab].filter((item) => approvalGroup(item.status) === "approved");
+      const entriesForView = (view) => {
+        if (["approved", "rejected"].includes(view)) {
+          return ["inventory", "lostposts", "claims"].flatMap((tab) =>
+            lostSets[tab]
+              .filter((item) => lostDecisionGroup(tab, item) === view)
+              .map((item) => ({ item, tab }))
+          );
+        }
+        const data = view === "claims"
+          ? lostSets.claims.filter((item) => item.status !== "คืนของแล้ว")
+          : lostSets[view].filter((item) => approvalGroup(item.status) === "approved");
+        return data.map((item) => ({ item, tab: view }));
+      };
+      const historySearch = currentRole === "admin"
+        ? ($("#historySearch")?.value || "").trim().toLowerCase()
+        : "";
+      const matchesSearch = ({ item }) =>
+        !historySearch ||
+        `${item.id} ${item.title} ${item.place} ${item.status} ${item.custody}`
+          .toLowerCase()
+          .includes(historySearch);
+      const visibleEntries = entriesForView(currentLostTab).filter(matchesSearch);
+      if (currentRole === "admin") {
+        const allEntries = ["inventory", "lostposts", "claims"].flatMap((tab) =>
+          lostSets[tab].map((item) => ({ item, tab }))
+        ).filter(matchesSearch);
+        const summary = $("#adminLostSummary");
+        if (summary) {
+          const counts = { pending: 0, approved: 0, rejected: 0, claims: 0 };
+          allEntries.forEach(({ item, tab }) => {
+            counts[lostDecisionGroup(tab, item)] += 1;
+            if (tab === "claims" && item.status !== "คืนของแล้ว") counts.claims += 1;
+          });
+          summary.innerHTML = [
+            [counts.pending, "รอตรวจสอบ", "รายการที่ยังไม่มีผลอนุมัติ"],
+            [counts.approved, "อนุมัติแล้ว", "รวมของรับฝาก ประกาศ และคำขอ"],
+            [counts.rejected, "ไม่อนุมัติ", "รายการที่ไม่ผ่านการตรวจสอบ"],
+            [counts.claims, "คำขอรับของ", "คำขอที่ยังไม่คืนของ"],
+          ].map(([value, label, hint], index) =>
+            `<article class="metric ${index === 2 ? "warn" : ""}"><span>${label}</span><strong>${value}</strong><small>${hint}</small></article>`
+          ).join("");
+        }
+        $$("#lostTabs [data-lost-count]").forEach((count) => {
+          count.textContent = entriesForView(count.dataset.lostCount)
+            .filter(matchesSearch).length;
+        });
+      }
       renderClerkCenter();
-      $("#lostGrid").innerHTML = data.length
-        ? data
-            .map((i) => {
+      const emptyLabel = currentLostTab === "approved"
+        ? "ยังไม่มีรายการที่อนุมัติแล้ว"
+        : currentLostTab === "rejected"
+        ? "ยังไม่มีรายการที่ไม่อนุมัติ"
+        : "ไม่มีรายการในหมวดนี้";
+      $("#lostGrid").innerHTML = visibleEntries.length
+        ? visibleEntries
+            .map(({ item: i, tab }) => {
               const note = i.decisionReason
                 ? `<div class="approval-note"><strong>${
                     i.status.includes("ไม่อนุมัติ")
@@ -1300,26 +1360,29 @@ export function useStaffDashboard() {
                 : "";
               const adminDelete =
                 currentRole === "admin"
-                  ? `<div class="admin-delete-row"><button class="small-btn delete" type="button" data-lost-action="delete" data-tab="${currentLostTab}" data-item-id="${i.id}">ลบรายการ</button></div>`
+                  ? `<div class="admin-delete-row"><button class="small-btn delete" type="button" data-lost-action="delete" data-tab="${tab}" data-item-id="${i.id}">ลบรายการ</button></div>`
                   : "";
               const controls =
-                currentLostTab === "claims"
+                tab === "claims"
                   ? `<div class="claim-controls"><button type="button" class="primary" data-lost-action="claim-detail" data-tab="claims" data-item-id="${i.id}">ดูรายละเอียดคำขอ</button></div>`
-                  : `${note}<div class="lost-foot"><span class="custody">${i.custody}</span>${currentLostTab === "inventory" ? `<span class="badge progress">สถานะการคืน: ${escapeHtml(returnStatusForFoundItem(i))}</span>` : ""}<button class="small-btn" type="button" data-lost-action="detail" data-tab="${currentLostTab}" data-item-id="${i.id}">ดูรายละเอียด</button></div>`;
-              const claimHint = currentLostTab === "claims" ? '<div class="approval-note"><strong>รับคำขออัตโนมัติ:</strong> ธุรการไม่ต้องกดอนุมัติ สามารถตรวจรายละเอียด นัดหมาย และยืนยันการส่งคืนได้</div>' : "";
+                  : `${note}<div class="lost-foot"><span class="custody">${i.custody}</span>${tab === "inventory" ? `<span class="badge progress">สถานะการคืน: ${escapeHtml(returnStatusForFoundItem(i))}</span>` : ""}<button class="small-btn" type="button" data-lost-action="detail" data-tab="${tab}" data-item-id="${i.id}">ดูรายละเอียด</button></div>`;
+              const claimHint = tab === "claims" ? '<div class="approval-note"><strong>รับคำขออัตโนมัติ:</strong> ธุรการไม่ต้องกดอนุมัติ สามารถตรวจรายละเอียด นัดหมาย และยืนยันการส่งคืนได้</div>' : "";
+              const sourceBadge = ["approved", "rejected"].includes(currentLostTab)
+                ? `<span class="badge neutral lost-source-badge">${approvalTypeLabel(tab)}</span>`
+                : "";
               const image = i.imageUrl
                 ? `<div class="lost-image has-image"><img src="${escapeHtml(i.imageUrl)}" alt="รูป ${escapeHtml(i.title)}" loading="lazy" /></div>`
                 : '<div class="lost-image"><svg class="icon"><use href="#i-box"/></svg></div>';
               return `<article class="lost-card" tabindex="0" data-lost-card="${
                 i.id
-              }">${image}<div class="lost-content"><span class="badge ${badgeClass(
+              }">${image}<div class="lost-content">${sourceBadge}<span class="badge ${badgeClass(
                 i.status
               )}">${i.status}</span><h3>${i.id} · ${i.title}</h3><p>${
                 i.place
-              }</p>${claimHint}${controls}${currentLostTab === "claims" ? "" : decisionButtons(currentLostTab, i)}${adminDelete}</div></article>`;
+              }</p>${claimHint}${controls}${tab === "claims" ? "" : decisionButtons(tab, i)}${adminDelete}</div></article>`;
             })
             .join("")
-        : '<div class="empty" style="grid-column:1/-1">ไม่มีรายการในหมวดนี้</div>';
+        : `<div class="empty" style="grid-column:1/-1">${emptyLabel}</div>`;
     }
     function approveLostItem(tab, id) {
       const item = lostSets[tab].find((x) => x.id === id);
@@ -1392,10 +1455,14 @@ export function useStaffDashboard() {
       renderQueue();
       renderNotifications();
       currentLostTab = tab;
-      $$("#lostTabs .tab").forEach((tabButton) =>
-        tabButton.classList.toggle("active", tabButton.dataset.tab === tab)
-      );
-      navigate("lost");
+      $$("#lostTabs .tab").forEach((tabButton) => {
+        const active = tabButton.dataset.tab === tab;
+        tabButton.classList.toggle("active", active);
+        if (tabButton.hasAttribute("aria-selected")) {
+          tabButton.setAttribute("aria-selected", String(active));
+        }
+      });
+      navigate(currentRole === "admin" ? "history" : "lost");
       renderLost();
       if (tab === "lostposts") {
         showSuccess(
@@ -1531,11 +1598,11 @@ export function useStaffDashboard() {
       if (index < 0) return;
       requestConfirmation(
         "ยืนยันลบรายการ",
-        `ลบ ${id} แบบ Soft Delete หรือไม่?`,
+        `ลบรายการ ${id} หรือไม่?`,
         () => {
           const [record] = lostSets[tab].splice(index, 1);
           storeDeletedRecord("lost", record, tab, record.title);
-          toast(`ย้าย ${id} ไปยังรายการที่ลบแล้ว`);
+          toast(`ลบรายการ ${id} แล้ว`);
           renderLost();
           renderMetrics();
           renderQueue();
@@ -1708,7 +1775,16 @@ export function useStaffDashboard() {
           `${s.name} ${s.id} ${s.role} ${s.zone}`.toLowerCase().includes(q)
       );
       const totals = staffRows.map((s) => staffOverviewStats(s, from, to));
+      const jobTypeForRole = { "แม่บ้าน": "cleaning", "ช่าง": "repair" };
+      const unassignedCount = allJobs.filter(
+        (job) =>
+          !job.assignee &&
+          !isTerminalStatus(job.status) &&
+          !String(job.status).includes("ยกเลิก") &&
+          (role === "all" || job.type === jobTypeForRole[role])
+      ).length;
       summary.innerHTML = [
+        [unassignedCount, "งานที่ยังไม่มีผู้รับผิดชอบ", "คิวงานปัจจุบันตาม Role"],
         [
           totals.reduce((n, x) => n + x.active, 0),
           "กำลังรับผิดชอบ",
@@ -1720,11 +1796,10 @@ export function useStaffDashboard() {
           "คืนเข้ากองกลาง",
           "มีเหตุผลประกอบทุกครั้ง",
         ],
-        [staffRows.length, "Staff ในมุมมอง", "ตาม Role และคำค้น"],
       ]
         .map(
           (v, i) =>
-            `<article class="metric ${i === 2 ? "warn" : ""}"><span>${
+            `<article class="metric ${i === 3 ? "warn" : ""}"><span>${
               v[1]
             }</span><strong>${v[0]}</strong><small>${v[2]}</small></article>`
         )
@@ -1764,13 +1839,10 @@ export function useStaffDashboard() {
         selectedOverviewStaff = "";
       renderStaffOverviewDetail();
     }
-    function showStaffOverview(name) {
+    function showStaffOverview(name, trigger) {
       selectedOverviewStaff = name;
       renderStaffOverviewDetail();
-      $("#staffOverviewDetail").scrollIntoView({
-        behavior: "smooth",
-        block: "center",
-      });
+      openModal("staffOverviewModal", trigger);
     }
     function renderStaffOverviewDetail() {
       if (!$("#staffOverviewDetail")) return;
@@ -1815,91 +1887,7 @@ export function useStaffDashboard() {
         : '<div class="empty">ไม่มีประวัติในช่วงวันที่เลือก</div>';
     }
     function renderHistory() {
-      if (!$("#historyTable")) return;
-      const summary = $("#historySummary"),
-        table = $("#historyTable"),
-        head = $("#historyHead");
-      if (!summary || !table || !head) return;
-      const approvals = auditHistory.filter(
-          (x) => x.action.includes("อนุมัติ") && !x.action.includes("ไม่")
-        ).length,
-        rejections = auditHistory.filter((x) =>
-          x.action.includes("ไม่อนุมัติ")
-        ).length;
-      summary.innerHTML = [
-        [auditHistory.length, "เหตุการณ์ทั้งหมด", "ทุกการเปลี่ยนแปลง"],
-        [approvals, "การอนุมัติ", "ผ่านการตรวจสอบ"],
-        [rejections, "ไม่อนุมัติ", "มีเหตุผลกำกับ"],
-        [deletedRecords.length, "รายการที่ลบแล้ว", "สามารถกู้คืนได้"],
-      ]
-        .map(
-          (v, i) =>
-            `<article class="metric ${i === 3 ? "warn" : ""}"><span>${
-              v[1]
-            }</span><strong>${v[0]}</strong><small>${v[2]}</small></article>`
-        )
-        .join("");
-      const q = ($("#historySearch")?.value || "").trim().toLowerCase(),
-        source = $("#historySourceFilter")?.value || "all",
-        action = $("#historyActionFilter")?.value || "all";
-      if (currentHistoryView === "deleted") {
-        head.innerHTML =
-          "<tr><th>รายการ</th><th>ส่วนของระบบ</th><th>ผู้ลบ</th><th>เวลาที่ลบ</th><th>จัดการ</th></tr>";
-        const rows = deletedRecords.filter(
-          (x) =>
-            (source === "all" || x.source === source) &&
-            `${x.itemId} ${x.title} ${x.deletedBy} ${sourceLabel(x.source)}`
-              .toLowerCase()
-              .includes(q)
-        );
-        table.innerHTML = rows.length
-          ? rows
-              .map(
-                (x) =>
-                  `<tr><td><strong>${x.itemId}</strong><br><small>${
-                    x.title
-                  }</small></td><td><span class="history-source">${sourceLabel(
-                    x.source
-                  )}</span></td><td>${x.deletedBy}</td><td>${
-                    x.deletedAt
-                  }</td><td><div class="row-actions"><button class="small-btn restore-btn" type="button" data-history-action="restore" data-history-uid="${
-                    x.uid
-                  }">กู้คืน</button><button class="small-btn permanent-btn" type="button" data-history-action="permanent-delete" data-history-uid="${
-                    x.uid
-                  }">ลบถาวร</button></div></td></tr>`
-              )
-              .join("")
-          : '<tr><td colspan="5" class="history-empty">ไม่พบรายการที่ลบแล้ว</td></tr>';
-        return;
-      }
-      head.innerHTML =
-        "<tr><th>เวลา</th><th>ผู้ดำเนินการ</th><th>การดำเนินการ</th><th>รายการ</th><th>รายละเอียด</th></tr>";
-      const rows = auditHistory.filter(
-        (x) =>
-          (source === "all" || x.source === source) &&
-          (action === "all" || x.action.includes(action)) &&
-          `${x.itemId} ${x.title} ${x.actor} ${x.action} ${x.detail}`
-            .toLowerCase()
-            .includes(q)
-      );
-      table.innerHTML = rows.length
-        ? rows
-            .map(
-              (x) =>
-                `<tr><td>${x.time}</td><td>${
-                  x.actor
-                }</td><td><span class="badge ${badgeClass(
-                  x.action
-                )} history-action">${
-                  x.action
-                }</span><br><span class="history-source">${sourceLabel(
-                  x.source
-                )}</span></td><td><strong>${x.itemId}</strong><br><small>${
-                  x.title
-                }</small></td><td class="history-detail">${x.detail}</td></tr>`
-            )
-            .join("")
-        : '<tr><td colspan="5" class="history-empty">ไม่พบประวัติที่ตรงกับตัวกรอง</td></tr>';
+      if ($("#historyLostSection")) renderLost();
     }
     function restoreDeleted(uid) {
       const index = deletedRecords.findIndex((x) => x.uid === uid);
@@ -2179,13 +2167,13 @@ export function useStaffDashboard() {
       const staff = staffData[i];
       requestConfirmation(
         "ยืนยันลบบัญชี",
-        `ลบบัญชี ${staff.name} แบบ Soft Delete หรือไม่?`,
+        `ลบบัญชี ${staff.name} หรือไม่?`,
         () => {
           const [record] = staffData.splice(i, 1);
           storeDeletedRecord("staff", record, "staffData", record.name);
           renderStaff();
           renderHistory();
-          toast("ย้ายบัญชี Staff ไปยังรายการที่ลบแล้ว");
+          toast("ลบบัญชี Staff แล้ว");
         }
       );
     }
@@ -2194,54 +2182,37 @@ export function useStaffDashboard() {
     // 11) ระบบ QR ประจำห้อง
     // -------------------------------------------------------------------------
 
-    // สร้าง URL ห้องจากข้อมูลอาคาร ชั้น และหมายเลขห้องในฟอร์ม
+    // ใช้ token ของสถานที่จริงเพื่อให้ฟอร์ม guest ระบุสถานที่จาก QR ได้
     function makeRoomUrl() {
-      const base = $("#baseUrl").value.trim(),
-        service = $("#service").value,
-        params = new URLSearchParams({
-          building: $("#building").value.trim(),
-          floor: $("#floor").value.trim(),
-          room: $("#room").value.trim(),
-        });
-      if (service !== "report") params.set("service", service);
-      return `${base}?${params.toString()}`;
-    }
-    function fallbackQrPng(text) {
-      const canvas = document.createElement("canvas");
-      canvas.width = 168;
-      canvas.height = 168;
-      const context = canvas.getContext("2d");
-      if (!context) return "";
-      context.fillStyle = "#fff";
-      context.fillRect(0, 0, 168, 168);
-      let seed = [...text].reduce((sum, char) => sum + char.charCodeAt(0), 0);
-      context.fillStyle = "#17202b";
-      for (let row = 0; row < 21; row++)
-        for (let col = 0; col < 21; col++) {
-          seed = (seed * 9301 + 49297) % 233280;
-          if (seed / 233280 > 0.52) context.fillRect(col * 8, row * 8, 8, 8);
-        }
-      return canvas.toDataURL("image/png");
+      const base = $("#baseUrl").value.trim() ||
+        new URL(`${import.meta.env.BASE_URL}user`, window.location.origin).toString();
+      return buildGuestQrUrl(base, $("#qrToken").value, $("#service").value);
     }
     function generateQr(addToList = false) {
-      if (!$("#qrCode")) return;
-      const url = makeRoomUrl();
+      if (!$("#qrCode")) return false;
+      let url;
+      try {
+        url = makeRoomUrl();
+      } catch (error) {
+        toast(error.message || "ลิงก์ QR ใช้ไม่ได้");
+        return false;
+      }
+      if (!window.QRCode) {
+        toast("ยังโหลดตัวสร้าง QR ไม่สำเร็จ กรุณาลองใหม่เมื่อเชื่อมต่ออินเทอร์เน็ต");
+        return false;
+      }
       $("#qrRoomName").textContent = $("#room").value.trim();
       $("#qrUrlText").textContent = url;
       const box = $("#qrCode");
       box.innerHTML = "";
-      if (window.QRCode)
-        new QRCode(box, {
-          text: url,
-          width: 168,
-          height: 168,
-          colorDark: "#17202b",
-          colorLight: "#ffffff",
-          correctLevel: QRCode.CorrectLevel.M,
-        });
-      else
-        box.innerHTML =
-          '<div class="qr-fallback" aria-label="ตัวอย่าง QR"></div>';
+      new QRCode(box, {
+        text: url,
+        width: 168,
+        height: 168,
+        colorDark: "#17202b",
+        colorLight: "#ffffff",
+        correctLevel: QRCode.CorrectLevel.M,
+      });
       if (addToList) {
         const item = document.createElement("div");
         item.className = "room-item";
@@ -2259,6 +2230,7 @@ export function useStaffDashboard() {
         $("#roomList").prepend(item);
         toast("สร้าง QR และเพิ่มห้องแล้ว");
       }
+      return true;
     }
 
     // -------------------------------------------------------------------------
@@ -3102,86 +3074,7 @@ export function useStaffDashboard() {
     }
 
     // -------------------------------------------------------------------------
-    // 15) ระบบประกาศอาคาร
-    // -------------------------------------------------------------------------
-
-    // แสดงประกาศทั้งหมด พร้อม action แก้ไขและลบตามสิทธิ์
-    function renderAnnouncements() {
-      if (!$("#announcementList")) return;
-      const list = $("#announcementList");
-      if (!list) return;
-      list.innerHTML = announcements.length ? announcements.map((item) =>
-        `<article class="announcement-card"><div><div class="job-meta"><span class="badge ${
-          item.status === "เผยแพร่" ? "done" : "wait"
-        }">${item.status}</span>${
-          item.pinned ? '<span class="badge progress">ปักหมุด</span>' : ""
-        }<span class="badge neutral">${escapeHtml(
-          item.audience
-        )}</span></div><h3>${escapeHtml(item.title)}</h3><p>${escapeHtml(
-          item.content
-        )}</p><small>${item.start} – ${
-          item.end
-        }</small></div><div class="row-actions"><button type="button" class="small-btn" data-announcement-action="edit" data-announcement-id="${
-          item.id
-        }">แก้ไข</button><button type="button" class="small-btn delete" data-announcement-action="delete" data-announcement-id="${
-          item.id
-        }">ลบ</button></div></article>`
-      ).join("") : '<div class="empty">ยังไม่มีประกาศ</div>';
-      $("#publishedCount").textContent = announcements.filter((item) => item.status === "เผยแพร่").length;
-      $("#draftCount").textContent = announcements.filter((item) => item.status === "Draft").length;
-      $("#pinnedCount").textContent = announcements.filter((item) => item.pinned).length;
-    }
-    function openAnnouncementEditor(
-      item = null,
-      trigger = document.activeElement
-    ) {
-      $("#announcementForm").reset();
-      $("#announcementId").value = item?.id || "";
-      $("#announcementModalTitle").textContent = item ? "แก้ไขประกาศ" : "สร้างประกาศ";
-      $("#announcementTitle").value = item?.title || "";
-      $("#announcementContent").value = item?.content || "";
-      $("#announcementAudience").value = item?.audience || "ผู้ใช้งานทุกคน";
-      $("#announcementStart").value = item?.start || todayISO();
-      $("#announcementEnd").value = item?.end || todayISO();
-      $("#announcementPinned").checked = Boolean(item?.pinned);
-      openModal("announcementModal", trigger);
-    }
-    function saveAnnouncement(status) {
-      const form = $("#announcementForm");
-      if (!form.checkValidity()) {
-        form.reportValidity();
-        return;
-      }
-      const id =
-        $("#announcementId").value ||
-        `AN-${String(32 + announcements.length).padStart(3, "0")}`;
-      const record = {
-        id,
-        title: $("#announcementTitle").value.trim(),
-        content: $("#announcementContent").value.trim(),
-        audience: $("#announcementAudience").value,
-        start: $("#announcementStart").value,
-        end: $("#announcementEnd").value,
-        pinned: $("#announcementPinned").checked,
-        status,
-      };
-      const index = announcements.findIndex((item) => item.id === id);
-      if (index >= 0) announcements[index] = record;
-      else announcements.unshift(record);
-      addAudit(
-        "announcement",
-        index >= 0 ? "แก้ไขประกาศ" : "สร้างประกาศ",
-        id,
-        record.title,
-        `สถานะ ${status}`
-      );
-      closeModal("announcementModal", false);
-      renderAnnouncements();
-      showSuccess(status === "เผยแพร่" ? "เผยแพร่ประกาศแล้ว" : "บันทึกฉบับร่างแล้ว");
-    }
-
-    // -------------------------------------------------------------------------
-    // 16) Responsive navigation และ Quick actions
+    // 15) Responsive navigation และ Quick actions
     // -------------------------------------------------------------------------
 
     // สร้าง action ทางลัดให้เหมาะกับ role และขนาดหน้าจอ
@@ -3206,16 +3099,17 @@ export function useStaffDashboard() {
               ["appointments", "นัดหมายวันนี้"],
             ]
           : [
-              ["announcement", "สร้างประกาศ"],
               ["add-staff", "เพิ่ม Staff"],
               ["qr", "สร้าง QR"],
-              ["assign", "มอบหมายงาน"],
             ];
+      if (!$("#mobileQuickActions")) return;
       $("#mobileQuickActions").innerHTML = actions.map((item) =>
         `<button type="button" class="quick-action" data-quick-action="${item[0]}">${item[1]}</button>`
         ).join("");
     }
     function renderDashboardQuickActions() {
+      if (!$("#dashboardQuickActions")) return;
+      if (currentRole === "admin") return;
       const actions =
         currentRole === "technician"
           ? [
@@ -3244,14 +3138,7 @@ export function useStaffDashboard() {
               "นัดหมายรับของ",
               "ยืนยันคืนของแล้ว",
             ]
-          : [
-              "ดูงานทั้งหมด",
-              "มอบหมายงาน",
-              "จัดการ Staff",
-              "สร้าง QR",
-              "สร้างประกาศ",
-              "ดู Activity Log",
-            ];
+          : [];
       $("#dashboardQuickActions").innerHTML = actions.map((label, index) =>
           `<button type="button" class="quick-action ${index === 0 && currentRole !== "clerk" ? "primary-action" : ""
           }" data-dashboard-action="${index}">${label}</button>`
@@ -3319,10 +3206,6 @@ export function useStaffDashboard() {
           renderLost();
           if (index === 2) openFoundForm(button);
         }
-        return;
-      }
-      if (currentRole === "admin") {
-        navigate(["jobs", "jobs", "staff", "qr", "announcements", "history"][index]);
         return;
       }
       currentBoardView = index === 0 ? "unassigned" : "mine";
@@ -3396,26 +3279,20 @@ export function useStaffDashboard() {
         navigate("jobs");
         toast("แสดงตารางงานวันนี้แล้ว");
       } else if (action === "found") {
-        navigate("lost");
+        navigate(currentRole === "admin" ? "history" : "lost");
         currentLostTab = "inventory";
         renderLost();
         openFoundForm(button);
       } else if (action === "claims" || action === "appointments") {
-        navigate("lost");
+        navigate(currentRole === "admin" ? "history" : "lost");
         currentLostTab = "claims";
         renderLost();
         if (action === "appointments" && lostSets.claims[0])
           openAppointment(lostSets.claims[0].id, button);
-      } else if (action === "announcement") openAnnouncementEditor(null, button);
-      else if (action === "add-staff") openModal("staffModal", button);
+      } else if (action === "add-staff") openModal("staffModal", button);
       else if (action === "qr") {
         navigate("qr");
         openModal("qrFormModal", button);
-      } else if (action === "assign") {
-        navigate("jobs");
-        const job = allJobs.find((item) => !item.assignee);
-        if (job) openAssignJob(job.id, button);
-        else toast("ไม่มีงานรอมอบหมาย");
       }
     });
     $("#myHistoryFrom")?.addEventListener("change", renderMyHistory);
@@ -3501,7 +3378,7 @@ export function useStaffDashboard() {
       else {
         currentLostTab = "claims";
         renderLost();
-        navigate("lost");
+        navigate(currentRole === "admin" ? "history" : "lost");
       }
     });
     $("#assignForm")?.addEventListener("submit", (event) => {
@@ -3816,17 +3693,6 @@ export function useStaffDashboard() {
       showSuccess(`ปิดงาน ${job.id} เรียบร้อย งานถูกย้ายไปประวัติแล้ว`);
     });
     $("#historySearch")?.addEventListener("input", renderHistory);
-    $("#historySourceFilter")?.addEventListener("change", renderHistory);
-    $("#historyActionFilter")?.addEventListener("change", renderHistory);
-    $("#historyTabs")?.addEventListener("click", (event) => {
-      const button = event.target.closest(".board-tab");
-      if (!button) return;
-      currentHistoryView = button.dataset.historyView;
-      $$("#historyTabs .board-tab").forEach((tab) =>
-        tab.classList.toggle("active", tab === button)
-      );
-      renderHistory();
-    });
     $("#myHistoryList")?.addEventListener("click", (event) => {
       const button = event.target.closest("[data-history-detail]");
       if (!button) return;
@@ -3836,16 +3702,9 @@ export function useStaffDashboard() {
       if (job) openJobDetail(job.id, button);
       else toast(`แสดงรายละเอียด ${button.dataset.historyDetail} จากประวัติแล้ว`);
     });
-    $("#historyTable")?.addEventListener("click", (event) => {
-      const button = event.target.closest("[data-history-action]");
-      if (!button) return;
-      if (button.dataset.historyAction === "restore")
-        restoreDeleted(button.dataset.historyUid);
-      else permanentDelete(button.dataset.historyUid);
-    });
     $("#staffOverviewTable")?.addEventListener("click", (event) => {
       const button = event.target.closest("[data-staff-overview]");
-      if (button) showStaffOverview(button.dataset.staffOverview);
+      if (button) showStaffOverview(button.dataset.staffOverview, button);
     });
     $("#staffTable")?.addEventListener("click", (event) => {
       const button = event.target.closest("[data-staff-action]");
@@ -3855,15 +3714,20 @@ export function useStaffDashboard() {
       if (button.dataset.staffAction === "remove") removeStaff(index);
       if (button.dataset.staffAction === "edit") openEditStaff(index, button);
       if (button.dataset.staffAction === "detail") {
-        selectedOverviewStaff = staffData[index].name;
         navigate("staff-overview");
-        renderStaffOverviewDetail();
+        showStaffOverview(staffData[index].name, button);
       }
     });
     $("#lostTabs")?.addEventListener("click", (event) => {
       const button = event.target.closest(".tab");
       if (!button) return;
-      $$(".tab").forEach((tab) => tab.classList.toggle("active", tab === button));
+      $$("#lostTabs .tab").forEach((tab) => {
+        const active = tab === button;
+        tab.classList.toggle("active", active);
+        if (tab.hasAttribute("aria-selected")) {
+          tab.setAttribute("aria-selected", String(active));
+        }
+      });
       currentLostTab = button.dataset.tab;
       renderLost();
     });
@@ -4341,7 +4205,7 @@ export function useStaffDashboard() {
         event.currentTarget.reportValidity();
         return;
       }
-      generateQr(true);
+      if (!generateQr(true)) return;
       addAudit(
         "qr",
         "สร้าง QR",
@@ -4358,9 +4222,8 @@ export function useStaffDashboard() {
       const canvas = $("#qrCode canvas"),
         img = $("#qrCode img");
       let href = canvas ? canvas.toDataURL("image/png") : img?.src;
-      if (!href) href = fallbackQrPng($("#qrUrlText").textContent);
       if (!href) {
-        toast("เบราว์เซอร์นี้ไม่รองรับการดาวน์โหลด QR");
+        toast("ยังไม่มี QR จริงให้ดาวน์โหลด กรุณาสร้าง QR ก่อน");
         return;
       }
       const link = document.createElement("a");
@@ -4407,32 +4270,6 @@ export function useStaffDashboard() {
     $("#printQr")?.addEventListener("click", () => {
       toast("เปิดหน้าต่างพิมพ์ QR แล้ว");
       window.print();
-    });
-    $("#announcementForm")?.addEventListener("submit", (event) => {
-      event.preventDefault();
-      saveAnnouncement("เผยแพร่");
-    });
-    $("#saveAnnouncementDraft")?.addEventListener("click", () =>
-      saveAnnouncement("Draft")
-    );
-    $("#announcementList")?.addEventListener("click", (event) => {
-      const button = event.target.closest("[data-announcement-action]");
-      if (!button) return;
-      const item = announcements.find(
-        (entry) => entry.id === button.dataset.announcementId
-      );
-      if (button.dataset.announcementAction === "edit")
-        openAnnouncementEditor(item, button);
-      else
-        requestConfirmation(
-          "ยืนยันลบประกาศ",
-          `ลบประกาศ “${item.title}” หรือไม่?`,
-          () => {
-            announcements = announcements.filter((entry) => entry.id !== item.id);
-            renderAnnouncements();
-            toast("ลบประกาศแล้ว");
-          }
-        );
     });
     $("#heroPrimary")?.addEventListener("click", () =>
       navigate(currentRole === "clerk" ? "clerk-center" : "jobs")

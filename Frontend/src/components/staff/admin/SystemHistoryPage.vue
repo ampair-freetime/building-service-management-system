@@ -2,47 +2,31 @@
 <section class="page" id="page-history">
           <div class="section-title">
             <div>
-              <div class="eyebrow">Audit &amp; recovery center</div>
-              <h2>ประวัติทั้งหมดและรายการที่ลบแล้ว</h2>
-              <p>ตรวจสอบกิจกรรมและกู้คืนรายการที่ถูกลบแบบ Soft Delete</p>
+              <div class="eyebrow">Lost &amp; found</div>
+              <h2>ของหายและรับฝาก</h2>
+              <p>ดูรายการตามหมวด หรือแยกตามผลการอนุมัติ</p>
             </div>
           </div>
-          <div class="history-summary" id="historySummary"></div>
-          <div class="board-tabs" id="historyTabs">
-            <button class="board-tab active" data-history-view="activity">
-              กิจกรรมทั้งหมด
-            </button>
-            <button class="board-tab" data-history-view="deleted">
-              รายการที่ลบแล้ว
-            </button>
-          </div>
-          <div class="history-controls">
+          <div class="history-summary" id="adminLostSummary"></div>
+          <div class="history-controls admin-history-controls">
             <input
               class="field-compact search"
               id="historySearch"
-              placeholder="ค้นหารหัส รายการ ผู้ดำเนินการ หรือรายละเอียด"
+              placeholder="ค้นหารหัส ชื่อรายการ สถานที่ หรือสถานะ"
             />
-            <select class="field-compact" id="historySourceFilter">
-              <option value="all">ทุกส่วนของระบบ</option>
-              <option value="jobs">งานแม่บ้านและช่าง</option>
-              <option value="lost">ของหาย–ของได้คืน</option>
-              <option value="staff">บัญชี Staff</option>
-              <option value="qr">QR และห้อง</option>
-            </select>
-            <select class="field-compact" id="historyActionFilter">
-              <option value="all">ทุกการดำเนินการ</option>
-              <option value="อนุมัติ">อนุมัติ</option>
-              <option value="ไม่อนุมัติ">ไม่อนุมัติ</option>
-              <option value="อัปเดต">อัปเดต</option>
-              <option value="ลบ">ลบ</option>
-              <option value="กู้คืน">กู้คืน</option>
-            </select>
+            <button class="primary" id="addFoundBtn" type="button">
+              + รับฝากของใหม่
+            </button>
           </div>
-          <div class="table-wrap">
-            <table class="data-table history-table">
-              <thead id="historyHead"></thead>
-              <tbody id="historyTable"></tbody>
-            </table>
-          </div>
+          <section class="history-lost-section" id="historyLostSection">
+            <div class="tabs admin-lost-tabs" id="lostTabs" role="tablist" aria-label="กรองรายการของหายและรับฝาก">
+              <button class="tab active" type="button" role="tab" aria-selected="true" data-tab="inventory">ของที่รับฝาก <span class="tab-count" data-lost-count="inventory">0</span></button>
+              <button class="tab" type="button" role="tab" aria-selected="false" data-tab="lostposts">ประกาศตามหา <span class="tab-count" data-lost-count="lostposts">0</span></button>
+              <button class="tab" type="button" role="tab" aria-selected="false" data-tab="claims">คำขอรับของ <span class="tab-count" data-lost-count="claims">0</span></button>
+              <button class="tab status-tab approved-tab" type="button" role="tab" aria-selected="false" data-tab="approved">อนุมัติแล้ว <span class="tab-count" data-lost-count="approved">0</span></button>
+              <button class="tab status-tab rejected-tab" type="button" role="tab" aria-selected="false" data-tab="rejected">ไม่อนุมัติ <span class="tab-count" data-lost-count="rejected">0</span></button>
+            </div>
+            <div class="lost-grid" id="lostGrid"></div>
+          </section>
         </section>
 </template>

@@ -161,81 +161,25 @@
           ><select id="service">
             <option value="report">เลือกประเภทบริการภายหลัง</option>
             <option value="repair">แจ้งซ่อม</option>
-            <option value="cleaning">แจ้งทำความสะอาด</option>
-            <option value="lost">ของหาย–ของได้คืน</option>
+            <option value="clean">แจ้งทำความสะอาด</option>
           </select>
         </div>
         <div class="field">
-          <label for="baseUrl">Base URL</label
+          <label for="qrToken">Token หรือลิงก์ QR ของสถานที่</label>
+          <input id="qrToken" required autocomplete="off" placeholder="วาง token หรือลิงก์ที่มี ?token=..." />
+          <small>ใช้ token ที่ระบบออกให้สถานที่จริง ไม่ใช่ชื่อห้องหรือรหัสที่ตั้งขึ้นเอง</small>
+        </div>
+        <div class="field">
+          <label for="baseUrl">URL หน้าแบบฟอร์ม (เว้นว่างเพื่อใช้เว็บนี้)</label
           ><input
             id="baseUrl"
-            value="https://building-care.example/report"
-            required
+            type="url"
+            placeholder="https://example.com/user"
           />
         </div>
         <button class="primary" style="width: 100%">
           สร้าง QR และเพิ่มห้อง
         </button>
-      </form>
-    </section>
-  </div>
-
-  <div
-    class="modal"
-    id="announcementModal"
-    role="dialog"
-    aria-modal="true"
-    aria-labelledby="announcementModalTitle"
-  >
-    <section class="modal-card">
-      <header class="modal-head">
-        <h3 id="announcementModalTitle">สร้างประกาศ</h3>
-        <button
-          type="button"
-          class="close"
-          data-close="announcementModal"
-          aria-label="ปิด"
-        >
-          <svg class="icon"><use href="#i-close" /></svg>
-        </button>
-      </header>
-      <form id="announcementForm">
-        <input type="hidden" id="announcementId" />
-        <div class="field">
-          <label for="announcementTitle">หัวข้อ</label
-          ><input id="announcementTitle" required />
-        </div>
-        <div class="field">
-          <label for="announcementContent">เนื้อหา</label
-          ><textarea id="announcementContent" required></textarea>
-        </div>
-        <div class="field">
-          <label for="announcementAudience">กลุ่มผู้เห็นประกาศ</label
-          ><select id="announcementAudience">
-            <option>ผู้ใช้งานทุกคน</option>
-            <option>เจ้าหน้าที่ทุก Role</option>
-            <option>เฉพาะผู้ใช้อาคาร 30</option>
-          </select>
-        </div>
-        <div class="form-row">
-          <div class="field">
-            <label for="announcementStart">วันที่เริ่ม</label
-            ><input id="announcementStart" type="date" required />
-          </div>
-          <div class="field">
-            <label for="announcementEnd">วันที่สิ้นสุด</label
-            ><input id="announcementEnd" type="date" required />
-          </div>
-        </div>
-        <label class="remember"
-          ><input id="announcementPinned" type="checkbox" />
-          ปักหมุดประกาศ</label
-        >
-        <div class="modal-actions">
-          <button type="button" class="secondary" id="saveAnnouncementDraft">
-            บันทึก Draft</button
-          ><button type="submit" class="primary">Publish</button>
-        </div>
       </form>
     </section>
   </div>

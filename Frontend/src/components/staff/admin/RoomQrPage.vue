@@ -5,8 +5,7 @@
               <div class="eyebrow">Room identity system</div>
               <h2>สร้าง QR ประจำห้อง</h2>
               <p>
-                QR แต่ละห้องพาผู้ใช้ไปยังหน้ารายงานที่เติมชื่ออาคาร ชั้น
-                และห้องให้อัตโนมัติ
+                QR ใช้ token ของสถานที่จริงเพื่อเลือกชั้นและห้องในฟอร์มอัตโนมัติ
               </p>
             </div>
           </div>
@@ -36,7 +35,7 @@
                   </div>
                   <h3 id="qrRoomName">CSB-307</h3>
                   <p id="qrUrlText">
-                    https://building-care.example/report?room=CSB-307
+                    สร้าง QR เพื่อแสดงลิงก์
                   </p>
                   <button class="secondary" id="downloadQr" type="button">
                     ดาวน์โหลด PNG

@@ -89,9 +89,10 @@ const { activeRole } = useStaffDashboard();
         <div class="nav-label">Operations</div>
         <nav class="nav-list" aria-label="เมนูเจ้าหน้าที่">
           <button
+            v-if="activeRole !== 'admin'"
             class="nav-item active"
             data-page="dashboard"
-            data-roles="all"
+            data-roles="housekeeper,technician,clerk"
           >
             <span class="nav-icon">01</span>ภาพรวมงาน
           </button>
@@ -103,15 +104,13 @@ const { activeRole } = useStaffDashboard();
             <span class="nav-icon">02</span>ศูนย์รับงาน
           </button>
           <button
+            v-if="activeRole !== 'admin'"
             class="nav-item"
             data-page="jobs"
-            data-roles="housekeeper,technician,admin"
+            data-roles="housekeeper,technician"
           >
             <span class="nav-icon">02</span
             ><span id="jobsNavLabel">ศูนย์รับงานรวม</span>
-          </button>
-          <button class="nav-item" data-page="lost" data-roles="clerk,admin">
-            <span class="nav-icon">03</span>ของหายและรับฝาก
           </button>
           <button
             class="nav-item"
@@ -120,24 +119,20 @@ const { activeRole } = useStaffDashboard();
           >
             <span class="nav-icon">H</span>ประวัติงานของฉัน
           </button>
-          <button
-            class="nav-item"
-            data-page="staff-overview"
-            data-roles="admin"
-          >
+          <button class="nav-item" data-page="staff-overview" data-roles="admin">
             <span class="nav-icon">WO</span>ภาพรวมงาน Staff
           </button>
-          <button class="nav-item" data-page="staff" data-roles="admin">
-            <span class="nav-icon">04</span>บัญชีเจ้าหน้าที่
+          <button v-if="activeRole === 'clerk'" class="nav-item" data-page="lost" data-roles="clerk">
+            <span class="nav-icon">03</span>ของหายและรับฝาก
           </button>
           <button class="nav-item" data-page="history" data-roles="admin">
-            <span class="nav-icon">05</span>ประวัติและรายการที่ลบ
+            <span class="nav-icon">02</span>ของหายและรับฝาก
+          </button>
+          <button class="nav-item" data-page="staff" data-roles="admin">
+            <span class="nav-icon">03</span>บัญชีเจ้าหน้าที่
           </button>
           <button class="nav-item" data-page="qr" data-roles="admin">
             <span class="nav-icon">QR</span>QR ประจำห้อง
-          </button>
-          <button class="nav-item" data-page="announcements" data-roles="admin">
-            <span class="nav-icon">AN</span>ประกาศอาคาร
           </button>
         </nav>
         <div class="sidebar-foot">
@@ -231,11 +226,11 @@ const { activeRole } = useStaffDashboard();
     </div>
 
     <nav class="bottom-nav" aria-label="เมนูด้านล่าง">
-      <button type="button" class="active" data-mobile-page="dashboard">
-        <svg class="icon"><use href="#i-home" /></svg><span>ภาพรวม</span>
+      <button type="button" class="active" :data-mobile-page="activeRole === 'admin' ? 'staff-overview' : 'dashboard'">
+        <svg class="icon"><use href="#i-home" /></svg><span>{{ activeRole === 'admin' ? 'งาน Staff' : 'ภาพรวม' }}</span>
       </button>
-      <button type="button" data-mobile-page="jobs">
-        <svg class="icon"><use href="#i-list" /></svg><span>งาน</span>
+      <button type="button" :data-mobile-page="activeRole === 'admin' ? 'history' : 'jobs'">
+        <svg class="icon"><use href="#i-list" /></svg><span>{{ activeRole === 'admin' ? 'ของหาย' : 'งาน' }}</span>
       </button>
       <button type="button" id="mobileNotification">
         <svg class="icon"><use href="#i-bell" /></svg><span>แจ้งเตือน</span

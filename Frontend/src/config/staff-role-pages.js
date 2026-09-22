@@ -20,14 +20,10 @@ export const STAFF_ROLE_PAGES = {
     { id: "my-history", label: "ประวัติงานของฉัน" },
   ],
   admin: [
-    { id: "dashboard", label: "ภาพรวมระบบ" },
-    { id: "jobs", label: "ศูนย์งานทั้งหมด" },
-    { id: "lost", label: "ของหายและรับฝาก" },
     { id: "staff-overview", label: "ภาพรวมงาน Staff" },
+    { id: "history", label: "ของหายและรับฝาก" },
     { id: "staff", label: "บัญชีเจ้าหน้าที่" },
-    { id: "history", label: "ประวัติและรายการที่ลบ" },
     { id: "qr", label: "QR ประจำห้อง" },
-    { id: "announcements", label: "ประกาศอาคาร" },
   ],
 };
 

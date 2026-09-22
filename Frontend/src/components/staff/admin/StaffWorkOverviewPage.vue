@@ -55,20 +55,30 @@
               <tbody id="staffOverviewTable"></tbody>
             </table>
           </div>
-          <section class="panel overview-detail-panel">
-            <div class="panel-body">
-              <div class="overview-detail-head">
-                <h3 id="overviewDetailTitle">
-                  เลือก Staff เพื่อดูรายละเอียดงาน
-                </h3>
-                <span class="badge neutral" id="overviewDetailCount"
-                  >0 รายการ</span
-                >
-              </div>
-              <div class="overview-detail-list" id="staffOverviewDetail">
-                <div class="empty">กด “ดูรายละเอียด” จากตารางด้านบน</div>
-              </div>
-            </div>
-          </section>
         </section>
+        <Teleport to="body">
+          <div
+            class="modal"
+            id="staffOverviewModal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="overviewDetailTitle"
+          >
+            <section class="modal-card staff-overview-modal-card">
+              <header class="modal-head">
+                <h3 id="overviewDetailTitle">รายละเอียดงานของ Staff</h3>
+                <button
+                  type="button"
+                  class="close"
+                  data-close="staffOverviewModal"
+                  aria-label="ปิดรายละเอียดงาน"
+                >
+                  <svg class="icon"><use href="#i-close" /></svg>
+                </button>
+              </header>
+              <span class="badge neutral" id="overviewDetailCount">0 รายการ</span>
+              <div class="overview-detail-list" id="staffOverviewDetail"></div>
+            </section>
+          </div>
+        </Teleport>
 </template>

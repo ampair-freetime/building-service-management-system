@@ -13,6 +13,14 @@ const routes = [
     name: "user",
     component: PublicServicePortal,
   },
+  {
+    path: "/cleaning",
+    redirect: (to) => ({ path: "/user", query: { ...to.query, service: "clean" } }),
+  },
+  {
+    path: "/repair",
+    redirect: (to) => ({ path: "/user", query: { ...to.query, service: "repair" } }),
+  },
 
   // เจ้าหน้าที่ -> Login
   {

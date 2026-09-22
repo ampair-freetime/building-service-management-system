@@ -275,12 +275,13 @@ onMounted(() => {
               </div>
               <LocationCombobox
                 v-model="selectedWorkType"
-                id="repairType"
-                label="ประเภทงาน"
-                placeholder="เลือกประเภทงาน"
-                :options="workTypeSuggestions"
-                :allow-custom="false"
-                required
+                  id="repairType"
+                  label="ประเภทงาน"
+                  placeholder="เลือกประเภทงาน"
+                  :options="workTypeSuggestions"
+                  :allow-custom="false"
+                  :searchable="false"
+                  required
               />
               <input
                 type="hidden"

@@ -9,6 +9,7 @@ const props = defineProps({
   options: { type: Array, default: () => [] },
   required: { type: Boolean, default: false },
   allowCustom: { type: Boolean, default: true },
+  searchable: { type: Boolean, default: true },
   modelValue: { type: String, default: "" },
 });
 const emit = defineEmits(["update:modelValue"]);
@@ -126,6 +127,7 @@ onBeforeUnmount(() => {
         :name="name || undefined"
         type="text"
         :value="query"
+        :readonly="!searchable"
         :placeholder="placeholder"
         autocomplete="off"
         role="combobox"

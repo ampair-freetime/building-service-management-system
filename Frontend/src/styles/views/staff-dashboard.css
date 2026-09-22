@@ -1237,14 +1237,6 @@ body {
 .history-detail {
   color: var(--muted);
 }
-.overview-detail-panel {
-  margin-top: 15px;
-}
-.overview-detail-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
 .overview-detail-item,
 .room-item {
   display: flex;
@@ -1253,10 +1245,74 @@ body {
   padding: 13px 0;
   border-top: 1px solid var(--line);
 }
+.modal .modal-card.staff-overview-modal-card {
+  width: min(760px, 100%);
+}
+.staff-overview-modal-card .overview-detail-list {
+  margin-top: 14px;
+}
+.staff-overview-modal-card .overview-detail-item > :nth-child(2) {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
 .overview-number {
   font-size: 24px;
   font-weight: 900;
   color: var(--primary);
+}
+.history-lost-section {
+  margin: 18px 0 28px;
+}
+.admin-history-controls .primary {
+  min-height: 50px;
+  white-space: nowrap;
+}
+.admin-lost-tabs {
+  align-items: center;
+}
+.admin-lost-tabs .tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.admin-lost-tabs .tab-count {
+  min-width: 22px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: rgba(37, 31, 64, 0.08);
+  color: inherit;
+  text-align: center;
+  font-size: 11px;
+}
+.admin-lost-tabs .tab.active .tab-count {
+  background: rgba(255, 255, 255, 0.22);
+}
+.admin-lost-tabs .status-tab.approved-tab {
+  margin-left: auto;
+}
+.admin-lost-tabs .approved-tab:not(.active) {
+  border-color: #bfe7cf;
+  background: #effaf3;
+  color: #167044;
+}
+.admin-lost-tabs .rejected-tab:not(.active) {
+  border-color: #f4c8c5;
+  background: #fff2f1;
+  color: #ad3b36;
+}
+.admin-lost-tabs .approved-tab.active {
+  border-color: #16824d;
+  background: #16824d;
+  color: #fff;
+}
+.admin-lost-tabs .rejected-tab.active {
+  border-color: #c74742;
+  background: #c74742;
+  color: #fff;
+}
+.lost-source-badge {
+  margin-right: 6px;
 }
 .qr-layout {
   display: grid;
@@ -1488,6 +1544,9 @@ body {
   .history-controls .search {
     grid-column: 1/-1;
     min-width: 0;
+  }
+  .admin-history-controls .primary {
+    grid-column: 1/-1;
   }
   .qr-layout {
     grid-template-columns: 1fr;

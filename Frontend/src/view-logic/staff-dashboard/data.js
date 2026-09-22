@@ -248,7 +248,6 @@ export function createStaffDashboardData() {
     auditHistory,
     workHistory,
     selectedOverviewStaff: "",
-    currentHistoryView: "activity",
     notificationSets,
     announcements,
     categories,
