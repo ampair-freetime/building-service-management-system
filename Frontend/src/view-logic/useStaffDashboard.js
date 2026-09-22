@@ -47,7 +47,10 @@ import {
 import {
   acceptRepairRequest,
   addRepairCompletionNote,
+  completeRepairRequest,
+  getRepairRequestDetail,
   getRepairRequestHistory,
+  getRepairRequests,
   updateRepairRequestStatus,
   uploadRepairCompletionPhotos,
 } from "../services/technicianAPI.js";
@@ -113,15 +116,21 @@ export function useStaffDashboard() {
       console.warn("Stored staff profile is invalid:", error);
     }
 
-    // ผูกข้อมูลจำลองกับชื่อบัญชีแม่บ้านที่ login เพื่อทดสอบแท็บ "งานของฉัน"
+    // ผูกงานจำลองกับชื่อ Staff ที่ login เพื่อทดสอบแท็บ "งานของฉัน"
     allJobs.forEach((job) => {
       if (job.assignee === "__CURRENT_HOUSEKEEPER__") {
         job.assignee = currentUserName.housekeeper;
+      }
+      if (job.assignee === "__CURRENT_TECHNICIAN__") {
+        job.assignee = currentUserName.technician;
       }
     });
     workHistory.forEach((record) => {
       if (record.staff === "__CURRENT_HOUSEKEEPER__") {
         record.staff = currentUserName.housekeeper;
+      }
+      if (record.staff === "__CURRENT_TECHNICIAN__") {
+        record.staff = currentUserName.technician;
       }
     });
     let currentLostTab = "inventory";
@@ -437,6 +446,66 @@ export function useStaffDashboard() {
       return backendStatus
         ? { backendStatus, label: cleaningStatusLabels[backendStatus] }
         : null;
+    }
+    const repairStatusLabels = {
+      waiting: "รอรับงาน",
+      assigned: "รับงานแล้ว",
+      received: "รับทราบงาน",
+      in_progress: "กำลังดำเนินการ",
+      completed: "เสร็จสิ้น",
+      cancelled: "ยกเลิก",
+    };
+    function nextRepairStatus(job) {
+      const next = { assigned: "received", received: "in_progress" }[
+        job.backendStatus
+      ];
+      return next ? { backendStatus: next, label: repairStatusLabels[next] } : null;
+    }
+    function repairLocation(location) {
+      return [location?.area, location?.floor && `ชั้น ${location.floor}`]
+        .filter(Boolean)
+        .join(" · ") || "ไม่ระบุสถานที่";
+    }
+    async function loadRepairRequests() {
+      if (currentRole !== "technician") return;
+      try {
+        const result = await getRepairRequests();
+        const staffId = JSON.parse(localStorage.getItem("buildingCareStaff") || "null")?.id;
+        const requests = Array.isArray(result.requests) ? result.requests : [];
+        const ids = new Set(requests.map((request) => request.id));
+        for (const request of requests) {
+          let job = allJobs.find((item) => item.backendId === request.id);
+          if (!job) {
+            job = { type: "repair", category: "งานซ่อม", reporter: "ผู้ใช้งานอาคาร", timeline: [] };
+            allJobs.push(job);
+          }
+          Object.assign(job, {
+            backendId: request.id,
+            id: request.request_code,
+            title: request.title,
+            detail: request.description,
+            room: repairLocation(request.location),
+            priority: request.priority === "urgent" ? "เร่งด่วน" : "ปกติ",
+            backendStatus: request.status,
+            status: repairStatusLabels[request.status] || request.status,
+            assigneeId: request.assigned_staff_id,
+            assignee: request.assigned_staff_id
+              ? request.assigned_staff_id === staffId ? activeStaffName() : "ช่างผู้รับผิดชอบ"
+              : null,
+            time: new Date(request.created_at).toLocaleString("th-TH"),
+          });
+        }
+        allJobs = allJobs.filter((job) =>
+          job.type !== "repair" || !job.backendId || ids.has(job.backendId),
+        );
+        renderJobs();
+        renderMetrics();
+        renderQueue();
+      } catch (error) {
+        if (await handleUnauthorizedResponse(error.status)) return;
+        console.error("Loading repair requests failed:", error);
+        toast(error.message || "ไม่สามารถโหลดรายการงานซ่อมได้");
+      }
     }
     function populateCategoryFilter() {
       const select = $("#categoryFilter");
@@ -926,7 +995,7 @@ export function useStaffDashboard() {
           }
           showSuccess(
             `เลขงาน: ${acceptedJob.id}\nสถานะ: ${acceptedJob.status}\nผู้รับผิดชอบ: ${assignedCleanerLabel(acceptedJob)}`,
-            "รับงานทำความสะอาดสำเร็จ",
+            job.type === "repair" ? "รับงานซ่อมสำเร็จ" : "รับงานทำความสะอาดสำเร็จ",
           );
         },
         "ยืนยันรับงาน"
@@ -940,10 +1009,12 @@ export function useStaffDashboard() {
         return false;
       }
 
-      // งานที่เปิดจาก notification ต้องให้ Backend ยืนยันก่อนเปลี่ยน UI
-      if (job.type === "cleaning" && job.backendId) {
+      // งานจริงต้องให้ Backend ยืนยันก่อนเปลี่ยน UI
+      if (job.backendId && ["cleaning", "repair"].includes(job.type)) {
         try {
-          const acceptedTask = await acceptCleaningTask(job.backendId);
+          const acceptedTask = job.type === "repair"
+            ? await acceptRepairRequest(job.backendId)
+            : await acceptCleaningTask(job.backendId);
           job.assignee =
             acceptedTask.assigned_staff?.full_name || activeStaffName();
           job.assigneeCode = acceptedTask.assigned_staff?.staff_code || "";
@@ -952,13 +1023,14 @@ export function useStaffDashboard() {
           job.status = "รับงานแล้ว";
         } catch (error) {
           if (await handleUnauthorizedResponse(error.status)) return false;
-          console.error("Accepting cleaning task failed:", error);
+          console.error("Accepting staff task failed:", error);
           toast(
             error.status === 409
-              ? "งานนี้มีแม่บ้านคนอื่นรับไปแล้ว"
-              : error.message || "ไม่สามารถรับงานทำความสะอาดได้",
+              ? "งานนี้มีเจ้าหน้าที่คนอื่นรับไปแล้ว"
+              : error.message || "ไม่สามารถรับงานได้",
           );
-          await loadStaffNotifications();
+          if (job.type === "repair") await loadRepairRequests();
+          else await loadStaffNotifications();
           return false;
         }
       } else {
@@ -2424,16 +2496,21 @@ export function useStaffDashboard() {
       if (!job.assignee && currentRole === "admin")
         buttons.push(["assign", "มอบหมายงาน", "primary-action"]);
       if (canEdit && !isTerminalStatus(job.status)) {
-        const cleaningNext = job.backendId ? nextCleaningStatus(job) : null;
-        if (job.type === "cleaning" && job.backendId) {
-          if (cleaningNext) {
+        const backendNext = job.backendId
+          ? job.type === "repair" ? nextRepairStatus(job) : nextCleaningStatus(job)
+          : null;
+        if (job.backendId && ["cleaning", "repair"].includes(job.type)) {
+          if (backendNext) {
             buttons.push([
               "status",
-              `เปลี่ยนเป็น ${cleaningNext.label}`,
+              `เปลี่ยนเป็น ${backendNext.label}`,
               "primary-action",
             ]);
           }
-          buttons.push(["note", "เพิ่มหมายเหตุ", ""], ["upload", "เพิ่มรูป", ""]);
+          if (job.type === "repair" && job.backendStatus === "in_progress")
+            buttons.push(["complete", "เสร็จสิ้น", ""]);
+          if (job.type === "cleaning")
+            buttons.push(["note", "เพิ่มหมายเหตุ", ""], ["upload", "เพิ่มรูป", ""]);
         } else {
           buttons.push(
             ["start", "เริ่มดำเนินการ", "primary-action"],
@@ -2443,7 +2520,7 @@ export function useStaffDashboard() {
             ["complete", "เสร็จสิ้น", ""]
           );
         }
-        if (isMine && currentRole !== "admin")
+        if (isMine && currentRole !== "admin" && !job.backendId)
           buttons.push(["return", "คืนงานเข้าคิวกลาง", ""]);
         if (currentRole === "admin")
           buttons.push(["assign", "เปลี่ยนผู้รับผิดชอบ", ""]);
@@ -2460,6 +2537,23 @@ export function useStaffDashboard() {
     async function openJobDetail(id, trigger = document.activeElement) {
       const job = allJobs.find((item) => item.id === id);
       if (!job) return;
+      if (job.type === "repair" && job.backendId) {
+        try {
+          const detail = await getRepairRequestDetail(job.backendId);
+          job.detail = detail.description;
+          job.room = repairLocation(detail.location);
+          job.reporterContact = detail.reporter_email;
+          job.backendStatus = detail.status;
+          job.status = repairStatusLabels[detail.status] || detail.status;
+          job.requestImageUrl = detail.images?.find((image) => image.image_type === "after")?.url
+            || detail.images?.[0]?.url || "";
+        } catch (error) {
+          if (await handleUnauthorizedResponse(error.status)) return;
+          console.error("Loading repair request detail failed:", error);
+          toast(error.message || "ไม่สามารถโหลดรายละเอียดงานซ่อมได้");
+          return;
+        }
+      }
       selectedJobId = id;
       $("#jobDetailCode").textContent = `${id} · ${job.category}`;
       $("#jobDetailTitle").textContent = job.title;
@@ -2481,8 +2575,8 @@ export function useStaffDashboard() {
       );
       const detailImage = $("#jobDetailImage");
       const detailIcon = $("#jobDetailIcon");
-      if (detailImage && job.completionPhotoUrl) {
-        detailImage.src = job.completionPhotoUrl;
+      if (detailImage && (job.completionPhotoUrl || job.requestImageUrl)) {
+        detailImage.src = job.completionPhotoUrl || job.requestImageUrl;
         detailImage.alt = `รูปหลังดำเนินการ ${job.title}`;
         detailImage.hidden = false;
         if (detailIcon) detailIcon.hidden = true;
@@ -2501,7 +2595,9 @@ export function useStaffDashboard() {
       // งานจริงที่รับแล้วสามารถโหลด timeline จาก Backend ได้
       if (job.backendId && job.assignee) {
         try {
-          const result = await getCleaningTaskHistory(job.backendId);
+          const result = job.type === "repair"
+            ? await getRepairRequestHistory(job.backendId)
+            : await getCleaningTaskHistory(job.backendId);
           const actionLabels = {
             created: "สร้างคำร้อง",
             assigned: "มอบหมายงาน",
@@ -2516,11 +2612,11 @@ export function useStaffDashboard() {
           const history = Array.isArray(result.history) ? result.history : [];
           job.timeline = history.map((entry) => {
             const statusChange = `${
-              cleaningStatusLabels[entry.old_status] ||
+              (job.type === "repair" ? repairStatusLabels : cleaningStatusLabels)[entry.old_status] ||
               entry.old_status ||
               "เริ่มต้น"
             } → ${
-              cleaningStatusLabels[entry.new_status] ||
+              (job.type === "repair" ? repairStatusLabels : cleaningStatusLabels)[entry.new_status] ||
               entry.new_status ||
               "ไม่ระบุ"
             }`;
@@ -2547,7 +2643,7 @@ export function useStaffDashboard() {
           $("#jobTimeline").innerHTML = jobTimeline(job);
         } catch (error) {
           if (await handleUnauthorizedResponse(error.status)) return;
-          console.error("Loading cleaning task history failed:", error);
+          console.error("Loading staff task history failed:", error);
         }
       }
     }
@@ -2603,9 +2699,17 @@ export function useStaffDashboard() {
     function openStatusUpdate(id, trigger = document.activeElement) {
       const job = allJobs.find((item) => item.id === id);
       if (!job) return;
-      const cleaningNext = job.backendId ? nextCleaningStatus(job) : null;
-      const options = cleaningNext
-        ? [cleaningNext.label]
+      const backendNext = job.backendId
+        ? job.type === "repair" ? nextRepairStatus(job) : nextCleaningStatus(job)
+        : null;
+      if (job.backendId && !backendNext) {
+        toast(job.type === "repair" && job.backendStatus === "in_progress"
+          ? "งานกำลังดำเนินการแล้ว กรุณาใช้ปุ่มเสร็จสิ้นเพื่อปิดงาน"
+          : "ไม่มีสถานะถัดไปที่เปลี่ยนได้");
+        return;
+      }
+      const options = backendNext
+        ? [backendNext.label]
         :
         currentRole === "technician"
           ? ["กำลังดำเนินการ", "รอข้อมูลเพิ่มเติม", "รออะไหล่", "เสร็จสิ้น"]
@@ -2688,8 +2792,10 @@ export function useStaffDashboard() {
         return;
       }
       if (action === "start") {
-        const cleaningNext = job.backendId ? nextCleaningStatus(job) : null;
-        const nextStatus = cleaningNext?.label || "กำลังดำเนินการ";
+        const backendNext = job.backendId
+          ? job.type === "repair" ? nextRepairStatus(job) : nextCleaningStatus(job)
+          : null;
+        const nextStatus = backendNext?.label || "กำลังดำเนินการ";
         requestConfirmation(
           "ยืนยันเริ่มดำเนินการ",
           `เปลี่ยนสถานะงาน ${job.id} เป็น “${nextStatus}” หรือไม่?`,
@@ -2701,32 +2807,35 @@ export function useStaffDashboard() {
     async function applyJobStatus(job, next, note) {
       const previous = job.status;
       const isBackendCleaning = job.type === "cleaning" && job.backendId;
-      if (isBackendCleaning) {
-        const transition = nextCleaningStatus(job);
-        if (!transition || transition.label !== next) {
+      const isBackendRepair = job.type === "repair" && job.backendId;
+      if (isBackendCleaning || isBackendRepair) {
+        const transition = isBackendRepair ? nextRepairStatus(job) : nextCleaningStatus(job);
+        if ((!transition || transition.label !== next) &&
+            !(isBackendRepair && next === "เสร็จสิ้น" && job.backendStatus === "in_progress")) {
           toast("ไม่สามารถเปลี่ยนไปยังสถานะนี้ได้ กรุณาโหลดข้อมูลใหม่");
           return false;
         }
         try {
-          const updatedTask = await updateCleaningTaskStatus(
-            job.backendId,
-            transition.backendStatus,
-          );
+          const updatedTask = isBackendRepair
+            ? next === "เสร็จสิ้น"
+              ? await completeRepairRequest(job.backendId)
+              : await updateRepairRequestStatus(job.backendId, transition.backendStatus)
+            : await updateCleaningTaskStatus(job.backendId, transition.backendStatus);
           job.backendStatus = updatedTask.status;
           job.assignee =
             updatedTask.assigned_staff?.full_name || job.assignee;
           job.assigneeCode =
             updatedTask.assigned_staff?.staff_code || job.assigneeCode;
           job.assigneeId = updatedTask.assigned_staff?.id || job.assigneeId;
-          next = cleaningStatusLabels[updatedTask.status] || next;
+          next = (isBackendRepair ? repairStatusLabels : cleaningStatusLabels)[updatedTask.status] || next;
         } catch (error) {
           if (await handleUnauthorizedResponse(error.status)) return false;
-          console.error("Updating cleaning task status failed:", error);
+          console.error("Updating staff task status failed:", error);
           toast(
             error.status === 409
               ? "ลำดับสถานะไม่ถูกต้อง กรุณาโหลดข้อมูลใหม่"
               : error.status === 403
-                ? "เฉพาะแม่บ้านผู้รับผิดชอบเท่านั้นที่อัปเดตสถานะได้"
+                ? "เฉพาะผู้รับผิดชอบงานเท่านั้นที่อัปเดตสถานะได้"
                 : error.message || "ไม่สามารถอัปเดตสถานะงานได้",
           );
           return false;
@@ -2758,7 +2867,7 @@ export function useStaffDashboard() {
       renderMetrics();
       renderQueue();
       renderStaffOverview();
-      if (isBackendCleaning && job.backendStatus !== "completed") {
+      if ((isBackendCleaning || isBackendRepair) && job.backendStatus !== "completed") {
         showSuccess(
           `เลขงาน: ${job.id}\nสถานะล่าสุด: ${job.status}\nผู้รับผิดชอบ: ${assignedCleanerLabel(job)}`,
           "อัปเดตสถานะงานสำเร็จ",
@@ -3785,31 +3894,34 @@ export function useStaffDashboard() {
         try {
           // บันทึกผลทันทีเพื่อไม่สร้างหมายเหตุซ้ำ หากรูปอัปโหลดไม่สำเร็จ
           if (!job.completionNoteId) {
-            const noteResult = await addCleaningCompletionNote(
-              job.backendId,
-              completionNote,
-            );
+            const noteResult = job.type === "repair"
+              ? await addRepairCompletionNote(job.backendId, completionNote)
+              : await addCleaningCompletionNote(job.backendId, completionNote);
             job.completionNoteId = noteResult.id;
             job.note = noteResult.note;
           }
-          const photoResult = await uploadCleaningCompletionPhotos(
-            job.backendId,
-            [file],
-          );
-          job.completionPhotos = photoResult.photos;
-          job.completionPhotoCount = photoResult.image_count;
+          if (job.type === "cleaning" || file) {
+            const photoResult = job.type === "repair"
+              ? await uploadRepairCompletionPhotos(job.backendId, [file])
+              : await uploadCleaningCompletionPhotos(job.backendId, [file]);
+            job.completionPhotos = photoResult.photos;
+            job.completionPhotoCount = photoResult.image_count;
+          }
         } catch (error) {
           if (await handleUnauthorizedResponse(error.status)) return;
-          console.error("Saving cleaning completion details failed:", error);
+          console.error("Saving task completion details failed:", error);
           toast(error.message || "บันทึกรายละเอียดปิดงานไม่สำเร็จ กรุณาลองใหม่");
           return;
         }
       }
       if (job.completionPhotoUrl?.startsWith("blob:")) {
         URL.revokeObjectURL(job.completionPhotoUrl);
+        job.completionPhotoUrl = "";
       }
-      job.completionPhotoUrl = URL.createObjectURL(file);
-      job.completionPhotoName = file.name;
+      if (file) {
+        job.completionPhotoUrl = URL.createObjectURL(file);
+        job.completionPhotoName = file.name;
+      }
       appendJobTimeline(job, "ปิดงาน", `เสร็จวันที่ ${$("#completeDate").value}`);
       renderJobs();
       closeModal("completeModal", false);
@@ -3972,6 +4084,30 @@ export function useStaffDashboard() {
         openCleaningRequestFromNotification(item, itemButton)
       ) {
         return;
+      }
+      if (currentRole === "technician" && item.requestId) {
+        let job = allJobs.find((entry) => entry.backendId === item.requestId);
+        if (!job) {
+          await loadRepairRequests();
+          job = allJobs.find((entry) => entry.backendId === item.requestId);
+        }
+        if (job) {
+          navigate("jobs");
+          openJobDetail(job.id, itemButton);
+        } else {
+          toast("ไม่พบงานซ่อมที่เชื่อมกับการแจ้งเตือนนี้");
+        }
+        return;
+      }
+      if (currentRole === "technician" && item.isMock) {
+        const mockJob = allJobs.find((job) =>
+          job.type === "repair" && item.text.startsWith(`${job.id}:`),
+        );
+        if (mockJob) {
+          navigate("jobs");
+          openJobDetail(mockJob.id, itemButton);
+          return;
+        }
       }
       const match = item.text.match(/(?:CL|RP)-\d+/);
       if (match) openJobDetail(match[0], itemButton);
@@ -4450,6 +4586,7 @@ export function useStaffDashboard() {
       await loadPendingLostItems();
       await loadApprovedLostFoundItems();
       await loadPendingOwnershipRequests();
+      await loadRepairRequests();
       await loadStaffNotifications();
       setRole(allowedRoles.includes(currentRole) ? currentRole : "admin");
     }

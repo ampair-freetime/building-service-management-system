@@ -69,6 +69,7 @@
         <div class="detail-layout">
           <div>
             <div class="detail-photo">
+              <img id="jobDetailImage" alt="" hidden />
               <svg class="icon" id="jobDetailIcon"><use href="#i-tools" /></svg>
             </div>
             <div class="timeline" id="jobTimeline"></div>
@@ -333,16 +334,31 @@
             ><textarea id="completeResult" required></textarea>
           </div>
           <div class="field">
-            <label for="completeNote">หมายเหตุปิดงาน</label
-            ><textarea id="completeNote" required></textarea>
+            <label for="completeNote">หมายเหตุปิดงาน</label>
+            <textarea
+              id="completeNote"
+              maxlength="2000"
+              placeholder="สรุปการซ่อมและสิ่งที่ควรติดตาม"
+              required
+            ></textarea>
+            <small>สูงสุด 2,000 ตัวอักษร</small>
           </div>
           <div class="field">
-            <label for="completeImage">รูปหลังดำเนินการ</label
-            ><input
-              id="completeImage"
-              type="file"
-              accept="image/jpeg,image/png,image/webp"
-            />
+            <label for="completeImage">รูปหลังดำเนินการ (ไม่บังคับ)</label>
+            <label class="drop-zone" id="completionDropZone" for="completeImage">
+              <input id="completeImage" type="file" accept="image/jpeg,image/png,image/webp" />
+              <span>
+                <svg class="icon" style="margin: auto"><use href="#i-upload" /></svg>
+                <strong>ลากรูปหลังดำเนินการมาวาง หรือเลือกจากเครื่อง</strong>
+                <small>JPG, PNG, WebP · ไม่เกิน 5 MB</small>
+              </span>
+            </label>
+            <div class="upload-preview" id="completionPreview">
+              <img alt="ตัวอย่างรูปหลังดำเนินการ" />
+              <span></span>
+              <button type="button" class="small-btn" id="removeCompletionImage">ลบรูป</button>
+            </div>
+            <small>รูปจะถูกอัปโหลดหลังปิดงานซ่อมสำเร็จ</small>
           </div>
           <div class="field">
             <label for="completeDate">วันที่เสร็จ</label

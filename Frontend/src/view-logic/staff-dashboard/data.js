@@ -1,7 +1,7 @@
 /**
  * สร้าง state เริ่มต้นสำหรับ Staff Dashboard
  * ข้อมูลจริงจะถูกโหลดจาก Backend ภายใน useStaffDashboard.js
- * MOCK-CLEAN-001 ใช้ทดสอบหน้าจอแม่บ้านเฉพาะฝั่ง Frontend
+ * MOCK-CLEAN-* และ MOCK-REPAIR-* ใช้ทดสอบหน้าจอเฉพาะฝั่ง Frontend
  */
 export function createStaffDashboardData() {
   // ข้อความ สี และเมนูประจำ role เป็น UI configuration ไม่ใช่ข้อมูลจำลอง
@@ -76,7 +76,7 @@ export function createStaffDashboardData() {
     admin: "แอดมิน",
   };
 
-  // ไม่มี backendId เพื่อให้ปุ่มรับงานทำงานแบบ local และไม่เรียก API ด้วย UUID ปลอม
+  // งานจำลองไม่มี backendId เพื่อให้ทดสอบ flow แบบ local โดยไม่เรียก API ด้วย UUID ปลอม
   const allJobs = [
     {
       id: "MOCK-CLEAN-001",
@@ -166,6 +166,94 @@ export function createStaffDashboardData() {
       timeline: [],
       isMock: true,
     },
+    {
+      id: "MOCK-REPAIR-001",
+      type: "repair",
+      category: "เครื่องปรับอากาศ",
+      title: "เครื่องปรับอากาศห้องเรียนไม่เย็น",
+      room: "ห้อง CSB-301 ชั้น 3",
+      reporter: "ผู้ใช้งานทดสอบ",
+      reporterContact: "tester@example.com",
+      time: "เมื่อสักครู่",
+      status: "รอรับงาน",
+      priority: "เร่งด่วน",
+      detail: "เปิดเครื่องแล้วมีลมออก แต่ห้องยังไม่เย็น กรุณาตรวจสอบ",
+      assignee: null,
+      timeline: [],
+      isMock: true,
+    },
+    {
+      id: "MOCK-REPAIR-002",
+      type: "repair",
+      category: "ไฟฟ้า/แสงสว่าง",
+      title: "ไฟทางเดินชั้น 2 กะพริบ",
+      room: "ทางเดินอาคาร CSB ชั้น 2",
+      reporter: "เจ้าหน้าที่อาคาร",
+      reporterContact: "building@example.com",
+      time: "10 นาทีที่แล้ว",
+      status: "รับงานแล้ว",
+      priority: "ปกติ",
+      detail: "หลอดไฟบริเวณหน้าลิฟต์กะพริบต่อเนื่อง",
+      assignee: "__CURRENT_TECHNICIAN__",
+      timeline: [{ title: "รับงาน", detail: "รับจากคิวกลาง", time: "09:10" }],
+      isMock: true,
+    },
+    {
+      id: "MOCK-REPAIR-003",
+      type: "repair",
+      category: "ประปา/สุขาภิบาล",
+      title: "ก๊อกน้ำอ่างล้างมือรั่ว",
+      room: "ห้องน้ำชาย ชั้น 1",
+      reporter: "ผู้ใช้งานทดสอบ",
+      reporterContact: "tester@example.com",
+      time: "25 นาทีที่แล้ว",
+      status: "กำลังดำเนินการ",
+      priority: "ปกติ",
+      detail: "น้ำหยดจากก๊อกตลอดเวลาแม้ปิดสนิทแล้ว",
+      assignee: "__CURRENT_TECHNICIAN__",
+      note: "กำลังตรวจสอบวาล์วและซีลก๊อกน้ำ",
+      timeline: [
+        { title: "รับงาน", detail: "รับจากคิวกลาง", time: "08:50" },
+        { title: "อัปเดตสถานะ", detail: "เริ่มตรวจสอบจุดรั่ว", time: "09:00" },
+      ],
+      isMock: true,
+    },
+    {
+      id: "MOCK-REPAIR-004",
+      type: "repair",
+      category: "อาคาร/เฟอร์นิเจอร์",
+      title: "บานพับประตูห้องประชุมหลวม",
+      room: "ห้องประชุม CSB-201",
+      reporter: "เจ้าหน้าที่คณะ",
+      reporterContact: "faculty@example.com",
+      time: "วันนี้ 08:00",
+      status: "เสร็จสิ้น",
+      priority: "ปกติ",
+      detail: "ประตูปิดไม่สนิทและมีเสียงดังขณะเปิดปิด",
+      assignee: "__CURRENT_TECHNICIAN__",
+      note: "ขันบานพับและทดสอบประตูเรียบร้อย",
+      timeline: [
+        { title: "รับงาน", detail: "รับจากคิวกลาง", time: "08:05" },
+        { title: "ปิดงาน", detail: "แก้ไขบานพับแล้ว", time: "08:40" },
+      ],
+      isMock: true,
+    },
+    {
+      id: "MOCK-REPAIR-005",
+      type: "repair",
+      category: "ไฟฟ้า/แสงสว่าง",
+      title: "ปลั๊กไฟห้องปฏิบัติการใช้งานไม่ได้",
+      room: "ห้อง Lab CSB-405",
+      reporter: "ผู้ดูแลห้องปฏิบัติการ",
+      reporterContact: "lab@example.com",
+      time: "วันนี้ 07:45",
+      status: "กำลังดำเนินการ",
+      priority: "ปกติ",
+      detail: "ปลั๊กไฟฝั่งหน้าต่างไม่มีไฟ ต้องตรวจสอบวงจร",
+      assignee: "ช่างทดสอบคนอื่น",
+      timeline: [],
+      isMock: true,
+    },
   ];
   const staffData = [];
   const lostSets = {
@@ -190,6 +278,20 @@ export function createStaffDashboardData() {
       time: "08:40",
       isMock: true,
     },
+    {
+      uid: "MOCK-WH-REPAIR-001",
+      staff: "__CURRENT_TECHNICIAN__",
+      role: "ช่าง",
+      itemId: "MOCK-REPAIR-004",
+      title: "บานพับประตูห้องประชุมหลวม",
+      category: "อาคาร/เฟอร์นิเจอร์",
+      action: "ปิดงาน",
+      status: "เสร็จสิ้น",
+      detail: "ขันบานพับและทดสอบประตูเรียบร้อย",
+      date: "2026-09-19",
+      time: "08:40",
+      isMock: true,
+    },
   ];
   const notificationSets = {
     housekeeper: [
@@ -203,7 +305,17 @@ export function createStaffDashboardData() {
         isMock: true,
       },
     ],
-    technician: [],
+    technician: [
+      {
+        id: "MOCK-NOTIFICATION-REPAIR-001",
+        title: "งานซ่อมเร่งด่วน",
+        text: "MOCK-REPAIR-001: เครื่องปรับอากาศห้องเรียนไม่เย็น",
+        time: "เมื่อสักครู่",
+        unread: true,
+        backend: false,
+        isMock: true,
+      },
+    ],
     clerk: [],
     admin: [],
   };
