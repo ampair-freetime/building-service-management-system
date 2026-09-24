@@ -1310,6 +1310,7 @@ main {
   font-size: 11px;
   line-height: 1.45;
 }
+
 .upload-trigger {
   border: 1px dashed #cdc8df;
   border-radius: 15px;
@@ -1727,14 +1728,6 @@ h4,
 }
 
 /* enhancements.css */
-.pull-indicator {
-  display: none;
-  text-align: center;
-  color: var(--muted);
-  font-size: 10px;
-  font-weight: 700;
-  padding: 5px;
-}
 .loading-mask {
   position: fixed;
   inset: 0;
@@ -1774,12 +1767,6 @@ h4,
     visibility: hidden;
   }
 }
-@media (max-width: 720px) {
-  .pull-indicator {
-    display: block;
-  }
-}
-
 /* self-contained fixes and inline SVG components */
 .icon {
   width: 24px;
