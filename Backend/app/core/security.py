@@ -1,5 +1,7 @@
 """เครื่องมือด้านความปลอดภัยสำหรับแฮชรหัสผ่านและจัดการ JWT."""
 
+import secrets
+import string
 from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
@@ -21,6 +23,24 @@ def hash_password(password: str) -> str:
 def verify_password(password: str, encoded_hash: str) -> bool:
     """ตรวจว่ารหัสผ่านที่กรอกตรงกับค่าแฮชในฐานข้อมูลหรือไม่."""
     return password_hash.verify(password, encoded_hash)
+
+
+def generate_temporary_password(length: int = 12) -> str:
+    """สุ่มรหัสที่มีอักขระครบสี่ประเภทและอ่านจากอีเมลได้ง่าย."""
+    if length < 4:
+        raise ValueError("Temporary password must have at least four characters")
+
+    groups = (
+        "".join(char for char in string.ascii_uppercase if char not in "OI"),
+        "".join(char for char in string.ascii_lowercase if char not in "ol"),
+        "".join(char for char in string.digits if char not in "01"),
+        "@#$%!?",
+    )
+    characters = [secrets.choice(group) for group in groups]
+    all_characters = "".join(groups)
+    characters.extend(secrets.choice(all_characters) for _ in range(length - len(groups)))
+    secrets.SystemRandom().shuffle(characters)
+    return "".join(characters)
 
 
 def create_access_token(staff_id: UUID, role: str) -> str:

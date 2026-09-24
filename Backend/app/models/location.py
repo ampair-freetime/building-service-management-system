@@ -20,7 +20,7 @@ class Location(Base):
     floor: Mapped[str | None] = mapped_column(String(30), nullable=True)
     # ข้อความอธิบายพื้นที่ เช่น "ห้อง 101" หรือ "ห้องน้ำหญิง" ใช้แสดงผลตรงๆ ไม่ประกอบคำนำหน้าเพิ่ม
     area: Mapped[str] = mapped_column(String(100))
-    qr_token: Mapped[str] = mapped_column(String(255), unique=True)
+    qr_token: Mapped[str | None] = mapped_column(String(255), unique=True, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()

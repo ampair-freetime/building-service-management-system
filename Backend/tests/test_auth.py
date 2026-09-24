@@ -119,7 +119,6 @@ def test_admin_can_create_and_list_all_staff_roles(
                 "staff_code": staff_code,
                 "email": email,
                 "full_name": full_name,
-                "password": "staff-password",
                 "role": role,
             },
         )
@@ -141,7 +140,6 @@ def test_admin_can_create_and_list_all_staff_roles(
             "staff_code": "HK001",
             "email": "another@example.com",
             "full_name": "Duplicate Staff",
-            "password": "staff-password",
             "role": "housekeeper",
         },
     )

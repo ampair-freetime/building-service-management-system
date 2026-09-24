@@ -3,8 +3,8 @@
 from fastapi import APIRouter, HTTPException, status
 
 from app.api.dependencies import AdminStaff, DbSession
-from app.schemas.staff import StaffCreate, StaffResponse
-from app.services.staff import DuplicateStaffError, create_staff, list_staff
+from app.schemas.staff import StaffCreate, StaffCreatedResponse, StaffResponse
+from app.services.staff import DuplicateStaffError, create_staff_and_send_credentials, list_staff
 
 router = APIRouter()
 
@@ -16,14 +16,16 @@ async def read_staff(session: DbSession, _admin: AdminStaff) -> list[StaffRespon
     return [StaffResponse.model_validate(account) for account in accounts]
 
 
-@router.post("", response_model=StaffResponse, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=StaffCreatedResponse, status_code=status.HTTP_201_CREATED)
 async def add_staff(
     payload: StaffCreate, session: DbSession, _admin: AdminStaff
-) -> StaffResponse:
+) -> StaffCreatedResponse:
     """สร้างบัญชีพนักงานใหม่ โดยอนุญาตเฉพาะ admin."""
     try:
-        account = await create_staff(session, payload)
+        account, email_sent = await create_staff_and_send_credentials(session, payload)
     except DuplicateStaffError as exc:
         # HTTP 409 หมายถึงข้อมูลใหม่ขัดแย้งกับบัญชีที่มีอยู่แล้ว
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
-    return StaffResponse.model_validate(account)
+    return StaffCreatedResponse(
+        **StaffResponse.model_validate(account).model_dump(), email_sent=email_sent
+    )

@@ -39,8 +39,8 @@ def test_seed_locations_is_idempotent_and_preserves_tokens(
     assert first_tokens == second_tokens
     assert len(first_tokens) == 2
     assert all(re.fullmatch(r"[A-Za-z0-9_-]{32}", token) for token in first_tokens.values())
-    assert first_output.count("https://frontend.example/app/cleaning?token=") == 2
-    assert second_output.count("https://frontend.example/app/cleaning?token=") == 2
+    assert first_output.count("https://frontend.example/app/user?token=") == 2
+    assert second_output.count("https://frontend.example/app/user?token=") == 2
 
     async def count_locations() -> int:
         async with factory() as session:

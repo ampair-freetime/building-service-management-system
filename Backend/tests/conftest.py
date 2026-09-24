@@ -11,12 +11,13 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
+from app.core.security import hash_password
 from app.db.base import Base
 from app.db.session import get_db_session
 from app.main import create_application
+from app.models.enums import AccountStatus
 from app.models.staff import Staff
 from app.schemas.staff import StaffCreate
-from app.services.staff import create_staff
 
 
 @pytest.fixture
@@ -67,16 +68,20 @@ def seed_staff(
 ) -> Staff:
     async def seed() -> Staff:
         async with session_factory() as session:
-            return await create_staff(
-                session,
-                StaffCreate(
-                    staff_code=staff_code,
-                    email=email,
-                    full_name=full_name,
-                    password=password,
-                    role=role,
-                    status=status,
-                ),
+            payload = StaffCreate(
+                staff_code=staff_code,
+                email=email,
+                full_name=full_name,
+                role=role,
             )
+            account = Staff(
+                **payload.model_dump(),
+                password_hash=hash_password(password),
+                status=AccountStatus(status),
+            )
+            session.add(account)
+            await session.commit()
+            await session.refresh(account)
+            return account
 
     return asyncio.run(seed())

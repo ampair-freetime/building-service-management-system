@@ -3,6 +3,7 @@
 from fastapi import APIRouter
 
 from app.api.v1.endpoints import (
+    admin_location,
     auth,
     cleaning_guest,
     cleaning_staff,
@@ -35,6 +36,9 @@ api_router.include_router(
     tags=["guest cleaning requests"],
 )
 api_router.include_router(staff.router, prefix="/staff", tags=["staff"])
+api_router.include_router(
+    admin_location.router, prefix="/admin/locations", tags=["admin locations"]
+)
 api_router.include_router(
     repair_guest.router,
     prefix="/guest/repair-requests",

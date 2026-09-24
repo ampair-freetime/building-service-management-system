@@ -11,12 +11,12 @@ from app.models.enums import AccountStatus, StaffRole
 class StaffCreate(BaseModel):
     """ข้อมูลที่แอดมินต้องส่งเมื่อสร้างบัญชีพนักงาน."""
 
+    model_config = ConfigDict(extra="forbid")
+
     staff_code: str = Field(min_length=2, max_length=30, pattern=r"^[A-Za-z0-9_-]+$")
     email: EmailStr
     full_name: str = Field(min_length=1, max_length=150)
-    password: str = Field(min_length=8, max_length=128)
     role: StaffRole
-    status: AccountStatus = AccountStatus.ACTIVE
 
     @field_validator("staff_code")
     @classmethod
@@ -52,3 +52,9 @@ class StaffResponse(BaseModel):
     last_login_at: datetime | None
     created_at: datetime
     updated_at: datetime
+
+
+class StaffCreatedResponse(StaffResponse):
+    """ผลการสร้างบัญชีและสถานะการส่งรหัสผ่านเริ่มต้น."""
+
+    email_sent: bool
