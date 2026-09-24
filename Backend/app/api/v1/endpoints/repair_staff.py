@@ -179,7 +179,6 @@ async def accept_task(
         status=task.status.value,
         assigned_staff=AssignedTechnicianResponse(
             id=technician.id,
-            staff_code=technician.staff_code,
             full_name=technician.full_name,
         ),
     )
@@ -225,7 +224,6 @@ async def update_task_status(
         status=task.status.value,
         assigned_staff=AssignedTechnicianResponse(
             id=technician.id,
-            staff_code=technician.staff_code,
             full_name=technician.full_name,
         ),
     )
@@ -269,7 +267,6 @@ async def complete_task(
         status=task.status.value,
         assigned_staff=AssignedTechnicianResponse(
             id=technician.id,
-            staff_code=technician.staff_code,
             full_name=technician.full_name,
         ),
     )

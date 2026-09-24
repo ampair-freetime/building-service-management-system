@@ -1,14 +1,28 @@
 """ข้อมูลเข้าและออกของ Admin location API."""
 
+import re
 from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+# คำนำหน้าที่ผู้ใช้มักพิมพ์ซ้ำกับ label "ชั้น" ที่ระบบเติมให้; เช็ก floor ก่อน fl (ยาวก่อนสั้น)
+_FLOOR_PREFIX = re.compile(r"^(?:ชั้น|floor|fl(?:\.|(?=[\s\d])))\s*", re.IGNORECASE)
+
 
 def normalize_floor(value: str | None) -> str | None:
-    if isinstance(value, str):
-        return " ".join(value.split()) or None
-    return value
+    """แปลง floor ให้อยู่ในรูปแบบเดียว เช่น "ชั้น 01" → "1" และ "b1" → "B1"."""
+    if not isinstance(value, str):
+        return value
+    text = " ".join(value.split())
+    if not text:
+        return None
+    text = _FLOOR_PREFIX.sub("", text)
+    if not text:
+        raise ValueError("Floor must not be only a prefix")
+    if text.isdecimal():
+        # int() แปลงเลขไทยเป็นเลขอารบิกและตัด 0 นำหน้าให้ในขั้นเดียว
+        text = str(int(text))
+    return text.upper()
 
 
 def normalize_area(value: str | None) -> str | None:
@@ -35,12 +49,6 @@ class AdminLocationCreate(BaseModel):
     @classmethod
     def clean_area(cls, value: str) -> str:
         return normalize_area(value)
-
-
-class AdminLocationBulkCreate(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    locations: list[AdminLocationCreate] = Field(min_length=1, max_length=100)
 
 
 class AdminLocationUpdate(BaseModel):

@@ -13,16 +13,9 @@ class StaffCreate(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    staff_code: str = Field(min_length=2, max_length=30, pattern=r"^[A-Za-z0-9_-]+$")
     email: EmailStr
     full_name: str = Field(min_length=1, max_length=150)
     role: StaffRole
-
-    @field_validator("staff_code")
-    @classmethod
-    def normalize_staff_code(cls, value: str) -> str:
-        """ตัดช่องว่างและเก็บรหัสพนักงานเป็นตัวพิมพ์ใหญ่ให้ค้นหาได้สม่ำเสมอ."""
-        return value.strip().upper()
 
     @field_validator("email")
     @classmethod
@@ -30,11 +23,13 @@ class StaffCreate(BaseModel):
         """เก็บอีเมลเป็นตัวพิมพ์เล็ก เพื่อป้องกันบัญชีซ้ำต่างกันแค่ตัวพิมพ์."""
         return str(value).strip().lower()
 
-    @field_validator("full_name")
+    @field_validator("full_name", mode="before")
     @classmethod
     def normalize_full_name(cls, value: str) -> str:
-        """รวมช่องว่างที่เกินมาในชื่อให้เหลือช่องเดียว."""
-        return " ".join(value.split())
+        """รวมช่องว่างที่เกินมาในชื่อให้เหลือช่องเดียว ก่อนตรวจ min_length เพื่อกันชื่อว่าง."""
+        if isinstance(value, str):
+            return " ".join(value.split())
+        return value
 
 
 class StaffResponse(BaseModel):
@@ -44,7 +39,6 @@ class StaffResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
-    staff_code: str
     email: EmailStr
     full_name: str
     role: StaffRole

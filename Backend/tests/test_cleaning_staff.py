@@ -153,7 +153,6 @@ def test_housekeeper_can_accept_cleaning_task(
 
     seed_staff(
         session_factory,
-        staff_code="HK001",
         email="housekeeper1@example.com",
         password="password-one",
         role="housekeeper",
@@ -162,7 +161,7 @@ def test_housekeeper_can_accept_cleaning_task(
 
     headers = login_staff(
         client,
-        "HK001",
+        "housekeeper1@example.com",
         "password-one",
     )
 
@@ -197,7 +196,7 @@ def test_housekeeper_can_accept_cleaning_task(
     assert body["request_code"] == created.json()["request_code"]
     assert body["status"] == "assigned"
 
-    assert body["assigned_staff"]["staff_code"] == "HK001"
+    assert "staff_code" not in body["assigned_staff"]
     assert body["assigned_staff"]["full_name"] == "House Keeper One"
 
     async def verify_database() -> None:
@@ -232,7 +231,6 @@ def test_second_housekeeper_cannot_accept_assigned_cleaning_task(
 
     seed_staff(
         session_factory,
-        staff_code="HK001",
         email="housekeeper1@example.com",
         password="password-one",
         role="housekeeper",
@@ -241,7 +239,6 @@ def test_second_housekeeper_cannot_accept_assigned_cleaning_task(
 
     seed_staff(
         session_factory,
-        staff_code="HK002",
         email="housekeeper2@example.com",
         password="password-two",
         role="housekeeper",
@@ -250,13 +247,13 @@ def test_second_housekeeper_cannot_accept_assigned_cleaning_task(
 
     hk1_headers = login_staff(
         client,
-        "HK001",
+        "housekeeper1@example.com",
         "password-one",
     )
 
     hk2_headers = login_staff(
         client,
-        "HK002",
+        "housekeeper2@example.com",
         "password-two",
     )
 
@@ -285,7 +282,7 @@ def test_second_housekeeper_cannot_accept_assigned_cleaning_task(
     )
 
     assert first.status_code == 200
-    assert first.json()["assigned_staff"]["staff_code"] == "HK001"
+    assert "staff_code" not in first.json()["assigned_staff"]
 
     # HK002 พยายามรับงานเดียวกัน
     second = client.patch(
@@ -330,7 +327,6 @@ def test_non_housekeeper_cannot_accept_cleaning_task(
 
     seed_staff(
         session_factory,
-        staff_code="TECH001",
         email="technician@example.com",
         password="correct-password",
         role="technician",
@@ -339,7 +335,7 @@ def test_non_housekeeper_cannot_accept_cleaning_task(
 
     headers = login_staff(
         client,
-        "TECH001",
+        "technician@example.com",
         "correct-password",
     )
 
@@ -379,7 +375,6 @@ def test_housekeeper_cannot_accept_nonexistent_cleaning_task(
 
     seed_staff(
         session_factory,
-        staff_code="HK001",
         email="housekeeper@example.com",
         password="correct-password",
         role="housekeeper",
@@ -388,7 +383,7 @@ def test_housekeeper_cannot_accept_nonexistent_cleaning_task(
 
     headers = login_staff(
         client,
-        "HK001",
+        "housekeeper@example.com",
         "correct-password",
     )
 
@@ -410,7 +405,6 @@ def test_housekeeper_can_update_cleaning_status_in_order(
 
     seed_staff(
         session_factory,
-        staff_code="HK001",
         email="status-housekeeper@example.com",
         password="correct-password",
         role="housekeeper",
@@ -419,7 +413,7 @@ def test_housekeeper_can_update_cleaning_status_in_order(
 
     headers = login_staff(
         client,
-        "HK001",
+        "status-housekeeper@example.com",
         "correct-password",
     )
 
@@ -500,7 +494,6 @@ def test_housekeeper_cannot_skip_cleaning_status(
 
     seed_staff(
         session_factory,
-        staff_code="HK001",
         email="invalid-status-housekeeper@example.com",
         password="correct-password",
         role="housekeeper",
@@ -509,7 +502,7 @@ def test_housekeeper_cannot_skip_cleaning_status(
 
     headers = login_staff(
         client,
-        "HK001",
+        "invalid-status-housekeeper@example.com",
         "correct-password",
     )
 
@@ -568,7 +561,6 @@ def test_guest_can_view_updated_cleaning_status(
 
     seed_staff(
         session_factory,
-        staff_code="HK001",
         email="progress-housekeeper@example.com",
         password="correct-password",
         role="housekeeper",
@@ -577,7 +569,7 @@ def test_guest_can_view_updated_cleaning_status(
 
     headers = login_staff(
         client,
-        "HK001",
+        "progress-housekeeper@example.com",
         "correct-password",
     )
 
@@ -653,7 +645,6 @@ def test_housekeeper_can_upload_completion_photos(
 
     seed_staff(
         session_factory,
-        staff_code="HK001",
         email="photo-housekeeper@example.com",
         password="correct-password",
         role="housekeeper",
@@ -662,7 +653,7 @@ def test_housekeeper_can_upload_completion_photos(
 
     headers = login_staff(
         client,
-        "HK001",
+        "photo-housekeeper@example.com",
         "correct-password",
     )
 
@@ -760,7 +751,6 @@ def test_invalid_completion_photo_is_not_uploaded(
 
     seed_staff(
         session_factory,
-        staff_code="HK001",
         email="invalid-photo@example.com",
         password="correct-password",
         role="housekeeper",
@@ -769,7 +759,7 @@ def test_invalid_completion_photo_is_not_uploaded(
 
     headers = login_staff(
         client,
-        "HK001",
+        "invalid-photo@example.com",
         "correct-password",
     )
 
@@ -841,7 +831,6 @@ def test_housekeeper_cannot_upload_completion_photos_before_completed(
 
     seed_staff(
         session_factory,
-        staff_code="HK001",
         email="not-completed@example.com",
         password="correct-password",
         role="housekeeper",
@@ -850,7 +839,7 @@ def test_housekeeper_cannot_upload_completion_photos_before_completed(
 
     headers = login_staff(
         client,
-        "HK001",
+        "not-completed@example.com",
         "correct-password",
     )
 
@@ -913,7 +902,6 @@ def test_guest_can_view_completion_photos(
 
     seed_staff(
         session_factory,
-        staff_code="HK001",
         email="guest-view-photo@example.com",
         password="correct-password",
         role="housekeeper",
@@ -922,7 +910,7 @@ def test_guest_can_view_completion_photos(
 
     headers = login_staff(
         client,
-        "HK001",
+        "guest-view-photo@example.com",
         "correct-password",
     )
 
@@ -998,7 +986,6 @@ def test_housekeeper_can_add_completion_note(
 
     seed_staff(
         session_factory,
-        staff_code="HK001",
         email="completion-note@example.com",
         password="correct-password",
         role="housekeeper",
@@ -1007,7 +994,7 @@ def test_housekeeper_can_add_completion_note(
 
     headers = login_staff(
         client,
-        "HK001",
+        "completion-note@example.com",
         "correct-password",
     )
 
@@ -1078,7 +1065,6 @@ def test_empty_completion_note_is_rejected(
 
     seed_staff(
         session_factory,
-        staff_code="HK001",
         email="empty-note@example.com",
         password="correct-password",
         role="housekeeper",
@@ -1087,7 +1073,7 @@ def test_empty_completion_note_is_rejected(
 
     headers = login_staff(
         client,
-        "HK001",
+        "empty-note@example.com",
         "correct-password",
     )
 
@@ -1147,7 +1133,6 @@ def test_housekeeper_cannot_add_completion_note_before_completed(
 
     seed_staff(
         session_factory,
-        staff_code="HK001",
         email="note-before-completed@example.com",
         password="correct-password",
         role="housekeeper",
@@ -1156,7 +1141,7 @@ def test_housekeeper_cannot_add_completion_note_before_completed(
 
     headers = login_staff(
         client,
-        "HK001",
+        "note-before-completed@example.com",
         "correct-password",
     )
 
@@ -1203,7 +1188,6 @@ def test_other_housekeeper_cannot_add_completion_note(
 
     seed_staff(
         session_factory,
-        staff_code="HK001",
         email="owner-note@example.com",
         password="correct-password",
         role="housekeeper",
@@ -1212,7 +1196,6 @@ def test_other_housekeeper_cannot_add_completion_note(
 
     seed_staff(
         session_factory,
-        staff_code="HK002",
         email="other-note@example.com",
         password="correct-password",
         role="housekeeper",
@@ -1221,13 +1204,13 @@ def test_other_housekeeper_cannot_add_completion_note(
 
     owner_headers = login_staff(
         client,
-        "HK001",
+        "owner-note@example.com",
         "correct-password",
     )
 
     other_headers = login_staff(
         client,
-        "HK002",
+        "other-note@example.com",
         "correct-password",
     )
 
@@ -1273,7 +1256,6 @@ def test_completion_note_appears_in_work_history(
 
     seed_staff(
         session_factory,
-        staff_code="HK001",
         email="history-note@example.com",
         password="correct-password",
         role="housekeeper",
@@ -1282,7 +1264,7 @@ def test_completion_note_appears_in_work_history(
 
     headers = login_staff(
         client,
-        "HK001",
+        "history-note@example.com",
         "correct-password",
     )
 

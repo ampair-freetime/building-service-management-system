@@ -54,7 +54,6 @@ def test_housekeeper_receives_notification_when_cleaning_request_created(
 
     seed_staff(
         session_factory,
-        staff_code="HK001",
         email="housekeeper@example.com",
         password="correct-password",
         role="housekeeper",
@@ -63,7 +62,7 @@ def test_housekeeper_receives_notification_when_cleaning_request_created(
 
     headers = login_staff(
         client,
-        "HK001",
+        "housekeeper@example.com",
         "correct-password",
     )
 
@@ -137,7 +136,6 @@ def test_housekeeper_cannot_mark_another_housekeepers_notification_as_read(
 
     seed_staff(
         session_factory,
-        staff_code="HK001",
         email="housekeeper1@example.com",
         password="password-one",
         role="housekeeper",
@@ -146,7 +144,6 @@ def test_housekeeper_cannot_mark_another_housekeepers_notification_as_read(
 
     seed_staff(
         session_factory,
-        staff_code="HK002",
         email="housekeeper2@example.com",
         password="password-two",
         role="housekeeper",
@@ -155,13 +152,13 @@ def test_housekeeper_cannot_mark_another_housekeepers_notification_as_read(
 
     hk1_headers = login_staff(
         client,
-        "HK001",
+        "housekeeper1@example.com",
         "password-one",
     )
 
     hk2_headers = login_staff(
         client,
-        "HK002",
+        "housekeeper2@example.com",
         "password-two",
     )
 

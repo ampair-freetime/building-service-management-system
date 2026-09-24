@@ -260,8 +260,8 @@ def test_empty_locations_and_ordered_public_location_fields(test_context):
                     Location(id=3, floor="2", area="ห้อง 201", qr_token="a3"),
                     Location(id=2, floor="1", area="ห้อง 102", qr_token="a2"),
                     Location(id=1, floor="1", area="ห้อง 101", qr_token="a1"),
-                    Location(id=5, floor="1", area="ห้อง 101", qr_token="a5"),
-                    Location(id=6, floor="1", area="ห้อง 101", qr_token="closed", is_active=False),
+                    Location(id=5, floor="1", area="ห้อง 101A", qr_token="a5"),
+                    Location(id=6, floor="1", area="ห้อง 103", qr_token="closed", is_active=False),
                 ]
             )
             await session.commit()

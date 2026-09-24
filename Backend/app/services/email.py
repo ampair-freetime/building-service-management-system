@@ -12,14 +12,13 @@ class EmailDeliveryError(Exception):
 
 
 def build_staff_welcome_email(
-    *, full_name: str, staff_code: str, email: str, temporary_password: str
+    *, full_name: str, email: str, temporary_password: str
 ) -> tuple[str, str]:
     """คืนหัวข้อและเนื้อหาเมลที่พนักงานใช้เข้าสู่ระบบครั้งแรก."""
     subject = "ข้อมูลเข้าสู่ระบบ Building Care สำหรับพนักงาน"
     body = (
         f"สวัสดีคุณ {full_name}\n\n"
         "บัญชีพนักงานของคุณพร้อมใช้งานแล้ว\n"
-        f"รหัสพนักงาน: {staff_code}\n"
         f"อีเมลที่ใช้เข้าสู่ระบบ: {email}\n"
         f"รหัสผ่านเริ่มต้น: {temporary_password}\n"
         f"หน้าเข้าสู่ระบบ: {settings.staff_login_url}\n\n"

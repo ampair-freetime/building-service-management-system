@@ -3,7 +3,7 @@
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, DateTime, Integer, String, func
+from sqlalchemy import Boolean, DateTime, Index, Integer, String, func, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -15,6 +15,15 @@ if TYPE_CHECKING:
 
 class Location(Base):
     __tablename__ = "locations"
+    __table_args__ = (
+        # coalesce ทำให้ floor ที่เป็น NULL ถือว่าเท่ากัน เพราะ NULL = NULL ไม่เป็นจริงใน unique index
+        Index(
+            "uq_locations_floor_area",
+            text("coalesce(floor, '')"),
+            "area",
+            unique=True,
+        ),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     floor: Mapped[str | None] = mapped_column(String(30), nullable=True)

@@ -42,7 +42,7 @@ Login ที่ `POST /api/v1/auth/login` ใช้ **รหัสพนัก�
 
 ## QR code ของสถานที่
 
-Admin เพิ่ม location ผ่าน `POST /api/v1/admin/locations` หรือ `POST /api/v1/admin/locations/bulk`
+Admin เพิ่ม location ทีละรายการผ่าน `POST /api/v1/admin/locations`
 ก่อน ห้องใหม่มี `qr_token: null` และ `qr_url: null` จนกว่าจะกด
 `POST /api/v1/admin/locations/{id}/qr/generate` การกด Generate ซ้ำคืน token เดิม
 

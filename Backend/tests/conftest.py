@@ -59,7 +59,6 @@ def test_context(
 def seed_staff(
     session_factory: async_sessionmaker[AsyncSession],
     *,
-    staff_code: str,
     email: str,
     password: str,
     role: str,
@@ -69,7 +68,6 @@ def seed_staff(
     async def seed() -> Staff:
         async with session_factory() as session:
             payload = StaffCreate(
-                staff_code=staff_code,
                 email=email,
                 full_name=full_name,
                 role=role,

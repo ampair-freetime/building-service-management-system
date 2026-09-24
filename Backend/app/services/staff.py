@@ -4,7 +4,7 @@ import asyncio
 import logging
 from uuid import UUID
 
-from sqlalchemy import or_, select
+from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 
 class DuplicateStaffError(Exception):
-    """แจ้งว่ารหัสพนักงานหรืออีเมลซ้ำกับบัญชีที่มีอยู่."""
+    """แจ้งว่าอีเมลซ้ำกับบัญชีที่มีอยู่."""
 
 
 async def get_staff_by_id(session: AsyncSession, staff_id: UUID) -> Staff | None:
@@ -26,23 +26,14 @@ async def get_staff_by_id(session: AsyncSession, staff_id: UUID) -> Staff | None
     return await session.get(Staff, staff_id)
 
 
-async def get_staff_by_identifier(
-    session: AsyncSession, identifier: str
-) -> Staff | None:
-    """ค้นหาบัญชีด้วยอีเมลหรือรหัสพนักงาน โดยไม่สนตัวพิมพ์ของข้อมูลที่รับมา."""
-    normalized = identifier.strip()
-    statement = select(Staff).where(
-        or_(
-            Staff.email == normalized.lower(),
-            Staff.staff_code == normalized.upper(),
-        )
-    )
-    return await session.scalar(statement)
+async def get_staff_by_email(session: AsyncSession, email: str) -> Staff | None:
+    """ค้นหาบัญชีด้วยอีเมล ซึ่งเก็บเป็นตัวพิมพ์เล็กเสมอ จึงแปลงข้อมูลที่รับมาก่อนเทียบ."""
+    return await session.scalar(select(Staff).where(Staff.email == email.strip().lower()))
 
 
 async def list_staff(session: AsyncSession) -> list[Staff]:
-    """คืนบัญชีพนักงานทั้งหมด เรียงตามรหัสพนักงาน."""
-    result = await session.scalars(select(Staff).order_by(Staff.staff_code))
+    """คืนบัญชีพนักงานทั้งหมด เรียงตามลำดับที่สร้าง."""
+    result = await session.scalars(select(Staff).order_by(Staff.created_at, Staff.email))
     return list(result)
 
 
@@ -50,7 +41,6 @@ async def create_staff(session: AsyncSession, payload: StaffCreate) -> tuple[Sta
     """สุ่มและแฮชรหัสผ่าน จากนั้นบันทึกบัญชีก่อนคืนรหัสจริงสำหรับส่งเมล."""
     temporary_password = generate_temporary_password()
     account = Staff(
-        staff_code=payload.staff_code,
         email=str(payload.email),
         full_name=payload.full_name,
         # แฮชก่อนสร้าง model เพื่อไม่ให้รหัสผ่านจริงถูกบันทึก
@@ -64,7 +54,7 @@ async def create_staff(session: AsyncSession, payload: StaffCreate) -> tuple[Sta
     except IntegrityError as exc:
         # unique constraint เป็นด่านสุดท้ายที่กันคำขอพร้อมกันสร้างข้อมูลซ้ำ
         await session.rollback()
-        raise DuplicateStaffError("Staff code or email already exists") from exc
+        raise DuplicateStaffError("Email already exists") from exc
 
     # โหลดค่าที่ฐานข้อมูลสร้างให้ เช่น created_at และ updated_at
     await session.refresh(account)
@@ -78,7 +68,6 @@ async def create_staff_and_send_credentials(
     account, temporary_password = await create_staff(session, payload)
     subject, body = build_staff_welcome_email(
         full_name=account.full_name,
-        staff_code=account.staff_code,
         email=account.email,
         temporary_password=temporary_password,
     )

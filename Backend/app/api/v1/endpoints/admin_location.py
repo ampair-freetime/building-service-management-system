@@ -9,7 +9,6 @@ from fastapi import APIRouter, HTTPException, Query, Response, status
 
 from app.api.dependencies import AdminStaff, DbSession
 from app.schemas.admin_location import (
-    AdminLocationBulkCreate,
     AdminLocationCreate,
     AdminLocationResponse,
     AdminLocationStatusUpdate,
@@ -23,7 +22,6 @@ from app.services.admin_location import (
     QrTokenCollisionError,
     build_qr_url,
     create_location,
-    create_locations_bulk,
     generate_qr,
     get_location_for_qr,
     get_location_or_raise,
@@ -65,15 +63,6 @@ async def add_location(
     payload: AdminLocationCreate, session: DbSession, _admin: AdminStaff
 ) -> AdminLocationResponse:
     return await _call(create_location(session, payload))
-
-
-@router.post(
-    "/bulk", response_model=list[AdminLocationResponse], status_code=status.HTTP_201_CREATED
-)
-async def add_locations_bulk(
-    payload: AdminLocationBulkCreate, session: DbSession, _admin: AdminStaff
-) -> list[AdminLocationResponse]:
-    return await _call(create_locations_bulk(session, payload))
 
 
 @router.get("/qr-bundle")

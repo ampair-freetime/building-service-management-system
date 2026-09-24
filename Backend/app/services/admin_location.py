@@ -10,7 +10,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.models.location import Location
 from app.schemas.admin_location import (
-    AdminLocationBulkCreate,
     AdminLocationCreate,
     AdminLocationResponse,
     AdminLocationUpdate,
@@ -99,6 +98,15 @@ async def _duplicate_exists(
     return await session.scalar(statement.limit(1)) is not None
 
 
+async def _commit_or_raise_duplicate(session: AsyncSession) -> None:
+    """unique index เป็นด่านสุดท้ายกันคำขอพร้อมกันที่ผ่าน _duplicate_exists มาทั้งคู่."""
+    try:
+        await session.commit()
+    except IntegrityError as exc:
+        await session.rollback()
+        raise DuplicateLocationError("Location already exists") from exc
+
+
 async def create_location(
     session: AsyncSession, payload: AdminLocationCreate
 ) -> AdminLocationResponse:
@@ -106,31 +114,9 @@ async def create_location(
         raise DuplicateLocationError("Location already exists")
     location = Location(floor=payload.floor, area=payload.area, qr_token=None)
     session.add(location)
-    await session.commit()
+    await _commit_or_raise_duplicate(session)
     await session.refresh(location)
     return to_admin_response(location)
-
-
-async def create_locations_bulk(
-    session: AsyncSession, payload: AdminLocationBulkCreate
-) -> list[AdminLocationResponse]:
-    seen: set[tuple[str | None, str]] = set()
-    for item in payload.locations:
-        key = (item.floor, item.area)
-        if key in seen or await _duplicate_exists(session, floor=item.floor, area=item.area):
-            raise DuplicateLocationError(
-                f"Location already exists: {item.floor or '-'} / {item.area}"
-            )
-        seen.add(key)
-
-    locations = [
-        Location(floor=item.floor, area=item.area, qr_token=None) for item in payload.locations
-    ]
-    session.add_all(locations)
-    await session.commit()
-    for location in locations:
-        await session.refresh(location)
-    return [to_admin_response(location) for location in locations]
 
 
 async def update_location(
@@ -148,7 +134,7 @@ async def update_location(
         raise DuplicateLocationError("Location already exists")
     for field, value in changes.items():
         setattr(location, field, value)
-    await session.commit()
+    await _commit_or_raise_duplicate(session)
     await session.refresh(location)
     return to_admin_response(location)
 

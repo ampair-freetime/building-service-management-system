@@ -1,27 +1,32 @@
 """ทดสอบ Admin location และวงจรชีวิตของ QR."""
 
+import asyncio
 from io import BytesIO
 from urllib.parse import quote
 from zipfile import ZipFile
 
+import pytest
 from conftest import seed_staff
 from fastapi.testclient import TestClient
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from app.models.location import Location
+from app.schemas.admin_location import normalize_floor
+from app.services import admin_location
 from app.services.admin_location import build_qr_url
 
 
 def admin_headers(client: TestClient, factory: async_sessionmaker[AsyncSession]) -> dict[str, str]:
     seed_staff(
         factory,
-        staff_code="ADMIN001",
         email="admin@example.com",
         password="admin-password",
         role="admin",
     )
     login = client.post(
         "/api/v1/auth/login",
-        json={"identifier": "ADMIN001", "password": "admin-password"},
+        json={"identifier": "admin@example.com", "password": "admin-password"},
     )
     assert login.status_code == 200
     return {"Authorization": f"Bearer {login.json()['access_token']}"}
@@ -116,7 +121,7 @@ def test_qr_image_bundle_and_regeneration(test_context) -> None:
     )
 
 
-def test_duplicate_bulk_and_update_validation(test_context) -> None:
+def test_duplicate_and_update_validation(test_context) -> None:
     client, factory = test_context
     headers = admin_headers(client, factory)
     one = create_location(client, headers, floor=None, area="โถง")
@@ -127,30 +132,15 @@ def test_duplicate_bulk_and_update_validation(test_context) -> None:
     )
     assert duplicate.status_code == 409
 
-    bulk = client.post(
-        "/api/v1/admin/locations/bulk",
+    create_location(client, headers, floor="2", area="ห้อง 201")
+    spaced_duplicate = client.post(
+        "/api/v1/admin/locations",
         headers=headers,
-        json={
-            "locations": [
-                {"floor": "2", "area": "ห้อง 201"},
-                {"floor": "2", "area": "  ห้อง   201 "},
-            ]
-        },
+        json={"floor": "2", "area": "  ห้อง   201 "},
     )
-    assert bulk.status_code == 409
-    existing_duplicate = client.post(
-        "/api/v1/admin/locations/bulk",
-        headers=headers,
-        json={
-            "locations": [
-                {"floor": "3", "area": "ห้อง 301"},
-                {"floor": None, "area": "โถง"},
-            ]
-        },
-    )
-    assert existing_duplicate.status_code == 409
+    assert spaced_duplicate.status_code == 409
     listing = client.get("/api/v1/admin/locations", headers=headers)
-    assert len(listing.json()) == 1
+    assert len(listing.json()) == 2
 
     second = create_location(client, headers, floor="2", area="ห้อง 202")
     second_path = f"/api/v1/admin/locations/{second['id']}"
@@ -172,24 +162,25 @@ def test_duplicate_bulk_and_update_validation(test_context) -> None:
     assert client.get(f"/api/v1/admin/locations/{one['id']}", headers=headers).status_code == 200
 
 
-def test_bulk_create_success_starts_without_qr(test_context) -> None:
+def test_blank_floor_create_starts_without_qr(test_context) -> None:
+    client, factory = test_context
+    headers = admin_headers(client, factory)
+    location = create_location(client, headers, floor="", area="  โถง  ")
+    assert location["floor"] is None
+    assert location["area"] == "โถง"
+    assert location["qr_token"] is None and location["qr_url"] is None
+
+
+def test_bulk_create_endpoint_is_removed(test_context) -> None:
     client, factory = test_context
     headers = admin_headers(client, factory)
     response = client.post(
         "/api/v1/admin/locations/bulk",
         headers=headers,
-        json={
-            "locations": [
-                {"floor": "1", "area": "ห้อง 101"},
-                {"floor": "", "area": "  โถง  "},
-            ]
-        },
+        json={"locations": [{"floor": "1", "area": "ห้อง 101"}]},
     )
-    assert response.status_code == 201
-    assert [item["area"] for item in response.json()] == ["ห้อง 101", "โถง"]
-    assert response.json()[1]["floor"] is None
-    assert all(item["qr_token"] is None and item["qr_url"] is None for item in response.json())
-    assert len(client.get("/api/v1/admin/locations", headers=headers).json()) == 2
+    assert response.status_code in {404, 405}
+    assert client.get("/api/v1/admin/locations", headers=headers).json() == []
 
 
 def test_inactive_missing_and_ungenerated_qr(test_context) -> None:
@@ -232,14 +223,13 @@ def test_admin_authorization_and_qr_url_escaping(test_context) -> None:
     client, factory = test_context
     seed_staff(
         factory,
-        staff_code="TECH001",
         email="tech@example.com",
         password="tech-password",
         role="technician",
     )
     login = client.post(
         "/api/v1/auth/login",
-        json={"identifier": "TECH001", "password": "tech-password"},
+        json={"identifier": "tech@example.com", "password": "tech-password"},
     )
     headers = {"Authorization": f"Bearer {login.json()['access_token']}"}
     assert client.get("/api/v1/admin/locations").status_code == 401
@@ -258,3 +248,94 @@ def test_admin_authorization_and_qr_url_escaping(test_context) -> None:
     assert build_qr_url("a/b +?", "https://example.com/app/") == (
         "https://example.com/app/user?token=" + quote("a/b +?", safe="")
     )
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        (None, None),
+        ("", None),
+        ("   ", None),
+        ("1", "1"),
+        ("01", "1"),
+        (" 1 ", "1"),
+        ("ชั้น 1", "1"),
+        ("ชั้น1", "1"),
+        ("ชั้น   01", "1"),
+        ("Floor 2", "2"),
+        ("fl.2", "2"),
+        ("0", "0"),
+        ("b1", "B1"),
+        ("ชั้น B1", "B1"),
+        ("ชั้นใต้ดิน", "ใต้ดิน"),
+        ("๑", "1"),
+        ("Flat", "FLAT"),
+    ],
+)
+def test_normalize_floor(raw, expected) -> None:
+    assert normalize_floor(raw) == expected
+
+
+def test_normalize_floor_rejects_prefix_only() -> None:
+    with pytest.raises(ValueError):
+        normalize_floor("ชั้น")
+
+
+def test_equivalent_floors_are_duplicates(test_context) -> None:
+    client, factory = test_context
+    headers = admin_headers(client, factory)
+    first = create_location(client, headers, floor="ชั้น 01", area="ห้อง 101")
+    assert first["floor"] == "1"
+    assert first["label"] == "ชั้น 1 ห้อง 101"
+
+    duplicate = client.post(
+        "/api/v1/admin/locations", headers=headers, json={"floor": "1", "area": "ห้อง 101"}
+    )
+    assert duplicate.status_code == 409
+
+    create_location(client, headers, floor="2", area="ห้อง 201")
+    no_space_prefix = client.post(
+        "/api/v1/admin/locations", headers=headers, json={"floor": "ชั้น2", "area": "ห้อง 201"}
+    )
+    assert no_space_prefix.status_code == 409
+
+    second = create_location(client, headers, floor="3", area="ห้อง 101")
+    moved = client.patch(
+        f"/api/v1/admin/locations/{second['id']}", headers=headers, json={"floor": "ชั้น 1"}
+    )
+    assert moved.status_code == 409
+    assert (
+        client.post(
+            "/api/v1/admin/locations", headers=headers, json={"floor": "ชั้น", "area": "โถง"}
+        ).status_code
+        == 422
+    )
+    assert len(client.get("/api/v1/admin/locations", headers=headers).json()) == 3
+
+
+def test_database_rejects_duplicate_location_with_null_floor(test_context) -> None:
+    _, factory = test_context
+
+    async def insert_twice() -> None:
+        async with factory() as session:
+            session.add_all([Location(floor=None, area="โถง"), Location(floor=None, area="โถง")])
+            await session.commit()
+
+    with pytest.raises(IntegrityError):
+        asyncio.run(insert_twice())
+
+
+def test_concurrent_duplicate_returns_conflict(test_context, monkeypatch) -> None:
+    client, factory = test_context
+    headers = admin_headers(client, factory)
+    create_location(client, headers)
+
+    async def never_duplicate(*args, **kwargs) -> bool:
+        # จำลองคำขอที่สองซึ่ง SELECT ก่อนคำขอแรก commit จึงไม่เห็นแถวซ้ำ
+        return False
+
+    monkeypatch.setattr(admin_location, "_duplicate_exists", never_duplicate)
+    response = client.post(
+        "/api/v1/admin/locations", headers=headers, json={"floor": "1", "area": "ห้อง 101"}
+    )
+    assert response.status_code == 409

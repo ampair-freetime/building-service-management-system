@@ -17,7 +17,6 @@ def test_clerk_can_view_found_item_detail(test_context):
 
     seed_staff(
         session_factory,
-        staff_code="CLERK001",
         email="clerk@example.com",
         password="admin-password",
         role="clerk",
@@ -26,7 +25,7 @@ def test_clerk_can_view_found_item_detail(test_context):
     login = client.post(
         "/api/v1/auth/login",
         json={
-            "identifier": "CLERK001",
+            "identifier": "clerk@example.com",
             "password": "admin-password",
         },
     )
@@ -80,7 +79,6 @@ def test_administrative_can_approve_found_item(test_context):
 
     seed_staff(
         session_factory,
-        staff_code="CLERK001",
         email="clerk@example.com",
         password="admin-password",
         role="clerk",
@@ -89,7 +87,7 @@ def test_administrative_can_approve_found_item(test_context):
     login = client.post(
         "/api/v1/auth/login",
         json={
-            "identifier": "CLERK001",
+            "identifier": "clerk@example.com",
             "password": "admin-password",
         },
     )
@@ -141,7 +139,6 @@ def test_cannot_approve_already_approved_found_item(test_context):
 
     seed_staff(
         session_factory,
-        staff_code="CLERK001",
         email="clerk@example.com",
         password="admin-password",
         role="clerk",
@@ -150,7 +147,7 @@ def test_cannot_approve_already_approved_found_item(test_context):
     login = client.post(
         "/api/v1/auth/login",
         json={
-            "identifier": "CLERK001",
+            "identifier": "clerk@example.com",
             "password": "admin-password",
         },
     )
@@ -197,7 +194,6 @@ def test_cannot_approve_lost_item(test_context):
 
     seed_staff(
         session_factory,
-        staff_code="CLERK001",
         email="clerk@example.com",
         password="admin-password",
         role="clerk",
@@ -206,7 +202,7 @@ def test_cannot_approve_lost_item(test_context):
     login = client.post(
         "/api/v1/auth/login",
         json={
-            "identifier": "CLERK001",
+            "identifier": "clerk@example.com",
             "password": "admin-password",
         },
     )
@@ -253,7 +249,6 @@ def test_cannot_approve_nonexistent_found_item(test_context):
 
     seed_staff(
         session_factory,
-        staff_code="CLERK001",
         email="clerk@example.com",
         password="admin-password",
         role="clerk",
@@ -262,7 +257,7 @@ def test_cannot_approve_nonexistent_found_item(test_context):
     login = client.post(
         "/api/v1/auth/login",
         json={
-            "identifier": "CLERK001",
+            "identifier": "clerk@example.com",
             "password": "admin-password",
         },
     )
@@ -287,7 +282,6 @@ def test_administrative_can_reject_found_item(test_context):
 
     seed_staff(
         session_factory,
-        staff_code="CLERK001",
         email="clerk@example.com",
         password="admin-password",
         role="clerk",
@@ -296,7 +290,7 @@ def test_administrative_can_reject_found_item(test_context):
     login = client.post(
         "/api/v1/auth/login",
         json={
-            "identifier": "CLERK001",
+            "identifier": "clerk@example.com",
             "password": "admin-password",
         },
     )
@@ -356,7 +350,6 @@ def test_rejection_reason_is_required(test_context):
 
     seed_staff(
         session_factory,
-        staff_code="CLERK001",
         email="clerk@example.com",
         password="admin-password",
         role="clerk",
@@ -365,7 +358,7 @@ def test_rejection_reason_is_required(test_context):
     login = client.post(
         "/api/v1/auth/login",
         json={
-            "identifier": "CLERK001",
+            "identifier": "clerk@example.com",
             "password": "admin-password",
         },
     )
@@ -423,7 +416,6 @@ def test_rejected_found_item_is_removed_from_pending_list(test_context):
 
     seed_staff(
         session_factory,
-        staff_code="CLERK001",
         email="clerk@example.com",
         password="admin-password",
         role="clerk",
@@ -432,7 +424,7 @@ def test_rejected_found_item_is_removed_from_pending_list(test_context):
     login = client.post(
         "/api/v1/auth/login",
         json={
-            "identifier": "CLERK001",
+            "identifier": "clerk@example.com",
             "password": "admin-password",
         },
     )
@@ -497,7 +489,6 @@ def test_administrative_can_view_pending_lost_items(test_context):
 
     seed_staff(
         session_factory,
-        staff_code="CLERK001",
         email="clerk@example.com",
         password="admin-password",
         role="clerk",
@@ -506,7 +497,7 @@ def test_administrative_can_view_pending_lost_items(test_context):
     login = client.post(
         "/api/v1/auth/login",
         json={
-            "identifier": "CLERK001",
+            "identifier": "clerk@example.com",
             "password": "admin-password",
         },
     )
@@ -559,7 +550,6 @@ def test_administrative_can_view_lost_item_detail(test_context):
 
     seed_staff(
         session_factory,
-        staff_code="CLERK001",
         email="clerk@example.com",
         password="admin-password",
         role="clerk",
@@ -568,7 +558,7 @@ def test_administrative_can_view_lost_item_detail(test_context):
     login = client.post(
         "/api/v1/auth/login",
         json={
-            "identifier": "CLERK001",
+            "identifier": "clerk@example.com",
             "password": "admin-password",
         },
     )
@@ -626,7 +616,6 @@ def test_administrative_can_approve_lost_item(test_context):
 
     seed_staff(
         session_factory,
-        staff_code="CLERK001",
         email="clerk@example.com",
         password="admin-password",
         role="clerk",
@@ -635,7 +624,7 @@ def test_administrative_can_approve_lost_item(test_context):
     login = client.post(
         "/api/v1/auth/login",
         json={
-            "identifier": "CLERK001",
+            "identifier": "clerk@example.com",
             "password": "admin-password",
         },
     )
@@ -696,7 +685,6 @@ def test_approved_lost_item_is_removed_from_pending_list(test_context):
 
     seed_staff(
         session_factory,
-        staff_code="CLERK001",
         email="clerk@example.com",
         password="admin-password",
         role="clerk",
@@ -705,7 +693,7 @@ def test_approved_lost_item_is_removed_from_pending_list(test_context):
     login = client.post(
         "/api/v1/auth/login",
         json={
-            "identifier": "CLERK001",
+            "identifier": "clerk@example.com",
             "password": "admin-password",
         },
     )
@@ -767,7 +755,6 @@ def test_approved_lost_item_is_published(test_context):
 
     seed_staff(
         session_factory,
-        staff_code="CLERK001",
         email="clerk@example.com",
         password="admin-password",
         role="clerk",
@@ -776,7 +763,7 @@ def test_approved_lost_item_is_published(test_context):
     login = client.post(
         "/api/v1/auth/login",
         json={
-            "identifier": "CLERK001",
+            "identifier": "clerk@example.com",
             "password": "admin-password",
         },
     )
@@ -837,7 +824,6 @@ def test_clerk_can_view_ownership_request_detail(test_context):
 
     seed_staff(
         session_factory,
-        staff_code="CLERK001",
         email="clerk@example.com",
         password="admin-password",
         role="clerk",
@@ -846,7 +832,7 @@ def test_clerk_can_view_ownership_request_detail(test_context):
     login = client.post(
         "/api/v1/auth/login",
         json={
-            "identifier": "CLERK001",
+            "identifier": "clerk@example.com",
             "password": "admin-password",
         },
     )
@@ -915,7 +901,6 @@ def test_clerk_can_view_pending_ownership_requests(test_context):
 
     seed_staff(
         session_factory,
-        staff_code="CLERK001",
         email="clerk@example.com",
         password="admin-password",
         role="clerk",
@@ -924,7 +909,7 @@ def test_clerk_can_view_pending_ownership_requests(test_context):
     login = client.post(
         "/api/v1/auth/login",
         json={
-            "identifier": "CLERK001",
+            "identifier": "clerk@example.com",
             "password": "admin-password",
         },
     )
@@ -987,7 +972,6 @@ def test_clerk_can_approve_ownership_request(test_context):
 
     seed_staff(
         session_factory,
-        staff_code="CLERK001",
         email="clerk@example.com",
         password="admin-password",
         role="clerk",
@@ -996,7 +980,7 @@ def test_clerk_can_approve_ownership_request(test_context):
     login = client.post(
         "/api/v1/auth/login",
         json={
-            "identifier": "CLERK001",
+            "identifier": "clerk@example.com",
             "password": "admin-password",
         },
     )
@@ -1066,7 +1050,6 @@ def test_clerk_can_request_additional_ownership_information(test_context):
 
     seed_staff(
         session_factory,
-        staff_code="CLERK001",
         email="clerk@example.com",
         password="admin-password",
         role="clerk",
@@ -1075,7 +1058,7 @@ def test_clerk_can_request_additional_ownership_information(test_context):
     login = client.post(
         "/api/v1/auth/login",
         json={
-            "identifier": "CLERK001",
+            "identifier": "clerk@example.com",
             "password": "admin-password",
         },
     )
@@ -1149,7 +1132,6 @@ def test_clerk_can_update_return_status_to_ready_for_pickup(test_context):
 
     seed_staff(
         session_factory,
-        staff_code="CLERK001",
         email="clerk@example.com",
         password="admin-password",
         role="clerk",
@@ -1158,7 +1140,7 @@ def test_clerk_can_update_return_status_to_ready_for_pickup(test_context):
     login = client.post(
         "/api/v1/auth/login",
         json={
-            "identifier": "CLERK001",
+            "identifier": "clerk@example.com",
             "password": "admin-password",
         },
     )
@@ -1233,7 +1215,6 @@ def test_clerk_can_update_return_status_to_returned(test_context):
 
     seed_staff(
         session_factory,
-        staff_code="CLERK001",
         email="clerk@example.com",
         password="admin-password",
         role="clerk",
@@ -1242,7 +1223,7 @@ def test_clerk_can_update_return_status_to_returned(test_context):
     login = client.post(
         "/api/v1/auth/login",
         json={
-            "identifier": "CLERK001",
+            "identifier": "clerk@example.com",
             "password": "admin-password",
         },
     )
@@ -1318,7 +1299,6 @@ def test_invalid_return_status_returns_422(test_context):
 
     seed_staff(
         session_factory,
-        staff_code="CLERK001",
         email="clerk@example.com",
         password="admin-password",
         role="clerk",
@@ -1327,7 +1307,7 @@ def test_invalid_return_status_returns_422(test_context):
     login = client.post(
         "/api/v1/auth/login",
         json={
-            "identifier": "CLERK001",
+            "identifier": "clerk@example.com",
             "password": "admin-password",
         },
     )
@@ -1388,7 +1368,6 @@ def test_cannot_update_return_status_for_unapproved_claim(test_context):
 
     seed_staff(
         session_factory,
-        staff_code="CLERK001",
         email="clerk@example.com",
         password="admin-password",
         role="clerk",
@@ -1397,7 +1376,7 @@ def test_cannot_update_return_status_for_unapproved_claim(test_context):
     login = client.post(
         "/api/v1/auth/login",
         json={
-            "identifier": "CLERK001",
+            "identifier": "clerk@example.com",
             "password": "admin-password",
         },
     )
@@ -1459,7 +1438,6 @@ def test_return_status_history_is_saved(test_context):
 
     seed_staff(
         session_factory,
-        staff_code="CLERK001",
         email="clerk@example.com",
         password="admin-password",
         role="clerk",
@@ -1468,7 +1446,7 @@ def test_return_status_history_is_saved(test_context):
     login = client.post(
         "/api/v1/auth/login",
         json={
-            "identifier": "CLERK001",
+            "identifier": "clerk@example.com",
             "password": "admin-password",
         },
     )
@@ -1545,7 +1523,6 @@ def test_administrative_can_reject_lost_item(test_context):
 
     seed_staff(
         session_factory,
-        staff_code="CLERK001",
         email="clerk@example.com",
         password="admin-password",
         role="clerk",
@@ -1554,7 +1531,7 @@ def test_administrative_can_reject_lost_item(test_context):
     login = client.post(
         "/api/v1/auth/login",
         json={
-            "identifier": "CLERK001",
+            "identifier": "clerk@example.com",
             "password": "admin-password",
         },
     )
@@ -1614,7 +1591,6 @@ def test_lost_item_rejection_reason_is_required(test_context):
 
     seed_staff(
         session_factory,
-        staff_code="CLERK001",
         email="clerk@example.com",
         password="admin-password",
         role="clerk",
@@ -1623,7 +1599,7 @@ def test_lost_item_rejection_reason_is_required(test_context):
     login = client.post(
         "/api/v1/auth/login",
         json={
-            "identifier": "CLERK001",
+            "identifier": "clerk@example.com",
             "password": "admin-password",
         },
     )
@@ -1681,7 +1657,6 @@ def test_rejected_lost_item_is_not_published_and_removed_from_pending_list(test_
 
     seed_staff(
         session_factory,
-        staff_code="CLERK001",
         email="clerk@example.com",
         password="admin-password",
         role="clerk",
@@ -1690,7 +1665,7 @@ def test_rejected_lost_item_is_not_published_and_removed_from_pending_list(test_
     login = client.post(
         "/api/v1/auth/login",
         json={
-            "identifier": "CLERK001",
+            "identifier": "clerk@example.com",
             "password": "admin-password",
         },
     )
@@ -1766,7 +1741,6 @@ def test_clerk_can_schedule_pickup(test_context):
 
     seed_staff(
         session_factory,
-        staff_code="CLERK001",
         email="clerk@example.com",
         password="admin-password",
         role="clerk",
@@ -1775,7 +1749,7 @@ def test_clerk_can_schedule_pickup(test_context):
     login = client.post(
         "/api/v1/auth/login",
         json={
-            "identifier": "CLERK001",
+            "identifier": "clerk@example.com",
             "password": "admin-password",
         },
     )
@@ -1850,7 +1824,6 @@ def test_schedule_pickup_requires_datetime(test_context):
 
     seed_staff(
         session_factory,
-        staff_code="CLERK001",
         email="clerk@example.com",
         password="admin-password",
         role="clerk",
@@ -1859,7 +1832,7 @@ def test_schedule_pickup_requires_datetime(test_context):
     login = client.post(
         "/api/v1/auth/login",
         json={
-            "identifier": "CLERK001",
+            "identifier": "clerk@example.com",
             "password": "admin-password",
         },
     )
@@ -1927,7 +1900,6 @@ def test_view_scheduled_pickup_details(test_context):
 
     seed_staff(
         session_factory,
-        staff_code="CLERK001",
         email="clerk@example.com",
         password="admin-password",
         role="clerk",
@@ -1936,7 +1908,7 @@ def test_view_scheduled_pickup_details(test_context):
     login = client.post(
         "/api/v1/auth/login",
         json={
-            "identifier": "CLERK001",
+            "identifier": "clerk@example.com",
             "password": "admin-password",
         },
     )

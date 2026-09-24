@@ -8,7 +8,7 @@ from app.schemas.staff import StaffResponse
 class LoginRequest(BaseModel):
     """ข้อมูลที่ผู้ใช้ต้องส่งเพื่อล็อกอิน."""
 
-    # identifier รับได้ทั้งอีเมลและรหัสพนักงาน
+    # คงชื่อ identifier ไว้ให้ frontend เดิมใช้ได้ แต่ระบบรับเฉพาะอีเมล
     identifier: str = Field(min_length=1, max_length=320)
     password: str = Field(min_length=1, max_length=128)
 

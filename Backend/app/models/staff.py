@@ -19,14 +19,13 @@ if TYPE_CHECKING:
 
 
 class Staff(Base):
-    """บัญชี Technician, Housekeeper, Adminnistrative และ Admin."""
+    """บัญชี Technician, Housekeeper, Administrative และ Admin."""
 
     __tablename__ = "staff"
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
     email: Mapped[str] = mapped_column(String(255), unique=True, index=True)
     password_hash: Mapped[str] = mapped_column(String(255))
-    staff_code: Mapped[str] = mapped_column(String(30), unique=True, index=True)
     full_name: Mapped[str] = mapped_column(String(150))
     role: Mapped[StaffRole] = mapped_column(
         SqlEnum(

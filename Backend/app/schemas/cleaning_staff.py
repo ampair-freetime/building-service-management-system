@@ -9,7 +9,6 @@ from app.models.enums import RequestAction, RequestStatus
 
 class AssignedCleanerResponse(BaseModel):
     id: UUID
-    staff_code: str
     full_name: str
 
 
