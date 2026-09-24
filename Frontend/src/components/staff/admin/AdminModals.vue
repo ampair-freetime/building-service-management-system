@@ -131,7 +131,7 @@
   >
     <section class="modal-card">
       <header class="modal-head">
-        <h3 id="qrFormModalTitle">สร้าง QR ประจำห้อง</h3>
+        <h3 id="qrFormModalTitle">เพิ่มสถานที่ใหม่</h3>
         <button
           type="button"
           class="close"
@@ -143,42 +143,28 @@
       </header>
       <form id="qrForm">
         <div class="field">
-          <label for="building">อาคาร</label
-          ><input id="building" value="อาคารเรียนรวม CSB" required />
-        </div>
-        <div class="form-row">
-          <div class="field">
-            <label for="floor">ชั้น</label
-            ><input id="floor" value="3" required />
-          </div>
-          <div class="field">
-            <label for="room">ชื่อ/เลขห้อง</label
-            ><input id="room" value="CSB-307" required />
-          </div>
-        </div>
-        <div class="field">
-          <label for="service">หน้าปลายทาง</label
-          ><select id="service">
-            <option value="report">เลือกประเภทบริการภายหลัง</option>
-            <option value="repair">แจ้งซ่อม</option>
-            <option value="clean">แจ้งทำความสะอาด</option>
-          </select>
-        </div>
-        <div class="field">
-          <label for="qrToken">Token หรือลิงก์ QR ของสถานที่</label>
-          <input id="qrToken" required autocomplete="off" placeholder="วาง token หรือลิงก์ที่มี ?token=..." />
-          <small>ใช้ token ที่ระบบออกให้สถานที่จริง ไม่ใช่ชื่อห้องหรือรหัสที่ตั้งขึ้นเอง</small>
-        </div>
-        <div class="field">
-          <label for="baseUrl">URL หน้าแบบฟอร์ม (เว้นว่างเพื่อใช้เว็บนี้)</label
-          ><input
-            id="baseUrl"
-            type="url"
-            placeholder="https://example.com/user"
+          <label for="qrLocationFloor">ชั้น</label>
+          <input
+            id="qrLocationFloor"
+            required
+            maxlength="30"
+            autocomplete="off"
+            placeholder="เช่น 1, 2 หรือชั้นใต้ดิน"
           />
         </div>
-        <button class="primary" style="width: 100%">
-          สร้าง QR และเพิ่มห้อง
+        <div class="field">
+          <label for="qrLocationName">ชื่อสถานที่</label>
+          <input
+            id="qrLocationName"
+            required
+            maxlength="100"
+            autocomplete="off"
+            placeholder="เช่น ห้อง CSB-307 หรือโถงชั้น 1"
+          />
+          <small>ระบบจะสร้าง QR Code ของสถานที่นี้ให้อัตโนมัติ</small>
+        </div>
+        <button type="submit" class="primary" style="width: 100%">
+          เพิ่มสถานที่และสร้าง QR
         </button>
       </form>
     </section>
@@ -186,36 +172,36 @@
 
   <div
     class="modal"
-    id="bulkQrModal"
+    id="qrDetailModal"
     role="dialog"
     aria-modal="true"
-    aria-labelledby="bulkQrTitle"
+    aria-labelledby="qrDetailTitle"
   >
-    <section class="modal-card">
+    <section class="modal-card qr-detail-modal-card">
       <header class="modal-head">
-        <h3 id="bulkQrTitle">สร้าง QR หลายห้อง</h3>
+        <h3 id="qrDetailTitle">รายละเอียดสถานที่</h3>
         <button
           type="button"
           class="close"
-          data-close="bulkQrModal"
+          data-close="qrDetailModal"
           aria-label="ปิด"
         >
           <svg class="icon"><use href="#i-close" /></svg>
         </button>
       </header>
-      <form id="bulkQrForm">
-        <div class="field">
-          <label for="bulkRooms">เลขห้อง</label
-          ><textarea
-            id="bulkRooms"
-            required
-            placeholder="เช่น CSB-301, CSB-302, CSB-303"
-          ></textarea>
+      <div class="qr-detail-content">
+        <div class="qr-code" id="qrCode">
+          <div class="qr-fallback"></div>
         </div>
-        <button type="submit" class="primary" style="width: 100%">
-          สร้าง QR ทุกห้อง
+        <div>
+          <span class="eyebrow">ชื่อสถานที่</span>
+          <h3 id="qrRoomName">-</h3>
+          <p class="qr-detail-floor" id="qrRoomFloor"></p>
+        </div>
+        <button class="primary" id="downloadQr" type="button">
+          ดาวน์โหลด QR Code
         </button>
-      </form>
+      </div>
     </section>
   </div>
 </template>

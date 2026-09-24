@@ -1,6 +1,8 @@
-import { onMounted, ref } from "vue";
+import { onBeforeUnmount, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import { buildGuestQrUrl } from "../services/guestQrUrl.js";
+import { mockServiceLocations } from "../services/mockServiceLocations.js";
+import { enhanceFilterSelects } from "../services/filterSelectDropdown.js";
 import { createStaffDashboardData } from "./staff-dashboard/data.js";
 import { STAFF_ROLE_PAGES, canRoleOpenPage } from "../config/staff-role-pages.js";
 import {
@@ -63,6 +65,7 @@ export function useStaffDashboard() {
   const allowedRoles = ["housekeeper", "technician", "clerk", "admin"];
   const savedRole = localStorage.getItem("buildingCareRole");
   const activeRole = ref(allowedRoles.includes(savedRole) ? savedRole : "clerk");
+  let cleanupFilterSelects = () => {};
 
   async function initializeDashboard() {
     // โหลด dependency ภายนอกก่อนสร้างหน้าจอ หากโหลดไม่ได้จะใช้ QR fallback แทน
@@ -1881,29 +1884,36 @@ export function useStaffDashboard() {
             .map((s) => {
               const st = staffOverviewStats(s, from, to),
                 latest = st.latest;
-              return `<tr><td><div class="overview-staff-name"><div class="person-avatar">${s.name.slice(
-                0,
-                2
-              )}</div><div><strong>${s.name}</strong><br><small>${
-                s.id
-              }</small></div></div></td><td><span class="badge neutral">${
-                s.role
-              }</span></td><td><span class="overview-number">${
-                st.active
-              }</span></td><td><span class="overview-number">${
-                st.closed
-              }</span></td><td><span class="overview-number">${
-                st.returned
-              }</span></td><td>${
-                latest
-                  ? `<strong>${latest.action}</strong><br><small>${latest.itemId} · ${latest.date}</small>`
-                  : '<span class="custody">ยังไม่มีกิจกรรม</span>'
-              }</td><td><button class="small-btn" type="button" data-staff-overview="${escapeHtml(
-                s.name
-              )}">ดูรายละเอียด</button></td></tr>`;
+              return `<article class="staff-overview-card">
+                <header class="staff-overview-card-head">
+                  <div class="overview-staff-name">
+                    <div class="person-avatar">${escapeHtml(s.name.slice(0, 2))}</div>
+                    <div><strong>${escapeHtml(s.name)}</strong><small>${escapeHtml(s.id)}</small></div>
+                  </div>
+                  <span class="badge neutral">${escapeHtml(s.role)}</span>
+                </header>
+                <div class="staff-overview-card-stats">
+                  <div><span>กำลังรับผิดชอบ</span><strong>${st.active}</strong></div>
+                  <div><span>ปิดแล้ว</span><strong>${st.closed}</strong></div>
+                  <div><span>คืนเข้ากองกลาง</span><strong>${st.returned}</strong></div>
+                </div>
+                <footer class="staff-overview-card-foot">
+                  <div class="staff-latest-activity">
+                    <span>กิจกรรมล่าสุด</span>
+                    ${
+                      latest
+                        ? `<strong>${escapeHtml(latest.action)}</strong><small>${escapeHtml(latest.itemId)} · ${escapeHtml(latest.date)}</small>`
+                        : '<strong class="custody">ยังไม่มีกิจกรรม</strong>'
+                    }
+                  </div>
+                  <button class="small-btn" type="button" data-staff-overview="${escapeHtml(
+                    s.name
+                  )}">ดูรายละเอียด</button>
+                </footer>
+              </article>`;
             })
             .join("")
-        : '<tr><td colspan="7" class="history-empty">ไม่พบ Staff ที่ตรงกับตัวกรอง</td></tr>';
+        : '<div class="history-empty staff-overview-empty">ไม่พบ Staff ที่ตรงกับตัวกรอง</div>';
       if (
         selectedOverviewStaff &&
         !staffRows.some((s) => s.name === selectedOverviewStaff)
@@ -2164,32 +2174,65 @@ export function useStaffDashboard() {
         ธุรการ: "#2563eb",
         แอดมิน: "#6757d9",
       };
-      $("#staffTable").innerHTML = staffData
-        .map((s, i) => {
-          const stats = staffOverviewStats(s);
-          return `<tr><td><div class="person"><div class="person-avatar" style="background:${
+      const roleLabels = {
+        admin: "แอดมิน",
+        clerk: "ธุรการ",
+        housekeeper: "แม่บ้าน",
+        technician: "ช่าง",
+      };
+      const selectedRole = $("#staffRoleFilter")?.value || "all";
+      const query = ($("#staffAccountSearch")?.value || "").trim().toLowerCase();
+      const visibleStaff = staffData
+        .map((staff, index) => ({ staff, index }))
+        .filter(({ staff }) => {
+          const matchesRole =
+            selectedRole === "all" || staff.role === roleLabels[selectedRole];
+          const searchable = `${staff.name} ${staff.id} ${staff.role} ${staff.zone || ""}`.toLowerCase();
+          return matchesRole && searchable.includes(query);
+        });
+      $("#staffTable").innerHTML = visibleStaff.length
+        ? visibleStaff.map(({ staff: s, index: i }) => {
+          return `<article class="staff-account-card">
+            <header class="staff-account-card-head">
+              <div class="person"><div class="person-avatar" style="background:${
             roleColors[s.role]
           }18;color:${roleColors[s.role]}">${s.name.slice(
             0,
             2
-          )}</div><div><strong>${s.name}</strong><br><small>${
+          ) ? escapeHtml(s.name.slice(0, 2)) : "-"}</div><div><strong>${escapeHtml(s.name)}</strong><small>${
             s.status === "ใช้งาน" ? "staff@building.local" : "บัญชีระงับ"
-          }</small></div></div></td><td>${
-            s.id
-          }</td><td><span class="badge neutral">${s.role}</span></td><td>${
-            s.zone || "-"
-          }<br><small>ปัจจุบัน ${stats.active} · เสร็จ ${stats.closed} · คืน ${
-            stats.returned
-          }</small></td><td><span class="badge ${
+          }</small></div></div>
+              <span class="badge ${
             s.status === "ใช้งาน" ? "done" : "wait"
           }">${
             s.status
-          }</span></td><td><div class="row-actions"><button class="small-btn" type="button" data-staff-action="detail" data-staff-index="${i}">ดูรายละเอียด</button><button class="small-btn" type="button" data-staff-action="edit" data-staff-index="${i}">แก้ไข Staff</button><button class="small-btn" type="button" data-staff-action="toggle" data-staff-index="${i}">${
+          }</span>
+            </header>
+            <div class="staff-account-meta">
+              <div><span>Staff ID</span><strong>${escapeHtml(s.id)}</strong></div>
+              <div><span>Role</span><strong>${escapeHtml(s.role)}</strong></div>
+              <div><span>พื้นที่รับผิดชอบ</span><strong>${escapeHtml(s.zone || "-")}</strong></div>
+            </div>
+            <footer class="staff-account-actions"><button class="small-btn" type="button" data-staff-action="detail" data-staff-index="${i}">ดูรายละเอียด</button><button class="small-btn" type="button" data-staff-action="edit" data-staff-index="${i}">แก้ไข Staff</button><button class="small-btn" type="button" data-staff-action="toggle" data-staff-index="${i}">${
             s.status === "ใช้งาน" ? "ปิดบัญชี" : "เปิดใช้"
-          }</button><button class="small-btn delete" type="button" data-staff-action="remove" data-staff-index="${i}">ลบ</button></div></td></tr>`;
+          }</button><button class="small-btn delete" type="button" data-staff-action="remove" data-staff-index="${i}">ลบ</button></footer>
+          </article>`;
         })
-        .join("");
+        .join("")
+        : '<div class="history-empty staff-account-empty">ไม่พบบัญชี Staff ที่ตรงกับตัวกรอง</div>';
       $("#staffTotal").textContent = staffData.length;
+      $("#staffActiveTotal").textContent = `ใช้งาน ${
+        staffData.filter((staff) => staff.status === "ใช้งาน").length
+      } บัญชี`;
+      $("#housekeeperTotal").textContent = staffData.filter(
+        (staff) => staff.role === "แม่บ้าน"
+      ).length;
+      $("#technicianTotal").textContent = staffData.filter(
+        (staff) => staff.role === "ช่าง"
+      ).length;
+      $("#clerkTotal").textContent = staffData.filter(
+        (staff) => staff.role === "ธุรการ"
+      ).length;
     }
     function openEditStaff(index, trigger = document.activeElement) {
       const staff = staffData[index];
@@ -2254,54 +2297,203 @@ export function useStaffDashboard() {
     // 11) ระบบ QR ประจำห้อง
     // -------------------------------------------------------------------------
 
-    // ใช้ token ของสถานที่จริงเพื่อให้ฟอร์ม guest ระบุสถานที่จาก QR ได้
-    function makeRoomUrl() {
-      const base = $("#baseUrl").value.trim() ||
-        new URL(`${import.meta.env.BASE_URL}user`, window.location.origin).toString();
-      return buildGuestQrUrl(base, $("#qrToken").value, $("#service").value);
+    const qrLocationsStorageKey = "buildingCareQrLocations";
+    const deletedSampleQrLocationsStorageKey = "buildingCareDeletedSampleQrLocations";
+    let selectedQrLocation = null;
+    let qrLocations = [];
+    let deletedSampleQrLocationIds = new Set();
+    try {
+      const savedQrLocations = JSON.parse(
+        localStorage.getItem(qrLocationsStorageKey) || "[]"
+      );
+      qrLocations = Array.isArray(savedQrLocations) ? savedQrLocations : [];
+    } catch {
+      qrLocations = [];
     }
-    function generateQr(addToList = false) {
-      if (!$("#qrCode")) return false;
-      let url;
-      try {
-        url = makeRoomUrl();
-      } catch (error) {
-        toast(error.message || "ลิงก์ QR ใช้ไม่ได้");
-        return false;
+    try {
+      const deletedSampleIds = JSON.parse(
+        localStorage.getItem(deletedSampleQrLocationsStorageKey) || "[]"
+      );
+      deletedSampleQrLocationIds = new Set(
+        Array.isArray(deletedSampleIds) ? deletedSampleIds : []
+      );
+    } catch {
+      deletedSampleQrLocationIds = new Set();
+    }
+
+    function createQrToken() {
+      return window.crypto?.randomUUID?.() ||
+        `location-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+    }
+
+    function makeRoomUrl(token) {
+      const base = new URL(
+        `${import.meta.env.BASE_URL}user`,
+        window.location.origin
+      ).toString();
+      return buildGuestQrUrl(base, token);
+    }
+
+    const sampleQrLocations = mockServiceLocations.map((location, index) => {
+        const name = location.area;
+        const token = `sample-location-${index + 1}`;
+        return {
+          id: token,
+          name,
+          floor: location.floor,
+          token,
+          url: makeRoomUrl(token),
+          createdAt: new Date().toISOString(),
+          isSample: true,
+        };
+      });
+    const sampleQrLocationIds = new Set(
+      sampleQrLocations.map((location) => location.id)
+    );
+    qrLocations = [
+      ...qrLocations.filter(
+        (location) =>
+          !location.isSample && !sampleQrLocationIds.has(location.id)
+      ),
+      ...sampleQrLocations.filter(
+        (location) => !deletedSampleQrLocationIds.has(location.id)
+      ),
+    ];
+
+    function saveQrLocations() {
+      localStorage.setItem(qrLocationsStorageKey, JSON.stringify(qrLocations));
+      localStorage.setItem(
+        deletedSampleQrLocationsStorageKey,
+        JSON.stringify([...deletedSampleQrLocationIds])
+      );
+    }
+
+    function removeQrLocation(location) {
+      requestConfirmation(
+        "ยืนยันลบสถานที่",
+        `ต้องการลบ ${location.name} และ QR Code ของสถานที่นี้หรือไม่?`,
+        () => {
+          qrLocations = qrLocations.filter((item) => item.id !== location.id);
+          if (location.isSample) deletedSampleQrLocationIds.add(location.id);
+          if (selectedQrLocation?.id === location.id) selectedQrLocation = null;
+          saveQrLocations();
+          renderQrLocations();
+          addAudit(
+            "qr",
+            "ลบสถานที่",
+            `LOCATION-${location.id}`,
+            location.name,
+            `ลบสถานที่ชั้น ${location.floor || "ไม่ระบุ"} และ QR Code`
+          );
+          toast(`ลบสถานที่ ${location.name} แล้ว`);
+        },
+        "ลบสถานที่"
+      );
+    }
+
+    function renderQrFloorOptions() {
+      const select = $("#qrFloorFilter");
+      if (!select) return;
+      const selected = select.value || "all";
+      const floors = [...new Set(
+        qrLocations.map((location) => location.floor).filter(Boolean)
+      )].sort((a, b) =>
+        String(a).localeCompare(String(b), "th", { numeric: true })
+      );
+      select.innerHTML = [
+        '<option value="all">ทุกชั้น</option>',
+        ...floors.map(
+          (floor) =>
+            `<option value="${escapeHtml(floor)}">ชั้น ${escapeHtml(floor)}</option>`
+        ),
+      ].join("");
+      select.value = floors.includes(selected) ? selected : "all";
+    }
+
+    function renderQrLocations() {
+      const list = $("#roomList");
+      if (!list) return;
+      renderQrFloorOptions();
+      const selectedFloor = $("#qrFloorFilter")?.value || "all";
+      const query = ($("#qrLocationSearch")?.value || "").trim().toLowerCase();
+      const visibleLocations = qrLocations.filter((location) => {
+        const matchesFloor =
+          selectedFloor === "all" || location.floor === selectedFloor;
+        const searchable = `${location.name} ${location.floor || ""}`.toLowerCase();
+        return matchesFloor && searchable.includes(query);
+      });
+      const count = $("#qrLocationCount");
+      if (count) count.textContent = String(visibleLocations.length);
+      if (!visibleLocations.length) {
+        list.innerHTML = `
+          <div class="qr-location-empty">
+            <strong>${qrLocations.length ? "ไม่พบสถานที่" : "ยังไม่มีสถานที่"}</strong>
+            <span>${
+              qrLocations.length
+                ? "ลองเปลี่ยนชั้นหรือคำค้นหา"
+                : "กด “เพิ่มสถานที่ใหม่” เพื่อสร้าง QR Code รายการแรก"
+            }</span>
+          </div>`;
+        return;
       }
+      list.innerHTML = visibleLocations
+        .map(
+          (location) => `
+            <article class="qr-location-item">
+              <div class="qr-location-symbol" aria-hidden="true">QR</div>
+              <div class="qr-location-copy">
+                <strong>${escapeHtml(location.name)}</strong>
+                <small>${location.floor ? `ชั้น ${escapeHtml(location.floor)} · ` : ""}${
+                  location.isSample
+                    ? "สถานที่ตัวอย่าง"
+                    : `สร้างเมื่อ ${escapeHtml(
+                        new Date(location.createdAt).toLocaleString("th-TH", {
+                          dateStyle: "medium",
+                          timeStyle: "short",
+                        })
+                      )}`
+                }</small>
+              </div>
+              <div class="qr-location-actions">
+                <button
+                  class="secondary"
+                  type="button"
+                  data-view-qr-location="${escapeHtml(location.id)}"
+                >ดูรายละเอียด</button>
+                <button
+                  class="danger qr-location-delete"
+                  type="button"
+                  data-delete-qr-location="${escapeHtml(location.id)}"
+                  aria-label="ลบสถานที่ ${escapeHtml(location.name)}"
+                  title="ลบสถานที่"
+                ><svg class="icon" aria-hidden="true"><use href="#i-trash" /></svg></button>
+              </div>
+            </article>`
+        )
+        .join("");
+    }
+
+    function showQrLocation(location) {
+      if (!location || !$("#qrCode")) return false;
       if (!window.QRCode) {
         toast("ยังโหลดตัวสร้าง QR ไม่สำเร็จ กรุณาลองใหม่เมื่อเชื่อมต่ออินเทอร์เน็ต");
         return false;
       }
-      $("#qrRoomName").textContent = $("#room").value.trim();
-      $("#qrUrlText").textContent = url;
+      selectedQrLocation = location;
+      $("#qrRoomName").textContent = location.name;
+      $("#qrRoomFloor").textContent = location.floor
+        ? `ชั้น ${location.floor}`
+        : "ไม่ระบุชั้น";
       const box = $("#qrCode");
       box.innerHTML = "";
       new QRCode(box, {
-        text: url,
+        text: location.url,
         width: 168,
         height: 168,
         colorDark: "#17202b",
         colorLight: "#ffffff",
         correctLevel: QRCode.CorrectLevel.M,
       });
-      if (addToList) {
-        const item = document.createElement("div");
-        item.className = "room-item";
-        item.innerHTML = `<div class="mini-qr"></div><div><strong>${escapeHtml(
-          $("#room").value.trim()
-        )} · ${escapeHtml(
-          $("#building").value.trim()
-        )}</strong><small>ชั้น ${escapeHtml(
-          $("#floor").value.trim()
-        )} · ${escapeHtml(
-          $("#service").selectedOptions[0].text
-        )}</small></div><button class="small-btn" type="button" data-copy-room-url="${encodeURIComponent(
-          url
-        )}">คัดลอกลิงก์</button>`;
-        $("#roomList").prepend(item);
-        toast("สร้าง QR และเพิ่มห้องแล้ว");
-      }
       return true;
     }
 
@@ -2353,7 +2545,7 @@ export function useStaffDashboard() {
       );
     }
     function toggleSidebar() {
-      if (window.matchMedia("(min-width: 1024px)").matches) return;
+      if (window.matchMedia("(min-width: 981px)").matches) return;
       const open = !$("#sidebar").classList.contains("open");
       $("#sidebar").classList.toggle("open", open);
       $("#sidebarBackdrop").classList.toggle("open", open);
@@ -3276,6 +3468,7 @@ export function useStaffDashboard() {
       })
     );
     $("#menuToggle")?.addEventListener("click", toggleSidebar);
+    $(".sidebar-close")?.addEventListener("click", closeSidebar);
     $("#sidebarBackdrop")?.addEventListener("click", closeSidebar);
     function syncNavigationForViewport() {
       $("#sidebar").classList.remove("open");
@@ -3412,6 +3605,7 @@ export function useStaffDashboard() {
       $("#myHistoryFrom").value = "";
       $("#myHistoryTo").value = "";
       $("#myHistoryType").value = "all";
+      $("#myHistoryType").dispatchEvent(new Event("change", { bubbles: true }));
       $("#myHistorySearch").value = "";
       renderMyHistory();
     });
@@ -3421,6 +3615,7 @@ export function useStaffDashboard() {
     $("#overviewSearch")?.addEventListener("input", renderStaffOverview);
     $("#resetOverviewFilters")?.addEventListener("click", () => {
       $("#overviewRoleFilter").value = "all";
+      $("#overviewRoleFilter").dispatchEvent(new Event("change", { bubbles: true }));
       $("#overviewFrom").value = "";
       $("#overviewTo").value = "";
       $("#overviewSearch").value = "";
@@ -3817,6 +4012,14 @@ export function useStaffDashboard() {
     $("#staffOverviewTable")?.addEventListener("click", (event) => {
       const button = event.target.closest("[data-staff-overview]");
       if (button) showStaffOverview(button.dataset.staffOverview, button);
+    });
+    $("#staffRoleFilter")?.addEventListener("change", renderStaff);
+    $("#staffAccountSearch")?.addEventListener("input", renderStaff);
+    $("#resetStaffAccountFilters")?.addEventListener("click", () => {
+      $("#staffRoleFilter").value = "all";
+      $("#staffRoleFilter").dispatchEvent(new Event("change", { bubbles: true }));
+      $("#staffAccountSearch").value = "";
+      renderStaff();
     });
     $("#staffTable")?.addEventListener("click", (event) => {
       const button = event.target.closest("[data-staff-action]");
@@ -4335,77 +4538,75 @@ export function useStaffDashboard() {
     $("#openQrModal")?.addEventListener("click", (event) =>
       openModal("qrFormModal", event.currentTarget)
     );
+    $("#qrFloorFilter")?.addEventListener("change", renderQrLocations);
+    $("#qrLocationSearch")?.addEventListener("input", renderQrLocations);
+    $("#resetQrLocationFilters")?.addEventListener("click", () => {
+      $("#qrFloorFilter").value = "all";
+      $("#qrFloorFilter").dispatchEvent(new Event("change", { bubbles: true }));
+      $("#qrLocationSearch").value = "";
+      renderQrLocations();
+    });
     $("#qrForm")?.addEventListener("submit", (event) => {
       event.preventDefault();
       if (!event.currentTarget.checkValidity()) {
         event.currentTarget.reportValidity();
         return;
       }
-      if (!generateQr(true)) return;
+      const name = $("#qrLocationName").value.trim();
+      const floor = $("#qrLocationFloor").value.trim();
+      const token = createQrToken();
+      const location = {
+        id: token,
+        name,
+        floor,
+        token,
+        url: makeRoomUrl(token),
+        createdAt: new Date().toISOString(),
+      };
+      qrLocations.unshift(location);
+      saveQrLocations();
+      renderQrLocations();
       addAudit(
         "qr",
-        "สร้าง QR",
-        `ROOM-${$("#room").value.trim()}`,
-        $("#room").value.trim(),
-        `สร้าง QR สำหรับ ${$("#building").value.trim()} ชั้น ${$(
-          "#floor"
-        ).value.trim()}`
+        "เพิ่มสถานที่และสร้าง QR",
+        `LOCATION-${token}`,
+        name,
+        `สร้าง QR สำหรับชั้น ${floor} · ${name}`
       );
       closeModal("qrFormModal", false);
-      showSuccess("สร้าง QR และเพิ่มห้องแล้ว");
+      event.currentTarget.reset();
+      showSuccess(`เพิ่ม ${name} และสร้าง QR Code แล้ว`);
     });
     $("#downloadQr")?.addEventListener("click", () => {
       const canvas = $("#qrCode canvas"),
         img = $("#qrCode img");
       let href = canvas ? canvas.toDataURL("image/png") : img?.src;
-      if (!href) {
-        toast("ยังไม่มี QR จริงให้ดาวน์โหลด กรุณาสร้าง QR ก่อน");
+      if (!href || !selectedQrLocation) {
+        toast("กรุณาเลือกสถานที่ก่อนดาวน์โหลด QR Code");
         return;
       }
       const link = document.createElement("a");
       link.href = href;
-      link.download = `QR-${$("#room").value.trim()}.png`;
+      link.download = `QR-${selectedQrLocation.name.replace(/[^\p{L}\p{N}_-]+/gu, "-")}.png`;
       link.click();
-      toast("ดาวน์โหลด QR แล้ว");
+      toast("ดาวน์โหลด QR Code แล้ว");
     });
     $("#roomList")?.addEventListener("click", (event) => {
-      const button = event.target.closest("[data-copy-room-url]");
-      if (!button) return;
-      navigator.clipboard?.writeText(
-        decodeURIComponent(button.dataset.copyRoomUrl)
-      );
-      toast("คัดลอกลิงก์ห้องแล้ว");
-    });
-    $("#bulkQr")?.addEventListener("click", (event) =>
-      openModal("bulkQrModal", event.currentTarget)
-    );
-    $("#bulkQrForm")?.addEventListener("submit", (event) => {
-      event.preventDefault();
-      if (!event.currentTarget.checkValidity()) {
-        event.currentTarget.reportValidity();
+      const deleteButton = event.target.closest("[data-delete-qr-location]");
+      if (deleteButton) {
+        const location = qrLocations.find(
+          (item) => item.id === deleteButton.dataset.deleteQrLocation
+        );
+        if (location) removeQrLocation(location);
         return;
       }
-      const rooms = $("#bulkRooms")
-        .value.split(",")
-        .map((room) => room.trim())
-        .filter(Boolean);
-      rooms.forEach((room) => {
-        const item = document.createElement("div");
-        item.className = "room-item";
-        item.innerHTML = `<div class="mini-qr"></div><div><strong>${escapeHtml(
-          room
-        )}</strong><small>สร้างพร้อมกัน · ${escapeHtml(
-          $("#building").value
-        )}</small></div>`;
-        $("#roomList").prepend(item);
-      });
-      closeModal("bulkQrModal", false);
-      event.currentTarget.reset();
-      showSuccess(`สร้าง QR ${rooms.length} ห้องแล้ว`);
-    });
-    $("#printQr")?.addEventListener("click", () => {
-      toast("เปิดหน้าต่างพิมพ์ QR แล้ว");
-      window.print();
+      const button = event.target.closest("[data-view-qr-location]");
+      if (!button) return;
+      const location = qrLocations.find(
+        (item) => item.id === button.dataset.viewQrLocation
+      );
+      if (!showQrLocation(location)) return;
+      openModal("qrDetailModal", button);
     });
     $("#heroPrimary")?.addEventListener("click", () =>
       navigate(currentRole === "clerk" ? "clerk-center" : "jobs")
@@ -4429,15 +4630,17 @@ export function useStaffDashboard() {
     }
 
     await loadInitialDashboardData();
+    cleanupFilterSelects = enhanceFilterSelects();
 
-    // QR library และ DOM พร้อมใช้งานแล้ว จึงสร้าง preview และปิด loading mask
+    // DOM พร้อมใช้งานแล้ว จึงแสดงรายการสถานที่และปิด loading mask
     setTimeout(() => {
-      generateQr(false);
+      renderQrLocations();
       $(".loading-mask")?.remove();
     }, 320);
   }
 
   onMounted(initializeDashboard);
+  onBeforeUnmount(() => cleanupFilterSelects());
 
   return { activeRole };
 }

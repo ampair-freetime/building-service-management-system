@@ -39,22 +39,11 @@
               ล้างตัวกรอง
             </button>
           </div>
-          <div class="table-wrap">
-            <table class="data-table">
-              <thead>
-                <tr>
-                  <th>เจ้าหน้าที่</th>
-                  <th>Role</th>
-                  <th>กำลังรับผิดชอบ</th>
-                  <th>ปิดแล้ว</th>
-                  <th>คืนเข้ากองกลาง</th>
-                  <th>กิจกรรมล่าสุด</th>
-                  <th>รายละเอียด</th>
-                </tr>
-              </thead>
-              <tbody id="staffOverviewTable"></tbody>
-            </table>
-          </div>
+          <div
+            class="staff-overview-grid"
+            id="staffOverviewTable"
+            aria-live="polite"
+          ></div>
         </section>
         <Teleport to="body">
           <div

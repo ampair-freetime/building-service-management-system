@@ -9,7 +9,10 @@ const { activeRole } = useStaffDashboard();
 </script>
 
 <template>
-  <div class="staff-dashboard-page">
+  <div
+    class="staff-dashboard-page"
+    :class="{ 'is-admin': activeRole === 'admin' }"
+  >
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
     <svg
       aria-hidden="true"
@@ -51,6 +54,9 @@ const { activeRole } = useStaffDashboard();
       <symbol id="i-box" viewBox="0 0 24 24">
         <path d="m3 7 9-4 9 4-9 4-9-4ZM3 7l9 4 9-4v10l-9 4-9-4V7Zm9 4v10" />
       </symbol>
+      <symbol id="i-qr" viewBox="0 0 24 24">
+        <path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h2v2h-2zM18 14h2v6h-4v-2h-2" />
+      </symbol>
       <symbol id="i-close" viewBox="0 0 24 24">
         <path d="m6 6 12 12M18 6 6 18" />
       </symbol>
@@ -65,6 +71,9 @@ const { activeRole } = useStaffDashboard();
       </symbol>
       <symbol id="i-log-out" viewBox="0 0 24 24">
         <path d="M10 5H5v14h5M14 8l4 4-4 4M8 12h10" />
+      </symbol>
+      <symbol id="i-trash" viewBox="0 0 24 24">
+        <path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5" />
       </symbol>
       <symbol id="i-megaphone" viewBox="0 0 24 24">
         <path
@@ -85,8 +94,14 @@ const { activeRole } = useStaffDashboard();
           <div>
             <strong>CS Building Care</strong><span>Staff operations portal</span>
           </div>
+          <button
+            type="button"
+            class="sidebar-close"
+            aria-label="ปิดเมนู"
+          >
+            <svg class="icon" aria-hidden="true"><use href="#i-close" /></svg>
+          </button>
         </div>
-        <div class="nav-label">Operations</div>
         <nav class="nav-list" aria-label="เมนูเจ้าหน้าที่">
           <button
             v-if="activeRole !== 'admin'"
@@ -140,11 +155,12 @@ const { activeRole } = useStaffDashboard();
         </div>
       </aside>
       <button
-        class="icon-btn menu-toggle"
+        class="icon-btn menu-toggle sidebar-floating-toggle"
         id="menuToggle"
         type="button"
         aria-label="เปิดเมนู"
         aria-expanded="false"
+        aria-controls="sidebar"
       >
         <svg class="icon"><use href="#i-menu" /></svg>
       </button>
@@ -156,7 +172,6 @@ const { activeRole } = useStaffDashboard();
       ></button>
 
       <main>
-        <div class="pull-indicator">↓ ดึงลงเพื่อรีเฟรช</div>
         <header class="topbar">
           
           <div class="top-actions">
@@ -225,25 +240,45 @@ const { activeRole } = useStaffDashboard();
       </main>
     </div>
 
-    <nav class="bottom-nav" aria-label="เมนูด้านล่าง">
-      <button type="button" class="active" :data-mobile-page="activeRole === 'admin' ? 'staff-overview' : 'dashboard'">
-        <svg class="icon"><use href="#i-home" /></svg><span>{{ activeRole === 'admin' ? 'งาน Staff' : 'ภาพรวม' }}</span>
-      </button>
-      <button type="button" :data-mobile-page="activeRole === 'admin' ? 'history' : 'jobs'">
-        <svg class="icon"><use href="#i-list" /></svg><span>{{ activeRole === 'admin' ? 'ของหาย' : 'งาน' }}</span>
-      </button>
-      <button type="button" id="mobileNotification">
-        <svg class="icon"><use href="#i-bell" /></svg><span>แจ้งเตือน</span
-        ><span
-          class="notification-count"
-          id="mobileNotificationCount"
-          aria-live="polite"
-          hidden
-        ></span>
-      </button>
-      <button type="button" id="mobileProfile">
-        <svg class="icon"><use href="#i-user" /></svg><span>โปรไฟล์</span>
-      </button>
+    <nav
+      class="bottom-nav"
+      :class="{ 'admin-bottom-nav': activeRole === 'admin' }"
+      aria-label="เมนูด้านล่าง"
+    >
+      <template v-if="activeRole === 'admin'">
+        <button type="button" class="active" data-mobile-page="staff-overview">
+          <svg class="icon"><use href="#i-home" /></svg><span>ภาพรวม Staff</span>
+        </button>
+        <button type="button" data-mobile-page="history">
+          <svg class="icon"><use href="#i-box" /></svg><span>ของหาย-รับฝาก</span>
+        </button>
+        <button type="button" data-mobile-page="staff">
+          <svg class="icon"><use href="#i-user" /></svg><span>บัญชี Staff</span>
+        </button>
+        <button type="button" data-mobile-page="qr">
+          <svg class="icon"><use href="#i-qr" /></svg><span>QR ห้อง</span>
+        </button>
+      </template>
+      <template v-else>
+        <button type="button" class="active" data-mobile-page="dashboard">
+          <svg class="icon"><use href="#i-home" /></svg><span>ภาพรวม</span>
+        </button>
+        <button type="button" data-mobile-page="jobs">
+          <svg class="icon"><use href="#i-list" /></svg><span>งาน</span>
+        </button>
+        <button type="button" id="mobileNotification">
+          <svg class="icon"><use href="#i-bell" /></svg><span>แจ้งเตือน</span
+          ><span
+            class="notification-count"
+            id="mobileNotificationCount"
+            aria-live="polite"
+            hidden
+          ></span>
+        </button>
+        <button type="button" id="mobileProfile">
+          <svg class="icon"><use href="#i-user" /></svg><span>โปรไฟล์</span>
+        </button>
+      </template>
     </nav>
   </div>
 </template>

@@ -1,49 +1,41 @@
 <template>
-<section class="page" id="page-qr">
-          <div class="section-title">
-            <div>
-              <div class="eyebrow">Room identity system</div>
-              <h2>สร้าง QR ประจำห้อง</h2>
-              <p>
-                QR ใช้ token ของสถานที่จริงเพื่อเลือกชั้นและห้องในฟอร์มอัตโนมัติ
-              </p>
-            </div>
-          </div>
-          <section class="qr-launch">
-            <div>
-              <h3>จัดการ QR ประจำห้อง</h3>
-              <p class="compact-card-copy">
-                สร้าง QR ใหม่หรือจัดการรายการห้องโดยไม่แสดงฟอร์มยาวค้างในหน้า
-              </p>
-            </div>
-            <div class="row-actions">
-              <button class="primary" id="openQrModal" type="button">
-                สร้าง QR</button
-              ><button class="secondary" id="bulkQr" type="button">
-                สร้างหลายห้อง</button
-              ><button class="secondary" id="printQr" type="button">
-                พิมพ์ QR
-              </button>
-            </div>
-          </section>
-          <div class="qr-layout compact">
-            <section class="qr-preview">
-              <div class="qr-card">
-                <div>
-                  <div class="qr-code" id="qrCode">
-                    <div class="qr-fallback"></div>
-                  </div>
-                  <h3 id="qrRoomName">CSB-307</h3>
-                  <p id="qrUrlText">
-                    สร้าง QR เพื่อแสดงลิงก์
-                  </p>
-                  <button class="secondary" id="downloadQr" type="button">
-                    ดาวน์โหลด PNG
-                  </button>
-                </div>
-              </div>
-              <div class="room-list" id="roomList"></div>
-            </section>
-          </div>
-        </section>
+  <section class="page" id="page-qr">
+    <div class="section-title">
+      <div>
+        <div class="eyebrow">Location QR system</div>
+        <h2>QR Code สถานที่</h2>
+        <p>เพิ่มสถานที่และสร้าง QR Code สำหรับเปิดหน้าบริการของสถานที่นั้น</p>
+      </div>
+      <button class="primary" id="openQrModal" type="button">
+        + เพิ่มสถานที่ใหม่
+      </button>
+    </div>
+
+    <div class="qr-location-filters">
+      <select class="field-compact" id="qrFloorFilter" aria-label="กรองตามชั้น">
+        <option value="all">ทุกชั้น</option>
+      </select>
+      <input
+        class="field-compact search"
+        id="qrLocationSearch"
+        type="search"
+        placeholder="ค้นหาชื่อสถานที่หรือชั้น"
+        aria-label="ค้นหาสถานที่"
+      />
+      <button class="secondary" id="resetQrLocationFilters" type="button">
+        ล้างตัวกรอง
+      </button>
+    </div>
+
+    <section class="qr-location-panel">
+      <header class="qr-location-head">
+        <div>
+          <h3>สถานที่ทั้งหมด</h3>
+          <p>เลือกดูรายละเอียดของแต่ละสถานที่เพื่อเปิด QR Code</p>
+        </div>
+        <span class="qr-location-count" id="qrLocationCount">0</span>
+      </header>
+      <div class="room-list qr-location-list" id="roomList"></div>
+    </section>
+  </section>
 </template>
