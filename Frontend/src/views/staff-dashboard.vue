@@ -11,7 +11,12 @@ const { activeRole } = useStaffDashboard();
 <template>
   <div
     class="staff-dashboard-page"
-    :class="{ 'is-admin': activeRole === 'admin' }"
+    :class="{
+      'is-admin': activeRole === 'admin',
+      'is-technician': activeRole === 'technician',
+      'is-housekeeper': activeRole === 'housekeeper',
+      'is-clerk': activeRole === 'clerk',
+    }"
   >
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
     <svg
@@ -218,11 +223,26 @@ const { activeRole } = useStaffDashboard();
                   id="notificationPanel"
                   aria-label="รายการแจ้งเตือน"
                 >
-                  <div class="notification-head">
-                    <h3 id="notificationTitle">การแจ้งเตือนของแอดมิน</h3>
-                    <button id="markAllRead">อ่านทั้งหมดแล้ว</button>
+                  <div class="notification-dialog" role="dialog" aria-modal="true" aria-labelledby="notificationTitle">
+                    <div class="notification-head">
+                      <div class="notification-head-copy">
+                        <h3 id="notificationTitle">การแจ้งเตือนของแอดมิน</h3>
+                        <p>รายการอัปเดตล่าสุดของคุณ</p>
+                      </div>
+                      <div class="notification-head-actions">
+                        <button id="markAllRead">อ่านทั้งหมดแล้ว</button>
+                        <button
+                          class="notification-close"
+                          type="button"
+                          data-close-notifications
+                          aria-label="ปิดการแจ้งเตือน"
+                        >
+                          <svg class="icon" aria-hidden="true"><use href="#i-close" /></svg>
+                        </button>
+                      </div>
+                    </div>
+                    <div class="notification-list" id="notificationList"></div>
                   </div>
-                  <div class="notification-list" id="notificationList"></div>
                 </section>
               </Teleport>
             </div>
@@ -250,7 +270,10 @@ const { activeRole } = useStaffDashboard();
 
     <nav
       class="bottom-nav"
-      :class="{ 'admin-bottom-nav': activeRole === 'admin' }"
+      :class="{
+        'admin-bottom-nav': activeRole === 'admin',
+        'technician-bottom-nav': ['technician', 'housekeeper'].includes(activeRole),
+      }"
       aria-label="เมนูด้านล่าง"
     >
       <template v-if="activeRole === 'admin'">
@@ -265,6 +288,31 @@ const { activeRole } = useStaffDashboard();
         </button>
         <button type="button" data-mobile-page="qr">
           <svg class="icon"><use href="#i-qr" /></svg><span>QR ห้อง</span>
+        </button>
+      </template>
+      <template v-else-if="['technician', 'housekeeper'].includes(activeRole)">
+        <button type="button" class="active" data-mobile-page="dashboard">
+          <svg class="icon"><use href="#i-home" /></svg><span>ภาพรวม</span>
+        </button>
+        <button type="button" data-mobile-page="jobs">
+          <svg class="icon"><use href="#i-list" /></svg><span>งาน</span>
+        </button>
+        <button type="button" data-mobile-page="my-history">
+          <svg class="icon"><use href="#i-history" /></svg><span>ประวัติงาน</span>
+        </button>
+      </template>
+      <template v-else-if="activeRole === 'clerk'">
+        <button type="button" class="active" data-mobile-page="dashboard">
+          <svg class="icon"><use href="#i-home" /></svg><span>ภาพรวม</span>
+        </button>
+        <button type="button" data-mobile-page="clerk-center">
+          <svg class="icon"><use href="#i-list" /></svg><span>ศูนย์งาน</span>
+        </button>
+        <button type="button" data-mobile-page="lost">
+          <svg class="icon"><use href="#i-box" /></svg><span>ของหาย-รับฝาก</span>
+        </button>
+        <button type="button" data-mobile-page="my-history">
+          <svg class="icon"><use href="#i-history" /></svg><span>ประวัติงาน</span>
         </button>
       </template>
       <template v-else>

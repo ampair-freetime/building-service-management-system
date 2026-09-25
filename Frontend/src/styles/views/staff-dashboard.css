@@ -9,8 +9,8 @@
   --canvas: #f7f7fb;
   --repair: #ff8a45;
   --repair-soft: #fff2e8;
-  --clean: #48b86a;
-  --clean-soft: #ebf8ed;
+  --clean: #24613a;
+  --clean-soft: #e1f2e6;
   --lost: #edae20;
   --lost-soft: #fff7df;
   --info: #4285f4;
@@ -22,6 +22,61 @@
   --radius: 24px;
   --radius-sm: 18px;
   --font: "Sarabun", "Open Sans", system-ui, sans-serif;
+}
+
+/* Technician uses the same orange palette as the Guest repair request flow. */
+.staff-dashboard-page.is-technician {
+  --primary: #b45309;
+  --primary-2: #d97706;
+  --primary-soft: #ffedd5;
+  --role: #b45309;
+  --role-soft: #ffedd5;
+  --line: #f1dfd0;
+  min-height: 100vh;
+  background: linear-gradient(145deg, #ffe8d5 0%, #fff5ec 48%, #ffeddc 100%);
+}
+
+.staff-dashboard-page.is-technician .brand-mark,
+.staff-dashboard-page.is-technician :is(.primary, .primary-btn, .submit-btn) {
+  border-color: #b45309;
+  background: linear-gradient(135deg, #b45309, #c65d13);
+  box-shadow: 0 8px 20px rgba(180, 83, 9, 0.16);
+}
+
+.staff-dashboard-page.is-technician :is(input, select, textarea, button):focus-visible {
+  outline-color: rgba(180, 83, 9, 0.4);
+}
+
+.staff-dashboard-page.is-technician .eyebrow {
+  color: #b45309;
+}
+
+.staff-dashboard-page.is-technician #page-jobs .board-tabs {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.staff-dashboard-page.is-technician #page-jobs .board-tab {
+  border: 1px solid #edc6a5;
+  background: rgba(255, 255, 255, 0.82);
+  color: #9a4c0b;
+  box-shadow: 0 4px 12px rgba(180, 83, 9, 0.08);
+}
+
+.staff-dashboard-page.is-technician #page-jobs .board-tab:hover {
+  border-color: #d97706;
+  background: #ffedd5;
+  color: #92400e;
+}
+
+.staff-dashboard-page.is-technician #page-jobs .board-tab.active {
+  border: 1px solid #b45309;
+  background: linear-gradient(135deg, #9a4708 0%, #b45309 48%, #d97706 100%);
+  color: #fff;
+  box-shadow: 0 9px 20px rgba(180, 83, 9, 0.24);
+  font-weight: 900;
 }
 
 /* Filter option lists follow the Guest location dropdown and inherit each role color. */
@@ -2461,6 +2516,9 @@ textarea:focus-visible,
     backdrop-filter: blur(18px);
     box-shadow: 0 -8px 28px rgba(35, 28, 66, 0.08);
   }
+  .bottom-nav.technician-bottom-nav {
+    grid-template-columns: repeat(3, 1fr);
+  }
   .bottom-nav button {
     position: relative;
     border: 0;
@@ -4313,12 +4371,12 @@ body {
 }
 
 @media (max-width: 720px) {
-  .staff-dashboard-page.is-admin .app main,
-  .staff-dashboard-page.is-admin .app.sidebar-collapsed main {
+  .staff-dashboard-page:is(.is-admin, .is-technician, .is-housekeeper, .is-clerk) .app main,
+  .staff-dashboard-page:is(.is-admin, .is-technician, .is-housekeeper, .is-clerk) .app.sidebar-collapsed main {
     padding-top: 0;
   }
 
-  .staff-dashboard-page.is-admin .topbar {
+  .staff-dashboard-page:is(.is-admin, .is-technician, .is-housekeeper, .is-clerk) .topbar {
     position: sticky;
     top: 0;
     z-index: 30;
@@ -4339,7 +4397,7 @@ body {
     -webkit-backdrop-filter: none;
   }
 
-  .staff-dashboard-page.is-admin .top-actions {
+  .staff-dashboard-page:is(.is-admin, .is-technician, .is-housekeeper, .is-clerk) .top-actions {
     display: flex;
     align-items: center;
     width: auto;
@@ -4348,12 +4406,12 @@ body {
     gap: 8px;
   }
 
-  .staff-dashboard-page.is-admin .top-actions .notification-wrap {
+  .staff-dashboard-page:is(.is-admin, .is-technician, .is-housekeeper, .is-clerk) .top-actions .notification-wrap {
     display: block;
   }
 
-  .staff-dashboard-page.is-admin .top-actions #notificationButton,
-  .staff-dashboard-page.is-admin .top-actions .header-profile {
+  .staff-dashboard-page:is(.is-admin, .is-technician, .is-housekeeper, .is-clerk) .top-actions #notificationButton,
+  .staff-dashboard-page:is(.is-admin, .is-technician, .is-housekeeper, .is-clerk) .top-actions .header-profile {
     display: grid !important;
     place-items: center;
     width: 46px;
@@ -4364,32 +4422,32 @@ body {
     padding: 0;
   }
 
-  .staff-dashboard-page.is-admin .header-profile > span:first-child {
+  .staff-dashboard-page:is(.is-admin, .is-technician, .is-housekeeper, .is-clerk) .header-profile > span:first-child {
     display: grid !important;
     width: 38px;
     height: 38px;
     margin: 0;
   }
 
-  .staff-dashboard-page.is-admin .header-profile > span:last-child {
+  .staff-dashboard-page:is(.is-admin, .is-technician, .is-housekeeper, .is-clerk) .header-profile > span:last-child {
     display: none !important;
   }
 
-  .staff-dashboard-page.is-admin .menu-toggle,
-  .staff-dashboard-page.is-admin .sidebar,
-  .staff-dashboard-page.is-admin .sidebar-backdrop {
+  .staff-dashboard-page:is(.is-admin, .is-technician, .is-housekeeper, .is-clerk) .menu-toggle,
+  .staff-dashboard-page:is(.is-admin, .is-technician, .is-housekeeper, .is-clerk) .sidebar,
+  .staff-dashboard-page:is(.is-admin, .is-technician, .is-housekeeper, .is-clerk) .sidebar-backdrop {
     display: none !important;
   }
 }
 
 @media (min-width: 721px) {
-  .staff-dashboard-page.is-admin .top-actions {
+  .staff-dashboard-page:is(.is-admin, .is-technician, .is-housekeeper, .is-clerk) .top-actions {
     margin-left: auto;
     margin-right: 0;
     padding-left: 0;
   }
 
-  .staff-dashboard-page.is-admin .header-profile {
+  .staff-dashboard-page:is(.is-admin, .is-technician, .is-housekeeper, .is-clerk) .header-profile {
     display: flex !important;
     width: auto;
     min-width: 150px;
@@ -4397,7 +4455,7 @@ body {
     padding: 5px 14px 5px 5px;
   }
 
-  .staff-dashboard-page.is-admin .header-profile > span:first-child {
+  .staff-dashboard-page:is(.is-admin, .is-technician, .is-housekeeper, .is-clerk) .header-profile > span:first-child {
     display: grid !important;
     flex: 0 0 38px;
     width: 38px;
@@ -4405,7 +4463,7 @@ body {
     margin: 0;
   }
 
-  .staff-dashboard-page.is-admin .header-profile > span:last-child {
+  .staff-dashboard-page:is(.is-admin, .is-technician, .is-housekeeper, .is-clerk) .header-profile > span:last-child {
     display: block !important;
     min-width: 0;
   }
@@ -4638,6 +4696,31 @@ body {
   }
 }
 
+/* Stack every personal-history filter as a full-width row on phones. */
+@media (max-width: 720px) {
+  .staff-dashboard-page #page-my-history .history-filter-panel {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+    width: 100%;
+  }
+
+  .staff-dashboard-page #page-my-history .history-filter-panel > * {
+    grid-column: 1 / -1;
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+    margin: 0;
+  }
+
+  .staff-dashboard-page #page-my-history .history-filter-panel .search,
+  .staff-dashboard-page #page-my-history .filter-select-trigger,
+  .staff-dashboard-page #page-my-history #resetMyHistoryFilters {
+    width: 100%;
+    min-width: 0;
+  }
+}
+
 /* Responsive staff workload cards replace the dense seven-column table. */
 .staff-dashboard-page .staff-overview-grid {
   display: grid;
@@ -4803,6 +4886,461 @@ body {
 
   .staff-dashboard-page .staff-overview-card-foot button {
     width: 100%;
+  }
+}
+
+/* Housekeeper mirrors the technician experience with the Guest cleaning palette. */
+.staff-dashboard-page.is-housekeeper {
+  --primary: #24613a;
+  --primary-2: #367a4d;
+  --primary-soft: #e1f2e6;
+  --role: #24613a;
+  --role-soft: #e1f2e6;
+  --line: #d2e7d8;
+  min-height: 100vh;
+  background: linear-gradient(145deg, #dff4e4 0%, #f3fbf5 48%, #e4f6e8 100%);
+}
+
+.staff-dashboard-page.is-housekeeper .eyebrow { color: #24613a; }
+.staff-dashboard-page.is-housekeeper .ready-pill {
+  background: #e1f2e6;
+  color: #24613a;
+}
+.staff-dashboard-page.is-housekeeper .ready-pill::before {
+  background: #367a4d;
+}
+.staff-dashboard-page.is-housekeeper .hero-main {
+  background: linear-gradient(135deg, #fff 0%, #f1faf4 58%, #e1f2e6 100%);
+}
+.staff-dashboard-page.is-housekeeper .hero-main::after {
+  background: radial-gradient(circle, rgba(54, 122, 77, 0.2), transparent 66%);
+}
+.staff-dashboard-page.is-housekeeper .shift-card {
+  border-color: #b9dac3;
+  background: linear-gradient(135deg, #e1f2e6, #f4fbf6 58%, #fff);
+}
+.staff-dashboard-page.is-housekeeper .queue-explainer {
+  border-color: #b9dac3;
+  background: #fff;
+}
+.staff-dashboard-page.is-housekeeper .sidebar .brand-mark,
+.staff-dashboard-page.is-housekeeper :is(.primary, .primary-btn, .submit-btn) {
+  border-color: #24613a;
+  background: linear-gradient(135deg, #24613a, #367a4d);
+  box-shadow: 0 8px 20px rgba(36, 97, 58, 0.16);
+}
+.staff-dashboard-page.is-housekeeper :is(input, select, textarea, button):focus-visible {
+  outline-color: rgba(36, 97, 58, 0.4);
+}
+.staff-dashboard-page.is-housekeeper #page-jobs .board-tabs {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+.staff-dashboard-page.is-housekeeper #page-jobs .board-tab {
+  border: 1px solid #b9dac3;
+  background: rgba(255, 255, 255, 0.82);
+  color: #24613a;
+  box-shadow: 0 4px 12px rgba(36, 97, 58, 0.08);
+}
+.staff-dashboard-page.is-housekeeper #page-jobs .board-tab:hover {
+  border-color: #367a4d;
+  background: #e1f2e6;
+  color: #1f5132;
+}
+.staff-dashboard-page.is-housekeeper #page-jobs .board-tab.active,
+.staff-dashboard-page.is-housekeeper .tab.active {
+  border-color: #24613a;
+  background: linear-gradient(135deg, #1f5132, #24613a 52%, #367a4d);
+  color: #fff;
+  box-shadow: 0 9px 20px rgba(36, 97, 58, 0.22);
+}
+.staff-dashboard-page.is-housekeeper #page-jobs .job-card {
+  border-color: #b9dac3;
+  box-shadow: 0 7px 22px rgba(36, 97, 58, 0.08);
+}
+.staff-dashboard-page.is-housekeeper #page-jobs .job-card.owned {
+  border-color: #367a4d;
+  box-shadow: 0 10px 28px rgba(36, 97, 58, 0.14);
+}
+.staff-dashboard-page.is-housekeeper :is(.notification-item.unread, .skeleton) {
+  background: #f1faf4;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .staff-dashboard-page.is-housekeeper #page-jobs .job-card:hover {
+    border-color: #367a4d;
+    box-shadow: 0 15px 38px rgba(36, 97, 58, 0.15);
+  }
+}
+
+.notification-panel.housekeeper-notifications .notification-dialog {
+  border-color: #b9dac3;
+  box-shadow: 0 30px 90px rgba(20, 65, 35, 0.28);
+}
+.housekeeper-notifications .notification-head { border-bottom-color: #d2e7d8; }
+.housekeeper-notifications .notification-head button {
+  border-color: #b9dac3;
+  color: #24613a;
+}
+.housekeeper-notifications .notification-group-label,
+.housekeeper-notifications .notification-open-action { color: #24613a; }
+.housekeeper-notifications .notification-item { border-color: #d2e7d8; }
+.housekeeper-notifications .notification-item.unread { border-color: #88bd98; }
+.housekeeper-notifications .notification-symbol,
+.housekeeper-notifications .notification-kind {
+  background: #e1f2e6;
+  color: #24613a;
+}
+.housekeeper-notifications .notification-actions { border-top-color: #e1eee5; }
+
+/* Clerk uses the same gold palette as the Guest lost-and-found flow. */
+.staff-dashboard-page.is-clerk {
+  --primary: #9a6508;
+  --primary-2: #c28a2a;
+  --primary-soft: #fff7dd;
+  --role: #9a6508;
+  --role-soft: #fff7dd;
+  --line: #eadfbd;
+  --lost: #d7a12c;
+  --lost-soft: #fffaf0;
+  min-height: 100vh;
+  background: linear-gradient(145deg, #fffaf0 0%, #fffefa 48%, #fffdf5 100%);
+}
+
+.staff-dashboard-page.is-clerk .eyebrow { color: #80550b; }
+.staff-dashboard-page.is-clerk .hero-main {
+  background: linear-gradient(135deg, #fff 0%, #fffaf0 58%, #fff7dd 100%);
+}
+.staff-dashboard-page.is-clerk .hero-main::after {
+  background: radial-gradient(circle, rgba(194, 138, 42, 0.2), transparent 66%);
+}
+.staff-dashboard-page.is-clerk .shift-card {
+  border-color: #eadfbd;
+  background: linear-gradient(135deg, #fff7dd, #fffaf0 58%, #fff);
+}
+.staff-dashboard-page.is-clerk .queue-explainer { border-color: #eadfbd; background: #fff; }
+.staff-dashboard-page.is-clerk .sidebar .brand-mark,
+.staff-dashboard-page.is-clerk :is(.primary, .primary-btn, .submit-btn) {
+  border-color: #9a6508;
+  background: linear-gradient(135deg, #9a6508, #c28a2a);
+  box-shadow: 0 8px 20px rgba(154, 101, 8, 0.16);
+}
+.staff-dashboard-page.is-clerk :is(input, select, textarea, button):focus-visible {
+  outline-color: rgba(154, 101, 8, 0.38);
+}
+.staff-dashboard-page.is-clerk .ready-pill {
+  background: #fff7dd;
+  color: #9a6508;
+}
+.staff-dashboard-page.is-clerk .ready-pill::before { background: #c28a2a; }
+.staff-dashboard-page.is-clerk .tab:hover {
+  border-color: #c28a2a;
+  background: #fff7dd;
+  color: #80550b;
+}
+.staff-dashboard-page.is-clerk .tab.active {
+  border-color: #9a6508;
+  background: linear-gradient(135deg, #80550b, #9a6508 52%, #c28a2a);
+  color: #fff;
+  box-shadow: 0 9px 20px rgba(154, 101, 8, 0.2);
+}
+.staff-dashboard-page.is-clerk :is(.clerk-center-box, .clerk-request-card, .lost-card) {
+  border-color: #eadfbd;
+}
+.staff-dashboard-page.is-clerk :is(.notification-item.unread, .skeleton) {
+  background: #fffaf0;
+}
+
+.notification-panel.clerk-notifications { background: rgba(48, 37, 17, 0.46); }
+.notification-panel.clerk-notifications .notification-dialog {
+  border-color: #eadfbd;
+  box-shadow: 0 30px 90px rgba(70, 48, 8, 0.28);
+}
+.clerk-notifications .notification-head { border-bottom-color: #eadfbd; }
+.clerk-notifications .notification-head button {
+  border-color: #eadfbd;
+  color: #9a6508;
+}
+.clerk-notifications .notification-group-label { color: #9a6508; }
+.clerk-notifications .notification-item { border-color: #eadfbd; }
+.clerk-notifications .notification-item.unread {
+  border-color: #d7a12c;
+  background: #fff;
+}
+.clerk-notifications .notification-symbol {
+  background: #fff7dd;
+  color: #9a6508;
+}
+
+@media (max-width: 720px) {
+  .staff-dashboard-page.is-clerk {
+    background: linear-gradient(180deg, #fff7dd 0%, #fffaf0 220px, #fffdf7 100%);
+  }
+}
+
+@media (max-width: 720px) {
+  .staff-dashboard-page.is-housekeeper {
+    background: linear-gradient(180deg, #dff4e4 0%, #f3fbf5 220px, #f9fdfa 100%);
+  }
+}
+
+/* Remove the remaining violet surfaces from the technician workspace. */
+.staff-dashboard-page.is-technician .hero-main {
+  background: linear-gradient(135deg, #fff 0%, #fff4e9 58%, #ffead7 100%);
+}
+
+.staff-dashboard-page.is-technician .hero-main::after {
+  background: radial-gradient(circle, rgba(217, 119, 6, 0.2), transparent 66%);
+}
+
+.staff-dashboard-page.is-technician .shift-card {
+  border-color: #f1d2b8;
+  background: linear-gradient(135deg, #ffead7 0%, #fff7ef 58%, #fff 100%);
+}
+
+.staff-dashboard-page.is-technician .queue-explainer {
+  border-color: #f1d2b8;
+  background: #fff;
+}
+
+.staff-dashboard-page.is-technician :is(.notification-item.unread, .skeleton) {
+  background: #fff1e4;
+}
+
+.staff-dashboard-page.is-technician .tab:hover {
+  border-color: #d97706;
+  background: #ffedd5;
+  color: #92400e;
+}
+
+.staff-dashboard-page.is-technician .tab.active {
+  border-color: #b45309;
+  background: linear-gradient(135deg, #9a4708, #b45309 52%, #d97706);
+  color: #fff;
+  box-shadow: 0 9px 20px rgba(180, 83, 9, 0.24);
+}
+
+.staff-dashboard-page.is-technician .sidebar .brand-mark {
+  background: linear-gradient(145deg, #b45309, #d97706);
+}
+
+.staff-dashboard-page.is-technician #page-jobs .job-card {
+  border-color: #f1d2b8;
+  box-shadow: 0 7px 22px rgba(180, 83, 9, 0.08);
+}
+
+.staff-dashboard-page.is-technician #page-jobs .job-card.owned {
+  border-color: #d97706;
+  box-shadow: 0 10px 28px rgba(180, 83, 9, 0.14);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .staff-dashboard-page.is-technician #page-jobs .job-card:hover {
+    border-color: #d97706;
+    box-shadow: 0 15px 38px rgba(180, 83, 9, 0.15);
+  }
+}
+
+@media (max-width: 720px) {
+  .staff-dashboard-page.is-technician {
+    background: linear-gradient(180deg, #ffe8d5 0%, #fff5ec 220px, #fffaf6 100%);
+  }
+}
+
+/* Clear, card-based notification window for maintenance staff. */
+.notification-panel.technician-notifications {
+  position: fixed;
+  inset: 0;
+  width: auto;
+  max-height: none;
+  padding: 24px;
+  overflow: auto;
+  border: 0;
+  border-radius: 0;
+  background: rgba(35, 25, 18, 0.48);
+  box-shadow: none;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+.notification-panel.technician-notifications.open {
+  display: grid;
+  align-items: start;
+  justify-items: center;
+  padding-top: clamp(36px, 8vh, 76px);
+}
+
+.technician-notifications .notification-dialog {
+  width: min(520px, 100%);
+  max-height: min(720px, calc(100vh - 48px));
+  overflow: hidden;
+  border: 1px solid #f1d2b8;
+  border-radius: 28px;
+  background: #fff;
+  box-shadow: 0 30px 90px rgba(35, 20, 10, 0.3);
+}
+
+.technician-notifications .notification-head {
+  padding: 20px;
+  border-bottom-color: #f1d2b8;
+  border-radius: 24px 24px 0 0;
+  background: #fff;
+}
+
+.technician-notifications .notification-head-copy p {
+  margin: 3px 0 0;
+  color: #8a6a54;
+  font-size: 11px;
+}
+
+.technician-notifications .notification-head button {
+  min-height: 36px;
+  padding: 0 11px;
+  border: 1px solid #edc6a5;
+  border-radius: 11px;
+  background: #fff;
+  color: #b45309;
+}
+
+.technician-notifications .notification-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.technician-notifications .notification-head .notification-close {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  min-width: 36px;
+  padding: 0;
+  border-color: #f1dfd0;
+  color: #6f625a;
+}
+
+.technician-notifications .notification-close .icon {
+  width: 18px;
+  height: 18px;
+}
+
+.technician-notifications .notification-list {
+  display: grid;
+  gap: 9px;
+  max-height: min(540px, 70vh);
+  padding: 8px 12px 14px;
+  overflow-y: auto;
+  border-radius: 0 0 24px 24px;
+}
+
+.technician-notifications .notification-group-label {
+  margin: 8px 4px 0;
+  color: #9a4c0b;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+}
+
+.technician-notifications .notification-item {
+  grid-template-columns: 44px minmax(0, 1fr);
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid #f1dfd0;
+  border-radius: 17px;
+  background: #fff;
+  box-shadow: 0 5px 16px rgba(180, 83, 9, 0.06);
+}
+
+.technician-notifications .notification-item.unread {
+  border-color: #e7ad7b;
+  background: #fff;
+}
+
+.technician-notifications .notification-symbol {
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  background: #ffedd5;
+  color: #b45309;
+}
+
+.technician-notifications .notification-item-content {
+  min-width: 0;
+}
+
+.technician-notifications .notification-item-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 5px;
+}
+
+.technician-notifications .notification-kind {
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: #ffedd5;
+  color: #9a4708;
+  font-size: 9px;
+  font-weight: 850;
+}
+
+.technician-notifications .notification-item-heading time {
+  color: #8a817a;
+  font-size: 9px;
+  white-space: nowrap;
+}
+
+.technician-notifications .notification-item strong {
+  color: #2c211a;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.technician-notifications .notification-item p {
+  margin: 4px 0 0;
+  color: #76675e;
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.technician-notifications .notification-actions {
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 10px;
+  padding-top: 9px;
+  border-top: 1px solid #f3e5d9;
+}
+
+.technician-notifications .notification-open-action,
+.technician-notifications .notification-hide-action {
+  color: #b45309;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.technician-notifications .notification-hide-action {
+  color: #8a817a;
+}
+
+@media (max-width: 480px) {
+  .notification-panel.technician-notifications {
+    inset: 0;
+    width: auto;
+    padding: 28px 14px 14px;
+  }
+
+  .technician-notifications .notification-dialog {
+    max-height: calc(100vh - 28px);
+    border-radius: 22px;
+  }
+
+  .technician-notifications .notification-head {
+    padding: 16px;
+  }
+
+  .technician-notifications .notification-item {
+    padding: 12px;
   }
 }
 
@@ -5340,3 +5878,24 @@ body {
   margin: 6px 0 14px;
   color: var(--muted);
 }
+
+/* Keep housekeeper notification accents green after the shared modal rules. */
+.notification-panel.housekeeper-notifications .notification-dialog {
+  border-color: #b9dac3;
+  box-shadow: 0 30px 90px rgba(20, 65, 35, 0.28);
+}
+.housekeeper-notifications .notification-head { border-bottom-color: #d2e7d8; }
+.housekeeper-notifications .notification-head button {
+  border-color: #b9dac3;
+  color: #24613a;
+}
+.housekeeper-notifications .notification-group-label,
+.housekeeper-notifications .notification-open-action { color: #24613a; }
+.housekeeper-notifications .notification-item { border-color: #d2e7d8; }
+.housekeeper-notifications .notification-item.unread { border-color: #88bd98; }
+.housekeeper-notifications .notification-symbol,
+.housekeeper-notifications .notification-kind {
+  background: #e1f2e6;
+  color: #24613a;
+}
+.housekeeper-notifications .notification-actions { border-top-color: #e1eee5; }

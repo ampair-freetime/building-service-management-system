@@ -71,6 +71,7 @@ export function useStaffDashboard() {
   const savedRole = localStorage.getItem("buildingCareRole");
   const activeRole = ref(allowedRoles.includes(savedRole) ? savedRole : "clerk");
   let cleanupFilterSelects = () => {};
+  let cleanupDashboardEvents = () => {};
 
   async function initializeDashboard() {
     // โหลด dependency ภายนอกก่อนสร้างหน้าจอ หากโหลดไม่ได้จะใช้ QR fallback แทน
@@ -2066,6 +2067,18 @@ export function useStaffDashboard() {
     // รวม notification ของ role ปัจจุบันและคำร้องใหม่ก่อน render
     function renderNotifications() {
       const list = notificationSets[currentRole] || [];
+      $("#notificationPanel")?.classList.toggle(
+        "technician-notifications",
+        ["technician", "housekeeper", "clerk"].includes(currentRole)
+      );
+      $("#notificationPanel")?.classList.toggle(
+        "housekeeper-notifications",
+        currentRole === "housekeeper"
+      );
+      $("#notificationPanel")?.classList.toggle(
+        "clerk-notifications",
+        currentRole === "clerk"
+      );
       const approvals = currentRole === "clerk" ? pendingApprovalRequests() : [];
       const claims = currentRole === "clerk" ? activeClaimNotifications() : [];
       const unread = list.filter((n) => n.unread).length + approvals.length + claims.filter((n) => n.unread).length;
@@ -2095,15 +2108,25 @@ export function useStaffDashboard() {
                     n.unread ? "unread" : ""
                   }" data-notification-id="${
                     n.id
-                  }"><div class="notification-symbol"><svg class="icon"><use href="#i-bell"/></svg></div><div><strong>${escapeHtml(
+                  }"><div class="notification-symbol"><svg class="icon"><use href="${
+                    currentRole === "technician"
+                      ? "#i-tools"
+                      : currentRole === "housekeeper"
+                        ? "#i-broom"
+                        : "#i-bell"
+                  }"/></svg></div><div class="notification-item-content"><div class="notification-item-heading"><span class="notification-kind">${
+                    currentRole === "technician"
+                      ? "งานซ่อม"
+                      : currentRole === "housekeeper"
+                        ? "งานทำความสะอาด"
+                        : "อัปเดต"
+                  }</span><time>${escapeHtml(n.time)}</time></div><strong>${escapeHtml(
                     n.title
                   )}</strong><p>${escapeHtml(
                     n.text
-                  )}</p><div class="notification-actions"><span>เปิดรายละเอียด</span><span data-hide-notification="${
+                  )}</p><div class="notification-actions"><span class="notification-open-action">เปิดรายละเอียด</span><span class="notification-hide-action" data-hide-notification="${
                     n.id
-                  }">ซ่อน</span></div></div><time>${escapeHtml(
-                    n.time
-                  )}</time></button>`
+                  }">ซ่อน</span></div></div></button>`
               )
               .join("")}`
         )
@@ -2154,9 +2177,9 @@ export function useStaffDashboard() {
     function renderStaff() {
       if (!$("#staffTable")) return;
       const roleColors = {
-        แม่บ้าน: "#159a75",
+        แม่บ้าน: "#24613a",
         ช่าง: "#f97316",
-        ธุรการ: "#2563eb",
+        ธุรการ: "#9a6508",
         แอดมิน: "#6757d9",
       };
       const roleLabels = {
@@ -3596,6 +3619,9 @@ export function useStaffDashboard() {
       updateMenuToggle(false);
     }
     window.addEventListener("resize", syncNavigationForViewport);
+    cleanupDashboardEvents = () => {
+      window.removeEventListener("resize", syncNavigationForViewport);
+    };
     syncNavigationForViewport();
     $("#dashboardQuickActions")?.addEventListener("click", (event) => {
       const button = event.target.closest("[data-dashboard-action]");
@@ -3670,15 +3696,15 @@ export function useStaffDashboard() {
     $("#notificationSettings")?.addEventListener("click", () =>
       toast("บันทึกการตั้งค่าการแจ้งเตือนแล้ว")
     );
-    $$("[data-mobile-page]").forEach((button) =>
-      button.addEventListener("click", () =>
-        navigate(
-          currentRole === "clerk" && button.dataset.mobilePage === "jobs"
-            ? "clerk-center"
-            : button.dataset.mobilePage
-        )
-      )
-    );
+    $(".bottom-nav")?.addEventListener("click", (event) => {
+      const button = event.target.closest("[data-mobile-page]");
+      if (!button) return;
+      navigate(
+        currentRole === "clerk" && button.dataset.mobilePage === "jobs"
+          ? "clerk-center"
+          : button.dataset.mobilePage
+      );
+    });
     $("#mobileQuickAction")?.addEventListener("click", (event) =>
       openModal("quickActionModal", event.currentTarget)
     );
@@ -4252,7 +4278,16 @@ export function useStaffDashboard() {
         open = !panel.classList.contains("open");
       panel.classList.toggle("open", open);
       $("#notificationButton").setAttribute("aria-expanded", String(open));
-      if (open) panel.querySelector("button")?.focus();
+      if (open) {
+        if (!panel.classList.contains("technician-notifications")) {
+          const triggerRect = trigger.getBoundingClientRect();
+          panel.style.setProperty(
+            "--notification-panel-top",
+            `${Math.round(triggerRect.bottom + 12)}px`
+          );
+        }
+        panel.querySelector("button")?.focus();
+      }
     }
     $("#notificationButton")?.addEventListener("click", (event) => {
       event.stopPropagation();
@@ -4264,6 +4299,16 @@ export function useStaffDashboard() {
     });
     $("#notificationPanel")?.addEventListener("click", async (event) => {
       event.stopPropagation();
+      if (event.target.closest("[data-close-notifications]")) {
+        event.currentTarget.classList.remove("open");
+        $("#notificationButton")?.setAttribute("aria-expanded", "false");
+        return;
+      }
+      if (event.target === event.currentTarget) {
+        event.currentTarget.classList.remove("open");
+        $("#notificationButton")?.setAttribute("aria-expanded", "false");
+        return;
+      }
       const clerkTarget = event.target.closest("[data-clerk-notification-target]");
       if (clerkTarget) {
         if (clerkTarget.dataset.clerkNotificationTarget === "claim")
@@ -4806,7 +4851,10 @@ export function useStaffDashboard() {
   }
 
   onMounted(initializeDashboard);
-  onBeforeUnmount(() => cleanupFilterSelects());
+  onBeforeUnmount(() => {
+    cleanupFilterSelects();
+    cleanupDashboardEvents();
+  });
 
   return { activeRole };
 }
