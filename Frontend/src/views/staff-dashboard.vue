@@ -128,6 +128,14 @@ const { activeRole } = useStaffDashboard();
             ><span id="jobsNavLabel">ศูนย์รับงานรวม</span>
           </button>
           <button
+            v-if="['housekeeper', 'technician'].includes(activeRole)"
+            class="nav-item"
+            data-page="my-jobs"
+            data-roles="housekeeper,technician"
+          >
+            <span class="nav-icon">03</span>งานของฉัน
+          </button>
+          <button
             class="nav-item"
             data-page="my-history"
             data-roles="housekeeper,technician,clerk"

@@ -188,7 +188,7 @@
             ><textarea
               id="statusNote"
               required
-              placeholder="สรุปความคืบหน้า"
+              placeholder="คืบหน้า"
             ></textarea>
           </div>
           <div class="field">

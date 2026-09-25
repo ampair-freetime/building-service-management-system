@@ -2121,16 +2121,11 @@ textarea:focus-visible,
   font-size: 10px;
   font-weight: 800;
 }
-.quick-action.primary-action {
-  background: var(--role);
-  border-color: var(--role);
-  color: #fff;
-}
 .staff-dashboard-page #dashboardQuickActions .quick-action:hover,
 .staff-dashboard-page #dashboardQuickActions .quick-action:focus-visible {
-  background: #40E0D0;
-  border-color: #40E0D0;
-  color: #fff;
+  background: var(--role);
+  border-color: var(--role);
+  color: #ffffff;
 }
 .progress-upload {
   border: 1px dashed #cbc6de;

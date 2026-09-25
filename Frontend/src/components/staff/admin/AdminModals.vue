@@ -19,34 +19,11 @@
             <label for="newName">ชื่อ-นามสกุล</label
             ><input id="newName" required />
           </div>
-          <div class="field">
-            <label for="newId">Username / Staff ID</label
-            ><input
-              id="newId"
-              placeholder="เช่น TECH001"
-              minlength="2"
-              maxlength="30"
-              pattern="[A-Za-z0-9_\-]+"
-              autocomplete="username"
-              required
-            />
-          </div>
         </div>
         <div class="form-row">
           <div class="field">
             <label for="newEmail">อีเมล</label
             ><input id="newEmail" type="email" autocomplete="email" required />
-          </div>
-          <div class="field">
-            <label for="newPassword">รหัสผ่านเริ่มต้น</label
-            ><input
-              id="newPassword"
-              minlength="8"
-              maxlength="128"
-              autocomplete="new-password"
-              required
-            />
-            <small>อย่างน้อย 8 ตัวอักษร</small>
           </div>
         </div>
         <div class="form-row">
@@ -59,11 +36,10 @@
               <option value="admin">แอดมิน</option>
             </select>
           </div>
-          <div class="field">
-            <label for="newZone">พื้นที่รับผิดชอบ</label
-            ><input id="newZone" placeholder="เช่น CSB ชั้น 1–3" />
-          </div>
         </div>
+        <p class="form-hint">
+          ระบบจะสร้างรหัสผ่านชั่วคราวและส่งไปยังอีเมลของ Staff
+        </p>
         <button class="primary" id="createStaffButton" style="width: 100%">
           สร้างบัญชี
         </button>

@@ -98,7 +98,6 @@ export function useStaffDashboard() {
       );
       if (
         signedInStaff?.full_name &&
-        signedInStaff?.staff_code &&
         allowedRoles.includes(signedInStaff.role)
       ) {
         const signedInRole = signedInStaff.role;
@@ -110,7 +109,7 @@ export function useStaffDashboard() {
           .join("");
         currentUserName[signedInRole] = signedInStaff.full_name;
         roleConfig[signedInRole].name = signedInStaff.full_name;
-        roleConfig[signedInRole].staffId = signedInStaff.staff_code;
+        roleConfig[signedInRole].staffId = signedInStaff.staff_code || "-";
         roleConfig[signedInRole].avatar = initials || roleConfig[signedInRole].avatar;
       }
     } catch (error) {
@@ -595,8 +594,6 @@ export function useStaffDashboard() {
       const profileName = $("#profileName");
       if (profileName) profileName.textContent = currentUserName[role];
 
-      const profileStaffId = $("#profileStaffId");
-      if (profileStaffId) profileStaffId.textContent = c.staffId;
 
       const profileEmail = $("#profileEmail");
       if (profileEmail) {
@@ -615,17 +612,6 @@ export function useStaffDashboard() {
       const profileRole = $("#profileRole");
       if (profileRole) profileRole.textContent = c.label;
 
-      const profileDepartment = $("#profileDepartment");
-      if (profileDepartment) {
-        profileDepartment.textContent =
-          role === "technician"
-            ? "งานอาคารและซ่อมบำรุง"
-            : role === "housekeeper"
-            ? "งานดูแลความสะอาด"
-            : role === "clerk"
-            ? "ธุรการและของหาย"
-            : "บริหารระบบ";
-      }
 
       const jobsNavLabel = $("#jobsNavLabel");
       if (jobsNavLabel) {
@@ -676,6 +662,7 @@ export function useStaffDashboard() {
 
     // เปลี่ยนหน้าภายใน Staff Dashboard โดยตรวจสิทธิ์ของ role ก่อนเสมอ
     function navigate(page) {
+      const destinationPage = page === "my-jobs" ? "jobs" : page;
       if (!canRoleOpenPage(currentRole, page)) {
         toast("บทบาทนี้ไม่มีสิทธิ์เข้าถึงเมนูดังกล่าว");
         return;
@@ -685,7 +672,7 @@ export function useStaffDashboard() {
         toast("บทบาทนี้ไม่มีสิทธิ์เข้าถึงเมนูดังกล่าว");
         return;
       }
-      const destination = $(`#page-${page}`);
+      const destination = $(`#page-${destinationPage}`);
       if (!destination) {
         toast("ไม่พบหน้าที่เลือก");
         return;
@@ -698,19 +685,14 @@ export function useStaffDashboard() {
       $$("[data-mobile-page]").forEach((n) =>
         n.classList.toggle("active", n.dataset.mobilePage === page)
       );
-      const titles = {
-        dashboard: "ภาพรวมการปฏิบัติงาน",
-        "clerk-center": "ศูนย์รับงาน",
-        jobs: roleConfig[currentRole].jobTitle,
-        "my-history": "ประวัติงานของฉัน",
-        lost: "ศูนย์ของหายและรับฝาก",
-        "staff-overview": "ภาพรวมงาน Staff",
-        staff: "จัดการบัญชีเจ้าหน้าที่",
-        history: "ของหายและรับฝาก",
-        qr: "QR ประจำห้อง",
-      };
-      const pageTitle = $("#pageTitle");
-      if (pageTitle) pageTitle.textContent = titles[page] || "Staff Operations";
+      // ให้หัวข้อหลักของหน้าตรงกับชื่อเมนู Sidebar ที่ผู้ใช้เลือก
+      if (target) {
+        const labelSource = target.cloneNode(true);
+        labelSource.querySelectorAll(".nav-icon").forEach((icon) => icon.remove());
+        const pageHeading = destination.querySelector("h2");
+        if (pageHeading) pageHeading.textContent = labelSource.textContent.trim();
+      }
+      if (page === "my-jobs") renderJobs();
       if (page === "clerk-center") renderClerkCenter();
       if (page === "my-history") renderMyHistory();
       if (page === "staff-overview") renderStaffOverview();
@@ -728,14 +710,10 @@ export function useStaffDashboard() {
       const jobs = roleJobs(),
         unassigned = jobs.filter((j) => !j.assignee).length,
         mine = jobs.filter((j) => j.assignee === activeStaffName()).length,
-        team = jobs.filter(
-          (j) => j.assignee && j.assignee !== activeStaffName()
-        ).length,
         urgent = jobs.filter(
           (j) => j.priority === "เร่งด่วน" && j.status !== "เสร็จสิ้น"
         ).length;
-      const completed = jobs.filter((j) => j.status === "เสร็จสิ้น").length,
-        waitingParts = jobs.filter((j) => j.status === "รออะไหล่").length;
+      const completed = jobs.filter((j) => j.status === "เสร็จสิ้น").length;
       let values;
       if (currentRole === "clerk")
         values = [
@@ -783,7 +761,6 @@ export function useStaffDashboard() {
           ["งานใหม่", String(unassigned), "คิวงานซ่อม"],
           ["งานของฉัน", String(mine), "กำลังรับผิดชอบ"],
           ["งานเร่งด่วน", String(urgent), "ควรรับก่อน"],
-          ["งานรออะไหล่", String(waitingParts), "ติดตามอะไหล่"],
           ["งานเสร็จวันนี้", String(completed), "ปิดงานแล้ว"],
         ];
       else
@@ -791,7 +768,6 @@ export function useStaffDashboard() {
           ["งานทำความสะอาดใหม่", String(unassigned), "คิวงานใหม่"],
           ["งานของฉัน", String(mine), "กำลังรับผิดชอบ"],
           ["งานเร่งด่วน", String(urgent), "ควรรับก่อน"],
-          ["งานตามกำหนดเวลา", String(team), "ของทีมวันนี้"],
           ["งานเสร็จวันนี้", String(completed), "ปิดงานแล้ว"],
         ];
       $("#metricGrid").innerHTML = values
@@ -895,7 +871,6 @@ export function useStaffDashboard() {
               "รับงานแล้ว",
               "กำลังดำเนินการ",
               "รอข้อมูลเพิ่มเติม",
-              "รออะไหล่",
               "เสร็จสิ้น",
               "ยกเลิก",
             ]
@@ -2866,17 +2841,19 @@ export function useStaffDashboard() {
       const backendNext = job.backendId
         ? job.type === "repair" ? nextRepairStatus(job) : nextCleaningStatus(job)
         : null;
-      if (job.backendId && !backendNext) {
-        toast(job.type === "repair" && job.backendStatus === "in_progress"
-          ? "งานกำลังดำเนินการแล้ว กรุณาใช้ปุ่มเสร็จสิ้นเพื่อปิดงาน"
-          : "ไม่มีสถานะถัดไปที่เปลี่ยนได้");
+      const canReturnToPool =
+        ["housekeeper", "technician"].includes(currentRole) &&
+        job.assignee === activeStaffName() &&
+        !["completed", "cancelled"].includes(job.backendStatus);
+      if (job.backendId && !backendNext && !canReturnToPool) {
+        toast("ไม่มีสถานะถัดไปที่เปลี่ยนได้");
         return;
       }
       const options = backendNext
         ? [backendNext.label]
         :
         currentRole === "technician"
-          ? ["กำลังดำเนินการ", "รอข้อมูลเพิ่มเติม", "รออะไหล่", "เสร็จสิ้น"]
+          ? ["กำลังดำเนินการ", "รอข้อมูลเพิ่มเติม", "เสร็จสิ้น"]
           : currentRole === "housekeeper"
           ? ["กำลังดำเนินการ", "พักงาน", "รอข้อมูลเพิ่มเติม", "เสร็จสิ้น"]
           : currentRole === "clerk"
@@ -2889,13 +2866,15 @@ export function useStaffDashboard() {
               "คืนของแล้ว",
             ]
           : job.type === "repair"
-          ? ["กำลังดำเนินการ", "รอข้อมูลเพิ่มเติม", "รออะไหล่", "เสร็จสิ้น"]
+          ? ["กำลังดำเนินการ", "รอข้อมูลเพิ่มเติม", "เสร็จสิ้น"]
           : ["กำลังดำเนินการ", "พักงาน", "รอข้อมูลเพิ่มเติม", "เสร็จสิ้น"];
+      if (canReturnToPool) options.push("คืนเข้ากองกลาง");
       $("#statusJobId").value = id;
       $("#newJobStatus").innerHTML = options
         .map((value) => `<option>${value}</option>`)
         .join("");
-      $("#statusNote").value = "";
+      const statusNote = $("#statusNote");
+      if (statusNote) statusNote.value = "";
       $("#statusImage").value = "";
       $("#statusTime").value = nowThai();
       $("#statusUpdateTitle").textContent = `อัปเดตสถานะ · ${id}`;
@@ -3417,7 +3396,6 @@ export function useStaffDashboard() {
               "รับงาน",
               "เริ่มดำเนินการ",
               "อัปเดตความคืบหน้า",
-              "แจ้งรออะไหล่",
               "ปิดงาน",
               "คืนงานเข้าคิวกลาง",
             ]
@@ -3452,8 +3430,19 @@ export function useStaffDashboard() {
 
     $$(".nav-item").forEach((button) =>
       button.addEventListener("click", () => {
+        if (["housekeeper", "technician"].includes(currentRole)) {
+          if (button.dataset.page === "my-jobs") {
+            currentBoardView = "mine";
+          } else if (button.dataset.page === "jobs") {
+            currentBoardView = "unassigned";
+          }
+          $$("#boardTabs .board-tab").forEach((tab) =>
+            tab.classList.toggle("active", tab.dataset.view === currentBoardView)
+          );
+        }
         closeSidebar();
         navigate(button.dataset.page);
+        if (["jobs", "my-jobs"].includes(button.dataset.page)) renderJobs();
       })
     );
     $$("[data-go]").forEach((button) =>
@@ -3855,8 +3844,12 @@ export function useStaffDashboard() {
         return;
       }
       const next = $("#newJobStatus").value,
-        note = $("#statusNote").value.trim();
+        note = $("#statusNote")?.value.trim() || "";
       closeModal("statusUpdateModal", false);
+      if (next === "คืนเข้ากองกลาง") {
+        openReturnJob(job.id);
+        return;
+      }
       if (next === "เสร็จสิ้น") {
         openCompleteModal(job.id);
         $("#completeResult").value = note;
@@ -4254,9 +4247,7 @@ export function useStaffDashboard() {
       submitButton.disabled = true;
       const payload = {
         full_name: $("#newName").value.trim(),
-        staff_code: $("#newId").value.trim(),
         email: $("#newEmail").value.trim(),
-        password: $("#newPassword").value,
         role: $("#newRole").value,
       };
       let account;
@@ -4270,7 +4261,6 @@ export function useStaffDashboard() {
         return;
       }
       const record = toDashboardStaff(account);
-      record.zone = $("#newZone").value.trim() || "-";
       staffData.push(record);
       addAudit(
         "staff",

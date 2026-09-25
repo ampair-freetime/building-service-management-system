@@ -35,7 +35,7 @@ async function parseResponse(response, fallbackMessage) {
 export function toDashboardStaff(account) {
   return {
     name: account.full_name,
-    id: account.staff_code,
+    id: account.id,
     email: account.email,
     role: STAFF_ROLE_LABELS[account.role] || account.role,
     zone: "-",
