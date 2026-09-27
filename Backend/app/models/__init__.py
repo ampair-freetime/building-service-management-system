@@ -19,13 +19,13 @@ from app.models.lost_found import LostClaim, LostItem, LostItemHistory
 from app.models.notification import Notification
 from app.models.service_request import RequestHistory, ServiceRequest
 from app.models.staff import Staff
+from app.models.staff_deletion_audit import StaffDeletionAudit
 
 __all__ = [
     "AccountStatus",
     "ClaimStatus",
     "Image",
     "ImageType",
-    "StaffInvitation",
     "Location",
     "LostClaim",
     "LostItem",
@@ -40,5 +40,7 @@ __all__ = [
     "RequestType",
     "ServiceRequest",
     "Staff",
+    "StaffDeletionAudit",
+    "StaffInvitation",
     "StaffRole",
 ]

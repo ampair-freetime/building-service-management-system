@@ -13,6 +13,7 @@ class StaffRole(str, Enum):
 class AccountStatus(str, Enum):
     ACTIVE = "active"
     SUSPENDED = "suspended"
+    DELETED = "deleted"
 
 
 class RequestType(str, Enum):
@@ -78,4 +79,3 @@ class RequestAction(str, Enum):
     COMPLETED = "completed"
     CANCELLED = "cancelled"
     COMPLETION_NOTE_ADDED = "completion_note_added"
-
