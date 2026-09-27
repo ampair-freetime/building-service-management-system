@@ -43,6 +43,44 @@ def _normalize_floor(value: str | None) -> str | None:
 
 def upgrade() -> None:
     connection = op.get_bind()
+    column_names = {column["name"] for column in sa.inspect(connection).get_columns("locations")}
+
+    # Some existing deployments were stamped at a merged revision while retaining
+    # the pre-area location schema. Bring that schema forward here before the
+    # normalisation below, so upgrade remains safe for both database histories.
+    if "area" not in column_names:
+        op.add_column("locations", sa.Column("area", sa.String(length=100), nullable=True))
+        legacy_locations = sa.table(
+            "locations",
+            sa.column("building", sa.String()),
+            sa.column("room", sa.String()),
+            sa.column("area_type", sa.String()),
+            sa.column("area", sa.String()),
+        )
+        if "area_type" in column_names and "building" in column_names:
+            fallback = sa.func.coalesce(
+                legacy_locations.c.area_type, legacy_locations.c.building
+            )
+        elif "area_type" in column_names:
+            fallback = legacy_locations.c.area_type
+        elif "building" in column_names:
+            fallback = legacy_locations.c.building
+        else:
+            fallback = sa.literal("Unknown area")
+        area_value = (
+            sa.case(
+                (legacy_locations.c.room.is_not(None), sa.literal("ห้อง ") + legacy_locations.c.room),
+                else_=fallback,
+            )
+            if "room" in column_names
+            else fallback
+        )
+        connection.execute(sa.update(legacy_locations).values(area=area_value))
+        op.alter_column("locations", "area", nullable=False)
+        for column_name in ("building", "room", "area_type"):
+            if column_name in column_names:
+                op.drop_column("locations", column_name)
+
     rows = connection.execute(sa.select(locations.c.id, locations.c.floor)).all()
     for location_id, floor in rows:
         normalized = _normalize_floor(floor)
