@@ -6,7 +6,17 @@ from app.api.dependencies import CurrentStaff, DbSession
 from app.core.security import create_access_token
 from app.models.staff import Staff
 from app.schemas.auth import LoginRequest, LoginResponse
-from app.schemas.staff import StaffResponse
+from app.schemas.staff import (
+    ActivationRequest,
+    ActivationTokenRequest,
+    ActivationValidationResponse,
+    StaffResponse,
+)
+from app.services.invitations import (
+    InvalidActivationTokenError,
+    activate_staff_account,
+    validate_activation_token,
+)
 from app.services.auth import authenticate_staff
 
 router = APIRouter()
@@ -32,3 +42,25 @@ async def login(payload: LoginRequest, session: DbSession) -> LoginResponse:
 async def read_current_staff(current_staff: CurrentStaff) -> Staff:
     """คืนโปรไฟล์ของเจ้าของ Bearer token ที่ผ่านการตรวจสอบแล้ว."""
     return current_staff
+
+
+@router.post("/activation/validate", response_model=ActivationValidationResponse)
+async def validate_activation(
+    payload: ActivationTokenRequest, session: DbSession
+) -> ActivationValidationResponse:
+    """Reject invalid links without logging their token in a URL."""
+    try:
+        await validate_activation_token(session, payload.token)
+    except InvalidActivationTokenError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    return ActivationValidationResponse()
+
+
+@router.post("/activation", status_code=status.HTTP_204_NO_CONTENT)
+@router.post("/setup-password", status_code=status.HTTP_204_NO_CONTENT)
+async def activate_account(payload: ActivationRequest, session: DbSession) -> None:
+    """Set a first password exactly once after validating the invitation token."""
+    try:
+        await activate_staff_account(session, token=payload.token, password=payload.password)
+    except InvalidActivationTokenError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc

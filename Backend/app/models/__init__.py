@@ -13,6 +13,7 @@ from app.models.enums import (
     StaffRole,
 )
 from app.models.image import Image
+from app.models.invitation import StaffInvitation
 from app.models.location import Location
 from app.models.lost_found import LostClaim, LostItem, LostItemHistory
 from app.models.notification import Notification
@@ -24,6 +25,7 @@ __all__ = [
     "ClaimStatus",
     "Image",
     "ImageType",
+    "StaffInvitation",
     "Location",
     "LostClaim",
     "LostItem",

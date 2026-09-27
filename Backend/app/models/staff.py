@@ -12,6 +12,7 @@ from app.db.base import Base
 from app.models.enums import AccountStatus, StaffRole
 
 if TYPE_CHECKING:
+    from app.models.invitation import StaffInvitation
     from app.models.image import Image
     from app.models.lost_found import LostClaim, LostItem, LostItemHistory
     from app.models.notification import Notification
@@ -84,4 +85,7 @@ class Staff(Base):
     )
     notifications: Mapped[list["Notification"]] = relationship(
         back_populates="staff"
+    )
+    invitations: Mapped[list["StaffInvitation"]] = relationship(
+        back_populates="staff", cascade="all, delete-orphan"
     )

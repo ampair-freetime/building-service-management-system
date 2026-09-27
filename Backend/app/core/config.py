@@ -23,6 +23,10 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 480
 
+    # Invitation links point to the frontend password-setup page. SMTP credentials
+    # stay on the server and are intentionally never returned by an API.
+    staff_activation_url: str = "http://localhost:5173/staff/setup-password"
+    invitation_token_expire_hours: int = 24
     # ไม่ตั้ง SMTP_HOST = สร้างบัญชีได้ แต่ตอบ email_sent=false
     smtp_host: str | None = None
     smtp_port: int = 587
@@ -31,7 +35,6 @@ class Settings(BaseSettings):
     smtp_use_starttls: bool = True
     smtp_timeout_seconds: int = 10
     mail_from: str = "Building Care <no-reply@example.com>"
-    staff_login_url: str = "http://localhost:5173/staff-login"
     public_base_url: str = "http://localhost:5173"
 
     # Cloudflare R2 ใช้ S3-compatible API โดย credentials ต้องอยู่ฝั่ง backend เท่านั้น
