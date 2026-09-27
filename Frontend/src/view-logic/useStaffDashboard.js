@@ -35,6 +35,7 @@ import {
 import {
   createStaffAccount,
   fetchStaffAccounts,
+  resendStaffInvitation,
   toDashboardStaff,
 } from "./staff-dashboard/staff-accounts.js";
 import {
@@ -2167,6 +2168,14 @@ export function useStaffDashboard() {
         });
       $("#staffTable").innerHTML = visibleStaff.length
         ? visibleStaff.map(({ staff: s, index: i }) => {
+          const invitationDelivery = {
+            sent: { label: "ส่งสำเร็จ", className: "done" },
+            failed: { label: "ส่งไม่สำเร็จ", className: "danger" },
+            unknown: { label: "ไม่มีข้อมูล", className: "neutral" },
+          }[s.invitationDeliveryStatus] || {
+            label: "ไม่มีข้อมูล",
+            className: "neutral",
+          };
           return `<article class="staff-account-card">
             <header class="staff-account-card-head">
               <div class="person"><div class="person-avatar" style="background:${
@@ -2187,7 +2196,9 @@ export function useStaffDashboard() {
               <div><span>Staff ID</span><strong>${escapeHtml(s.id)}</strong></div>
               <div><span>Role</span><strong>${escapeHtml(s.role)}</strong></div>
               <div><span>พื้นที่รับผิดชอบ</span><strong>${escapeHtml(s.zone || "-")}</strong></div>
+              <div><span>สถานะการส่งคำเชิญ</span><strong class="invitation-delivery-status ${invitationDelivery.className}">${invitationDelivery.label}</strong></div>
             </div>
+            <button class="small-btn resend-invitation-button" type="button" data-staff-action="resend-invitation" data-staff-index="${i}" ${s.status === "ใช้งาน" ? "" : "disabled"}>ส่งคำเชิญซ้ำ</button>
             <footer class="staff-account-actions"><button class="small-btn" type="button" data-staff-action="detail" data-staff-index="${i}">ดูรายละเอียด</button><button class="small-btn" type="button" data-staff-action="edit" data-staff-index="${i}">แก้ไข Staff</button><button class="small-btn" type="button" data-staff-action="toggle" data-staff-index="${i}">${
             s.status === "ใช้งาน" ? "ปิดบัญชี" : "เปิดใช้"
           }</button><button class="small-btn delete" type="button" data-staff-action="remove" data-staff-index="${i}">ลบ</button></footer>
@@ -2250,6 +2261,56 @@ export function useStaffDashboard() {
           renderStaff();
           toast("อัปเดตสถานะบัญชีแล้ว");
         }
+      );
+    }
+    async function performResendStaffInvitation(index, button) {
+      const staff = staffData[index];
+      if (!staff || currentRole !== "admin") return;
+      button.disabled = true;
+      button.textContent = "กำลังส่ง…";
+      try {
+        const result = await resendStaffInvitation(staff.id);
+        const delivered = result.email_sent === true;
+        staff.invitationDeliveryStatus = delivered ? "sent" : "failed";
+        addAudit(
+          "staff",
+          "ส่งคำเชิญซ้ำ",
+          staff.id,
+          staff.name,
+          delivered ? "ส่งอีเมลสำเร็จ" : "ส่งอีเมลไม่สำเร็จ",
+        );
+        renderStaff();
+        showSuccess(
+          delivered
+            ? `ส่งคำเชิญใหม่ไปยัง ${staff.email} แล้ว`
+            : `ระบบสร้างคำเชิญใหม่แล้ว แต่ส่งไปยัง ${staff.email} ไม่สำเร็จ`,
+          delivered ? "ส่งคำเชิญสำเร็จ" : "ส่งคำเชิญไม่สำเร็จ",
+          delivered ? "success" : "error",
+        );
+      } catch (error) {
+        if (await handleUnauthorizedResponse(error.status)) return;
+        console.error("Resending staff invitation failed:", error);
+        showSuccess(
+          error.status === 404
+            ? "Backend ยังไม่รองรับการส่งคำเชิญซ้ำ"
+            : error.message || "ไม่สามารถส่งคำเชิญซ้ำได้",
+          "ส่งคำเชิญไม่สำเร็จ",
+          "error",
+        );
+        if (document.contains(button)) {
+          button.disabled = false;
+          button.textContent = "ส่งคำเชิญซ้ำ";
+        }
+      }
+    }
+    function resendInvitation(index, button) {
+      const staff = staffData[index];
+      if (!staff || currentRole !== "admin") return;
+      requestConfirmation(
+        "ยืนยันส่งคำเชิญซ้ำ",
+        `ส่งคำเชิญและข้อมูลเข้าสู่ระบบชุดใหม่ไปยัง ${staff.email} หรือไม่?`,
+        () => performResendStaffInvitation(index, button),
+        "ส่งคำเชิญ",
       );
     }
     function removeStaff(i) {
@@ -2533,12 +2594,12 @@ export function useStaffDashboard() {
       $("#confirmActionButton").textContent = label;
       openModal("confirmModal");
     }
-    function showSuccess(message, title = "บันทึกสำเร็จ") {
+    function showSuccess(message, title = "บันทึกสำเร็จ", variant = "success") {
       const successModal = $("#successModal");
-      successModal?.classList.remove("rejection-result");
+      successModal?.classList.toggle("rejection-result", variant === "error");
       successModal
         ?.querySelector(".success-check use")
-        ?.setAttribute("href", "#i-check");
+        ?.setAttribute("href", variant === "error" ? "#i-close" : "#i-check");
       const successTitle = $("#successModalTitle");
       if (successTitle) successTitle.textContent = title;
       $("#successModalText").textContent = message;
@@ -4021,6 +4082,8 @@ export function useStaffDashboard() {
       if (button.dataset.staffAction === "toggle") toggleStaff(index);
       if (button.dataset.staffAction === "remove") removeStaff(index);
       if (button.dataset.staffAction === "edit") openEditStaff(index, button);
+      if (button.dataset.staffAction === "resend-invitation")
+        resendInvitation(index, button);
       if (button.dataset.staffAction === "detail") {
         navigate("staff-overview");
         showStaffOverview(staffData[index].name, button);
@@ -4273,7 +4336,13 @@ export function useStaffDashboard() {
       closeModal("staffModal", false);
       form.reset();
       submitButton.disabled = false;
-      showSuccess("สร้างบัญชี Staff แล้ว");
+      showSuccess(
+        account.email_sent
+          ? `สร้างบัญชี Staff และส่งคำเชิญไปยัง ${record.email} แล้ว`
+          : `สร้างบัญชี Staff แล้ว แต่ส่งคำเชิญไปยัง ${record.email} ไม่สำเร็จ กรุณาตรวจสอบระบบอีเมล`,
+        account.email_sent ? "ส่งคำเชิญสำเร็จ" : "ส่งคำเชิญไม่สำเร็จ",
+        account.email_sent ? "success" : "error",
+      );
     });
     $("#editStaffForm")?.addEventListener("submit", (event) => {
       event.preventDefault();
