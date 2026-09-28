@@ -14,6 +14,7 @@ from app.api.v1.endpoints import (
     repair_guest,
     repair_staff,
     staff,
+    staff_work_overview,
 )
 
 api_router = APIRouter()
@@ -36,6 +37,11 @@ api_router.include_router(
     tags=["guest cleaning requests"],
 )
 api_router.include_router(staff.router, prefix="/staff", tags=["staff"])
+api_router.include_router(
+    staff_work_overview.router,
+    prefix="/staff-work-overview",
+    tags=["staff work overview"],
+)
 api_router.include_router(
     admin_location.router, prefix="/admin/locations", tags=["admin locations"]
 )
