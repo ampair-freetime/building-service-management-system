@@ -24,10 +24,13 @@ services:
       BACKEND_CORS_ORIGINS: '["http://localhost:5173"]'
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-building_service}:${POSTGRES_PASSWORD:-building_service}@database:5432/${POSTGRES_DB:-building_service}
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:-development-only-change-this-secret}
-      SMTP_HOST: mailpit
-      SMTP_PORT: 1025
-      SMTP_USE_STARTTLS: "false"
-      STAFF_LOGIN_URL: http://localhost:5173/staff-login
+      SMTP_HOST: ${SMTP_HOST:-mailpit}
+      SMTP_PORT: ${SMTP_PORT:-1025}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_USE_STARTTLS: ${SMTP_USE_STARTTLS:-false}
+      MAIL_FROM: ${MAIL_FROM:-Building Care <no-reply@example.com>}
+      STAFF_LOGIN_URL: ${STAFF_LOGIN_URL:-http://localhost:5173/staff-login}
       PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:5173}
       R2_ACCOUNT_ID: ${R2_ACCOUNT_ID:-}
       R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID:-}
