@@ -32,8 +32,10 @@ import {
   todayISO,
   validImage,
 } from "./staff-dashboard/utils.js";
+import { fetchStaffWorkOverview, fetchStaffCurrentWork } from "./staff-dashboard/staff-work-overview.js";
 import {
   createStaffAccount,
+  deleteStaffAccount,
   fetchStaffAccounts,
   resendStaffInvitation,
   toDashboardStaff,
@@ -139,6 +141,9 @@ export function useStaffDashboard() {
     const readClaimNotifications = new Set();
     let currentBoardView = "unassigned";
     let selectedJobId = "";
+    let overviewData = null;
+    let overviewRequest = 0;
+    let overviewSearchTimer = null;
     let pendingConfirmAction = null;
     let lastModalTrigger = null;
     const $ = (s) => document.querySelector(s),
@@ -168,7 +173,7 @@ export function useStaffDashboard() {
         staffData = await fetchStaffAccounts();
         renderStaff();
         renderMetrics();
-        renderStaffOverview();
+        loadStaffWorkOverview();
       } catch (error) {
         if (await handleUnauthorizedResponse(error.status)) return;
         console.error("Loading staff accounts failed:", error);
@@ -696,7 +701,7 @@ export function useStaffDashboard() {
       if (page === "my-jobs") renderJobs();
       if (page === "clerk-center") renderClerkCenter();
       if (page === "my-history") renderMyHistory();
-      if (page === "staff-overview") renderStaffOverview();
+      if (page === "staff-overview") loadStaffWorkOverview();
       if (page === "history") renderHistory();
       closeSidebar();
       window.scrollTo({
@@ -1810,139 +1815,121 @@ export function useStaffDashboard() {
         latest: latestHistoryFor(staff.name, from, to),
       };
     }
-    function renderStaffOverview() {
-      if (!$("#staffOverviewTable")) return;
-      const table = $("#staffOverviewTable"),
-        summary = $("#staffOverviewSummary");
-      if (!table || !summary) return;
-      const role = $("#overviewRoleFilter")?.value || "all",
-        from = $("#overviewFrom")?.value || "",
-        to = $("#overviewTo")?.value || "",
-        q = ($("#overviewSearch")?.value || "").trim().toLowerCase();
-      const staffRows = staffData.filter(
-        (s) =>
-          s.role !== "แอดมิน" &&
-          (role === "all" || s.role === role) &&
-          `${s.name} ${s.id} ${s.role} ${s.zone}`.toLowerCase().includes(q)
-      );
-      const totals = staffRows.map((s) => staffOverviewStats(s, from, to));
-      const jobTypeForRole = { "แม่บ้าน": "cleaning", "ช่าง": "repair" };
-      const unassignedCount = allJobs.filter(
-        (job) =>
-          !job.assignee &&
-          !isTerminalStatus(job.status) &&
-          !String(job.status).includes("ยกเลิก") &&
-          (role === "all" || job.type === jobTypeForRole[role])
-      ).length;
-      summary.innerHTML = [
-        [unassignedCount, "งานที่ยังไม่มีผู้รับผิดชอบ", "คิวงานปัจจุบันตาม Role"],
-        [
-          totals.reduce((n, x) => n + x.active, 0),
-          "กำลังรับผิดชอบ",
-          "งานที่ยังไม่ถึงสถานะสุดท้าย",
-        ],
-        [totals.reduce((n, x) => n + x.closed, 0), "ปิดแล้ว", "นับตามงานไม่ซ้ำ"],
-        [
-          totals.reduce((n, x) => n + x.returned, 0),
-          "คืนเข้ากองกลาง",
-          "มีเหตุผลประกอบทุกครั้ง",
-        ],
-      ]
-        .map(
-          (v, i) =>
-            `<article class="metric ${i === 3 ? "warn" : ""}"><span>${
-              v[1]
-            }</span><strong>${v[0]}</strong><small>${v[2]}</small></article>`
-        )
-        .join("");
-      table.innerHTML = staffRows.length
-        ? staffRows
-            .map((s) => {
-              const st = staffOverviewStats(s, from, to),
-                latest = st.latest;
-              return `<article class="staff-overview-card">
-                <header class="staff-overview-card-head">
-                  <div class="overview-staff-name">
-                    <div class="person-avatar">${escapeHtml(s.name.slice(0, 2))}</div>
-                    <div><strong>${escapeHtml(s.name)}</strong><small>${escapeHtml(s.id)}</small></div>
-                  </div>
-                  <span class="badge neutral">${escapeHtml(s.role)}</span>
-                </header>
-                <div class="staff-overview-card-stats">
-                  <div><span>กำลังรับผิดชอบ</span><strong>${st.active}</strong></div>
-                  <div><span>ปิดแล้ว</span><strong>${st.closed}</strong></div>
-                  <div><span>คืนเข้ากองกลาง</span><strong>${st.returned}</strong></div>
-                </div>
-                <footer class="staff-overview-card-foot">
-                  <div class="staff-latest-activity">
-                    <span>กิจกรรมล่าสุด</span>
-                    ${
-                      latest
-                        ? `<strong>${escapeHtml(latest.action)}</strong><small>${escapeHtml(latest.itemId)} · ${escapeHtml(latest.date)}</small>`
-                        : '<strong class="custody">ยังไม่มีกิจกรรม</strong>'
-                    }
-                  </div>
-                  <button class="small-btn" type="button" data-staff-overview="${escapeHtml(
-                    s.name
-                  )}">ดูรายละเอียด</button>
-                </footer>
-              </article>`;
-            })
-            .join("")
-        : '<div class="history-empty staff-overview-empty">ไม่พบ Staff ที่ตรงกับตัวกรอง</div>';
-      if (
-        selectedOverviewStaff &&
-        !staffRows.some((s) => s.name === selectedOverviewStaff)
-      )
-        selectedOverviewStaff = "";
-      renderStaffOverviewDetail();
-    }
-    function showStaffOverview(name, trigger) {
-      selectedOverviewStaff = name;
-      renderStaffOverviewDetail();
-      openModal("staffOverviewModal", trigger);
-    }
-    function renderStaffOverviewDetail() {
-      if (!$("#staffOverviewDetail")) return;
-      const box = $("#staffOverviewDetail"),
-        title = $("#overviewDetailTitle"),
-        count = $("#overviewDetailCount");
-      if (!box || !title || !count) return;
-      if (!selectedOverviewStaff) {
-        title.textContent = "เลือก Staff เพื่อดูรายละเอียดงาน";
-        count.textContent = "0 รายการ";
-        box.innerHTML =
-          '<div class="empty">กด “ดูรายละเอียด” จากตารางด้านบน</div>';
-        return;
+    async function loadStaffWorkOverview() {
+      if (currentRole !== "admin") return;
+      const request = ++overviewRequest;
+      const summary = $("#staffOverviewSummary");
+      const table = $("#staffOverviewTable");
+      if (summary) summary.innerHTML = '<div class="history-empty overview-state" role="status">กำลังโหลดสถิติงาน…</div>';
+      if (table) table.innerHTML = '<div class="history-empty overview-state" role="status">กำลังโหลดรายชื่อเจ้าหน้าที่…</div>';
+      try {
+        const result = await fetchStaffWorkOverview({
+          role: $("#overviewRoleFilter")?.value || "all",
+          search: $("#overviewSearch")?.value || "",
+        });
+        if (request !== overviewRequest) return;
+        overviewData = result;
+        renderStaffOverview();
+      } catch (error) {
+        if (request !== overviewRequest) return;
+        overviewData = null;
+        if (await handleUnauthorizedResponse(error.status)) return;
+        console.error("Loading staff work overview failed:", error);
+        if (summary) summary.innerHTML = '<div class="history-empty overview-state" role="alert">ไม่สามารถโหลดสถิติงานได้ <button type="button" class="overview-retry" data-overview-retry="summary">ลองใหม่</button></div>';
+        if (table) table.innerHTML = '<div class="history-empty staff-overview-empty overview-state">ยังไม่สามารถแสดงข้อมูลเจ้าหน้าที่ได้</div>';
       }
-      const from = $("#overviewFrom")?.value || "",
-        to = $("#overviewTo")?.value || "";
-      const rows = workHistory
-        .filter(
-          (x) =>
-            x.staff === selectedOverviewStaff && inDateRange(x.date, from, to)
-        )
-        .sort((a, b) =>
-          `${b.date} ${b.time}`.localeCompare(`${a.date} ${a.time}`)
+    }
+    function renderStaffOverview() {
+      const table = $("#staffOverviewTable");
+      const summary = $("#staffOverviewSummary");
+      if (!table || !summary || !overviewData) return;
+      const { staff, summary: counts } = overviewData;
+      summary.innerHTML = [
+        [counts.unassigned, "งานที่ยังไม่มีผู้รับผิดชอบ", "คิวงานแม่บ้านและช่าง"],
+        [counts.current_assigned, "กำลังรับผิดชอบ", "งานที่ยังไม่เสร็จของทีมที่แสดง"],
+        [counts.closed, "ปิดแล้ว", "จำนวนงานที่เจ้าหน้าที่ปิด"],
+        [counts.returned, "คืนเข้ากองกลาง", "จำนวนงานที่เจ้าหน้าที่คืน"],
+      ].map(([value, label, description], index) =>
+        `<article class="metric ${index === 3 ? "warn" : ""}"><span>${label}</span><strong>${value}</strong><small>${description}</small>${index === 1 ? '<button class="overview-metric-action" type="button" id="viewOverallCurrentWork">ดูรายการงาน</button>' : ""}</article>`
+      ).join("");
+      table.innerHTML = staff.length
+        ? staff.map((person) => {
+          const role = person.role === "housekeeper" ? "แม่บ้าน" : "ช่าง";
+          return `<article class="staff-overview-card">
+            <header class="staff-overview-card-head">
+              <div class="overview-staff-name">
+                <div class="person-avatar">${escapeHtml(person.full_name.slice(0, 2))}</div>
+                <div><strong>${escapeHtml(person.full_name)}</strong><small>${escapeHtml(person.email)}</small></div>
+              </div>
+              <span class="badge neutral">${role}</span>
+            </header>
+            <div class="staff-overview-card-stats">
+              <div><span>กำลังรับผิดชอบ</span><strong>${person.counts.current_assigned}</strong></div>
+              <div><span>ปิดแล้ว</span><strong>${person.counts.closed}</strong></div>
+              <div><span>คืนเข้ากองกลาง</span><strong>${person.counts.returned}</strong></div>
+            </div>
+            <footer class="staff-overview-card-foot">
+              <button class="small-btn" type="button" data-staff-overview="${person.id}">ดูสถิติรายบุคคล</button>
+            </footer>
+          </article>`;
+        }).join("")
+        : `<div class="history-empty staff-overview-empty overview-state" role="status">${$("#overviewRoleFilter")?.value !== "all" || $("#overviewSearch")?.value.trim() ? "ไม่พบเจ้าหน้าที่ที่ตรงกับตัวกรอง" : "ยังไม่มีเจ้าหน้าที่แม่บ้านหรือช่างในระบบ"}</div>`;
+    }
+    function overviewWorkItemMarkup(item, owner = "") {
+      const statuses = item.request_type === "cleaning" ? cleaningStatusLabels : repairStatusLabels;
+      const type = item.request_type === "cleaning" ? "งานทำความสะอาด" : "งานซ่อม";
+      return `<article class="overview-detail-item"><div><strong>${escapeHtml(item.request_code)}</strong></div><div><strong>${escapeHtml(item.title)}</strong><p>${type}${owner ? ` · ${escapeHtml(owner)}` : ""}</p></div><span class="badge neutral">${escapeHtml(statuses[item.status] || item.status)}</span></article>`;
+    }
+    async function showOverallCurrentWork(trigger) {
+      const staff = overviewData?.staff || [];
+      const request = overviewRequest;
+      $("#overviewWorkItemsCount").textContent = "กำลังโหลด…";
+      $("#overviewWorkItemsList").innerHTML = '<div class="empty overview-state" role="status">กำลังโหลดรายการงาน…</div>';
+      openModal("overviewWorkItemsModal", trigger);
+      try {
+        const results = await Promise.all(staff.map((person) => fetchStaffCurrentWork(person.id)));
+        if (request !== overviewRequest || !$("#overviewWorkItemsModal")?.classList.contains("open")) return;
+        const items = results.flatMap((result, index) =>
+          result.current_work.map((item) => ({ item, owner: staff[index].full_name }))
         );
-      title.textContent = `รายละเอียดงาน · ${selectedOverviewStaff}`;
-      count.textContent = `${rows.length} รายการ`;
-      box.innerHTML = rows.length
-        ? rows
-            .map(
-              (x) =>
-                `<article class="overview-detail-item"><div><strong>${
-                  x.date
-                }</strong><p>${x.time} น.</p></div><div><strong>${x.itemId} · ${
-                  x.title
-                }</strong><p>${escapeHtml(
-                  x.detail
-                )}</p></div><span class="badge ${badgeClass(x.action)}">${
-                  x.action
-                }</span></article>`
-            )
-            .join("")
-        : '<div class="empty">ไม่มีประวัติในช่วงวันที่เลือก</div>';
+        $("#overviewWorkItemsCount").textContent = `${items.length} รายการ`;
+        $("#overviewWorkItemsList").innerHTML = items.length
+          ? items.map(({ item, owner }) => overviewWorkItemMarkup(item, owner)).join("")
+          : '<div class="empty">ไม่มีงานที่กำลังรับผิดชอบ</div>';
+      } catch (error) {
+        if (await handleUnauthorizedResponse(error.status)) return;
+        if (!$("#overviewWorkItemsModal")?.classList.contains("open")) return;
+        $("#overviewWorkItemsCount").textContent = "ไม่สามารถโหลดได้";
+        $("#overviewWorkItemsList").innerHTML = '<div class="empty overview-state" role="alert">ไม่สามารถโหลดรายการงานได้ <button type="button" class="overview-retry" data-overview-retry="overall-work">ลองใหม่</button></div>';
+      }
+    }
+    async function showStaffOverview(staffId, trigger) {
+      const person = overviewData?.staff.find((item) => item.id === staffId);
+      if (!person) return;
+      selectedOverviewStaff = staffId;
+      $("#overviewDetailTitle").textContent = `สถิติรายบุคคล · ${person.full_name}`;
+      $("#overviewDetailEmail").textContent = person.email;
+      $("#overviewPersonStats").innerHTML = [
+        ["กำลังรับผิดชอบ", person.counts.current_assigned],
+        ["ปิดแล้ว", person.counts.closed],
+        ["คืนเข้ากองกลาง", person.counts.returned],
+      ].map(([label, value]) => `<div><span>${label}</span><strong>${value}</strong></div>`).join("");
+      $("#overviewDetailCount").textContent = "กำลังโหลด…";
+      $("#staffOverviewDetail").innerHTML = '<div class="empty overview-state" role="status">กำลังโหลดงานปัจจุบัน…</div>';
+      openModal("staffOverviewModal", trigger);
+      try {
+        const result = await fetchStaffCurrentWork(staffId);
+        if (selectedOverviewStaff !== staffId || !$("#staffOverviewModal")?.classList.contains("open")) return;
+        $("#overviewDetailCount").textContent = `${result.current_work_count} รายการ`;
+        $("#staffOverviewDetail").innerHTML = result.current_work.length
+          ? result.current_work.map((item) => overviewWorkItemMarkup(item)).join("")
+          : '<div class="empty">ไม่มีงานที่กำลังรับผิดชอบ</div>';
+      } catch (error) {
+        if (selectedOverviewStaff !== staffId) return;
+        if (await handleUnauthorizedResponse(error.status)) return;
+        $("#overviewDetailCount").textContent = "ไม่สามารถโหลดได้";
+        $("#staffOverviewDetail").innerHTML = '<div class="empty overview-state" role="alert">ไม่สามารถโหลดงานปัจจุบันได้ <button type="button" class="overview-retry" data-overview-retry="staff-work">ลองใหม่</button></div>';
+      }
     }
     function renderHistory() {
       if ($("#historyLostSection")) renderLost();
@@ -2171,6 +2158,7 @@ export function useStaffDashboard() {
           const invitationDelivery = {
             sent: { label: "ส่งสำเร็จ", className: "done" },
             failed: { label: "ส่งไม่สำเร็จ", className: "danger" },
+            pending: { label: "กำลังส่ง", className: "neutral" },
             unknown: { label: "ไม่มีข้อมูล", className: "neutral" },
           }[s.invitationDeliveryStatus] || {
             label: "ไม่มีข้อมูล",
@@ -2313,19 +2301,54 @@ export function useStaffDashboard() {
         "ส่งคำเชิญ",
       );
     }
+    const deletingStaffIds = new Set();
     function removeStaff(i) {
       if (currentRole !== "admin") return;
       const staff = staffData[i];
+      if (!staff || deletingStaffIds.has(staff.id)) return;
       requestConfirmation(
-        "ยืนยันลบบัญชี",
-        `ลบบัญชี ${staff.name} หรือไม่?`,
-        () => {
-          const [record] = staffData.splice(i, 1);
-          storeDeletedRecord("staff", record, "staffData", record.name);
-          renderStaff();
-          renderHistory();
-          toast("ลบบัญชี Staff แล้ว");
-        }
+        "ยืนยันการลบบัญชีพนักงาน",
+        `คุณต้องการลบบัญชี ${staff.name} (${staff.email}) หรือไม่? บัญชีนี้จะเข้าสู่ระบบไม่ได้อีก และจะหายไปจากรายการพนักงาน`,
+        async () => {
+          if (deletingStaffIds.has(staff.id)) return;
+          deletingStaffIds.add(staff.id);
+          try {
+            await deleteStaffAccount(staff.id);
+            const index = staffData.findIndex((item) => item.id === staff.id);
+            if (index !== -1) staffData.splice(index, 1);
+            addAudit("staff", "ลบ", staff.id, staff.name, "ปิดบัญชี Staff แล้ว");
+            renderStaff();
+            renderHistory();
+            loadStaffWorkOverview();
+            showSuccess(
+              `ลบบัญชี ${staff.name} (${staff.email}) เรียบร้อยแล้ว`,
+              "ลบบัญชีสำเร็จ",
+            );
+          } catch (error) {
+            if (await handleUnauthorizedResponse(error.status)) return;
+            const assignments = error.unfinishedAssignments || [];
+            const codes = assignments.map((item) => item.request_code).filter(Boolean);
+            const message = codes.length
+              ? `กรุณาโอนงานที่ยังไม่เสร็จก่อนลบบัญชี: ${codes.join(", ")}`
+              : error.status === 404
+                ? "ไม่พบบัญชีนี้ในระบบ กรุณาโหลดรายการพนักงานใหม่"
+                : error.message === "You cannot delete your own account"
+                ? "ไม่สามารถลบบัญชีของตัวเองได้"
+                : error.message === "You cannot delete the last active administrator"
+                  ? "ไม่สามารถลบบัญชีแอดมินที่ใช้งานอยู่คนสุดท้ายได้"
+                  : error instanceof TypeError
+                    ? "เชื่อมต่อระบบไม่ได้ กรุณาลองใหม่อีกครั้ง"
+                    : error.message || "ไม่สามารถลบบัญชีเจ้าหน้าที่ได้";
+            showSuccess(
+              message,
+              "ลบบัญชีไม่สำเร็จ",
+              "error",
+            );
+          } finally {
+            deletingStaffIds.delete(staff.id);
+          }
+        },
+        "ลบบัญชี",
       );
     }
 
@@ -3659,18 +3682,16 @@ export function useStaffDashboard() {
       $("#myHistorySearch").value = "";
       renderMyHistory();
     });
-    $("#overviewRoleFilter")?.addEventListener("change", renderStaffOverview);
-    $("#overviewFrom")?.addEventListener("change", renderStaffOverview);
-    $("#overviewTo")?.addEventListener("change", renderStaffOverview);
-    $("#overviewSearch")?.addEventListener("input", renderStaffOverview);
+    $("#overviewRoleFilter")?.addEventListener("change", loadStaffWorkOverview);
+    $("#overviewSearch")?.addEventListener("input", () => {
+      clearTimeout(overviewSearchTimer);
+      overviewSearchTimer = setTimeout(loadStaffWorkOverview, 300);
+    });
     $("#resetOverviewFilters")?.addEventListener("click", () => {
+      clearTimeout(overviewSearchTimer);
       $("#overviewRoleFilter").value = "all";
-      $("#overviewRoleFilter").dispatchEvent(new Event("change", { bubbles: true }));
-      $("#overviewFrom").value = "";
-      $("#overviewTo").value = "";
       $("#overviewSearch").value = "";
-      selectedOverviewStaff = "";
-      renderStaffOverview();
+      loadStaffWorkOverview();
     });
 
     // -------------------------------------------------------------------------
@@ -4063,6 +4084,21 @@ export function useStaffDashboard() {
       if (job) openJobDetail(job.id, button);
       else toast(`แสดงรายละเอียด ${button.dataset.historyDetail} จากประวัติแล้ว`);
     });
+    $("#staffOverviewSummary")?.addEventListener("click", (event) => {
+      if (event.target.closest('[data-overview-retry="summary"]')) loadStaffWorkOverview();
+    });
+    $("#overviewWorkItemsList")?.addEventListener("click", (event) => {
+      const button = event.target.closest('[data-overview-retry="overall-work"]');
+      if (button) showOverallCurrentWork(button);
+    });
+    $("#staffOverviewDetail")?.addEventListener("click", (event) => {
+      const button = event.target.closest('[data-overview-retry="staff-work"]');
+      if (button && selectedOverviewStaff) showStaffOverview(selectedOverviewStaff, button);
+    });
+    $("#staffOverviewSummary")?.addEventListener("click", (event) => {
+      const button = event.target.closest("#viewOverallCurrentWork");
+      if (button) showOverallCurrentWork(button);
+    });
     $("#staffOverviewTable")?.addEventListener("click", (event) => {
       const button = event.target.closest("[data-staff-overview]");
       if (button) showStaffOverview(button.dataset.staffOverview, button);
@@ -4085,8 +4121,11 @@ export function useStaffDashboard() {
       if (button.dataset.staffAction === "resend-invitation")
         resendInvitation(index, button);
       if (button.dataset.staffAction === "detail") {
+        const staffId = staffData[index]?.id;
+        $("#overviewRoleFilter").value = "all";
+        $("#overviewSearch").value = "";
         navigate("staff-overview");
-        showStaffOverview(staffData[index].name, button);
+        if (staffId) loadStaffWorkOverview().then(() => showStaffOverview(staffId, button));
       }
     });
     $("#lostTabs")?.addEventListener("click", (event) => {
@@ -4325,6 +4364,7 @@ export function useStaffDashboard() {
       }
       const record = toDashboardStaff(account);
       staffData.push(record);
+      loadStaffWorkOverview();
       addAudit(
         "staff",
         "สร้างบัญชี",

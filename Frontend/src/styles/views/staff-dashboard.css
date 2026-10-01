@@ -1304,6 +1304,48 @@ body {
 .staff-overview-modal-card .overview-detail-list {
   margin-top: 14px;
 }
+.staff-overview-modal-card .overview-staff-email {
+  margin: 0 0 14px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.staff-overview-modal-card .overview-person-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-bottom: 18px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #fafbfd;
+}
+.staff-overview-modal-card .overview-person-stats > div {
+  min-width: 0;
+  padding: 14px 8px;
+  text-align: center;
+}
+.staff-overview-modal-card .overview-person-stats > div + div {
+  border-left: 1px solid var(--line);
+}
+.staff-overview-modal-card .overview-person-stats span,
+.staff-overview-modal-card .overview-person-stats strong {
+  display: block;
+}
+.staff-overview-modal-card .overview-person-stats span {
+  color: var(--muted);
+  font-size: 11px;
+}
+.staff-overview-modal-card .overview-person-stats strong {
+  margin-top: 6px;
+  color: var(--primary);
+  font-size: 24px;
+}
+.staff-overview-modal-card .overview-work-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 0;
+  font-size: 15px;
+}
 .staff-overview-modal-card .overview-detail-item > :nth-child(2) {
   flex: 1;
   min-width: 0;
@@ -4944,4 +4986,55 @@ body {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     padding: 14px 15px 15px;
   }
+}
+
+.staff-dashboard-page #page-staff-overview .overview-work-type-filter {
+  display: grid;
+  gap: 5px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+.staff-dashboard-page #page-staff-overview .overview-work-type-filter select {
+  width: 100%;
+}
+
+.staff-dashboard-page #page-staff-overview .overview-metric-action {
+  margin-top: 10px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--primary);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.staff-dashboard-page #page-staff-overview .overview-metric-action:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 3px;
+}
+
+.staff-dashboard-page #page-staff-overview .overview-state,
+.staff-overview-modal-card .overview-state {
+  padding: 18px;
+  text-align: center;
+}
+.overview-retry {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--primary);
+  font: inherit;
+  font-weight: 800;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.overview-retry:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
 }

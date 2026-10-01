@@ -41,11 +41,12 @@ export function toDashboardStaff(account) {
     zone: "-",
     status: account.status === "active" ? "ใช้งาน" : "พักงาน",
     invitationDeliveryStatus:
-      account.email_sent === true
+      account.invitation_delivery_status ||
+      (account.email_sent === true
         ? "sent"
         : account.email_sent === false
           ? "failed"
-          : "unknown",
+          : "unknown"),
   };
 }
 
@@ -72,4 +73,24 @@ export async function resendStaffInvitation(staffId) {
     { method: "POST", headers: authHeaders() },
   );
   return parseResponse(response, "ไม่สามารถส่งคำเชิญซ้ำได้");
+}
+
+export async function deleteStaffAccount(staffId) {
+  const response = await fetch(`${STAFF_ENDPOINT}/${encodeURIComponent(staffId)}`, {
+    method: "DELETE",
+    headers: authHeaders(),
+  });
+  if (response.ok) return;
+
+  const body = await response.json().catch(() => ({}));
+  const detail = body.detail;
+  const message = typeof detail === "string"
+    ? detail
+    : typeof detail?.message === "string"
+      ? detail.message
+      : "ไม่สามารถลบบัญชีเจ้าหน้าที่ได้";
+  const error = new Error(message);
+  error.status = response.status;
+  error.unfinishedAssignments = detail?.unfinished_assignments || [];
+  throw error;
 }
