@@ -7,6 +7,7 @@ from app.api.v1.endpoints import (
     auth,
     cleaning_guest,
     cleaning_staff,
+    clerk_work_overview,
     found_item,
     lost_found_clerk,
     lost_item,
@@ -41,6 +42,11 @@ api_router.include_router(
     staff_work_overview.router,
     prefix="/staff-work-overview",
     tags=["staff work overview"],
+)
+api_router.include_router(
+    clerk_work_overview.router,
+    prefix="/clerk-work-overview",
+    tags=["clerk work overview"],
 )
 api_router.include_router(
     admin_location.router, prefix="/admin/locations", tags=["admin locations"]
