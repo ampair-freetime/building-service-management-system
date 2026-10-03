@@ -190,9 +190,7 @@ const { activeRole } = useStaffDashboard();
 
       <main>
         <header class="topbar">
-          
           <div class="top-actions">
-            <span class="ready-pill">พร้อมปฏิบัติงาน</span>
             <div class="notification-wrap">
               <button
                 class="icon-btn"

@@ -114,12 +114,3 @@ test("repair adapter reports validation and network failures", async () => {
     fetchImpl: async () => { throw new TypeError("offline"); },
   }), /อินเทอร์เน็ต/);
 });
-
-test("repair demo success does not display an undefined receipt", async () => {
-  const state = useRepairSubmission(async () => ({ demo: true }));
-  let receipt;
-  await state.submit(payload(), (result) => { receipt = result; });
-  assert.deepEqual(receipt, { demo: true });
-  assert.equal(state.message.value, "ส่งคำขอซ่อมเรียบร้อยแล้ว");
-  assert.doesNotMatch(state.message.value, /undefined|รหัสติดตาม/);
-});

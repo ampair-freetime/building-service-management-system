@@ -124,15 +124,3 @@ test('adapter handles validation errors, network errors and timeout', async () =
     }),
   }), /นานเกินไป/);
 });
-
-
-test('demo success passes the result to the modal callback without claiming a real receipt', async () => {
-  const state = useCleaningSubmission(async () => ({ demo: true }));
-  let receipt;
-  await state.submit(payload(), result => { receipt = result; });
-  assert.deepEqual(receipt, { demo: true });
-  assert.equal(state.status.value, 'success');
-  assert.equal(state.isSubmitting.value, false);
-  assert.equal(state.message.value, 'ส่งคำขอทำความสะอาดเรียบร้อยแล้ว');
-  assert.doesNotMatch(state.message.value, /undefined|รหัสติดตาม/);
-});

@@ -1,7 +1,28 @@
 <script setup>
+import { onMounted, ref } from "vue";
+import { resolveCleaningLocationByQr } from "../../../services/cleaningRequests.js";
+
 const params = new URLSearchParams(window.location.search);
-const hasQrWithoutService = Boolean(params.get("token")?.trim()) &&
-  !["clean", "repair"].includes(params.get("service"));
+const qrToken = params.get("token")?.trim() ?? "";
+const currentQrLocation = ref(null);
+
+function formatQrLocation(location) {
+  if (!location) return "";
+  return location.floor
+    ? `ชั้น ${location.floor} · ${location.area}`
+    : location.area;
+}
+
+onMounted(async () => {
+  if (!qrToken || qrToken.length > 255) return;
+
+  try {
+    currentQrLocation.value = await resolveCleaningLocationByQr(qrToken);
+  } catch {
+    // ซ่อนตำแหน่งไว้เมื่อ QR ใช้ไม่ได้หรือเชื่อมต่อระบบไม่ได้
+    currentQrLocation.value = null;
+  }
+});
 </script>
 
 <template>
@@ -30,21 +51,21 @@ const hasQrWithoutService = Boolean(params.get("token")?.trim()) &&
             </svg>
           </header>
 
-          <section class="location-card" aria-label="ตำแหน่งปัจจุบัน">
+          <section
+            v-if="currentQrLocation"
+            class="location-card"
+            aria-label="ตำแหน่งปัจจุบัน"
+          >
             <div class="location-icon">
               <svg class="icon"><use href="#i-pin" /></svg>
             </div>
             <div class="location-copy">
               <small>ตำแหน่งปัจจุบัน</small
-              ><strong>อาคาร วิทยาศาสตร์คอมพิวเตอร์ (CS)</strong>
+              ><strong>{{ formatQrLocation(currentQrLocation) }}</strong>
             </div>
           </section>
 
-          <p v-if="hasQrWithoutService" class="qr-location-message" role="status">
-            เปิดจาก QR แล้ว กรุณาเลือกแจ้งซ่อมหรือแจ้งทำความสะอาด ระบบจะเลือกสถานที่ให้ในฟอร์ม
-          </p>
-
-          <section class="dashboard-section">
+          <section class="dashboard-section service-menu-section">
             <div class="section-head">
               <h2>เมนูบริการ</h2>
             </div>
@@ -118,7 +139,7 @@ const hasQrWithoutService = Boolean(params.get("token")?.trim()) &&
               <div class="tracking-result-head">
                 <div>
                   <small>รหัสคำร้อง  </small
-                  ><strong id="trackingResultCode">LOST-20260912-3BE8986F</strong>
+                  ><strong id="trackingResultCode">–</strong>
                   <p id="trackingResultText" style="margin: 5px 0 0"></p>
                 </div>
                 <span class="status progress" id="trackingResultStatus"

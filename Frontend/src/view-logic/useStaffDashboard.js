@@ -132,23 +132,6 @@ export function useStaffDashboard() {
       console.warn("Stored staff profile is invalid:", error);
     }
 
-    // ผูกงานจำลองกับชื่อ Staff ที่ login เพื่อทดสอบแท็บ "งานของฉัน"
-    allJobs.forEach((job) => {
-      if (job.assignee === "__CURRENT_HOUSEKEEPER__") {
-        job.assignee = currentUserName.housekeeper;
-      }
-      if (job.assignee === "__CURRENT_TECHNICIAN__") {
-        job.assignee = currentUserName.technician;
-      }
-    });
-    workHistory.forEach((record) => {
-      if (record.staff === "__CURRENT_HOUSEKEEPER__") {
-        record.staff = currentUserName.housekeeper;
-      }
-      if (record.staff === "__CURRENT_TECHNICIAN__") {
-        record.staff = currentUserName.technician;
-      }
-    });
     let currentLostTab = currentRole === "admin" ? "approved" : "inventory";
     let appliedHistorySearch = "";
     let currentClerkCenterView = "approvals";
@@ -615,12 +598,6 @@ export function useStaffDashboard() {
 
       const heroPrimary = $("#heroPrimary");
       if (heroPrimary) heroPrimary.textContent = c.primary;
-
-      $$(".role-demo-btn").forEach((button) => {
-        const active = button.dataset.roleSwitch === role;
-        button.classList.toggle("active", active);
-        button.setAttribute("aria-pressed", String(active));
-      });
 
       const headerAvatar = $("#headerAvatar");
       if (headerAvatar) headerAvatar.textContent = c.avatar;
@@ -2114,11 +2091,7 @@ export function useStaffDashboard() {
     async function loadStaffNotifications() {
       try {
         const notifications = await getStaffNotifications();
-        const mockNotifications = notificationSets[currentRole].filter(
-          (notification) => notification.isMock,
-        );
-        notificationSets[currentRole] = [
-          ...notifications.map((notification) => ({
+        notificationSets[currentRole] = notifications.map((notification) => ({
             id: notification.id,
             requestId: notification.request_id,
             title: notification.title,
@@ -2129,9 +2102,7 @@ export function useStaffDashboard() {
             }),
             unread: !notification.is_read,
             backend: true,
-          })),
-          ...mockNotifications,
-        ];
+          }));
         renderNotifications();
       } catch (error) {
         if (await handleUnauthorizedResponse(error.status)) return;
@@ -2331,8 +2302,7 @@ export function useStaffDashboard() {
         .filter(({ staff }) => {
           const matchesRole =
             selectedRole === "all" || staff.role === roleLabels[selectedRole];
-          const searchable =
-            `${staff.name} ${staff.id} ${staff.role} ${staff.zone || ""}`.toLowerCase();
+          const searchable = `${staff.name} ${staff.role}`.toLowerCase();
           return matchesRole && searchable.includes(query);
         });
       $("#staffTable").innerHTML = visibleStaff.length
@@ -2360,9 +2330,7 @@ export function useStaffDashboard() {
               }</span>
             </header>
             <div class="staff-account-meta">
-              <div><span>Staff ID</span><strong>${escapeHtml(s.id)}</strong></div>
               <div><span>Role</span><strong>${escapeHtml(s.role)}</strong></div>
-              <div><span>พื้นที่รับผิดชอบ</span><strong>${escapeHtml(s.zone || "-")}</strong></div>
               <div><span>สถานะการส่งคำเชิญ</span><strong class="invitation-delivery-status ${invitationDelivery.className}">${invitationDelivery.label}</strong></div>
             </div>
             <button class="small-btn resend-invitation-button" type="button" data-staff-action="resend-invitation" data-staff-index="${i}" ${s.status === "ใช้งาน" ? "" : "disabled"}>ส่งคำเชิญซ้ำ</button>
@@ -4572,16 +4540,6 @@ export function useStaffDashboard() {
         }
         return;
       }
-      if (currentRole === "technician" && item.isMock) {
-        const mockJob = allJobs.find(
-          (job) => job.type === "repair" && item.text.startsWith(`${job.id}:`),
-        );
-        if (mockJob) {
-          navigate("jobs");
-          openJobDetail(mockJob.id, itemButton);
-          return;
-        }
-      }
       const match = item.text.match(/(?:CL|RP)-\d+/);
       if (match) openJobDetail(match[0], itemButton);
       else if (currentRole === "clerk") navigate("clerk-center");
@@ -4660,9 +4618,23 @@ export function useStaffDashboard() {
     function setStaffFieldError(field, message) {
       if (!field) return false;
       field.setCustomValidity(message);
-      field.setAttribute("aria-invalid", String(Boolean(message)));
-      const errorMessage = document.getElementById(`${field.id}Error`);
+      if (message) field.setAttribute("aria-invalid", "true");
+      else field.removeAttribute("aria-invalid");
+
+      const errorId = field.getAttribute("aria-describedby");
+      const errorMessage = errorId ? document.getElementById(errorId) : null;
       if (errorMessage) errorMessage.textContent = message;
+
+      if (field.tagName === "SELECT") {
+        const visibleTrigger = field
+          .closest(".filter-select-dropdown")
+          ?.querySelector(".filter-select-trigger");
+        if (visibleTrigger) {
+          visibleTrigger.setAttribute("aria-describedby", errorId || "");
+          if (message) visibleTrigger.setAttribute("aria-invalid", "true");
+          else visibleTrigger.removeAttribute("aria-invalid");
+        }
+      }
       return !message;
     }
 
@@ -4702,7 +4674,10 @@ export function useStaffDashboard() {
           (field) => field.getAttribute("aria-invalid") === "true",
         );
         if (firstInvalid?.id === "newRole") {
-          firstInvalid.nextElementSibling?.focus();
+          firstInvalid
+            .closest(".filter-select-dropdown")
+            ?.querySelector(".filter-select-trigger")
+            ?.focus();
         } else {
           firstInvalid?.focus();
         }
@@ -4714,20 +4689,26 @@ export function useStaffDashboard() {
       form?.querySelectorAll("input, select").forEach((field) => {
         field.setCustomValidity("");
         field.removeAttribute("aria-invalid");
-        const errorMessage = document.getElementById(`${field.id}Error`);
+        const errorId = field.getAttribute("aria-describedby");
+        const errorMessage = errorId ? document.getElementById(errorId) : null;
         if (errorMessage) errorMessage.textContent = "";
+        field
+          .closest(".filter-select-dropdown")
+          ?.querySelector(".filter-select-trigger")
+          ?.removeAttribute("aria-invalid");
       });
     }
 
     staffFormFields.forEach((field) => {
-      const eventName = field.tagName === "SELECT" ? "change" : "input";
-      field.addEventListener(eventName, () => {
+      const handleStaffFieldChange = () => {
         validateStaffField(field);
         const lastNameField = $("#newLastName");
         if (field.id === "newFirstName" && lastNameField?.value.trim()) {
           validateStaffField(lastNameField);
         }
-      });
+      };
+      field.addEventListener("input", handleStaffFieldChange);
+      field.addEventListener("change", handleStaffFieldChange);
       field.addEventListener("blur", () => validateStaffField(field));
     });
     staffForm?.addEventListener("reset", () => clearStaffFormValidation(staffForm));

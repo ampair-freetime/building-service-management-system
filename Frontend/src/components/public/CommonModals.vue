@@ -77,7 +77,7 @@
               <div><dt>ปัญหาที่พบ</dt><dd id="successProblem"></dd></div>
             </dl>
             <p id="successInstruction">เก็บรหัสคำร้องนี้ไว้เพื่อติดตามสถานะ</p>
-            <strong class="request-code" id="successCode">LOST-20260912-3BE8986F</strong>
+            <strong class="request-code" id="successCode">–</strong>
             <small class="success-email" id="successEmail"></small>
           </div>
           <div class="modal-actions">

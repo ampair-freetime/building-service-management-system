@@ -52,7 +52,7 @@ export function installServiceFormValidation(form) {
     return !message;
   }
 
-  // Capture runs before either Vue's submit handler or the demo handler.
+  // Capture runs before Vue's submit handler.
   listen(form, "submit", event => {
     const valid = fields.map(validateField).every(Boolean);
     if (!valid || !form.checkValidity()) {

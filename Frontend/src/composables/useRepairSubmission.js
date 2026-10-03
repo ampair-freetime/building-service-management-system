@@ -31,9 +31,7 @@ export function useRepairSubmission(upload = uploadRepairRequest) {
       const result = await upload(payload, { requestId });
       onSuccess(result);
       status.value = "success";
-      message.value = result.demo
-        ? "ส่งคำขอซ่อมเรียบร้อยแล้ว"
-        : `ส่งคำขอสำเร็จ รหัสติดตาม: ${result.request_code}`;
+      message.value = `ส่งคำขอสำเร็จ รหัสติดตาม: ${result.request_code}`;
       requestId = undefined;
     } catch (error) {
       status.value = "error";

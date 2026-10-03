@@ -419,7 +419,7 @@ export function usePublicServicePortal() {
         }, 120);
       });
 
-    // โหลดประกาศจริงทันทีเพื่อแทนที่การ์ดตัวอย่างที่ไม่มี item_code จากฐานข้อมูล
+    // โหลดประกาศจริงจากฐานข้อมูลทันที
     filterPosts();
 
     function setDetailContent(data, action = "close") {
@@ -535,23 +535,7 @@ export function usePublicServicePortal() {
 
       openUiModal("detailModal", trigger);
 
-      // การ์ดตัวอย่างยังไม่มี item_code จึงแสดงข้อมูลเดิมจากหน้าเว็บได้ตามปกติ
-      if (!itemCode) {
-        setDetailContent(
-          {
-            dialogTitle: "รายละเอียดประกาศ",
-            title: selectedClaimItem,
-            detail: card.querySelector(".post-body p")?.textContent.trim(),
-            date: card.querySelector(".post-date")?.textContent.trim(),
-            location: card.dataset.search?.split(" ").slice(-3).join(" "),
-            status: card.querySelector(".post-type")?.textContent.trim(),
-            icon: isFound ? "#i-box" : "#i-search",
-          },
-          isFound ? "claim" : "contact",
-        );
-        setItemDetailState("content");
-        return;
-      }
+      if (!itemCode) return;
 
       setItemDetailState("loading");
 
@@ -613,8 +597,6 @@ export function usePublicServicePortal() {
       });
     }
 
-    document.querySelectorAll(".post-card").forEach(bindPostCard);
-
     function openClaim(itemName, trigger) {
       if (!selectedClaimItemCode) {
         showToast("กรุณาเลือกประกาศพบของจากผลค้นหาอีกครั้ง");
@@ -666,8 +648,7 @@ export function usePublicServicePortal() {
       details = {},
     ) {
       showConfirmationDetails(details);
-      const trackingCode =
-        requestId || `BC-${Math.floor(1000 + Math.random() * 9000)}`;
+      const trackingCode = requestId;
       const serviceType = serviceTypeForRequest(
         { requestType: type },
         trackingCode,
@@ -687,7 +668,6 @@ export function usePublicServicePortal() {
         itemName: details.problem || "ไม่ระบุรายละเอียด",
         updatedAt: "เพิ่งส่งคำร้อง",
         email: recipientEmail.trim().toLowerCase(),
-        demo: Boolean(details.demo),
       });
       document.getElementById("successType").textContent = type;
       document.getElementById("successInstruction").textContent =
@@ -730,30 +710,15 @@ export function usePublicServicePortal() {
       });
     }
 
-    function createDemoRequestCode(prefix) {
-      const today = new Date();
-      const date = [
-        today.getFullYear(),
-        String(today.getMonth() + 1).padStart(2, "0"),
-        String(today.getDate()).padStart(2, "0"),
-      ].join("");
-      const suffix = crypto
-        .randomUUID()
-        .replaceAll("-", "")
-        .slice(0, 8)
-        .toUpperCase();
-      return `${prefix}-${date}-${suffix}`;
-    }
-
     const cleaningForm = document.querySelector("#clean form");
     const confirmCleaningRequest = (event) => {
-      const { demo, request_code, recipientEmail, location, problem, status } =
+      const { request_code, recipientEmail, location, problem, status } =
         event.detail;
       showSuccess(
         "แจ้งทำความสะอาดเรียบร้อยแล้ว",
         recipientEmail,
-        demo ? createDemoRequestCode("CLEAN") : request_code,
-        { location, problem, status, demo },
+        request_code,
+        { location, problem, status },
       );
     };
     cleaningForm?.addEventListener(
@@ -769,13 +734,13 @@ export function usePublicServicePortal() {
 
     const repairForm = document.querySelector("#repair form");
     const confirmRepairRequest = (event) => {
-      const { demo, request_code, recipientEmail, location, problem, status } =
+      const { request_code, recipientEmail, location, problem, status } =
         event.detail;
       showSuccess(
         "แจ้งซ่อมเรียบร้อยแล้ว",
         recipientEmail,
-        demo ? createDemoRequestCode("REPAIR") : request_code,
-        { location, problem, status, demo },
+        request_code,
+        { location, problem, status },
       );
     };
     repairForm?.addEventListener(
@@ -1330,19 +1295,16 @@ export function usePublicServicePortal() {
         const isLostFoundCode =
           code.startsWith("LOST-") || code.startsWith("FOUND-");
         const isServiceCode =
-          code.startsWith("CLN-") ||
-          code.startsWith("CLEAN-") ||
-          code.startsWith("RPR-") ||
-          code.startsWith("REPAIR-");
+          code.startsWith("CLN-") || code.startsWith("RPR-");
         const localItem = trackedRequests.get(code);
-        if (!isLostFoundCode && (!isServiceCode || localItem?.demo)) {
+        if (!isLostFoundCode && !isServiceCode) {
           // เปิดโอกาสให้ browser วาด loading state ก่อนอัปเดตข้อมูลในหน่วยความจำ
           await new Promise((resolve) => window.setTimeout(resolve, 0));
         }
         let item;
         if (isLostFoundCode) {
           item = await trackLostFoundItem(code, email);
-        } else if (isServiceCode && !localItem?.demo) {
+        } else if (isServiceCode) {
           const remoteItem = await trackServiceRequest(code, email);
           const hasMatchingLocalItem =
             localItem && (!localItem.email || localItem.email === email);

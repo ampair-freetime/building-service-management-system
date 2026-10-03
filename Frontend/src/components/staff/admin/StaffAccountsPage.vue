@@ -44,7 +44,7 @@
               class="field-compact search"
               id="staffAccountSearch"
               type="search"
-              placeholder="ค้นหาชื่อ, Staff ID หรือพื้นที่รับผิดชอบ"
+              placeholder="ค้นหาชื่อหรือ Role"
               aria-label="ค้นหาบัญชีเจ้าหน้าที่"
             />
             <button class="secondary" id="resetStaffAccountFilters" type="button">
