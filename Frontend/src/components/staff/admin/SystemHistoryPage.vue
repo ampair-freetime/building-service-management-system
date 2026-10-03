@@ -16,8 +16,8 @@ import ClerkApprovalsOverviewPage from "./ClerkApprovalsOverviewPage.vue";
 
     <section class="admin-history-items" id="historyLostSection" aria-labelledby="adminHistoryItemsTitle">
       <div class="admin-history-items-heading">
-        <h3 id="adminHistoryItemsTitle">รายการของหายและรับฝาก</h3>
-        <p>ค้นหาและเปิดดูโพสต์ที่ธุรการอนุมัติแล้ว รวมถึงคำขอรับของ</p>
+        <h3 id="adminHistoryItemsTitle">ของหายและรับฝาก</h3>
+        <p>รายการที่ธุรการตรวจสอบแล้วและคำขอรับของ เปิดดูรายละเอียดได้</p>
       </div>
       <form class="history-controls admin-history-controls" id="historySearchForm" role="search">
         <button class="small-btn" id="staffLostRefreshButton" type="button">รีเฟรชประกาศ</button>
@@ -25,15 +25,13 @@ import ClerkApprovalsOverviewPage from "./ClerkApprovalsOverviewPage.vue";
         <button class="primary" type="submit">แสดงผล</button>
       </form>
       <div class="tabs admin-lost-tabs" id="lostTabs" role="tablist" aria-label="กรองรายการของหายและรับฝาก">
-        <!-- <button class="tab" type="button" role="tab" aria-selected="false" data-tab="inventory">ของที่รับฝาก <span class="tab-count" data-lost-count="inventory">0</span></button>
+        <button class="tab active" type="button" role="tab" aria-selected="true" data-tab="inventory">ของที่รับฝาก <span class="tab-count" data-lost-count="inventory">0</span></button>
         <button class="tab" type="button" role="tab" aria-selected="false" data-tab="lostposts">ประกาศตามหา <span class="tab-count" data-lost-count="lostposts">0</span></button>
-        <button class="tab" type="button" role="tab" aria-selected="false" data-tab="claims">คำขอรับของ <span class="tab-count" data-lost-count="claims">0</span></button> -->
-        <button class="tab active" data-tab="inventory">ของที่รับฝาก</button
-            ><button class="tab" data-tab="lostposts">ประกาศตามหา</button
-            ><button class="tab" data-tab="claims">คำขอรับของ</button>
-        <button class="tab active status-tab approved-tab" type="button" role="tab" aria-selected="true" data-tab="approved">อนุมัติแล้ว <span class="tab-count" data-lost-count="approved">0</span></button>
+        <button class="tab" type="button" role="tab" aria-selected="false" data-tab="claims">คำขอรับของ <span class="tab-count" data-lost-count="claims">0</span></button>
+        <button class="tab status-tab approved-tab" type="button" role="tab" aria-selected="false" data-tab="approved">อนุมัติแล้ว <span class="tab-count" data-lost-count="approved">0</span></button>
         <button class="tab status-tab rejected-tab" type="button" role="tab" aria-selected="false" data-tab="rejected">ไม่อนุมัติ <span class="tab-count" data-lost-count="rejected">0</span></button>
       </div>
+      <div class="approval-flow-note"><span>✓</span><div><strong>แสดงรายการที่ผ่านการตรวจสอบแล้ว</strong><br />“ของที่รับฝาก” และ “ประกาศตามหา” แสดงรายการที่ธุรการอนุมัติแล้ว ส่วน “คำขอรับของ” แสดงคำขอที่เกี่ยวข้องกับรายการรับฝาก</div></div>
       <div class="lost-grid" id="lostGrid"></div>
     </section>
   </section>

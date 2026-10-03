@@ -140,7 +140,24 @@ export function useStaffDashboard() {
       console.warn("Stored staff profile is invalid:", error);
     }
 
-    let currentLostTab = currentRole === "admin" ? "approved" : "inventory";
+    // ผูกงานจำลองกับชื่อ Staff ที่ login เพื่อทดสอบแท็บ "งานของฉัน"
+    allJobs.forEach((job) => {
+      if (job.assignee === "__CURRENT_HOUSEKEEPER__") {
+        job.assignee = currentUserName.housekeeper;
+      }
+      if (job.assignee === "__CURRENT_TECHNICIAN__") {
+        job.assignee = currentUserName.technician;
+      }
+    });
+    workHistory.forEach((record) => {
+      if (record.staff === "__CURRENT_HOUSEKEEPER__") {
+        record.staff = currentUserName.housekeeper;
+      }
+      if (record.staff === "__CURRENT_TECHNICIAN__") {
+        record.staff = currentUserName.technician;
+      }
+    });
+    let currentLostTab = "inventory";
     let appliedHistorySearch = "";
     let currentClerkCenterView = "approvals";
     const clerkApprovalLoadState = { found: "loading", lost: "loading", claims: "loading" };
