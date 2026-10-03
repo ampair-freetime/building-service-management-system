@@ -545,7 +545,10 @@ a:focus-visible {
     max-width: 540px;
   }
   .building-art {
-    width: min(520px, 100%);
+    display: none;
+  }
+  .visual-copy {
+    display: none;
   }
   .login-content {
     padding: 36px 38px 40px;

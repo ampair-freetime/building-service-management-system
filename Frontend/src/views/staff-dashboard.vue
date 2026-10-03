@@ -68,6 +68,10 @@ const { activeRole } = useStaffDashboard();
       <symbol id="i-check" viewBox="0 0 24 24">
         <path d="m5 12 4 4L19 6" />
       </symbol>
+      <symbol id="i-copy" viewBox="0 0 24 24">
+        <rect x="9" y="9" width="11" height="11" rx="2" />
+        <path d="M15 9V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h3" />
+      </symbol>
       <symbol id="i-upload" viewBox="0 0 24 24">
         <path d="M12 16V4m0 0L7 9m5-5 5 5M4 16v4h16v-4" />
       </symbol>
@@ -148,7 +152,7 @@ const { activeRole } = useStaffDashboard();
             <span class="nav-icon">H</span>ประวัติงานของฉัน
           </button>
           <button class="nav-item" data-page="staff-overview" data-roles="admin">
-            <span class="nav-icon">WO</span>ภาพรวมงาน Staff
+            <span class="nav-icon">WO</span>ภาพรวมงานของเจ้าหน้าที่
           </button>
           <button v-if="activeRole === 'clerk'" class="nav-item" data-page="lost" data-roles="clerk">
             <span class="nav-icon">03</span>ของหายและรับฝาก
@@ -160,7 +164,7 @@ const { activeRole } = useStaffDashboard();
             <span class="nav-icon">03</span>บัญชีเจ้าหน้าที่
           </button>
           <button class="nav-item" data-page="qr" data-roles="admin">
-            <span class="nav-icon">QR</span>QR ประจำห้อง
+            <span class="nav-icon">QR</span>จัดการสถานที่
           </button>
         </nav>
         <div class="sidebar-foot">
