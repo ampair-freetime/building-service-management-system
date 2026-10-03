@@ -35,7 +35,7 @@ async function parseResponse(response, fallbackMessage) {
 export function toDashboardStaff(account) {
   return {
     name: account.full_name,
-    id: account.staff_code,
+    id: account.id,
     email: account.email,
     role: STAFF_ROLE_LABELS[account.role] || account.role,
     zone: "-",
@@ -58,4 +58,17 @@ export async function createStaffAccount(payload) {
     body: JSON.stringify(payload),
   });
   return parseResponse(response, "สร้างบัญชีไม่สำเร็จ");
+}
+
+export async function updateStaffAccount(staffId, payload) {
+  // ส่งข้อมูล Staff ที่แก้ไขไปยัง Backend
+  const response = await fetch(
+    `${STAFF_ENDPOINT}/${encodeURIComponent(staffId)}`,
+    {
+      method: "PATCH",
+      headers: authHeaders(true),
+      body: JSON.stringify(payload),
+    },
+  );
+  return parseResponse(response, "แก้ไขบัญชีเจ้าหน้าที่ไม่สำเร็จ");
 }

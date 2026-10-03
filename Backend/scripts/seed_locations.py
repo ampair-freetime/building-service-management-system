@@ -3,10 +3,9 @@
 import argparse
 import asyncio
 import os
-import secrets
 import sys
 from pathlib import Path
-from urllib.parse import quote, urlsplit, urlunsplit
+from urllib.parse import urlsplit, urlunsplit
 
 from sqlalchemy import select
 
@@ -19,6 +18,13 @@ try:
     os.chdir(backend_root)
     from app.db.session import AsyncSessionLocal
     from app.models.location import Location
+    from app.schemas.admin_location import AdminLocationCreate
+    from app.services.admin_location import (
+        DuplicateLocationError,
+        build_qr_url,
+        create_location,
+        generate_qr,
+    )
 finally:
     os.chdir(original_working_directory)
 
@@ -31,7 +37,7 @@ LOCATIONS = [
 
 
 def normalize_base_url(value: str) -> str:
-    """รับเฉพาะ HTTP(S) URL และตัด path slash ท้ายก่อนต่อหน้า cleaning."""
+    """รับเฉพาะ HTTP(S) URL และตัด path slash ท้ายก่อนต่อหน้า guest."""
     parts = urlsplit(value.strip())
     if parts.scheme not in {"http", "https"} or not parts.netloc:
         raise argparse.ArgumentTypeError("--base-url ต้องเป็น HTTP(S) URL ที่สมบูรณ์")
@@ -42,20 +48,38 @@ async def seed_locations(base_url: str) -> list[Location]:
     """เพิ่มเฉพาะสถานที่ที่ยังไม่มี โดยรักษา token เดิมเมื่อรันซ้ำ."""
     async with AsyncSessionLocal() as session:
         for values in LOCATIONS:
-            location = await session.scalar(select(Location).filter_by(**values))
+            payload = AdminLocationCreate(**values)
+            location = await session.scalar(
+                select(Location).where(
+                    Location.floor == payload.floor,
+                    Location.area == payload.area,
+                )
+            )
             if location is None:
-                session.add(Location(**values, qr_token=secrets.token_urlsafe(24)))
-        await session.commit()
+                try:
+                    created = await create_location(session, payload)
+                except DuplicateLocationError:
+                    location = await session.scalar(
+                        select(Location).where(
+                            Location.floor == payload.floor,
+                            Location.area == payload.area,
+                        )
+                    )
+                else:
+                    location = await session.get(Location, created.id)
+            if location is not None and location.is_active and location.qr_token is None:
+                await generate_qr(session, location_id=location.id)
+
         result = await session.scalars(
             select(Location)
-            .where(Location.is_active.is_(True))
+            .where(Location.is_active.is_(True), Location.qr_token.is_not(None))
             .order_by(Location.floor, Location.area, Location.id)
         )
         locations = list(result)
 
     for location in locations:
         label = f"ชั้น {location.floor} {location.area}" if location.floor else location.area
-        url = f"{base_url}/cleaning?token={quote(location.qr_token, safe='')}"
+        url = build_qr_url(location.qr_token, base_url)
         print(f"{location.id}\t{label}\t{url}")
     return locations
 

@@ -43,6 +43,7 @@ export function enhanceFilterSelects(root = document) {
         const item = document.createElement("button");
         item.type = "button";
         item.className = "filter-select-option";
+        item.disabled = option.disabled;
         item.setAttribute("role", "option");
         item.setAttribute("aria-selected", String(option.value === select.value));
         const text = document.createElement("span");
@@ -87,15 +88,22 @@ export function enhanceFilterSelects(root = document) {
       if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
       event.preventDefault();
       if (menu.hidden) return toggle();
-      const items = [...menu.querySelectorAll(".filter-select-option")];
+      const items = [
+        ...menu.querySelectorAll(".filter-select-option:not(:disabled)"),
+      ];
       const index = items.indexOf(document.activeElement);
       const step = event.key === "ArrowDown" ? 1 : -1;
       items[(index + step + items.length) % items.length]?.focus();
     }
 
+    function handleFormReset() {
+      requestAnimationFrame(sync);
+    }
+
     trigger.addEventListener("click", toggle);
     wrapper.addEventListener("keydown", handleKeydown);
     select.addEventListener("change", sync);
+    select.form?.addEventListener("reset", handleFormReset);
     document.addEventListener("pointerdown", handleOutside);
     const observer = new MutationObserver(sync);
     observer.observe(select, { childList: true, subtree: true });
@@ -103,6 +111,7 @@ export function enhanceFilterSelects(root = document) {
 
     const cleanup = () => {
       observer.disconnect();
+      select.form?.removeEventListener("reset", handleFormReset);
       document.removeEventListener("pointerdown", handleOutside);
       enhancedSelects.delete(select);
     };

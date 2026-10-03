@@ -13,62 +13,129 @@
           ×
         </button>
       </div>
-      <form id="staffForm">
-        <div class="form-row">
+      <form id="staffForm" novalidate>
+        <div class="form-row staff-name-row">
           <div class="field">
-            <label for="newName">ชื่อ-นามสกุล</label
-            ><input id="newName" required />
-          </div>
-          <div class="field">
-            <label for="newId">Username / Staff ID</label
-            ><input
-              id="newId"
-              placeholder="เช่น TECH001"
+            <label for="newFirstName">ชื่อ</label>
+            <input
+              id="newFirstName"
+              required
               minlength="2"
-              maxlength="30"
-              pattern="[A-Za-z0-9_\-]+"
-              autocomplete="username"
-              required
+              maxlength="149"
+              autocomplete="given-name"
+              aria-describedby="newFirstNameError"
             />
+            <p
+              id="newFirstNameError"
+              class="field-error"
+              aria-live="polite"
+            ></p>
+          </div>
+          <div class="field">
+            <label for="newLastName">นามสกุล</label>
+            <input
+              id="newLastName"
+              required
+              minlength="2"
+              maxlength="149"
+              autocomplete="family-name"
+              aria-describedby="newLastNameError"
+            />
+            <p
+              id="newLastNameError"
+              class="field-error"
+              aria-live="polite"
+            ></p>
           </div>
         </div>
-        <div class="form-row">
-          <div class="field">
-            <label for="newEmail">อีเมล</label
-            ><input id="newEmail" type="email" autocomplete="email" required />
-          </div>
-          <div class="field">
-            <label for="newPassword">รหัสผ่านเริ่มต้น</label
-            ><input
-              id="newPassword"
-              minlength="8"
-              maxlength="128"
-              autocomplete="new-password"
-              required
-            />
-            <small>อย่างน้อย 8 ตัวอักษร</small>
-          </div>
+        <div class="field">
+          <label for="newEmail">อีเมล</label>
+          <input
+            id="newEmail"
+            type="email"
+            maxlength="254"
+            autocomplete="email"
+            aria-describedby="newEmailError"
+            required
+          />
+          <p id="newEmailError" class="field-error" aria-live="polite"></p>
         </div>
-        <div class="form-row">
-          <div class="field">
-            <label for="newRole">Role</label
-            ><select id="newRole" required>
-              <option value="housekeeper">แม่บ้าน</option>
-              <option value="technician">ช่าง</option>
-              <option value="clerk">ธุรการ</option>
-              <option value="admin">แอดมิน</option>
-            </select>
-          </div>
-          <div class="field">
-            <label for="newZone">พื้นที่รับผิดชอบ</label
-            ><input id="newZone" placeholder="เช่น CSB ชั้น 1–3" />
-          </div>
+        <div class="field">
+          <label for="newRole">Role</label
+          ><select
+            class="field-compact"
+            id="newRole"
+            aria-label="เลือก Role"
+            aria-describedby="newRoleError"
+            required
+          >
+            <option value="" disabled selected>เลือก Role</option>
+            <option value="housekeeper">แม่บ้าน</option>
+            <option value="technician">ช่าง</option>
+            <option value="clerk">ธุรการ</option>
+            <option value="admin">แอดมิน</option>
+          </select>
+          <p id="newRoleError" class="field-error" aria-live="polite"></p>
         </div>
         <button class="primary" id="createStaffButton" style="width: 100%">
           สร้างบัญชี
         </button>
       </form>
     </div>
+  </div>
+
+  <div
+    class="modal"
+    id="staffCredentialsModal"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="staffCredentialsTitle"
+  >
+    <section class="modal-card staff-credentials-modal-card">
+      <header class="modal-head">
+        <h3 id="staffCredentialsTitle">สร้างบัญชี Staff สำเร็จ</h3>
+        <button
+          type="button"
+          class="close"
+          data-close="staffCredentialsModal"
+          aria-label="ปิด"
+        >
+          <svg class="icon"><use href="#i-close" /></svg>
+        </button>
+      </header>
+      <div
+        class="success-check staff-credentials-success-check"
+        aria-hidden="true"
+      >
+        <svg class="icon"><use href="#i-check" /></svg>
+      </div>
+      <p class="generated-password-notice">
+        รหัสผ่านนี้จะแสดงเพียงครั้งเดียว กรุณาคัดลอกและส่งให้ Staff อย่างปลอดภัย
+      </p>
+      <div class="generated-password-box">
+        <code id="generatedStaffPassword" aria-label="รหัสผ่านชั่วคราว"></code>
+        <button
+          type="button"
+          class="secondary generated-password-copy"
+          id="copyGeneratedPassword"
+          aria-label="คัดลอกรหัสผ่าน"
+          title="คัดลอกรหัสผ่าน"
+        >
+          <svg class="icon" aria-hidden="true"><use href="#i-copy" /></svg>
+        </button>
+      </div>
+      <p
+        class="generated-password-email-status"
+        id="generatedPasswordEmailStatus"
+      ></p>
+      <button
+        type="button"
+        class="primary generated-password-done"
+        data-close="staffCredentialsModal"
+      >
+        เสร็จสิ้น
+      </button>
+    </section>
   </div>
 
   <div
@@ -93,26 +160,45 @@
       <form id="editStaffForm">
         <input type="hidden" id="editStaffIndex" />
         <div class="field">
-          <label for="editStaffName">ชื่อ-นามสกุล</label
-          ><input id="editStaffName" required />
+          <label for="editStaffName">ชื่อ-นามสกุล</label>
+          <!-- ตรวจว่าชื่อมี 2-150 ตัวอักษร -->
+          <input
+            id="editStaffName"
+            required
+            minlength="2"
+            maxlength="150"
+            autocomplete="name"
+          />
         </div>
+
         <div class="field">
-          <label for="editStaffEmail">อีเมล</label
-          ><input id="editStaffEmail" type="email" required />
+          <label for="editStaffEmail">อีเมล</label>
+          <!-- ตรวจรูปแบบอีเมลด้วย Browser -->
+          <input
+            id="editStaffEmail"
+            type="email"
+            required
+            maxlength="254"
+            autocomplete="email"
+          />
         </div>
+
         <div class="form-row">
           <div class="field">
-            <label for="editStaffRole">Role</label
-            ><select id="editStaffRole">
-              <option>แม่บ้าน</option>
-              <option>ช่าง</option>
-              <option>ธุรการ</option>
-              <option>แอดมิน</option>
+            <label for="editStaffRole">บทบาท</label>
+            <!-- บังคับให้เลือก Role -->
+            <select id="editStaffRole" required>
+              <option value="" disabled>เลือกบทบาทเจ้าหน้าที่</option>
+              <option value="แม่บ้าน">แม่บ้าน</option>
+              <option value="ช่าง">ช่าง</option>
+              <option value="ธุรการ">ธุรการ</option>
+              <option value="แอดมิน">แอดมิน</option>
             </select>
           </div>
+
           <div class="field">
-            <label for="editStaffZone">พื้นที่รับผิดชอบ</label
-            ><input id="editStaffZone" />
+            <label for="editStaffZone">พื้นที่รับผิดชอบ</label>
+            <input id="editStaffZone" maxlength="100" />
           </div>
         </div>
         <button type="submit" class="primary" style="width: 100%">
@@ -163,6 +249,13 @@
           />
           <small>ระบบจะสร้าง QR Code ของสถานที่นี้ให้อัตโนมัติ</small>
         </div>
+        <div class="field">
+          <label for="qrServiceType">ประเภทบริการ</label>
+          <select id="qrServiceType" required>
+            <option value="repair">แจ้งซ่อม</option>
+            <option value="clean">แจ้งทำความสะอาด</option>
+          </select>
+        </div>
         <button type="submit" class="primary" style="width: 100%">
           เพิ่มสถานที่และสร้าง QR
         </button>
@@ -194,13 +287,17 @@
           <div class="qr-fallback"></div>
         </div>
         <div>
-          <span class="eyebrow">ชื่อสถานที่</span>
           <h3 id="qrRoomName">-</h3>
           <p class="qr-detail-floor" id="qrRoomFloor"></p>
         </div>
-        <button class="primary" id="downloadQr" type="button">
-          ดาวน์โหลด QR Code
-        </button>
+        <div class="qr-detail-actions">
+          <button class="primary" id="downloadQr" type="button">
+            ดาวน์โหลด QR Code
+          </button>
+          <button class="secondary" id="printQr" type="button">
+            พิมพ์ QR Code
+          </button>
+        </div>
       </div>
     </section>
   </div>

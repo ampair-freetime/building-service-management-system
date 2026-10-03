@@ -6,11 +6,13 @@ export const STAFF_ROLE_PAGES = {
   housekeeper: [
     { id: "dashboard", label: "ภาพรวมงาน" },
     { id: "jobs", label: "คิวงานทำความสะอาด" },
+    { id: "my-jobs", label: "งานของฉัน" },
     { id: "my-history", label: "ประวัติงานของฉัน" },
   ],
   technician: [
     { id: "dashboard", label: "ภาพรวมงาน" },
     { id: "jobs", label: "คิวงานแจ้งซ่อม" },
+    { id: "my-jobs", label: "งานของฉัน" },
     { id: "my-history", label: "ประวัติงานของฉัน" },
   ],
   clerk: [
@@ -20,10 +22,10 @@ export const STAFF_ROLE_PAGES = {
     { id: "my-history", label: "ประวัติงานของฉัน" },
   ],
   admin: [
-    { id: "staff-overview", label: "ภาพรวมงาน Staff" },
+    { id: "staff-overview", label: "ภาพรวมงานของเจ้าหน้าที่" },
     { id: "history", label: "ของหายและรับฝาก" },
     { id: "staff", label: "บัญชีเจ้าหน้าที่" },
-    { id: "qr", label: "QR ประจำห้อง" },
+    { id: "qr", label: "จัดการสถานที่" },
   ],
 };
 

@@ -5,14 +5,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.security import verify_password
 from app.models.enums import AccountStatus
 from app.models.staff import Staff
-from app.services.staff import get_staff_by_identifier
+from app.services.staff import get_staff_by_email
 
 
 async def authenticate_staff(
     session: AsyncSession, identifier: str, password: str
 ) -> Staff | None:
     """คืนบัญชีเมื่อข้อมูลถูกต้อง หรือคืน None เมื่อไม่ผ่านการยืนยันตัวตน."""
-    account = await get_staff_by_identifier(session, identifier)
+    account = await get_staff_by_email(session, identifier)
 
     # บัญชีที่ถูกปิดใช้งานต้องล็อกอินไม่ได้ แม้รหัสผ่านจะถูกต้อง
     if account is None or account.status != AccountStatus.ACTIVE:

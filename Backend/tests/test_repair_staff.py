@@ -147,7 +147,6 @@ def test_technician_can_view_repair_requests(
 
     seed_staff(
         session_factory,
-        staff_code="TECH001",
         email="technician1@example.com",
         password="password-one",
         role="technician",
@@ -161,7 +160,7 @@ def test_technician_can_view_repair_requests(
         title="Air conditioner broken",
     )
 
-    headers = login_staff(client, "TECH001", "password-one")
+    headers = login_staff(client, "technician1@example.com", "password-one")
 
     response = client.get(
         "/api/v1/repair-requests",
@@ -197,7 +196,6 @@ def test_repair_list_does_not_include_cleaning_requests(
 
     seed_staff(
         session_factory,
-        staff_code="TECH001",
         email="technician1@example.com",
         password="password-one",
         role="technician",
@@ -218,7 +216,7 @@ def test_repair_list_does_not_include_cleaning_requests(
         title="Dirty floor",
     )
 
-    headers = login_staff(client, "TECH001", "password-one")
+    headers = login_staff(client, "technician1@example.com", "password-one")
 
     response = client.get(
         "/api/v1/repair-requests",
@@ -240,14 +238,13 @@ def test_repair_list_is_empty_when_no_repair_requests(
 
     seed_staff(
         session_factory,
-        staff_code="TECH001",
         email="technician1@example.com",
         password="password-one",
         role="technician",
         full_name="Technician One",
     )
 
-    headers = login_staff(client, "TECH001", "password-one")
+    headers = login_staff(client, "technician1@example.com", "password-one")
 
     response = client.get(
         "/api/v1/repair-requests",
@@ -265,14 +262,13 @@ def test_non_technician_cannot_view_repair_requests(
 
     seed_staff(
         session_factory,
-        staff_code="HK001",
         email="housekeeper@example.com",
         password="password-one",
         role="housekeeper",
         full_name="Housekeeper One",
     )
 
-    headers = login_staff(client, "HK001", "password-one")
+    headers = login_staff(client, "housekeeper@example.com", "password-one")
 
     response = client.get(
         "/api/v1/repair-requests",
@@ -291,7 +287,6 @@ def test_technician_can_view_repair_request_detail(
 
     seed_staff(
         session_factory,
-        staff_code="TECH001",
         email="technician1@example.com",
         password="password-one",
         role="technician",
@@ -305,7 +300,7 @@ def test_technician_can_view_repair_request_detail(
         title="Broken air conditioner",
     )
 
-    headers = login_staff(client, "TECH001", "password-one")
+    headers = login_staff(client, "technician1@example.com", "password-one")
 
     response = client.get(
         "/api/v1/repair-requests",
@@ -350,14 +345,13 @@ def test_repair_detail_returns_404_when_request_not_found(
 
     seed_staff(
         session_factory,
-        staff_code="TECH001",
         email="technician1@example.com",
         password="password-one",
         role="technician",
         full_name="Technician One",
     )
 
-    headers = login_staff(client, "TECH001", "password-one")
+    headers = login_staff(client, "technician1@example.com", "password-one")
 
     response = client.get(
         f"/api/v1/repair-requests/{uuid4()}",
@@ -377,7 +371,6 @@ def test_repair_detail_does_not_allow_cleaning_request(
 
     seed_staff(
         session_factory,
-        staff_code="TECH001",
         email="technician1@example.com",
         password="password-one",
         role="technician",
@@ -391,7 +384,7 @@ def test_repair_detail_does_not_allow_cleaning_request(
         title="Dirty floor",
     )
 
-    headers = login_staff(client, "TECH001", "password-one")
+    headers = login_staff(client, "technician1@example.com", "password-one")
 
     async def get_cleaning_request_id():
         async with session_factory() as session:
@@ -422,7 +415,6 @@ def test_repair_detail_includes_attached_images(
 
     seed_staff(
         session_factory,
-        staff_code="TECH001",
         email="technician1@example.com",
         password="password-one",
         role="technician",
@@ -476,7 +468,7 @@ def test_repair_detail_includes_attached_images(
 
     headers = login_staff(
         client,
-        "TECH001",
+        "technician1@example.com",
         "password-one",
     )
 
@@ -512,7 +504,6 @@ def test_technician_can_accept_repair_task(
 
     seed_staff(
         session_factory,
-        staff_code="TECH001",
         email="technician1@example.com",
         password="password-one",
         role="technician",
@@ -526,7 +517,7 @@ def test_technician_can_accept_repair_task(
         title="Air conditioner broken",
     )
 
-    headers = login_staff(client, "TECH001", "password-one")
+    headers = login_staff(client, "technician1@example.com", "password-one")
 
     async def get_request_id():
         async with session_factory() as session:
@@ -550,7 +541,7 @@ def test_technician_can_accept_repair_task(
     assert body["id"] == str(request_id)
     assert body["request_code"] == "REP-ACCEPT-001"
     assert body["status"] == "assigned"
-    assert body["assigned_staff"]["staff_code"] == "TECH001"
+    assert "staff_code" not in body["assigned_staff"]
     assert body["assigned_staff"]["full_name"] == "Technician One"
 
     async def verify_database() -> None:
@@ -585,7 +576,6 @@ def test_second_technician_cannot_accept_assigned_repair_task(
 
     seed_staff(
         session_factory,
-        staff_code="TECH001",
         email="technician1@example.com",
         password="password-one",
         role="technician",
@@ -594,7 +584,6 @@ def test_second_technician_cannot_accept_assigned_repair_task(
 
     seed_staff(
         session_factory,
-        staff_code="TECH002",
         email="technician2@example.com",
         password="password-two",
         role="technician",
@@ -610,13 +599,13 @@ def test_second_technician_cannot_accept_assigned_repair_task(
 
     tech1_headers = login_staff(
         client,
-        "TECH001",
+        "technician1@example.com",
         "password-one",
     )
 
     tech2_headers = login_staff(
         client,
-        "TECH002",
+        "technician2@example.com",
         "password-two",
     )
 
@@ -637,7 +626,7 @@ def test_second_technician_cannot_accept_assigned_repair_task(
     )
 
     assert first.status_code == 200
-    assert first.json()["assigned_staff"]["staff_code"] == "TECH001"
+    assert "staff_code" not in first.json()["assigned_staff"]
 
     # TECH002 พยายามรับงานเดียวกัน
     second = client.patch(
@@ -680,7 +669,6 @@ def test_technician_can_update_repair_status_to_received(
 
     seed_staff(
         session_factory,
-        staff_code="TECH001",
         email="technician1@example.com",
         password="password-one",
         role="technician",
@@ -694,7 +682,7 @@ def test_technician_can_update_repair_status_to_received(
         title="Broken air conditioner",
     )
 
-    headers = login_staff(client, "TECH001", "password-one")
+    headers = login_staff(client, "technician1@example.com", "password-one")
 
     async def get_request_id():
         async with session_factory() as session:
@@ -754,7 +742,6 @@ def test_technician_can_update_repair_status_to_in_progress(
 
     seed_staff(
         session_factory,
-        staff_code="TECH001",
         email="technician1@example.com",
         password="password-one",
         role="technician",
@@ -768,7 +755,7 @@ def test_technician_can_update_repair_status_to_in_progress(
         title="Broken light",
     )
 
-    headers = login_staff(client, "TECH001", "password-one")
+    headers = login_staff(client, "technician1@example.com", "password-one")
 
     async def get_request_id():
         async with session_factory() as session:
@@ -836,7 +823,6 @@ def test_technician_cannot_skip_repair_status(
 
     seed_staff(
         session_factory,
-        staff_code="TECH001",
         email="technician1@example.com",
         password="password-one",
         role="technician",
@@ -850,7 +836,7 @@ def test_technician_cannot_skip_repair_status(
         title="Broken door",
     )
 
-    headers = login_staff(client, "TECH001", "password-one")
+    headers = login_staff(client, "technician1@example.com", "password-one")
 
     async def get_request_id():
         async with session_factory() as session:
@@ -901,7 +887,6 @@ def test_other_technician_cannot_update_repair_status(
 
     seed_staff(
         session_factory,
-        staff_code="TECH001",
         email="technician1@example.com",
         password="password-one",
         role="technician",
@@ -910,7 +895,6 @@ def test_other_technician_cannot_update_repair_status(
 
     seed_staff(
         session_factory,
-        staff_code="TECH002",
         email="technician2@example.com",
         password="password-two",
         role="technician",
@@ -924,8 +908,8 @@ def test_other_technician_cannot_update_repair_status(
         title="Broken fan",
     )
 
-    tech1_headers = login_staff(client, "TECH001", "password-one")
-    tech2_headers = login_staff(client, "TECH002", "password-two")
+    tech1_headers = login_staff(client, "technician1@example.com", "password-one")
+    tech2_headers = login_staff(client, "technician2@example.com", "password-two")
 
     async def get_request_id():
         async with session_factory() as session:
@@ -973,7 +957,6 @@ def test_technician_can_complete_repair_task(
 
     seed_staff(
         session_factory,
-        staff_code="TECH001",
         email="complete-repair@example.com",
         password="correct-password",
         role="technician",
@@ -989,7 +972,7 @@ def test_technician_can_complete_repair_task(
 
     headers = login_staff(
         client,
-        "TECH001",
+        "complete-repair@example.com",
         "correct-password",
     )
 
@@ -1066,7 +1049,6 @@ def test_technician_cannot_complete_repair_before_in_progress(
 
     seed_staff(
         session_factory,
-        staff_code="TECH001",
         email="early-complete@example.com",
         password="correct-password",
         role="technician",
@@ -1082,7 +1064,7 @@ def test_technician_cannot_complete_repair_before_in_progress(
 
     headers = login_staff(
         client,
-        "TECH001",
+        "early-complete@example.com",
         "correct-password",
     )
 
@@ -1132,7 +1114,6 @@ def test_other_technician_cannot_complete_repair_task(
 
     seed_staff(
         session_factory,
-        staff_code="TECH001",
         email="owner-complete@example.com",
         password="correct-password",
         role="technician",
@@ -1141,7 +1122,6 @@ def test_other_technician_cannot_complete_repair_task(
 
     seed_staff(
         session_factory,
-        staff_code="TECH002",
         email="other-complete@example.com",
         password="correct-password",
         role="technician",
@@ -1157,13 +1137,13 @@ def test_other_technician_cannot_complete_repair_task(
 
     tech1_headers = login_staff(
         client,
-        "TECH001",
+        "owner-complete@example.com",
         "correct-password",
     )
 
     tech2_headers = login_staff(
         client,
-        "TECH002",
+        "other-complete@example.com",
         "correct-password",
     )
 
@@ -1227,7 +1207,6 @@ def test_technician_can_add_repair_completion_note(
 
     seed_staff(
         session_factory,
-        staff_code="TECH001",
         email="repair-note@example.com",
         password="correct-password",
         role="technician",
@@ -1243,7 +1222,7 @@ def test_technician_can_add_repair_completion_note(
 
     headers = login_staff(
         client,
-        "TECH001",
+        "repair-note@example.com",
         "correct-password",
     )
 
@@ -1329,7 +1308,6 @@ def test_technician_cannot_add_repair_note_before_completed(
 
     seed_staff(
         session_factory,
-        staff_code="TECH001",
         email="early-note@example.com",
         password="correct-password",
         role="technician",
@@ -1345,7 +1323,7 @@ def test_technician_cannot_add_repair_note_before_completed(
 
     headers = login_staff(
         client,
-        "TECH001",
+        "early-note@example.com",
         "correct-password",
     )
 
@@ -1401,7 +1379,6 @@ def test_repair_completion_note_appears_in_work_history(
 
     seed_staff(
         session_factory,
-        staff_code="TECH001",
         email="repair-history@example.com",
         password="correct-password",
         role="technician",
@@ -1417,7 +1394,7 @@ def test_repair_completion_note_appears_in_work_history(
 
     headers = login_staff(
         client,
-        "TECH001",
+        "repair-history@example.com",
         "correct-password",
     )
 
@@ -1506,7 +1483,6 @@ def test_technician_can_upload_repair_completion_photos(
     seed_location(session_factory)
     seed_staff(
         session_factory,
-        staff_code="TECH001",
         email="repair-photo@example.com",
         password="correct-password",
         role="technician",
@@ -1518,7 +1494,7 @@ def test_technician_can_upload_repair_completion_photos(
         request_type=RequestType.REPAIR,
         title="Broken projector",
     )
-    headers = login_staff(client, "TECH001", "correct-password")
+    headers = login_staff(client, "repair-photo@example.com", "correct-password")
 
     async def get_request_id():
         async with session_factory() as session:

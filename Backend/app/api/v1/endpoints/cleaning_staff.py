@@ -66,7 +66,6 @@ async def accept_task(
         status=task.status.value,
         assigned_staff=AssignedCleanerResponse(
             id=housekeeper.id,
-            staff_code=housekeeper.staff_code,
             full_name=housekeeper.full_name,
         ),
     )
@@ -112,7 +111,6 @@ async def update_task_status(
         status=task.status.value,
         assigned_staff=AssignedCleanerResponse(
             id=housekeeper.id,
-            staff_code=housekeeper.staff_code,
             full_name=housekeeper.full_name,
         ),
     )

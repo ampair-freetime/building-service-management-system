@@ -184,14 +184,6 @@
             ><select id="newJobStatus" required></select>
           </div>
           <div class="field">
-            <label for="statusNote">หมายเหตุ</label
-            ><textarea
-              id="statusNote"
-              required
-              placeholder="สรุปความคืบหน้า"
-            ></textarea>
-          </div>
-          <div class="field">
             <label for="statusImage">รูปความคืบหน้า (ถ้ามี)</label
             ><input
               id="statusImage"

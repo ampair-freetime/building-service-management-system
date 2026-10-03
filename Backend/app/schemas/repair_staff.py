@@ -60,7 +60,6 @@ class RepairRequestDetailResponse(BaseModel):
 
 class AssignedTechnicianResponse(BaseModel):
     id: UUID
-    staff_code: str
     full_name: str
 
 

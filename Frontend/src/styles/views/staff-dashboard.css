@@ -126,6 +126,10 @@
   outline: none; background: var(--role-soft, var(--primary-soft));
   color: var(--role, var(--primary));
 }
+.staff-dashboard-page .filter-select-option:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
 .staff-dashboard-page .filter-select-option svg { justify-self: end; }
 @media (max-width: 720px) {
   .staff-dashboard-page .filter-select-dropdown,
@@ -1533,6 +1537,146 @@ body {
   display: grid;
   gap: 14px;
 }
+
+/* Keep every account field flush with the full width of the create modal. */
+#staffModal #staffForm {
+  width: 100%;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+#staffModal #staffForm > .form-row {
+  width: 100%;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+#staffModal #staffForm > .staff-name-row {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+#staffModal #staffForm > :is(.field, .form-row),
+#staffModal #staffForm .field,
+#staffModal #staffForm :is(input, select) {
+  width: 100%;
+  min-width: 0;
+}
+
+#staffModal #staffForm > .field,
+#staffModal #staffForm > .form-row,
+#staffModal #staffForm > .form-row > .field {
+  grid-column: 1 / -1;
+}
+
+#staffModal #staffForm > .staff-name-row > .field {
+  grid-column: auto;
+}
+
+#staffModal .field-error {
+  display: none;
+  margin: 0;
+  color: var(--danger, #d33b49);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+#staffModal .field-error:not(:empty) {
+  display: block;
+}
+
+#staffModal .field :is(input, select)[aria-invalid="true"],
+#staffModal .filter-select-native[aria-invalid="true"] + .filter-select-trigger {
+  border-color: var(--danger, #d33b49);
+  background: #fff7f8;
+}
+
+/* Let the Role option list extend past the dialog instead of creating a scrollbar. */
+@media (min-width: 721px) {
+  #staffModal {
+    overflow-y: auto;
+  }
+
+  #staffModal .modal-card {
+    max-height: none;
+    overflow: visible;
+  }
+
+  #staffModal .modal-head {
+    border-radius: 26px 26px 0 0;
+  }
+}
+
+.modal .modal-card.staff-credentials-modal-card {
+  width: min(520px, 100%);
+}
+.staff-credentials-modal-card .modal-head {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) 42px;
+}
+.staff-credentials-modal-card .modal-head h3 {
+  grid-column: 2;
+  text-align: center;
+}
+.staff-credentials-modal-card .modal-head .close {
+  grid-column: 3;
+}
+.generated-password-notice,
+.generated-password-email-status {
+  margin: 0 0 14px;
+}
+.staff-credentials-success-check {
+  width: 96px;
+  height: 96px;
+  margin-bottom: 20px;
+  background: #dcf8e4;
+  color: #16813a;
+  box-shadow: 0 12px 30px rgba(22, 129, 58, 0.16);
+}
+.staff-credentials-success-check .icon {
+  width: 52px;
+  height: 52px;
+  stroke-width: 2.5;
+}
+.generated-password-box {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: stretch;
+  margin-bottom: 14px;
+}
+.generated-password-box code {
+  display: grid;
+  place-items: center;
+  min-width: 0;
+  min-height: 52px;
+  padding: 12px 14px;
+  overflow-wrap: anywhere;
+  border: 1px solid var(--line);
+  border-radius: 15px;
+  background: #f7f5ff;
+  color: var(--ink);
+  font-size: clamp(14px, 3vw, 18px);
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  user-select: all;
+}
+.generated-password-copy {
+  display: grid;
+  width: 52px;
+  min-width: 52px;
+  min-height: 52px;
+  padding: 0;
+  place-items: center;
+}
+.generated-password-copy .icon {
+  width: 23px;
+  height: 23px;
+}
+.generated-password-email-status {
+  color: var(--muted);
+  font-size: 13px;
+}
+.generated-password-done {
+  width: 100%;
+}
 @media (max-width: 1050px) {
   .sidebar {
     left: -280px;
@@ -2176,16 +2320,11 @@ textarea:focus-visible,
   font-size: 10px;
   font-weight: 800;
 }
-.quick-action.primary-action {
-  background: var(--role);
-  border-color: var(--role);
-  color: #fff;
-}
 .staff-dashboard-page #dashboardQuickActions .quick-action:hover,
 .staff-dashboard-page #dashboardQuickActions .quick-action:focus-visible {
-  background: #40E0D0;
-  border-color: #40E0D0;
-  color: #fff;
+  background: var(--role);
+  border-color: var(--role);
+  color: #ffffff;
 }
 .progress-upload {
   border: 1px dashed #cbc6de;
@@ -3651,6 +3790,23 @@ body {
     margin: -20px -16px 16px;
     padding: 17px 16px 12px;
   }
+  #staffModal,
+  #staffCredentialsModal {
+    align-items: center;
+    padding: 16px;
+  }
+  #staffModal .modal-card,
+  #staffCredentialsModal .modal-card {
+    width: min(620px, 100%);
+    max-height: calc(100dvh - 32px);
+    border-radius: 26px;
+    padding: 20px 16px;
+    transform: translateY(14px) scale(0.985);
+  }
+  #staffModal.open .modal-card,
+  #staffCredentialsModal.open .modal-card {
+    transform: translateY(0) scale(1);
+  }
   .detail-layout,
   .form-row,
   .profile-grid {
@@ -4237,8 +4393,8 @@ body {
     position: fixed;
     left: 20px;
     right: auto;
-    top: 14px;
-    bottom: auto;
+    top: auto;
+    bottom: max(20px, env(safe-area-inset-bottom));
     z-index: 41;
     width: 52px;
     height: 52px;
@@ -4489,7 +4645,7 @@ body {
 
 .staff-dashboard-page .qr-location-item {
   display: grid;
-  grid-template-columns: 46px minmax(0, 1fr) auto;
+  grid-template-columns: 58px minmax(0, 1fr) auto;
   align-items: center;
   gap: 14px;
   min-height: 82px;
@@ -4507,29 +4663,53 @@ body {
   gap: 8px;
 }
 
-.staff-dashboard-page .qr-location-delete {
-  display: inline-grid;
-  place-items: center;
-  width: 46px;
-  min-width: 46px;
-  padding: 0;
+.staff-dashboard-page .qr-location-title {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
-.staff-dashboard-page .qr-location-delete .icon {
-  width: 20px;
-  height: 20px;
+.staff-dashboard-page .qr-status-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.staff-dashboard-page .qr-status-badge.is-active {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.staff-dashboard-page .qr-status-badge.is-inactive {
+  background: #f1f5f9;
+  color: #64748b;
 }
 
 .staff-dashboard-page .qr-location-symbol {
   display: grid;
   place-items: center;
-  width: 46px;
-  height: 46px;
-  border-radius: 15px;
+  width: 58px;
+  height: 58px;
+  overflow: hidden;
+  border: 2px solid #fff;
+  border-radius: 10px;
   background: var(--primary-soft);
   color: var(--primary);
   font-size: 11px;
   font-weight: 900;
+  box-shadow: 0 0 0 1px var(--line);
+}
+
+.staff-dashboard-page .qr-location-symbol canvas,
+.staff-dashboard-page .qr-location-symbol img {
+  display: block;
+  width: 54px !important;
+  height: 54px !important;
 }
 
 .staff-dashboard-page .qr-location-copy {
@@ -4587,7 +4767,10 @@ body {
   font-size: 13px;
 }
 
-.staff-dashboard-page .qr-detail-content #downloadQr {
+.staff-dashboard-page .qr-detail-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
   width: 100%;
 }
 
@@ -4607,18 +4790,18 @@ body {
   }
 
   .staff-dashboard-page .qr-location-item {
-    grid-template-columns: 42px minmax(0, 1fr);
+    grid-template-columns: 58px minmax(0, 1fr);
     gap: 11px;
   }
 
   .staff-dashboard-page .qr-location-symbol {
-    width: 42px;
-    height: 42px;
+    width: 58px;
+    height: 58px;
   }
 
   .staff-dashboard-page .qr-location-actions {
     grid-column: 1 / -1;
-    grid-template-columns: minmax(0, 1fr) 46px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     width: 100%;
   }
 
