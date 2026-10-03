@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from "vue-router";
 
 import PublicServicePortal from "../views/PublicServicePortal.vue";
 import StaffLogin from "../views/staff-login.vue";
+import StaffPasswordSetup from "../views/staff-password-setup.vue";
 import StaffDashboard from "../views/staff-dashboard.vue";
 import MobileDemo from "../views/MobileDemo.vue";
 
@@ -27,6 +28,11 @@ const routes = [
     path: "/staff-login",
     name: "staff-login",
     component: StaffLogin,
+  },
+  {
+    path: "/staff/setup-password",
+    name: "staff-password-setup",
+    component: StaffPasswordSetup,
   },
 
   // Dashboard เจ้าหน้าที่

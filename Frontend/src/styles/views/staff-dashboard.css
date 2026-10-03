@@ -2121,16 +2121,11 @@ textarea:focus-visible,
   font-size: 10px;
   font-weight: 800;
 }
-.quick-action.primary-action {
-  background: var(--role);
-  border-color: var(--role);
-  color: #fff;
-}
 .staff-dashboard-page #dashboardQuickActions .quick-action:hover,
 .staff-dashboard-page #dashboardQuickActions .quick-action:focus-visible {
-  background: #40E0D0;
-  border-color: #40E0D0;
-  color: #fff;
+  background: var(--role);
+  border-color: var(--role);
+  color: #ffffff;
 }
 .progress-upload {
   border: 1px dashed #cbc6de;
@@ -4850,7 +4845,7 @@ body {
 
 .staff-dashboard-page .staff-account-meta {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
   padding: 16px 18px;
 }
@@ -4875,6 +4870,18 @@ body {
   font-size: 13px;
 }
 
+.staff-dashboard-page .invitation-delivery-status.done {
+  color: var(--clean);
+}
+
+.staff-dashboard-page .invitation-delivery-status.danger {
+  color: var(--danger);
+}
+
+.staff-dashboard-page .invitation-delivery-status.neutral {
+  color: var(--muted);
+}
+
 .staff-dashboard-page .staff-account-actions {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -4888,6 +4895,19 @@ body {
   min-height: 40px;
   padding: 5px 7px;
   white-space: normal;
+}
+
+.staff-dashboard-page .resend-invitation-button {
+  width: calc(100% - 36px);
+  min-height: 40px;
+  margin: 0 18px;
+  border-color: color-mix(in srgb, var(--primary) 35%, var(--line));
+  color: var(--primary);
+}
+
+.staff-dashboard-page .resend-invitation-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 @media (max-width: 720px) {

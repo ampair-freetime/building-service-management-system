@@ -13,11 +13,13 @@ from app.models.enums import (
     StaffRole,
 )
 from app.models.image import Image
+from app.models.invitation import StaffInvitation
 from app.models.location import Location
 from app.models.lost_found import LostClaim, LostItem, LostItemHistory
 from app.models.notification import Notification
 from app.models.service_request import RequestHistory, ServiceRequest
 from app.models.staff import Staff
+from app.models.staff_deletion_audit import StaffDeletionAudit
 
 __all__ = [
     "AccountStatus",
@@ -38,5 +40,7 @@ __all__ = [
     "RequestType",
     "ServiceRequest",
     "Staff",
+    "StaffDeletionAudit",
+    "StaffInvitation",
     "StaffRole",
 ]

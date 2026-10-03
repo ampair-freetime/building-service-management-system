@@ -64,19 +64,7 @@
               ><strong id="profileEmail">-</strong>
             </div>
             <div>
-              <small>รหัสเจ้าหน้าที่</small
-              ><strong id="profileStaffId">-</strong>
-            </div>
-            <div>
               <small>Role</small><strong id="profileRole">-</strong>
-            </div>
-            <div>
-              <small>แผนก</small
-              ><strong id="profileDepartment">บริหารระบบ</strong>
-            </div>
-            <div>
-              <small>สถานะ</small
-              ><strong style="color: #258745">พร้อมปฏิบัติงาน</strong>
             </div>
           </div>
         </div>

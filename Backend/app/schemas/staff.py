@@ -49,6 +49,18 @@ class StaffResponse(BaseModel):
 
 
 class StaffCreatedResponse(StaffResponse):
-    """ผลการสร้างบัญชีและสถานะการส่งรหัสผ่านเริ่มต้น."""
+    """ผลการสร้างบัญชีและสถานะการส่ง invitation."""
 
     email_sent: bool
+
+
+class ActivationTokenRequest(BaseModel):
+    token: str = Field(min_length=20, max_length=512)
+
+
+class ActivationRequest(ActivationTokenRequest):
+    password: str = Field(min_length=8, max_length=128)
+
+
+class ActivationValidationResponse(BaseModel):
+    valid: bool = True

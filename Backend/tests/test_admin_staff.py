@@ -1,14 +1,10 @@
-"""ตรวจ flow สร้าง Staff โดย Admin และการส่งรหัสผ่านเริ่มต้น."""
-
-import re
-import string
+"""ตรวจ flow สร้าง Staff โดย Admin และการส่ง invitation ที่ปลอดภัย."""
 
 from conftest import seed_staff
 from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from app.core.security import generate_temporary_password
-from app.services.email import EmailDeliveryError
+from app.services.invitation_email import EmailDeliveryError
 
 
 def admin_headers(
@@ -38,11 +34,14 @@ def staff_payload(**changes: str) -> dict[str, str]:
     return payload
 
 
-def test_create_sends_password_that_can_log_in(test_context, monkeypatch) -> None:
+def test_create_sends_invitation_without_exposing_password(test_context, monkeypatch) -> None:
     client, session_factory = test_context
     headers = admin_headers(client, session_factory)
     sent: list[dict[str, str]] = []
-    monkeypatch.setattr("app.services.staff.send_email", lambda **kwargs: sent.append(kwargs))
+    async def send_invitation(**kwargs) -> None:
+        sent.append(kwargs)
+
+    monkeypatch.setattr("app.services.invitations.send_invitation_email", send_invitation)
 
     response = client.post("/api/v1/staff", headers=headers, json=staff_payload())
 
@@ -53,30 +52,22 @@ def test_create_sends_password_that_can_log_in(test_context, monkeypatch) -> Non
     assert body["email"] == "hk@example.com"
     assert "staff_code" not in body
     assert len(sent) == 1
-    assert sent[0]["to"] == "hk@example.com"
-    assert "hk@example.com" in sent[0]["text_body"]
-    assert "รหัสพนักงาน" not in sent[0]["text_body"]
-    password = re.search(r"รหัสผ่านเริ่มต้น: (.+)", sent[0]["text_body"]).group(1)
+    assert sent[0]["recipient"] == "hk@example.com"
+    assert sent[0]["staff_identifier"] == "hk@example.com"
+    assert "token=" in sent[0]["activation_link"]
     assert "password" not in body
     assert "password_hash" not in body
-    assert password not in response.text
-
-    login = client.post(
-        "/api/v1/auth/login",
-        json={"identifier": "hk@example.com", "password": password},
-    )
-    assert login.status_code == 200
-    assert login.json()["staff"]["id"] == body["id"]
+    assert "token=" not in response.text
 
 
 def test_delivery_failure_keeps_account_and_reports_false(test_context, monkeypatch) -> None:
     client, session_factory = test_context
     headers = admin_headers(client, session_factory)
 
-    def fail_delivery(**kwargs) -> None:
+    async def fail_delivery(**kwargs) -> None:
         raise EmailDeliveryError("SMTP unavailable")
 
-    monkeypatch.setattr("app.services.staff.send_email", fail_delivery)
+    monkeypatch.setattr("app.services.invitations.send_invitation_email", fail_delivery)
     response = client.post("/api/v1/staff", headers=headers, json=staff_payload())
 
     assert response.status_code == 201
@@ -89,7 +80,10 @@ def test_duplicate_or_invalid_request_never_sends_email(test_context, monkeypatc
     client, session_factory = test_context
     headers = admin_headers(client, session_factory)
     sent: list[dict[str, str]] = []
-    monkeypatch.setattr("app.services.staff.send_email", lambda **kwargs: sent.append(kwargs))
+    async def send_invitation(**kwargs) -> None:
+        sent.append(kwargs)
+
+    monkeypatch.setattr("app.services.invitations.send_invitation_email", send_invitation)
     first = client.post("/api/v1/staff", headers=headers, json=staff_payload())
     assert first.status_code == 201
     assert len(sent) == 1
@@ -117,7 +111,10 @@ def test_duplicate_or_invalid_request_never_sends_email(test_context, monkeypatc
 def test_only_admin_can_create_staff(test_context, monkeypatch) -> None:
     client, session_factory = test_context
     sent: list[dict[str, str]] = []
-    monkeypatch.setattr("app.services.staff.send_email", lambda **kwargs: sent.append(kwargs))
+    async def send_invitation(**kwargs) -> None:
+        sent.append(kwargs)
+
+    monkeypatch.setattr("app.services.invitations.send_invitation_email", send_invitation)
     seed_staff(
         session_factory,
         email="tech@example.com",
@@ -132,16 +129,3 @@ def test_only_admin_can_create_staff(test_context, monkeypatch) -> None:
     assert client.post("/api/v1/staff", json=staff_payload()).status_code == 401
     assert client.post("/api/v1/staff", headers=headers, json=staff_payload()).status_code == 403
     assert sent == []
-
-
-def test_temporary_password_has_all_character_types() -> None:
-    passwords = [generate_temporary_password() for _ in range(100)]
-    assert len(set(passwords)) == len(passwords)
-    for password in passwords:
-        assert len(password) == 12
-        assert any(char.isupper() for char in password)
-        assert any(char.islower() for char in password)
-        assert any(char.isdigit() for char in password)
-        assert any(char in "@#$%!?" for char in password)
-        assert not set(password) & set("0Oo1lI")
-        assert set(password) <= set(string.ascii_letters + string.digits + "@#$%!?")

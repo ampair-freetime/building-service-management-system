@@ -35,11 +35,17 @@ async function parseResponse(response, fallbackMessage) {
 export function toDashboardStaff(account) {
   return {
     name: account.full_name,
-    id: account.staff_code,
+    id: account.id,
     email: account.email,
     role: STAFF_ROLE_LABELS[account.role] || account.role,
     zone: "-",
     status: account.status === "active" ? "ใช้งาน" : "พักงาน",
+    invitationDeliveryStatus:
+      account.email_sent === true
+        ? "sent"
+        : account.email_sent === false
+          ? "failed"
+          : "unknown",
   };
 }
 
@@ -58,4 +64,12 @@ export async function createStaffAccount(payload) {
     body: JSON.stringify(payload),
   });
   return parseResponse(response, "สร้างบัญชีไม่สำเร็จ");
+}
+
+export async function resendStaffInvitation(staffId) {
+  const response = await fetch(
+    `${STAFF_ENDPOINT}/${encodeURIComponent(staffId)}/resend-invitation`,
+    { method: "POST", headers: authHeaders() },
+  );
+  return parseResponse(response, "ไม่สามารถส่งคำเชิญซ้ำได้");
 }

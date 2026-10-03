@@ -499,6 +499,21 @@ a:focus-visible {
   font-weight: 800;
   text-decoration: none;
 }
+.setup-symbols { position: absolute; overflow: hidden; }
+.password-setup-page .login-card { max-width: 620px; }
+.password-setup-page .login-content { padding-block: 42px; }
+.password-requirements { display: grid; grid-template-columns: 1fr 1fr; gap: 7px 14px; margin: -3px 0 1px; padding: 0; list-style: none; color: var(--muted); font-size: 11px; }
+.password-requirements li { display: flex; align-items: center; gap: 6px; }
+.password-requirements li.passed { color: #258745; }
+.setup-alert { padding: 11px 13px; border: 1px solid #f3c7cd; border-radius: 13px; background: #fff7f8; color: #b52f40; font-size: 11px; }
+.setup-login-link { min-height: 40px; border: 0; background: transparent; color: var(--primary); font-size: 11px; font-weight: 800; }
+.setup-success { display: grid; justify-items: center; text-align: center; }
+.setup-success-icon { width: 68px; height: 68px; margin-bottom: 18px; border-radius: 50%; background: #e9f8ef; color: #258745; display: grid; place-items: center; }
+.setup-success-icon .icon { width: 30px; height: 30px; }
+.setup-success h2 { margin: 7px 0 6px; font-size: 28px; }
+.setup-success p { margin: 0 0 22px; color: var(--muted); font-size: 12px; }
+.setup-success .login-button { width: 100%; }
+
 @media (hover: hover) and (pointer: fine) {
   .role-card:hover,
   .google-button:hover {
@@ -560,6 +575,9 @@ a:focus-visible {
   }
   .login-head h2 {
     font-size: 27px;
+  }
+  .password-requirements {
+    grid-template-columns: 1fr;
   }
   .role-grid {
     grid-template-columns: 1fr 1fr;

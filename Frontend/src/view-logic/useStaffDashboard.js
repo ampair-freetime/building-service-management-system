@@ -35,6 +35,7 @@ import {
 import {
   createStaffAccount,
   fetchStaffAccounts,
+  resendStaffInvitation,
   toDashboardStaff,
 } from "./staff-dashboard/staff-accounts.js";
 import {
@@ -98,7 +99,6 @@ export function useStaffDashboard() {
       );
       if (
         signedInStaff?.full_name &&
-        signedInStaff?.staff_code &&
         allowedRoles.includes(signedInStaff.role)
       ) {
         const signedInRole = signedInStaff.role;
@@ -110,7 +110,7 @@ export function useStaffDashboard() {
           .join("");
         currentUserName[signedInRole] = signedInStaff.full_name;
         roleConfig[signedInRole].name = signedInStaff.full_name;
-        roleConfig[signedInRole].staffId = signedInStaff.staff_code;
+        roleConfig[signedInRole].staffId = signedInStaff.staff_code || "-";
         roleConfig[signedInRole].avatar = initials || roleConfig[signedInRole].avatar;
       }
     } catch (error) {
@@ -595,8 +595,6 @@ export function useStaffDashboard() {
       const profileName = $("#profileName");
       if (profileName) profileName.textContent = currentUserName[role];
 
-      const profileStaffId = $("#profileStaffId");
-      if (profileStaffId) profileStaffId.textContent = c.staffId;
 
       const profileEmail = $("#profileEmail");
       if (profileEmail) {
@@ -615,17 +613,6 @@ export function useStaffDashboard() {
       const profileRole = $("#profileRole");
       if (profileRole) profileRole.textContent = c.label;
 
-      const profileDepartment = $("#profileDepartment");
-      if (profileDepartment) {
-        profileDepartment.textContent =
-          role === "technician"
-            ? "งานอาคารและซ่อมบำรุง"
-            : role === "housekeeper"
-            ? "งานดูแลความสะอาด"
-            : role === "clerk"
-            ? "ธุรการและของหาย"
-            : "บริหารระบบ";
-      }
 
       const jobsNavLabel = $("#jobsNavLabel");
       if (jobsNavLabel) {
@@ -676,6 +663,7 @@ export function useStaffDashboard() {
 
     // เปลี่ยนหน้าภายใน Staff Dashboard โดยตรวจสิทธิ์ของ role ก่อนเสมอ
     function navigate(page) {
+      const destinationPage = page === "my-jobs" ? "jobs" : page;
       if (!canRoleOpenPage(currentRole, page)) {
         toast("บทบาทนี้ไม่มีสิทธิ์เข้าถึงเมนูดังกล่าว");
         return;
@@ -685,7 +673,7 @@ export function useStaffDashboard() {
         toast("บทบาทนี้ไม่มีสิทธิ์เข้าถึงเมนูดังกล่าว");
         return;
       }
-      const destination = $(`#page-${page}`);
+      const destination = $(`#page-${destinationPage}`);
       if (!destination) {
         toast("ไม่พบหน้าที่เลือก");
         return;
@@ -698,19 +686,14 @@ export function useStaffDashboard() {
       $$("[data-mobile-page]").forEach((n) =>
         n.classList.toggle("active", n.dataset.mobilePage === page)
       );
-      const titles = {
-        dashboard: "ภาพรวมการปฏิบัติงาน",
-        "clerk-center": "ศูนย์รับงาน",
-        jobs: roleConfig[currentRole].jobTitle,
-        "my-history": "ประวัติงานของฉัน",
-        lost: "ศูนย์ของหายและรับฝาก",
-        "staff-overview": "ภาพรวมงาน Staff",
-        staff: "จัดการบัญชีเจ้าหน้าที่",
-        history: "ของหายและรับฝาก",
-        qr: "QR ประจำห้อง",
-      };
-      const pageTitle = $("#pageTitle");
-      if (pageTitle) pageTitle.textContent = titles[page] || "Staff Operations";
+      // ให้หัวข้อหลักของหน้าตรงกับชื่อเมนู Sidebar ที่ผู้ใช้เลือก
+      if (target) {
+        const labelSource = target.cloneNode(true);
+        labelSource.querySelectorAll(".nav-icon").forEach((icon) => icon.remove());
+        const pageHeading = destination.querySelector("h2");
+        if (pageHeading) pageHeading.textContent = labelSource.textContent.trim();
+      }
+      if (page === "my-jobs") renderJobs();
       if (page === "clerk-center") renderClerkCenter();
       if (page === "my-history") renderMyHistory();
       if (page === "staff-overview") renderStaffOverview();
@@ -728,14 +711,10 @@ export function useStaffDashboard() {
       const jobs = roleJobs(),
         unassigned = jobs.filter((j) => !j.assignee).length,
         mine = jobs.filter((j) => j.assignee === activeStaffName()).length,
-        team = jobs.filter(
-          (j) => j.assignee && j.assignee !== activeStaffName()
-        ).length,
         urgent = jobs.filter(
           (j) => j.priority === "เร่งด่วน" && j.status !== "เสร็จสิ้น"
         ).length;
-      const completed = jobs.filter((j) => j.status === "เสร็จสิ้น").length,
-        waitingParts = jobs.filter((j) => j.status === "รออะไหล่").length;
+      const completed = jobs.filter((j) => j.status === "เสร็จสิ้น").length;
       let values;
       if (currentRole === "clerk")
         values = [
@@ -783,7 +762,6 @@ export function useStaffDashboard() {
           ["งานใหม่", String(unassigned), "คิวงานซ่อม"],
           ["งานของฉัน", String(mine), "กำลังรับผิดชอบ"],
           ["งานเร่งด่วน", String(urgent), "ควรรับก่อน"],
-          ["งานรออะไหล่", String(waitingParts), "ติดตามอะไหล่"],
           ["งานเสร็จวันนี้", String(completed), "ปิดงานแล้ว"],
         ];
       else
@@ -791,7 +769,6 @@ export function useStaffDashboard() {
           ["งานทำความสะอาดใหม่", String(unassigned), "คิวงานใหม่"],
           ["งานของฉัน", String(mine), "กำลังรับผิดชอบ"],
           ["งานเร่งด่วน", String(urgent), "ควรรับก่อน"],
-          ["งานตามกำหนดเวลา", String(team), "ของทีมวันนี้"],
           ["งานเสร็จวันนี้", String(completed), "ปิดงานแล้ว"],
         ];
       $("#metricGrid").innerHTML = values
@@ -895,7 +872,6 @@ export function useStaffDashboard() {
               "รับงานแล้ว",
               "กำลังดำเนินการ",
               "รอข้อมูลเพิ่มเติม",
-              "รออะไหล่",
               "เสร็จสิ้น",
               "ยกเลิก",
             ]
@@ -2192,6 +2168,14 @@ export function useStaffDashboard() {
         });
       $("#staffTable").innerHTML = visibleStaff.length
         ? visibleStaff.map(({ staff: s, index: i }) => {
+          const invitationDelivery = {
+            sent: { label: "ส่งสำเร็จ", className: "done" },
+            failed: { label: "ส่งไม่สำเร็จ", className: "danger" },
+            unknown: { label: "ไม่มีข้อมูล", className: "neutral" },
+          }[s.invitationDeliveryStatus] || {
+            label: "ไม่มีข้อมูล",
+            className: "neutral",
+          };
           return `<article class="staff-account-card">
             <header class="staff-account-card-head">
               <div class="person"><div class="person-avatar" style="background:${
@@ -2212,7 +2196,9 @@ export function useStaffDashboard() {
               <div><span>Staff ID</span><strong>${escapeHtml(s.id)}</strong></div>
               <div><span>Role</span><strong>${escapeHtml(s.role)}</strong></div>
               <div><span>พื้นที่รับผิดชอบ</span><strong>${escapeHtml(s.zone || "-")}</strong></div>
+              <div><span>สถานะการส่งคำเชิญ</span><strong class="invitation-delivery-status ${invitationDelivery.className}">${invitationDelivery.label}</strong></div>
             </div>
+            <button class="small-btn resend-invitation-button" type="button" data-staff-action="resend-invitation" data-staff-index="${i}" ${s.status === "ใช้งาน" ? "" : "disabled"}>ส่งคำเชิญซ้ำ</button>
             <footer class="staff-account-actions"><button class="small-btn" type="button" data-staff-action="detail" data-staff-index="${i}">ดูรายละเอียด</button><button class="small-btn" type="button" data-staff-action="edit" data-staff-index="${i}">แก้ไข Staff</button><button class="small-btn" type="button" data-staff-action="toggle" data-staff-index="${i}">${
             s.status === "ใช้งาน" ? "ปิดบัญชี" : "เปิดใช้"
           }</button><button class="small-btn delete" type="button" data-staff-action="remove" data-staff-index="${i}">ลบ</button></footer>
@@ -2275,6 +2261,56 @@ export function useStaffDashboard() {
           renderStaff();
           toast("อัปเดตสถานะบัญชีแล้ว");
         }
+      );
+    }
+    async function performResendStaffInvitation(index, button) {
+      const staff = staffData[index];
+      if (!staff || currentRole !== "admin") return;
+      button.disabled = true;
+      button.textContent = "กำลังส่ง…";
+      try {
+        const result = await resendStaffInvitation(staff.id);
+        const delivered = result.email_sent === true;
+        staff.invitationDeliveryStatus = delivered ? "sent" : "failed";
+        addAudit(
+          "staff",
+          "ส่งคำเชิญซ้ำ",
+          staff.id,
+          staff.name,
+          delivered ? "ส่งอีเมลสำเร็จ" : "ส่งอีเมลไม่สำเร็จ",
+        );
+        renderStaff();
+        showSuccess(
+          delivered
+            ? `ส่งคำเชิญใหม่ไปยัง ${staff.email} แล้ว`
+            : `ระบบสร้างคำเชิญใหม่แล้ว แต่ส่งไปยัง ${staff.email} ไม่สำเร็จ`,
+          delivered ? "ส่งคำเชิญสำเร็จ" : "ส่งคำเชิญไม่สำเร็จ",
+          delivered ? "success" : "error",
+        );
+      } catch (error) {
+        if (await handleUnauthorizedResponse(error.status)) return;
+        console.error("Resending staff invitation failed:", error);
+        showSuccess(
+          error.status === 404
+            ? "Backend ยังไม่รองรับการส่งคำเชิญซ้ำ"
+            : error.message || "ไม่สามารถส่งคำเชิญซ้ำได้",
+          "ส่งคำเชิญไม่สำเร็จ",
+          "error",
+        );
+        if (document.contains(button)) {
+          button.disabled = false;
+          button.textContent = "ส่งคำเชิญซ้ำ";
+        }
+      }
+    }
+    function resendInvitation(index, button) {
+      const staff = staffData[index];
+      if (!staff || currentRole !== "admin") return;
+      requestConfirmation(
+        "ยืนยันส่งคำเชิญซ้ำ",
+        `ส่งคำเชิญและข้อมูลเข้าสู่ระบบชุดใหม่ไปยัง ${staff.email} หรือไม่?`,
+        () => performResendStaffInvitation(index, button),
+        "ส่งคำเชิญ",
       );
     }
     function removeStaff(i) {
@@ -2558,12 +2594,12 @@ export function useStaffDashboard() {
       $("#confirmActionButton").textContent = label;
       openModal("confirmModal");
     }
-    function showSuccess(message, title = "บันทึกสำเร็จ") {
+    function showSuccess(message, title = "บันทึกสำเร็จ", variant = "success") {
       const successModal = $("#successModal");
-      successModal?.classList.remove("rejection-result");
+      successModal?.classList.toggle("rejection-result", variant === "error");
       successModal
         ?.querySelector(".success-check use")
-        ?.setAttribute("href", "#i-check");
+        ?.setAttribute("href", variant === "error" ? "#i-close" : "#i-check");
       const successTitle = $("#successModalTitle");
       if (successTitle) successTitle.textContent = title;
       $("#successModalText").textContent = message;
@@ -2866,17 +2902,19 @@ export function useStaffDashboard() {
       const backendNext = job.backendId
         ? job.type === "repair" ? nextRepairStatus(job) : nextCleaningStatus(job)
         : null;
-      if (job.backendId && !backendNext) {
-        toast(job.type === "repair" && job.backendStatus === "in_progress"
-          ? "งานกำลังดำเนินการแล้ว กรุณาใช้ปุ่มเสร็จสิ้นเพื่อปิดงาน"
-          : "ไม่มีสถานะถัดไปที่เปลี่ยนได้");
+      const canReturnToPool =
+        ["housekeeper", "technician"].includes(currentRole) &&
+        job.assignee === activeStaffName() &&
+        !["completed", "cancelled"].includes(job.backendStatus);
+      if (job.backendId && !backendNext && !canReturnToPool) {
+        toast("ไม่มีสถานะถัดไปที่เปลี่ยนได้");
         return;
       }
       const options = backendNext
         ? [backendNext.label]
         :
         currentRole === "technician"
-          ? ["กำลังดำเนินการ", "รอข้อมูลเพิ่มเติม", "รออะไหล่", "เสร็จสิ้น"]
+          ? ["กำลังดำเนินการ", "รอข้อมูลเพิ่มเติม", "เสร็จสิ้น"]
           : currentRole === "housekeeper"
           ? ["กำลังดำเนินการ", "พักงาน", "รอข้อมูลเพิ่มเติม", "เสร็จสิ้น"]
           : currentRole === "clerk"
@@ -2889,13 +2927,15 @@ export function useStaffDashboard() {
               "คืนของแล้ว",
             ]
           : job.type === "repair"
-          ? ["กำลังดำเนินการ", "รอข้อมูลเพิ่มเติม", "รออะไหล่", "เสร็จสิ้น"]
+          ? ["กำลังดำเนินการ", "รอข้อมูลเพิ่มเติม", "เสร็จสิ้น"]
           : ["กำลังดำเนินการ", "พักงาน", "รอข้อมูลเพิ่มเติม", "เสร็จสิ้น"];
+      if (canReturnToPool) options.push("คืนเข้ากองกลาง");
       $("#statusJobId").value = id;
       $("#newJobStatus").innerHTML = options
         .map((value) => `<option>${value}</option>`)
         .join("");
-      $("#statusNote").value = "";
+      const statusNote = $("#statusNote");
+      if (statusNote) statusNote.value = "";
       $("#statusImage").value = "";
       $("#statusTime").value = nowThai();
       $("#statusUpdateTitle").textContent = `อัปเดตสถานะ · ${id}`;
@@ -3417,7 +3457,6 @@ export function useStaffDashboard() {
               "รับงาน",
               "เริ่มดำเนินการ",
               "อัปเดตความคืบหน้า",
-              "แจ้งรออะไหล่",
               "ปิดงาน",
               "คืนงานเข้าคิวกลาง",
             ]
@@ -3452,8 +3491,19 @@ export function useStaffDashboard() {
 
     $$(".nav-item").forEach((button) =>
       button.addEventListener("click", () => {
+        if (["housekeeper", "technician"].includes(currentRole)) {
+          if (button.dataset.page === "my-jobs") {
+            currentBoardView = "mine";
+          } else if (button.dataset.page === "jobs") {
+            currentBoardView = "unassigned";
+          }
+          $$("#boardTabs .board-tab").forEach((tab) =>
+            tab.classList.toggle("active", tab.dataset.view === currentBoardView)
+          );
+        }
         closeSidebar();
         navigate(button.dataset.page);
+        if (["jobs", "my-jobs"].includes(button.dataset.page)) renderJobs();
       })
     );
     $$("[data-go]").forEach((button) =>
@@ -3855,8 +3905,12 @@ export function useStaffDashboard() {
         return;
       }
       const next = $("#newJobStatus").value,
-        note = $("#statusNote").value.trim();
+        note = $("#statusNote")?.value.trim() || "";
       closeModal("statusUpdateModal", false);
+      if (next === "คืนเข้ากองกลาง") {
+        openReturnJob(job.id);
+        return;
+      }
       if (next === "เสร็จสิ้น") {
         openCompleteModal(job.id);
         $("#completeResult").value = note;
@@ -4028,6 +4082,8 @@ export function useStaffDashboard() {
       if (button.dataset.staffAction === "toggle") toggleStaff(index);
       if (button.dataset.staffAction === "remove") removeStaff(index);
       if (button.dataset.staffAction === "edit") openEditStaff(index, button);
+      if (button.dataset.staffAction === "resend-invitation")
+        resendInvitation(index, button);
       if (button.dataset.staffAction === "detail") {
         navigate("staff-overview");
         showStaffOverview(staffData[index].name, button);
@@ -4254,9 +4310,7 @@ export function useStaffDashboard() {
       submitButton.disabled = true;
       const payload = {
         full_name: $("#newName").value.trim(),
-        staff_code: $("#newId").value.trim(),
         email: $("#newEmail").value.trim(),
-        password: $("#newPassword").value,
         role: $("#newRole").value,
       };
       let account;
@@ -4270,7 +4324,6 @@ export function useStaffDashboard() {
         return;
       }
       const record = toDashboardStaff(account);
-      record.zone = $("#newZone").value.trim() || "-";
       staffData.push(record);
       addAudit(
         "staff",
@@ -4283,7 +4336,13 @@ export function useStaffDashboard() {
       closeModal("staffModal", false);
       form.reset();
       submitButton.disabled = false;
-      showSuccess("สร้างบัญชี Staff แล้ว");
+      showSuccess(
+        account.email_sent
+          ? `สร้างบัญชี Staff และส่งคำเชิญไปยัง ${record.email} แล้ว`
+          : `สร้างบัญชี Staff แล้ว แต่ส่งคำเชิญไปยัง ${record.email} ไม่สำเร็จ กรุณาตรวจสอบระบบอีเมล`,
+        account.email_sent ? "ส่งคำเชิญสำเร็จ" : "ส่งคำเชิญไม่สำเร็จ",
+        account.email_sent ? "success" : "error",
+      );
     });
     $("#editStaffForm")?.addEventListener("submit", (event) => {
       event.preventDefault();

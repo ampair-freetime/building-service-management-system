@@ -7,6 +7,8 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-building_service}
     expose:
       - "5432"
+    ports:
+      - 127.0.0.1:5433:5432
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -30,7 +32,6 @@ services:
       SMTP_PASSWORD: ${SMTP_PASSWORD:-}
       SMTP_USE_STARTTLS: ${SMTP_USE_STARTTLS:-false}
       MAIL_FROM: ${MAIL_FROM:-Building Care <no-reply@example.com>}
-      STAFF_LOGIN_URL: ${STAFF_LOGIN_URL:-http://localhost:5173/staff-login}
       PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:5173}
       R2_ACCOUNT_ID: ${R2_ACCOUNT_ID:-}
       R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID:-}

@@ -25,7 +25,6 @@
                 <option value="รับงานแล้ว">รับงานแล้ว</option>
                 <option value="กำลังดำเนินการ">กำลังดำเนินการ</option>
                 <option value="รอข้อมูลเพิ่มเติม">รอข้อมูลเพิ่มเติม</option>
-                <option value="รออะไหล่">รออะไหล่</option>
                 <option value="เสร็จสิ้น">เสร็จสิ้น</option>
                 <option value="ยกเลิก">ยกเลิก</option>
                 <option value="คืนเข้าคิวกลาง">คืนเข้าคิวกลาง</option>

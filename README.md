@@ -23,21 +23,26 @@ docker compose restart backend
 
 ## บัญชีสำหรับ login (development เท่านั้น)
 
-Login ที่ `POST /api/v1/auth/login` ใช้ **รหัสพนักงานหรืออีเมล** ก็ได้
+Login ที่ `POST /api/v1/auth/login` ใช้ **อีเมล**
 
 ```json
-{ "identifier": "ADMIN001", "password": "Admin@1234" }
+{ "identifier": "admin@example.com", "password": "Admin@1234" }
 ```
 
-| Role | รหัสพนักงาน | Email | Password | ที่มา |
-| --- | --- | --- | --- | --- |
+| Role | Email | Password | ที่มา |
+| --- | --- | --- | --- |
 | `admin` (แอดมิน) | `admin@example.com` | `Admin@1234` | สร้างอัตโนมัติจาก migration |
-| `clerk` (เจ้าหน้าที่ของหาย) | ตั้งเองตอนสร้าง | อีเมลที่ใช้ได้ | ระบบสุ่มและส่งทางอีเมล | ต้องสร้างเอง ↓ |
-| `housekeeper` (แม่บ้าน) | ตั้งเองตอนสร้าง | อีเมลที่ใช้ได้ | ระบบสุ่มและส่งทางอีเมล | ต้องสร้างเอง ↓ |
-| `technician` (ช่าง) | ตั้งเองตอนสร้าง | อีเมลที่ใช้ได้ | ระบบสุ่มและส่งทางอีเมล | ต้องสร้างเอง ↓ |
+| `clerk` (เจ้าหน้าที่ของหาย) | อีเมลที่ใช้ได้ | Staff ตั้งเองผ่าน invitation link | Admin สร้างผ่าน API |
+| `housekeeper` (แม่บ้าน) | อีเมลที่ใช้ได้ | Staff ตั้งเองผ่าน invitation link | Admin สร้างผ่าน API |
+| `technician` (ช่าง) | อีเมลที่ใช้ได้ | Staff ตั้งเองผ่าน invitation link | Admin สร้างผ่าน API |
 
- แล้วสร้างผ่าน `POST /api/v1/staff`
-(ทำใน http://localhost:8000/docs ได้) ดูรหัสผ่านเริ่มต้นใน Mailpit; response มี `email_sent` แต่ไม่คืนรหัสผ่าน
+Admin สร้างบัญชีผ่าน `POST /api/v1/staff` โดยส่ง `email`, `full_name` และ `role`
+(ทำใน http://localhost:8000/docs ได้) จากนั้นเปิดอีเมลใน Mailpit แล้วกด invitation link
+เพื่อตั้งรหัสผ่านก่อน login; response มี `email_sent` แต่ไม่คืนรหัสผ่านหรือ token
+ลิงก์หมดอายุใน 24 ชั่วโมงตามค่าเริ่มต้น และใช้ได้ครั้งเดียว
+หากส่งอีเมลไม่สำเร็จหรือลิงก์หมดอายุ ให้ Admin เรียก
+`POST /api/v1/staff/{staff_id}/resend-invitation` เพื่อส่งลิงก์ใหม่สำหรับบัญชีเดิมที่ยังไม่ activate
+ลิงก์เก่าจะใช้ไม่ได้หลัง resend และ resend ใช้ไม่ได้กับบัญชีที่ activate แล้ว
 รหัสผ่านของบัญชี admin เริ่มต้นเป็นค่าสาธารณะสำหรับ dev ห้ามใช้บน production
 
 ## QR code ของสถานที่
