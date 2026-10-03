@@ -2,7 +2,8 @@
 import { useStaffPasswordSetup } from "../view-logic/staff-password-setup/useStaffPasswordSetup.js";
 const {
   password, confirmPassword, showPassword, showConfirmPassword, loading,
-  submitted, success, errorMessage, invitationToken, invitedEmail,
+  submitted, success, errorMessage, invitedEmail,
+  checkingLink, linkValid, linkError,
   requirements, passwordsMatch, canSubmit, handleSubmit, goToLogin,
 } = useStaffPasswordSetup();
 </script>
@@ -37,10 +38,9 @@ const {
               <h2>ตั้งรหัสผ่านของคุณ</h2>
               <p>{{ invitedEmail ? `สำหรับบัญชี ${invitedEmail}` : "สร้างรหัสผ่านสำหรับเข้าสู่ระบบเจ้าหน้าที่" }}</p>
             </header>
-            <div v-if="!invitationToken" class="setup-alert" role="alert">
-              ลิงก์นี้ไม่มี Token กรุณาเปิดลิงก์จากอีเมลคำเชิญอีกครั้ง
-            </div>
-            <form class="login-form" @submit.prevent="handleSubmit">
+            <p v-if="checkingLink" class="setup-checking" role="status">กำลังตรวจสอบลิงก์คำเชิญ…</p>
+            <div v-else-if="linkError" class="setup-alert" role="alert">{{ linkError }}</div>
+            <form v-if="linkValid" class="login-form" @submit.prevent="handleSubmit">
               <div class="field">
                 <label for="setup-password">รหัสผ่านใหม่</label>
                 <div class="password-wrap">
@@ -80,6 +80,7 @@ const {
               </button>
               <button class="setup-login-link" type="button" @click="goToLogin">กลับไปหน้าเข้าสู่ระบบ</button>
             </form>
+            <button v-if="!linkValid" class="setup-login-link" type="button" @click="goToLogin">กลับไปหน้าเข้าสู่ระบบ</button>
           </div>
         </div>
       </section>

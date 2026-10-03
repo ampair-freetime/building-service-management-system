@@ -5,6 +5,7 @@
       role="dialog"
       aria-modal="true"
       aria-labelledby="confirmModalTitle"
+      aria-describedby="confirmModalText"
     >
       <section class="modal-card confirmation">
         <header class="modal-head">
