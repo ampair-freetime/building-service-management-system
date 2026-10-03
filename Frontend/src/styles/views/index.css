@@ -359,7 +359,6 @@ main {
   display: none;
   max-width: 1080px;
   margin: auto;
-  animation: pageIn 0.32s ease;
 }
 .page.active {
   display: block;
