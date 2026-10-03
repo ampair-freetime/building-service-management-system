@@ -13,7 +13,7 @@ class StaffCreate(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    email: EmailStr
+    email: EmailStr = Field(max_length=255)
     full_name: str = Field(min_length=1, max_length=150)
     role: StaffRole
 
@@ -30,6 +30,32 @@ class StaffCreate(BaseModel):
         if isinstance(value, str):
             return " ".join(value.split())
         return value
+
+
+class StaffUpdate(BaseModel):
+    """PATCH ยอมให้แก้เฉพาะชื่อ/email; ไม่ส่ง field = คงเดิม, null = ไม่รับ."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    full_name: str | None = Field(default=None, min_length=1, max_length=150)
+    email: EmailStr | None = Field(default=None, max_length=255)
+
+    @field_validator("full_name", "email", mode="before")
+    @classmethod
+    def reject_null(cls, value):
+        if value is None:
+            raise ValueError("This field cannot be null")
+        return value
+
+    @field_validator("full_name", mode="before")
+    @classmethod
+    def normalize_full_name(cls, value):
+        return StaffCreate.normalize_full_name(value)
+
+    @field_validator("email")
+    @classmethod
+    def normalize_email(cls, value: EmailStr) -> str:
+        return StaffCreate.normalize_email(value)
 
 
 class StaffResponse(BaseModel):

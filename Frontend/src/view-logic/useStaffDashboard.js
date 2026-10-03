@@ -41,6 +41,8 @@ import {
   rememberInvitationDelivery,
   resendStaffInvitation,
   toDashboardStaff,
+  toUpdatedDashboardStaff,
+  updateStaffProfile,
 } from "./staff-dashboard/staff-accounts.js";
 import {
   acceptCleaningTask,
@@ -2172,7 +2174,7 @@ export function useStaffDashboard() {
         .filter(({ staff }) => {
           const matchesRole =
             selectedRole === "all" || staff.role === roleLabels[selectedRole];
-          const searchable = `${staff.name} ${staff.id} ${staff.role} ${staff.zone || ""}`.toLowerCase();
+          const searchable = `${staff.name} ${staff.email} ${staff.id} ${staff.role}`.toLowerCase();
           return matchesRole && searchable.includes(query);
         });
       $("#staffTable").innerHTML = visibleStaff.length
@@ -2194,7 +2196,7 @@ export function useStaffDashboard() {
             0,
             2
           ) ? escapeHtml(s.name.slice(0, 2)) : "-"}</div><div><strong>${escapeHtml(s.name)}</strong><small>${
-            s.status === "ใช้งาน" ? "staff@building.local" : "บัญชีระงับ"
+            escapeHtml(s.email || "-")
           }</small></div></div>
               <span class="badge ${
             s.status === "ใช้งาน" ? "done" : "wait"
@@ -2235,25 +2237,74 @@ export function useStaffDashboard() {
     }
     function openEditStaff(index, trigger = document.activeElement) {
       const staff = staffData[index];
-      if (!staff) return;
-      $("#editStaffIndex").value = index;
+      if (!staff || currentRole !== "admin") return;
+      $("#editStaffIndex").value = staff.id;
       $("#editStaffName").value = staff.name;
-      $("#editStaffEmail").value = "staff@building.local";
-      $("#editStaffRole").value = staff.role;
-      $("#editStaffZone").value = staff.zone || "";
+      $("#editStaffEmail").value = staff.email;
+      $("#editStaffRole").textContent = staff.role;
+      $("#editStaffError").hidden = true;
+      $("#editStaffButton").disabled = false;
       openModal("editStaffModal", trigger);
     }
-    function changeStaffRole(i, value) {
-      const old = staffData[i].role;
-      staffData[i].role = value;
-      addAudit(
-        "staff",
-        "อัปเดต Role",
-        staffData[i].id,
-        staffData[i].name,
-        `เปลี่ยนจาก ${old} เป็น ${value}`
-      );
-      toast(`เปลี่ยน Role ของ ${staffData[i].name} เป็น ${value} แล้ว`);
+    async function performStaffProfileUpdate(staff, changes) {
+      const button = $("#editStaffButton");
+      if (currentRole !== "admin" || button.disabled) return;
+      // The confirmation dialog closes the edit modal; restore the retained form.
+      if (!$("#editStaffModal").classList.contains("open")) openModal("editStaffModal");
+      const errorMessage = $("#editStaffError");
+      errorMessage.hidden = true;
+      button.disabled = true;
+      button.textContent = "กำลังบันทึก…";
+      try {
+        const account = await updateStaffProfile(staff.id, changes);
+        const index = staffData.findIndex((item) => item.id === staff.id);
+        if (index !== -1) staffData[index] = toUpdatedDashboardStaff(staff, account);
+        const emailChanged = staff.email !== account.email;
+        let signedIn;
+        try {
+          signedIn = JSON.parse(localStorage.getItem("buildingCareStaff") || "null");
+        } catch {
+          // A browser cache problem must not turn a successful API save into an error.
+        }
+        if (signedIn?.id === account.id) {
+          try {
+            localStorage.setItem("buildingCareStaff", JSON.stringify(account));
+          } catch {
+            // The saved profile can still be displayed when storage is unavailable.
+          }
+          currentUserName[currentRole] = account.full_name;
+          roleConfig[currentRole].name = account.full_name;
+          const headerName = $("#headerName");
+          if (headerName) headerName.textContent = account.full_name.split(" ")[0];
+          const profileName = $("#profileName");
+          if (profileName) profileName.textContent = account.full_name;
+          const profileEmail = $("#profileEmail");
+          if (profileEmail) profileEmail.textContent = account.email;
+        }
+        addAudit("staff", "แก้ไข Staff", account.id, account.full_name,
+          `แก้ไข ${Object.keys(changes).join(", ")}`);
+        closeModal("editStaffModal", false);
+        renderStaff();
+        loadStaffWorkOverview();
+        showSuccess(emailChanged
+          ? "บันทึกชื่อและอีเมลแล้ว ลิงก์คำเชิญเดิมใช้ไม่ได้ หาก Staff ยังไม่ได้ตั้งรหัสผ่าน ให้กดส่งคำเชิญซ้ำไปอีเมลใหม่"
+          : "บันทึกข้อมูล Staff แล้ว");
+      } catch (error) {
+        if (await handleUnauthorizedResponse(error.status)) return;
+        errorMessage.textContent = error.status === 409
+          ? "อีเมลนี้ถูกใช้แล้ว กรุณาใช้อีเมลอื่น"
+          : error.status === 422
+            ? "กรุณาตรวจสอบชื่อและอีเมลให้ถูกต้อง"
+            : error.status === 403
+              ? "เฉพาะ Admin เท่านั้นที่แก้ข้อมูล Staff ได้"
+              : error.status === 404
+                ? "ไม่พบบัญชี Staff นี้ กรุณาโหลดรายการใหม่"
+                : "บันทึกไม่สำเร็จ กรุณาลองใหม่";
+        errorMessage.hidden = false;
+      } finally {
+        button.disabled = false;
+        button.textContent = "บันทึกข้อมูล";
+      }
     }
     function toggleStaff(i) {
       const staff = staffData[i];
@@ -4457,22 +4508,20 @@ export function useStaffDashboard() {
         event.currentTarget.reportValidity();
         return;
       }
-      const index = Number($("#editStaffIndex").value),
-        staff = staffData[index];
-      if (!staff) return;
-      staff.name = $("#editStaffName").value.trim();
-      staff.role = $("#editStaffRole").value;
-      staff.zone = $("#editStaffZone").value.trim();
-      addAudit(
-        "staff",
-        "แก้ไข Staff",
-        staff.id,
-        staff.name,
-        `Role ${staff.role} · ${staff.zone}`
-      );
-      closeModal("editStaffModal", false);
-      renderStaff();
-      showSuccess("บันทึกข้อมูล Staff แล้ว");
+      const staff = staffData.find((item) => item.id === $("#editStaffIndex").value);
+      if (!staff || currentRole !== "admin" || $("#editStaffButton").disabled) return;
+      const name = $("#editStaffName").value.trim().replace(/\s+/g, " ");
+      const email = $("#editStaffEmail").value.trim().toLowerCase();
+      const changes = {};
+      if (name !== staff.name) changes.full_name = name;
+      if (email !== staff.email) changes.email = email;
+      if (changes.email) {
+        requestConfirmation("ยืนยันเปลี่ยนอีเมล Staff",
+          `ตรวจสอบว่า ${email} เป็นอีเมลของ Staff คนนี้แล้วหรือไม่? ลิงก์คำเชิญเดิมจะใช้ไม่ได้ และต้องใช้อีเมลใหม่เพื่อเข้าสู่ระบบ`,
+          () => performStaffProfileUpdate(staff, changes), "ยืนยันและบันทึก");
+      } else {
+        performStaffProfileUpdate(staff, changes);
+      }
     });
     $("#claimActions")?.addEventListener("click", (event) => {
       const button = event.target.closest("[data-claim-action]");

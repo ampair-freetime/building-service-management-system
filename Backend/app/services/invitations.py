@@ -14,12 +14,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.security import hash_password
-from app.models.invitation import StaffInvitation
 from app.models.enums import AccountStatus
+from app.models.invitation import StaffInvitation
 from app.models.staff import Staff
 from app.schemas.staff import StaffCreate
 from app.services.invitation_email import EmailDeliveryError, send_invitation_email
-from app.services.staff import DuplicateStaffError
+from app.services.staff import DuplicateStaffError, get_staff_for_update
 
 logger = logging.getLogger(__name__)
 
@@ -80,6 +80,27 @@ async def _create_pending_invitation(
 async def _deliver(
     session: AsyncSession, staff: Staff, invitation: StaffInvitation, token: str
 ) -> InvitationResult:
+    # Re-read under the same account lock as email update/resend/activation.
+    # An email changed between creation and delivery must never receive an old link.
+    current_staff = await get_staff_for_update(session, staff.id)
+    current_invitation = await session.scalar(
+        select(StaffInvitation)
+        .where(
+            StaffInvitation.id == invitation.id,
+            StaffInvitation.used_at.is_(None),
+            StaffInvitation.invalidated_at.is_(None),
+            StaffInvitation.expires_at > _now(),
+        )
+        .execution_options(populate_existing=True)
+    )
+    if (
+        current_staff is None
+        or current_staff.status != AccountStatus.ACTIVE
+        or current_invitation is None
+    ):
+        invitation.delivery_status = "failed"
+        await session.commit()
+        return InvitationResult(staff, False, "failed")
     try:
         await send_invitation_email(
             recipient=staff.email,
@@ -129,9 +150,11 @@ async def create_staff_and_invite(
 
 
 async def resend_staff_invitation(session: AsyncSession, staff_id: UUID) -> InvitationResult:
-    staff = await session.get(Staff, staff_id)
-    if staff is None:
+    staff = await get_staff_for_update(session, staff_id)
+    if staff is None or staff.status == AccountStatus.DELETED:
         raise LookupError("Staff account not found")
+    if staff.status != AccountStatus.ACTIVE:
+        raise InvitationNotAvailableError("Account is not active")
 
     used_invitation = await session.scalar(
         select(StaffInvitation.id).where(
@@ -149,11 +172,12 @@ async def resend_staff_invitation(session: AsyncSession, staff_id: UUID) -> Invi
 
 async def validate_activation_token(session: AsyncSession, token: str) -> None:
     invitation = await session.scalar(
-        select(StaffInvitation.id).where(
+        select(StaffInvitation.id).join(Staff).where(
             StaffInvitation.token_hash == _hash_token(token),
             StaffInvitation.used_at.is_(None),
             StaffInvitation.invalidated_at.is_(None),
             StaffInvitation.expires_at > _now(),
+            Staff.status == AccountStatus.ACTIVE,
         )
     )
     if invitation is None:
@@ -164,6 +188,18 @@ async def validate_activation_token(session: AsyncSession, token: str) -> None:
 
 async def activate_staff_account(session: AsyncSession, *, token: str, password: str) -> None:
     """Consume a token atomically, then replace the placeholder password hash."""
+    # Lock Staff before updating the invitation, matching email update/resend.
+    target_id = await session.scalar(
+        select(StaffInvitation.staff_id).where(
+            StaffInvitation.token_hash == _hash_token(token)
+        )
+    )
+    staff = await get_staff_for_update(session, target_id) if target_id is not None else None
+    if staff is None or staff.status != AccountStatus.ACTIVE:
+        await session.rollback()
+        raise InvalidActivationTokenError(
+            "Invalid or expired activation link. Request a new invitation."
+        )
     staff_id = await session.scalar(
         update(StaffInvitation)
         .where(
@@ -176,12 +212,6 @@ async def activate_staff_account(session: AsyncSession, *, token: str, password:
         .returning(StaffInvitation.staff_id)
     )
     if staff_id is None:
-        await session.rollback()
-        raise InvalidActivationTokenError(
-            "Invalid or expired activation link. Request a new invitation."
-        )
-    staff = await session.get(Staff, staff_id)
-    if staff is None:
         await session.rollback()
         raise InvalidActivationTokenError(
             "Invalid or expired activation link. Request a new invitation."

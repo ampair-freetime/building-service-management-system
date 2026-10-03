@@ -70,28 +70,19 @@
         <input type="hidden" id="editStaffIndex" />
         <div class="field">
           <label for="editStaffName">ชื่อ-นามสกุล</label
-          ><input id="editStaffName" required />
+          ><input id="editStaffName" required maxlength="150" />
         </div>
         <div class="field">
           <label for="editStaffEmail">อีเมล</label
-          ><input id="editStaffEmail" type="email" required />
+          ><input id="editStaffEmail" type="email" required maxlength="255" />
         </div>
-        <div class="form-row">
-          <div class="field">
-            <label for="editStaffRole">Role</label
-            ><select id="editStaffRole">
-              <option>แม่บ้าน</option>
-              <option>ช่าง</option>
-              <option>ธุรการ</option>
-              <option>แอดมิน</option>
-            </select>
-          </div>
-          <div class="field">
-            <label for="editStaffZone">พื้นที่รับผิดชอบ</label
-            ><input id="editStaffZone" />
-          </div>
+        <div class="field">
+          <span>Role</span>
+          <strong id="editStaffRole"></strong>
+          <small>ยังไม่รองรับการเปลี่ยน Role</small>
         </div>
-        <button type="submit" class="primary" style="width: 100%">
+        <p id="editStaffError" class="field-error" role="alert" hidden></p>
+        <button id="editStaffButton" type="submit" class="primary" style="width: 100%">
           บันทึกข้อมูล
         </button>
       </form>
