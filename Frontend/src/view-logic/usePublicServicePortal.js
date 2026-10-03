@@ -1536,10 +1536,6 @@ export function usePublicServicePortal() {
       320,
     );
 
-    const qrService = new URLSearchParams(window.location.search).get("service");
-    if (qrService === "clean" || qrService === "repair") {
-      navigate(qrService);
-    }
   });
 
   onUnmounted(() => {

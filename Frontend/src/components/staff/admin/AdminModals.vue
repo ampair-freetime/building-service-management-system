@@ -125,13 +125,6 @@
           />
           <small>ระบบจะสร้าง QR Code ของสถานที่นี้ให้อัตโนมัติ</small>
         </div>
-        <div class="field">
-          <label for="qrServiceType">ประเภทบริการ</label>
-          <select id="qrServiceType" required>
-            <option value="repair">แจ้งซ่อม</option>
-            <option value="clean">แจ้งทำความสะอาด</option>
-          </select>
-        </div>
         <button type="submit" class="primary" style="width: 100%">
           เพิ่มสถานที่และสร้าง QR
         </button>

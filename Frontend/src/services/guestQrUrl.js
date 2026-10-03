@@ -1,4 +1,4 @@
-export function buildGuestQrUrl(baseUrl, token, service = "report") {
+export function buildGuestQrUrl(baseUrl, token) {
   let locationToken = token.trim();
   if (/^https?:\/\//i.test(locationToken)) {
     locationToken = new URL(locationToken).searchParams.get("token")?.trim() ?? "";
@@ -13,8 +13,5 @@ export function buildGuestQrUrl(baseUrl, token, service = "report") {
       : `${url.pathname.replace(/\/?$/, "/")}user`;
   }
   url.searchParams.set("token", locationToken);
-  if (service === "clean" || service === "repair") {
-    url.searchParams.set("service", service);
-  }
   return url.toString();
 }

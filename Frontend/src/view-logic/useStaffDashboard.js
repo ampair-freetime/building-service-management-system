@@ -2645,12 +2645,6 @@ export function useStaffDashboard() {
         });
       });
     }
-    // เพิ่มประเภทบริการลงใน URL ที่ Backend ส่งมา
-    function buildServiceRequestUrl(qrUrl, service) {
-      const url = new URL(qrUrl);
-      url.searchParams.set("service", service);
-      return url.toString();
-    }
     function showQrLocation(location) {
       if (!location || !$("#qrCode")) return false;
       if (!location.url) {
@@ -5042,8 +5036,6 @@ export function useStaffDashboard() {
       const submitButton = form.querySelector('button[type="submit"]');
       const area = $("#qrLocationName").value.trim();
       const floor = $("#qrLocationFloor").value.trim();
-      // อ่านประเภทบริการที่ Admin เลือก
-      const service = $("#qrServiceType").value;
       if (submitButton) submitButton.disabled = true;
       try {
         // สร้างสถานที่ก่อนเพื่อรับ ID จาก Backend
@@ -5053,11 +5045,7 @@ export function useStaffDashboard() {
         });
         // ขอ token และ qr_url จาก Backend
         const generated = await generateAdminLocationQr(created.id);
-        // เพิ่มประเภทบริการลงใน qr_url ก่อนสร้าง Preview
-        const location = {
-          ...toDashboardQrLocation(generated),
-          url: buildServiceRequestUrl(generated.qr_url, service),
-        };
+        const location = toDashboardQrLocation(generated);
         await loadQrLocations();
         addAudit(
           "qr",
