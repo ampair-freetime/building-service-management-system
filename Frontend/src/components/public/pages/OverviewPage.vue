@@ -35,20 +35,12 @@ onMounted(async () => {
               ระบบบริหารจัดการงานบริการอาคารเรียน<br />
               ภาควิชาวิทยาการคอมพิวเตอร์
             </p>
-            <svg
+            <img
               class="building-illustration"
-              viewBox="0 0 220 170"
+              src="/images/cs-building-line-art.svg"
+              alt=""
               aria-hidden="true"
-            >
-              <path
-                d="M12 154h196M28 154V76h46v78M74 154V42h72v112M146 154V66h48v88M94 42V25h32v17M40 93h10m10 0h7M40 111h10m10 0h7M40 129h10m10 0h7M91 62h12m18 0h12M91 84h12m18 0h12M91 106h12m18 0h12M91 128h12m18 0h12M160 85h10m10 0h6M160 105h10m10 0h6M160 125h10m10 0h6M104 154v-22h14v22"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="5"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              />
-            </svg>
+            />
           </header>
 
           <section
