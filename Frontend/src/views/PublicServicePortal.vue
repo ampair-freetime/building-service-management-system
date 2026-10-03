@@ -54,6 +54,20 @@ const { sidebarOpen, closeSidebar, toggleSidebar } = usePublicServicePortal();
         <path d="M3 12a9 9 0 1 0 3-6.7L3 8" />
         <path d="M3 3v5h5M12 7v5l3 2" />
       </symbol>
+      <symbol id="i-repair-service" viewBox="0 0 24 24">
+        <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.106-3.105c.32-.322.863-.22.983.218a6 6 0 0 1-8.259 7.057l-7.91 7.91a1 1 0 0 1-2.999-3l7.91-7.91a6 6 0 0 1 7.057-8.259c.438.12.54.662.219.984z" />
+      </symbol>
+      <symbol id="i-clean-service" viewBox="0 0 24 24">
+        <path d="M11 2v2M12 3h-2M13.5 10.5 22 2M14.734 13.841a2 2 0 0 0-.314-2.42L12.58 9.58a2 2 0 0 0-2.421-.314l-7.657 4.461A1 1 0 0 0 2.3 15.3l6.403 6.403a1 1 0 0 0 1.571-.204zM20 15v4M22 17h-4M4 4v4m1 10 2-2M6 6H2m5.699 4.7 5.602 5.601" />
+      </symbol>
+      <symbol id="i-lost-service" viewBox="0 0 24 24">
+        <rect width="20" height="5" x="2" y="3" rx="1" />
+        <path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8M10 12h4" />
+      </symbol>
+      <symbol id="i-track-service" viewBox="0 0 24 24">
+        <path d="M6 4h12a2 2 0 0 1 2 2v14H4V6a2 2 0 0 1 2-2Z" />
+        <path d="M9 4V2m6 2V2M8 10h8m-8 4h3m-3 3h3m3-3 1 1 2-2" />
+      </symbol>
       <symbol id="i-plus" viewBox="0 0 24 24">
         <path d="M12 5v14M5 12h14" />
       </symbol>
@@ -161,12 +175,12 @@ const { sidebarOpen, closeSidebar, toggleSidebar } = usePublicServicePortal();
         </button>
         <button type="button" data-go="repair" data-bottom-page="repair">
           <span class="nav-glyph"
-            ><svg class="icon"><use href="#i-tools" /></svg></span
+            ><svg class="icon"><use href="#i-repair-service" /></svg></span
           ><span>แจ้งซ่อม</span>
         </button>
         <button type="button" data-go="clean" data-bottom-page="clean">
           <span class="nav-glyph"
-            ><svg class="icon"><use href="#i-broom" /></svg></span
+            ><svg class="icon"><use href="#i-clean-service" /></svg></span
           ><span>แจ้งทำความสะอาด</span>
         </button>
         <button
@@ -175,12 +189,12 @@ const { sidebarOpen, closeSidebar, toggleSidebar } = usePublicServicePortal();
           data-bottom-page="lost"
         >
           <span class="nav-glyph"
-            ><svg class="icon"><use href="#i-box" /></svg></span
+            ><svg class="icon"><use href="#i-lost-service" /></svg></span
           ><span>ของหาย-ได้คืน</span>
         </button>
         <button type="button" data-scroll-track>
           <span class="nav-glyph"
-            ><svg class="icon"><use href="#i-history" /></svg></span
+            ><svg class="icon"><use href="#i-track-service" /></svg></span
           ><span>ติดตามสถานะงาน</span>
         </button>
       </nav>
