@@ -1646,79 +1646,6 @@ body {
   }
 }
 
-.modal .modal-card.staff-credentials-modal-card {
-  width: min(520px, 100%);
-}
-.staff-credentials-modal-card .modal-head {
-  display: grid;
-  grid-template-columns: 42px minmax(0, 1fr) 42px;
-}
-.staff-credentials-modal-card .modal-head h3 {
-  grid-column: 2;
-  text-align: center;
-}
-.staff-credentials-modal-card .modal-head .close {
-  grid-column: 3;
-}
-.generated-password-notice,
-.generated-password-email-status {
-  margin: 0 0 14px;
-}
-.staff-credentials-success-check {
-  width: 96px;
-  height: 96px;
-  margin-bottom: 20px;
-  background: #dcf8e4;
-  color: #16813a;
-  box-shadow: 0 12px 30px rgba(22, 129, 58, 0.16);
-}
-.staff-credentials-success-check .icon {
-  width: 52px;
-  height: 52px;
-  stroke-width: 2.5;
-}
-.generated-password-box {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 10px;
-  align-items: stretch;
-  margin-bottom: 14px;
-}
-.generated-password-box code {
-  display: grid;
-  place-items: center;
-  min-width: 0;
-  min-height: 52px;
-  padding: 12px 14px;
-  overflow-wrap: anywhere;
-  border: 1px solid var(--line);
-  border-radius: 15px;
-  background: #f7f5ff;
-  color: var(--ink);
-  font-size: clamp(14px, 3vw, 18px);
-  font-weight: 800;
-  letter-spacing: 0.04em;
-  user-select: all;
-}
-.generated-password-copy {
-  display: grid;
-  width: 52px;
-  min-width: 52px;
-  min-height: 52px;
-  padding: 0;
-  place-items: center;
-}
-.generated-password-copy .icon {
-  width: 23px;
-  height: 23px;
-}
-.generated-password-email-status {
-  color: var(--muted);
-  font-size: 13px;
-}
-.generated-password-done {
-  width: 100%;
-}
 @media (max-width: 1050px) {
   .sidebar {
     left: -280px;
@@ -3841,21 +3768,18 @@ body {
     margin: -20px -16px 16px;
     padding: 17px 16px 12px;
   }
-  #staffModal,
-  #staffCredentialsModal {
+  #staffModal {
     align-items: center;
     padding: 16px;
   }
-  #staffModal .modal-card,
-  #staffCredentialsModal .modal-card {
+  #staffModal .modal-card {
     width: min(620px, 100%);
     max-height: calc(100dvh - 32px);
     border-radius: 26px;
     padding: 20px 16px;
     transform: translateY(14px) scale(0.985);
   }
-  #staffModal.open .modal-card,
-  #staffCredentialsModal.open .modal-card {
+  #staffModal.open .modal-card {
     transform: translateY(0) scale(1);
   }
   .detail-layout,

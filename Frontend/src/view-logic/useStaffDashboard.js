@@ -48,7 +48,6 @@ import {
   rememberInvitationDelivery,
   resendStaffInvitation,
   toDashboardStaff,
-  updateStaffAccount,
 } from "./staff-dashboard/staff-accounts.js";
 import {
   acceptCleaningTask,
@@ -2367,7 +2366,7 @@ export function useStaffDashboard() {
               <div><span>สถานะการส่งคำเชิญ</span><strong class="invitation-delivery-status ${invitationDelivery.className}">${invitationDelivery.label}</strong></div>
             </div>
             <button class="small-btn resend-invitation-button" type="button" data-staff-action="resend-invitation" data-staff-index="${i}" ${s.status === "ใช้งาน" ? "" : "disabled"}>ส่งคำเชิญซ้ำ</button>
-            <footer class="staff-account-actions"><button class="small-btn" type="button" data-staff-action="detail" data-staff-index="${i}">ดูรายละเอียด</button><button class="small-btn" type="button" data-staff-action="edit" data-staff-index="${i}">แก้ไข Staff</button><button class="small-btn" type="button" data-staff-action="toggle" data-staff-index="${i}">${
+            <footer class="staff-account-actions"><button class="small-btn" type="button" data-staff-action="detail" data-staff-index="${i}">ดูรายละเอียด</button><button class="small-btn" type="button" data-staff-action="toggle" data-staff-index="${i}">${
               s.status === "ใช้งาน" ? "ปิดบัญชี" : "เปิดใช้"
             }</button><button class="small-btn delete" type="button" data-staff-action="remove" data-staff-index="${i}">ลบ</button></footer>
           </article>`;
@@ -2390,28 +2389,6 @@ export function useStaffDashboard() {
       $("#adminTotal").textContent = staffData.filter(
         (staff) => staff.role === "แอดมิน"
       ).length;
-    }
-    function openEditStaff(index, trigger = document.activeElement) {
-      const staff = staffData[index];
-      if (!staff) return;
-      $("#editStaffIndex").value = index;
-      $("#editStaffName").value = staff.name;
-      $("#editStaffEmail").value = staff.email || "";
-      $("#editStaffRole").value = staff.role;
-      $("#editStaffZone").value = staff.zone || "";
-      openModal("editStaffModal", trigger);
-    }
-    function changeStaffRole(i, value) {
-      const old = staffData[i].role;
-      staffData[i].role = value;
-      addAudit(
-        "staff",
-        "อัปเดต Role",
-        staffData[i].id,
-        staffData[i].name,
-        `เปลี่ยนจาก ${old} เป็น ${value}`,
-      );
-      toast(`เปลี่ยน Role ของ ${staffData[i].name} เป็น ${value} แล้ว`);
     }
     function toggleStaff(i) {
       const staff = staffData[i];
@@ -2762,12 +2739,6 @@ export function useStaffDashboard() {
       if (!modal) return;
       modal.classList.remove("open");
       modal.setAttribute("aria-hidden", "true");
-      if (id === "staffCredentialsModal") {
-        const password = $("#generatedStaffPassword");
-        if (password) password.textContent = "";
-        const emailStatus = $("#generatedPasswordEmailStatus");
-        if (emailStatus) emailStatus.textContent = "";
-      }
       if (!$(".modal.open")) document.body.classList.remove("modal-open");
       if (
         restoreFocus &&
@@ -4413,7 +4384,6 @@ export function useStaffDashboard() {
       const index = Number(button.dataset.staffIndex);
       if (button.dataset.staffAction === "toggle") toggleStaff(index);
       if (button.dataset.staffAction === "remove") removeStaff(index);
-      if (button.dataset.staffAction === "edit") openEditStaff(index, button);
       if (button.dataset.staffAction === "resend-invitation")
         resendInvitation(index, button);
       if (button.dataset.staffAction === "detail") {
@@ -4682,29 +4652,6 @@ export function useStaffDashboard() {
       closeModal("confirmModal", false);
       if (typeof action === "function") action();
     });
-    $("#copyGeneratedPassword")?.addEventListener("click", async () => {
-      const password = $("#generatedStaffPassword")?.textContent || "";
-      if (!password) return;
-      try {
-        if (navigator.clipboard?.writeText) {
-          await navigator.clipboard.writeText(password);
-        } else {
-          const copySource = document.createElement("textarea");
-          copySource.value = password;
-          copySource.style.position = "fixed";
-          copySource.style.opacity = "0";
-          document.body.appendChild(copySource);
-          copySource.select();
-          const copied = document.execCommand("copy");
-          copySource.remove();
-          if (!copied) throw new Error("Clipboard API is unavailable");
-        }
-        toast("คัดลอกรหัสผ่านแล้ว");
-      } catch (error) {
-        console.error("Copying generated password failed:", error);
-        toast("คัดลอกไม่สำเร็จ กรุณาเลือกรหัสผ่านแล้วคัดลอกเอง");
-      }
-    });
     const staffForm = $("#staffForm");
     const staffFormFields = staffForm
       ? [...staffForm.querySelectorAll("input, select")]
@@ -4841,56 +4788,6 @@ export function useStaffDashboard() {
         account.email_sent ? "ส่งคำเชิญสำเร็จ" : "ส่งคำเชิญไม่สำเร็จ",
         account.email_sent ? "success" : "error",
       );
-    });
-    $("#editStaffForm")?.addEventListener("submit", async (event) => {
-      event.preventDefault();
-
-      const form = event.currentTarget;
-      const nameInput = $("#editStaffName");
-      const emailInput = $("#editStaffEmail");
-      const roleInput = $("#editStaffRole");
-
-      // ไม่อนุญาตให้กรอกชื่อเป็นช่องว่าง
-      nameInput.setCustomValidity(
-        nameInput.value.trim().length < 2
-          ? "กรุณากรอกชื่ออย่างน้อย 2 ตัวอักษร"
-          : "",
-      );
-
-      if (!form.checkValidity()) {
-        form.reportValidity();
-        return;
-      }
-
-      const index = Number($("#editStaffIndex").value);
-      const staff = staffData[index];
-      if (!staff) return;
-
-      const roleValues = {
-        แม่บ้าน: "housekeeper",
-        ช่าง: "technician",
-        ธุรการ: "clerk",
-        แอดมิน: "admin",
-      };
-      const submitButton = form.querySelector('button[type="submit"]');
-      if (submitButton) submitButton.disabled = true;
-      try {
-        // เรียก Update API แล้วโหลดรายชื่อ Staff ล่าสุด
-        await updateStaffAccount(staff.id, {
-          full_name: nameInput.value.trim(),
-          email: emailInput.value.trim().toLowerCase(),
-          role: roleValues[roleInput.value],
-        });
-        await loadStaffAccounts();
-        closeModal("editStaffModal", false);
-        showSuccess("บันทึกข้อมูล Staff แล้ว");
-      } catch (error) {
-        if (await handleUnauthorizedResponse(error.status)) return;
-        console.error("Updating staff account failed:", error);
-        toast(error.message || "แก้ไขบัญชีเจ้าหน้าที่ไม่สำเร็จ");
-      } finally {
-        if (submitButton) submitButton.disabled = false;
-      }
     });
     $("#claimActions")?.addEventListener("click", (event) => {
       const button = event.target.closest("[data-claim-action]");

@@ -73,15 +73,9 @@ def test_delivery_failure_keeps_account_and_reports_false(test_context, monkeypa
     assert response.status_code == 201
     body = response.json()
     assert body["email_sent"] is False
-    assert body["temporary_password"]
-    login = client.post(
-        "/api/v1/auth/login",
-        json={"identifier": "hk@example.com", "password": body["temporary_password"]},
-    )
-    assert login.status_code == 200
+    assert "temporary_password" not in body
     listing = client.get("/api/v1/staff", headers=headers)
     assert [item["email"] for item in listing.json()] == ["admin@example.com", "hk@example.com"]
-    assert all("temporary_password" not in item for item in listing.json())
 
 
 def test_duplicate_or_invalid_request_never_sends_email(test_context, monkeypatch) -> None:
