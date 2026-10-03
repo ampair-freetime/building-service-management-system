@@ -2,44 +2,34 @@
   <section class="page active" id="page-dashboard">
     <div class="section-title">
       <div>
-        <div class="eyebrow">Clerk Overview</div>
-        <h2>ภาพรวมงาน</h2>
+        <div class="eyebrow">Clerk approvals</div>
+        <h2>ภาพรวมงานอนุมัติ</h2>
+        <p>ติดตามรายการที่ต้องตรวจสอบและเปิดรายละเอียดเพื่อดำเนินการต่อ</p>
       </div>
     </div>
-    <div class="metrics" id="metricGrid"></div>
-    <section class="panel" style="margin-bottom: 20px">
-      <div class="panel-head">
-        <div>
-          <h3>ดำเนินการด่วน</h3>
-          <p>เลือกสิ่งที่ต้องทำต่อจากสถานะงานปัจจุบัน</p>
-        </div>
-      </div>
-      <div class="panel-body">
-        <div class="quick-action-grid" id="dashboardQuickActions"></div>
-      </div>
-    </section>
-    <div class="grid-2">
+    <div class="metrics" id="clerkApprovalMetrics" aria-live="polite"></div>
+    <div class="grid-2 clerk-approvals-overview">
       <section class="panel">
         <div class="panel-head">
           <div>
-            <h3 id="queueTitle">คิวงานรวมที่ควรรับก่อน</h3>
-            <p>งานที่ยังไม่มีผู้รับผิดชอบ เรียงตามความเร่งด่วน</p>
+            <h3>รายการรอพิจารณา</h3>
+            <p>ของที่พบและประกาศของหายที่ยังรอผลอนุมัติ</p>
           </div>
-          <button class="text-btn" data-go="jobs">เปิดศูนย์รับงาน →</button>
+          <button class="text-btn" type="button" data-clerk-overview-view="approvals">ดูทั้งหมด →</button>
         </div>
         <div class="panel-body">
-          <div class="queue" id="priorityQueue"></div>
+          <div class="clerk-approval-preview" id="clerkApprovalPreview" aria-live="polite"></div>
         </div>
       </section>
       <section class="panel">
         <div class="panel-head">
           <div>
-            <h3>กิจกรรมล่าสุด</h3>
-            <p>การเปลี่ยนแปลงใน Role ของคุณ</p>
+            <h3>ไปยังงานที่ต้องดำเนินการ</h3>
+            <p>เปิดรายการตามประเภทเพื่อพิจารณาต่อ</p>
           </div>
         </div>
         <div class="panel-body">
-          <div class="activity" id="activityList"></div>
+          <div class="clerk-approval-shortcuts" id="clerkApprovalShortcuts"></div>
         </div>
       </section>
     </div>

@@ -149,7 +149,7 @@ const { activeRole } = useStaffDashboard();
             <span class="nav-icon">03</span>ของหายและรับฝาก
           </button>
           <button class="nav-item" data-page="history" data-roles="admin">
-            <span class="nav-icon">02</span>ของหายและรับฝาก
+            <span class="nav-icon">02</span>ภาพรวมเจ้าหน้าที่ธุรการ
           </button>
           <button class="nav-item" data-page="staff" data-roles="admin">
             <span class="nav-icon">03</span>บัญชีเจ้าหน้าที่

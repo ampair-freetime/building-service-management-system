@@ -3,6 +3,41 @@ const API_BASE_URL = (
 ).replace(/\/+$/, "");
 
 const STAFF_ENDPOINT = `${API_BASE_URL}/staff`;
+const DELIVERY_CACHE_KEY = "buildingCareInvitationDeliveryResults";
+
+function readDeliveryCache() {
+  try {
+    const value = JSON.parse(localStorage.getItem(DELIVERY_CACHE_KEY) || "{}");
+    return value && typeof value === "object" && !Array.isArray(value) ? value : {};
+  } catch {
+    return {};
+  }
+}
+
+export function rememberInvitationDelivery(account, status) {
+  if (!account?.id || !account?.email || !["sent", "failed"].includes(status)) return;
+  try {
+    const cache = readDeliveryCache();
+    cache[account.id] = {
+      email: account.email.toLowerCase(),
+      status,
+      recordedAt: new Date().toISOString(),
+    };
+    localStorage.setItem(DELIVERY_CACHE_KEY, JSON.stringify(cache));
+  } catch {
+    // Browser storage can be unavailable; the current page can still show the result.
+  }
+}
+
+export function forgetInvitationDelivery(staffId) {
+  try {
+    const cache = readDeliveryCache();
+    delete cache[staffId];
+    localStorage.setItem(DELIVERY_CACHE_KEY, JSON.stringify(cache));
+  } catch {
+    // Deletion on the server has already succeeded.
+  }
+}
 
 const STAFF_ROLE_LABELS = {
   housekeeper: "แม่บ้าน",
@@ -33,6 +68,11 @@ async function parseResponse(response, fallbackMessage) {
 }
 
 export function toDashboardStaff(account) {
+  const serverStatus = account.invitation_delivery_status ||
+    (account.email_sent === true ? "sent" : account.email_sent === false ? "failed" : null);
+  const cached = readDeliveryCache()[account.id];
+  const cachedStatus = cached?.email === String(account.email).toLowerCase() &&
+    ["sent", "failed"].includes(cached.status) ? cached.status : null;
   return {
     name: account.full_name,
     id: account.id,
@@ -40,13 +80,8 @@ export function toDashboardStaff(account) {
     role: STAFF_ROLE_LABELS[account.role] || account.role,
     zone: "-",
     status: account.status === "active" ? "ใช้งาน" : "พักงาน",
-    invitationDeliveryStatus:
-      account.invitation_delivery_status ||
-      (account.email_sent === true
-        ? "sent"
-        : account.email_sent === false
-          ? "failed"
-          : "unknown"),
+    invitationDeliveryStatus: serverStatus || cachedStatus || "unknown",
+    invitationStatusSource: serverStatus ? "server" : cachedStatus ? "browser" : "none",
   };
 }
 

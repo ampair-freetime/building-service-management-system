@@ -61,18 +61,5 @@
             </section>
           </div>
         </Teleport>
-        <Teleport to="body">
-          <div class="modal" id="overviewWorkItemsModal" role="dialog" aria-modal="true" aria-labelledby="overviewWorkItemsTitle">
-            <section class="modal-card staff-overview-modal-card">
-              <header class="modal-head">
-                <h3 id="overviewWorkItemsTitle">งานที่กำลังรับผิดชอบทั้งหมด</h3>
-                <button type="button" class="close" data-close="overviewWorkItemsModal" aria-label="ปิดรายการงาน">
-                  <svg class="icon"><use href="#i-close" /></svg>
-                </button>
-              </header>
-              <span class="badge neutral" id="overviewWorkItemsCount">กำลังโหลด…</span>
-              <div class="overview-detail-list" id="overviewWorkItemsList" aria-live="polite"></div>
-            </section>
-          </div>
-        </Teleport>
+
 </template>

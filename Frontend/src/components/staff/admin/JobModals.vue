@@ -69,6 +69,7 @@
         <div class="detail-layout">
           <div>
             <div class="detail-photo">
+              <img id="jobDetailImage" alt="" hidden />
               <svg class="icon" id="jobDetailIcon"><use href="#i-tools" /></svg>
             </div>
             <div class="timeline" id="jobTimeline"></div>
@@ -78,18 +79,21 @@
             <p id="jobDetailDescription"></p>
             <div class="detail-meta">
               <div>
-                <small>สถานที่</small><strong id="jobDetailRoom">–</strong>
+                <small id="jobDetailRoomLabel">สถานที่</small><strong id="jobDetailRoom">–</strong>
               </div>
               <div>
-                <small>ผู้แจ้ง</small><strong id="jobDetailReporter">–</strong>
+                <small id="jobDetailReporterLabel">ผู้แจ้ง</small><strong id="jobDetailReporter">–</strong>
               </div>
               <div>
-                <small>ติดต่อ</small
+                <small id="jobDetailContactLabel">ติดต่อ</small
                 ><strong id="jobDetailContact">staff@cmu.ac.th</strong>
               </div>
               <div>
-                <small>ผู้รับผิดชอบ</small
+                <small id="jobDetailAssigneeLabel">ผู้รับผิดชอบ</small
                 ><strong id="jobDetailAssignee">–</strong>
+              </div>
+              <div id="jobDetailReturnStatusGroup" hidden>
+                <small>สถานะการคืนของ</small><strong id="jobDetailReturnStatus">ยังไม่มีคำขอรับคืน</strong>
               </div>
             </div>
             <div class="detail-notes">

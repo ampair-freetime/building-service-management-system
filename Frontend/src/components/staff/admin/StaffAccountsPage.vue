@@ -27,6 +27,10 @@
               <span>บัญชีธุรการ</span><strong id="clerkTotal">0</strong
               ><small>บัญชีเจ้าหน้าที่ธุรการ</small>
             </article>
+            <article class="metric">
+              <span>บัญชีแอดมิน</span><strong id="adminTotal">0</strong
+              ><small>บัญชีผู้ดูแลระบบ</small>
+            </article>
           </div>
           <div class="staff-account-filters">
             <select class="field-compact" id="staffRoleFilter" aria-label="กรองตาม Role">
