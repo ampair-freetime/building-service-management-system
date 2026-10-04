@@ -3,7 +3,7 @@
     <div class="section-title">
       <div>
         <div class="eyebrow">Location QR system</div>
-        <h2>QR Code สถานที่</h2>
+        <h2>จัดการสถานที่</h2>
         <p>เพิ่มสถานที่และสร้าง QR Code สำหรับเปิดหน้าบริการของสถานที่นั้น</p>
       </div>
       <button class="primary" id="openQrModal" type="button">

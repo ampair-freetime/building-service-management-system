@@ -13,33 +13,70 @@
           ×
         </button>
       </div>
-      <form id="staffForm">
-        <div class="form-row">
+      <form id="staffForm" novalidate>
+        <div class="form-row staff-name-row">
           <div class="field">
-            <label for="newName">ชื่อ-นามสกุล</label
-            ><input id="newName" required />
+            <label for="newFirstName">ชื่อ</label>
+            <input
+              id="newFirstName"
+              required
+              minlength="2"
+              maxlength="149"
+              autocomplete="given-name"
+              aria-describedby="newFirstNameError"
+            />
+            <p
+              id="newFirstNameError"
+              class="field-error"
+              aria-live="polite"
+            ></p>
+          </div>
+          <div class="field">
+            <label for="newLastName">นามสกุล</label>
+            <input
+              id="newLastName"
+              required
+              minlength="2"
+              maxlength="149"
+              autocomplete="family-name"
+              aria-describedby="newLastNameError"
+            />
+            <p
+              id="newLastNameError"
+              class="field-error"
+              aria-live="polite"
+            ></p>
           </div>
         </div>
-        <div class="form-row">
-          <div class="field">
-            <label for="newEmail">อีเมล</label
-            ><input id="newEmail" type="email" autocomplete="email" required />
-          </div>
+        <div class="field">
+          <label for="newEmail">อีเมล</label>
+          <input
+            id="newEmail"
+            type="email"
+            maxlength="254"
+            autocomplete="email"
+            aria-describedby="newEmailError"
+            required
+          />
+          <p id="newEmailError" class="field-error" aria-live="polite"></p>
         </div>
-        <div class="form-row">
-          <div class="field">
-            <label for="newRole">Role</label
-            ><select id="newRole" required>
-              <option value="housekeeper">แม่บ้าน</option>
-              <option value="technician">ช่าง</option>
-              <option value="clerk">ธุรการ</option>
-              <option value="admin">แอดมิน</option>
-            </select>
-          </div>
+        <div class="field">
+          <label for="newRole">Role</label
+          ><select
+            class="field-compact"
+            id="newRole"
+            aria-label="เลือก Role"
+            aria-describedby="newRoleError"
+            required
+          >
+            <option value="" disabled selected>เลือก Role</option>
+            <option value="housekeeper">แม่บ้าน</option>
+            <option value="technician">ช่าง</option>
+            <option value="clerk">ธุรการ</option>
+            <option value="admin">แอดมิน</option>
+          </select>
+          <p id="newRoleError" class="field-error" aria-live="polite"></p>
         </div>
-        <p class="form-hint">
-          ระบบจะส่งลิงก์ไปยังอีเมลของ Staff เพื่อให้ตั้งรหัสผ่านด้วยตนเอง
-        </p>
         <button class="primary" id="createStaffButton" style="width: 100%">
           สร้างบัญชี
         </button>
@@ -161,13 +198,17 @@
           <div class="qr-fallback"></div>
         </div>
         <div>
-          <span class="eyebrow">ชื่อสถานที่</span>
           <h3 id="qrRoomName">-</h3>
           <p class="qr-detail-floor" id="qrRoomFloor"></p>
         </div>
-        <button class="primary" id="downloadQr" type="button">
-          ดาวน์โหลด QR Code
-        </button>
+        <div class="qr-detail-actions">
+          <button class="primary" id="downloadQr" type="button">
+            ดาวน์โหลด QR Code
+          </button>
+          <button class="secondary" id="printQr" type="button">
+            พิมพ์ QR Code
+          </button>
+        </div>
       </div>
     </section>
   </div>

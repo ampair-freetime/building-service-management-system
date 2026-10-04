@@ -1,6 +1,6 @@
 import asyncio
 import concurrent.futures
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from io import BytesIO
 from uuid import UUID, uuid4
 from zoneinfo import ZoneInfo
@@ -185,10 +185,7 @@ def test_public_list_only_returns_approved_items_and_hides_private_fields(
 
     asyncio.run(approve_item())
 
-    approved_list = client.get(
-        "/api/v1/guest/found-items",
-        params={"search": "กุญแจ"},
-    )
+    approved_list = client.get("/api/v1/guest/found-items")
     assert approved_list.status_code == 200
     body = approved_list.json()
     assert body["total"] == 1
@@ -203,6 +200,62 @@ def test_public_list_only_returns_approved_items_and_hides_private_fields(
     detail = client.get(f"/api/v1/guest/found-items/{item_code.lower()}")
     assert detail.status_code == 200
     assert detail.json()["item_code"] == item_code
+
+
+@pytest.mark.parametrize("report_type", [LostType.LOST, LostType.FOUND])
+def test_public_list_returns_all_rows_beyond_200_in_stable_order(
+    test_context: tuple[TestClient, async_sessionmaker[AsyncSession]],
+    fake_storage: FakeObjectStorage,
+    report_type: LostType,
+) -> None:
+    client, session_factory = test_context
+    timestamp = datetime(2025, 1, 15, tzinfo=UTC)
+
+    async def seed() -> None:
+        async with session_factory() as session:
+            for kind in [LostType.LOST, LostType.FOUND]:
+                for index in range(250):
+                    session.add(LostItem(
+                        id=UUID(int=(1 if kind == LostType.LOST else 2) * 1000 + index),
+                        item_code=f"{kind.value.upper()}-TEST-{index}",
+                        report_type=kind,
+                        item_category="สิ่งของ",
+                        item_name=f"รายการ {index}",
+                        description="คำค้นเฉพาะรายการเก่า" if index == 0 else None,
+                        event_datetime=timestamp,
+                        created_at=timestamp,
+                        reporter_email="private@example.com",
+                        custody_location="ห้องลับ",
+                        private_verification_detail="หลักฐานลับ",
+                        status=LostStatus.APPROVED,
+                    ))
+                for state in LostStatus:
+                    session.add(LostItem(
+                        item_code=f"{kind.value.upper()}-HIDDEN-{state.value}",
+                        report_type=kind,
+                        item_category="สิ่งของ",
+                        item_name="ต้องไม่เผยแพร่",
+                        event_datetime=timestamp,
+                        reporter_email="private@example.com",
+                        status=state,
+                        deleted_at=timestamp if state == LostStatus.APPROVED else None,
+                    ))
+            await session.commit()
+
+    asyncio.run(seed())
+    response = client.get(f"/api/v1/guest/{report_type.value}-items")
+    assert response.status_code == 200
+    body = response.json()
+    assert set(body) == {"items", "total"}
+    assert body["total"] == len(body["items"]) == 250
+    assert [item["item_code"] for item in body["items"]] == [
+        f"{report_type.value.upper()}-TEST-{index}" for index in reversed(range(250))
+    ]
+    assert body["items"][-1]["description"] == "คำค้นเฉพาะรายการเก่า"
+    for item in body["items"]:
+        assert item["report_type"] == report_type.value
+        assert item["status"] == "approved"
+        assert not {"reporter_email", "custody_location", "private_verification_detail"} & item.keys()
 
 
 def test_found_item_keeps_verification_detail_private_in_database(
@@ -805,11 +858,11 @@ def test_empty_file_input_is_treated_as_no_image(
     assert asyncio.run(count_images()) == 0
 
 
-def test_category_filter_matches_normalized_value(
+def test_public_list_preserves_normalized_category(
     test_context: tuple[TestClient, async_sessionmaker[AsyncSession]],
     fake_storage: FakeObjectStorage,
 ) -> None:
-    """ตอนสร้างยุบช่องว่างซ้อน ตัวกรองจึงต้องยุบด้วย ไม่งั้นค่าที่ผู้ใช้พิมพ์เกินมากรองไม่เจอ."""
+    """List ส่งหมวดหมู่ที่ normalize ตอนสร้างแล้ว โดยไม่กรองข้อมูลที่ backend."""
     client, session_factory = test_context
     created = client.post(
         "/api/v1/guest/lost-items",
@@ -819,23 +872,10 @@ def test_category_filter_matches_normalized_value(
     item_code = created.json()["item_code"]
     _set_item_status(session_factory, item_code=item_code, new_status=LostStatus.APPROVED)
 
-    exact = client.get(
-        "/api/v1/guest/lost-items",
-        params={"category": "ของ ใช้ ส่วนตัว"},
-    )
-    assert exact.json()["total"] == 1
-
-    spaced = client.get(
-        "/api/v1/guest/lost-items",
-        params={"category": "  ของ   ใช้  ส่วนตัว  "},
-    )
-    assert spaced.json()["total"] == 1
-
-    unrelated = client.get(
-        "/api/v1/guest/lost-items",
-        params={"category": "เครื่องประดับ"},
-    )
-    assert unrelated.json()["total"] == 0
+    response = client.get("/api/v1/guest/lost-items")
+    assert response.status_code == 200
+    assert response.json()["total"] == 1
+    assert response.json()["items"][0]["item_category"] == "ของ ใช้ ส่วนตัว"
 
 
 def test_custody_location_appears_only_after_claim_is_approved(
@@ -922,7 +962,7 @@ def test_guest_can_view_latest_return_status(test_context):
                 item_category="Accessories",
                 item_name="Bag",
                 description="Black bag",
-                event_datetime=datetime.now(timezone.utc),
+                event_datetime=datetime.now(UTC),
                 location_id=None,
                 location_detail="Building A",
                 custody_location="Clerk Office",

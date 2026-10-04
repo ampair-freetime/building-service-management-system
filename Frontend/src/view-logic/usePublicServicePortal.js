@@ -11,13 +11,16 @@ import {
   createFoundItemClaim,
   createLostItem,
   getLostFoundItem,
-  searchLostFoundItems,
+  fetchPublicLostFoundItems,
   trackLostFoundItem,
   trackServiceRequest,
 } from "../services/api";
+import { createLostFoundStore, filterLostFoundItems } from "../services/lostFoundSearch.js";
 
 export function usePublicServicePortal() {
   const validationCleanups = [];
+  let portalMounted = true;
+  onUnmounted(() => { portalMounted = false; });
   const sidebarOpen = ref(false);
   const closeSidebar = () => {
     sidebarOpen.value = false;
@@ -274,42 +277,72 @@ export function usePublicServicePortal() {
         else if (sidebar.classList.contains("open")) closeSidebar();
       }
     });
-    // นับลำดับการค้นหา เพื่อป้องกันผลเก่าทับผลล่าสุด
+    const postsStore = createLostFoundStore(fetchPublicLostFoundItems);
+    let appliedPostQuery = "";
+    const postPageSize = 20;
+    let postPage = 0;
+    // นับ event เพื่อให้ผลโหลดแสดงด้วยคำค้นและประเภทล่าสุด
     let searchRequestId = 0;
 
-    // ค้นหาประกาศตามคำค้นและประเภท แล้วแสดงผลจาก API
-    async function filterPosts() {
+    function renderFilteredPosts() {
+      const items = filterLostFoundItems(postsStore.items, {
+        type: activePostFilter,
+        search: appliedPostQuery,
+      });
+      const lastPage = Math.max(0, Math.ceil(items.length / postPageSize) - 1);
+      postPage = Math.min(postPage, lastPage);
+      const start = postPage * postPageSize;
+      const visibleItems = items.slice(start, start + postPageSize);
+      renderSearchPosts(visibleItems);
+      document.getElementById("resultSummary").textContent =
+        items.length
+          ? `แสดง ${start + 1}–${start + visibleItems.length} จาก ${items.length} รายการที่ตรงกับตัวกรอง`
+          : "ไม่พบรายการ";
+      document.getElementById("lostPagination").hidden = items.length <= postPageSize;
+      document.getElementById("lostPageSummary").textContent =
+        `หน้า ${postPage + 1} จาก ${lastPage + 1}`;
+      document.getElementById("lostPreviousPage").disabled = postPage === 0;
+      document.getElementById("lostNextPage").disabled = postPage === lastPage;
+      const empty = document.getElementById("noSearchResults");
+      empty.hidden = items.length !== 0;
+      empty.querySelector("strong").textContent = postsStore.items.length
+        ? "ไม่พบประกาศที่ตรงกับคำค้นหรือประเภท"
+        : "ยังไม่มีประกาศที่เผยแพร่";
+      empty.querySelector("p").textContent = postsStore.items.length
+        ? "ลองเปลี่ยนคำค้น หรือเลือกประเภท “ทั้งหมด” แล้วค้นหาอีกครั้ง"
+        : "กดรีเฟรชเพื่อตรวจสอบประกาศใหม่อีกครั้ง";
+    }
+
+    async function filterPosts({ force = false } = {}) {
       const requestId = ++searchRequestId;
-      const query = document.getElementById("lostSearch").value.trim();
       const summary = document.getElementById("resultSummary");
       const empty = document.getElementById("noSearchResults");
       const grid = document.getElementById("postGrid");
 
       openLostView("browse", false);
-      summary.textContent = "กำลังค้นหา...";
+      if (force) postPage = 0;
+      summary.textContent = "กำลังโหลดประกาศ...";
       empty.hidden = true;
       grid.setAttribute("aria-busy", "true");
       grid.classList.add("is-loading");
+      document.getElementById("lostPreviousPage").disabled = true;
+      document.getElementById("lostNextPage").disabled = true;
 
       try {
-        const result = await searchLostFoundItems({
-          type: activePostFilter,
-          search: query,
-        });
-
-        // ป้องกันผลจากการค้นหาเก่าทับการค้นหาครั้งล่าสุด
-        if (requestId !== searchRequestId) return;
-
-        renderSearchPosts(result.items);
-        summary.textContent = `แสดง ${result.items.length} จาก ${result.total} รายการ`;
-        empty.hidden = result.items.length !== 0;
-        grid.removeAttribute("aria-busy");
-        grid.classList.remove("is-loading");
+        await postsStore.ensureLoaded({ force });
+        if (!portalMounted || requestId !== searchRequestId) return;
+        renderFilteredPosts();
       } catch (error) {
-        if (requestId !== searchRequestId) return;
-        summary.textContent = error.message;
-        grid.removeAttribute("aria-busy");
-        grid.classList.remove("is-loading");
+        if (!portalMounted || requestId !== searchRequestId) return;
+        if (postsStore.loaded) renderFilteredPosts();
+        summary.textContent = postsStore.loaded
+          ? `${error.message} · กำลังแสดงข้อมูลที่โหลดไว้ก่อนหน้า`
+          : error.message;
+      } finally {
+        if (portalMounted && requestId === searchRequestId) {
+          grid.removeAttribute("aria-busy");
+          grid.classList.remove("is-loading");
+        }
       }
     }
 
@@ -392,11 +425,12 @@ export function usePublicServicePortal() {
       grid.replaceChildren(...cards);
     }
 
-    document.querySelectorAll(".filter-chip").forEach((chip) =>
+    document.querySelectorAll(".filter-chip[data-filter]").forEach((chip) =>
       chip.addEventListener("click", () => {
         activePostFilter = chip.dataset.filter;
+        postPage = 0;
         document
-          .querySelectorAll(".filter-chip")
+          .querySelectorAll(".filter-chip[data-filter]")
           .forEach((item) => item.classList.toggle("active", item === chip));
         filterPosts();
       }),
@@ -405,6 +439,8 @@ export function usePublicServicePortal() {
       .getElementById("lostSearchForm")
       .addEventListener("submit", (event) => {
         event.preventDefault();
+        appliedPostQuery = document.getElementById("lostSearch").value.trim();
+        postPage = 0;
         const searchButton = document.getElementById("lostSearchButton");
         searchButton.classList.add("pressed");
         window.setTimeout(() => {
@@ -419,7 +455,20 @@ export function usePublicServicePortal() {
         }, 120);
       });
 
-    // โหลดประกาศจริงทันทีเพื่อแทนที่การ์ดตัวอย่างที่ไม่มี item_code จากฐานข้อมูล
+    document.getElementById("lostRefreshButton")?.addEventListener("click", () => {
+      void filterPosts({ force: true });
+    });
+    document.getElementById("lostPreviousPage")?.addEventListener("click", () => {
+      if (postPage === 0) return;
+      postPage--;
+      renderFilteredPosts();
+    });
+    document.getElementById("lostNextPage")?.addEventListener("click", () => {
+      postPage++;
+      renderFilteredPosts();
+    });
+
+    // โหลดประกาศจริงจากฐานข้อมูลทันที
     filterPosts();
 
     function setDetailContent(data, action = "close") {
@@ -535,23 +584,7 @@ export function usePublicServicePortal() {
 
       openUiModal("detailModal", trigger);
 
-      // การ์ดตัวอย่างยังไม่มี item_code จึงแสดงข้อมูลเดิมจากหน้าเว็บได้ตามปกติ
-      if (!itemCode) {
-        setDetailContent(
-          {
-            dialogTitle: "รายละเอียดประกาศ",
-            title: selectedClaimItem,
-            detail: card.querySelector(".post-body p")?.textContent.trim(),
-            date: card.querySelector(".post-date")?.textContent.trim(),
-            location: card.dataset.search?.split(" ").slice(-3).join(" "),
-            status: card.querySelector(".post-type")?.textContent.trim(),
-            icon: isFound ? "#i-box" : "#i-search",
-          },
-          isFound ? "claim" : "contact",
-        );
-        setItemDetailState("content");
-        return;
-      }
+      if (!itemCode) return;
 
       setItemDetailState("loading");
 
@@ -561,6 +594,7 @@ export function usePublicServicePortal() {
 
         if (!item) {
           setItemDetailState("not-found");
+          void filterPosts({ force: true });
           return;
         }
 
@@ -613,8 +647,6 @@ export function usePublicServicePortal() {
       });
     }
 
-    document.querySelectorAll(".post-card").forEach(bindPostCard);
-
     function openClaim(itemName, trigger) {
       if (!selectedClaimItemCode) {
         showToast("กรุณาเลือกประกาศพบของจากผลค้นหาอีกครั้ง");
@@ -666,8 +698,7 @@ export function usePublicServicePortal() {
       details = {},
     ) {
       showConfirmationDetails(details);
-      const trackingCode =
-        requestId || `BC-${Math.floor(1000 + Math.random() * 9000)}`;
+      const trackingCode = requestId;
       const serviceType = serviceTypeForRequest(
         { requestType: type },
         trackingCode,
@@ -687,7 +718,6 @@ export function usePublicServicePortal() {
         itemName: details.problem || "ไม่ระบุรายละเอียด",
         updatedAt: "เพิ่งส่งคำร้อง",
         email: recipientEmail.trim().toLowerCase(),
-        demo: Boolean(details.demo),
       });
       document.getElementById("successType").textContent = type;
       document.getElementById("successInstruction").textContent =
@@ -730,30 +760,15 @@ export function usePublicServicePortal() {
       });
     }
 
-    function createDemoRequestCode(prefix) {
-      const today = new Date();
-      const date = [
-        today.getFullYear(),
-        String(today.getMonth() + 1).padStart(2, "0"),
-        String(today.getDate()).padStart(2, "0"),
-      ].join("");
-      const suffix = crypto
-        .randomUUID()
-        .replaceAll("-", "")
-        .slice(0, 8)
-        .toUpperCase();
-      return `${prefix}-${date}-${suffix}`;
-    }
-
     const cleaningForm = document.querySelector("#clean form");
     const confirmCleaningRequest = (event) => {
-      const { demo, request_code, recipientEmail, location, problem, status } =
+      const { request_code, recipientEmail, location, problem, status } =
         event.detail;
       showSuccess(
         "แจ้งทำความสะอาดเรียบร้อยแล้ว",
         recipientEmail,
-        demo ? createDemoRequestCode("CLEAN") : request_code,
-        { location, problem, status, demo },
+        request_code,
+        { location, problem, status },
       );
     };
     cleaningForm?.addEventListener(
@@ -769,13 +784,13 @@ export function usePublicServicePortal() {
 
     const repairForm = document.querySelector("#repair form");
     const confirmRepairRequest = (event) => {
-      const { demo, request_code, recipientEmail, location, problem, status } =
+      const { request_code, recipientEmail, location, problem, status } =
         event.detail;
       showSuccess(
         "แจ้งซ่อมเรียบร้อยแล้ว",
         recipientEmail,
-        demo ? createDemoRequestCode("REPAIR") : request_code,
-        { location, problem, status, demo },
+        request_code,
+        { location, problem, status },
       );
     };
     repairForm?.addEventListener(
@@ -1330,19 +1345,16 @@ export function usePublicServicePortal() {
         const isLostFoundCode =
           code.startsWith("LOST-") || code.startsWith("FOUND-");
         const isServiceCode =
-          code.startsWith("CLN-") ||
-          code.startsWith("CLEAN-") ||
-          code.startsWith("RPR-") ||
-          code.startsWith("REPAIR-");
+          code.startsWith("CLN-") || code.startsWith("RPR-");
         const localItem = trackedRequests.get(code);
-        if (!isLostFoundCode && (!isServiceCode || localItem?.demo)) {
+        if (!isLostFoundCode && !isServiceCode) {
           // เปิดโอกาสให้ browser วาด loading state ก่อนอัปเดตข้อมูลในหน่วยความจำ
           await new Promise((resolve) => window.setTimeout(resolve, 0));
         }
         let item;
         if (isLostFoundCode) {
           item = await trackLostFoundItem(code, email);
-        } else if (isServiceCode && !localItem?.demo) {
+        } else if (isServiceCode) {
           const remoteItem = await trackServiceRequest(code, email);
           const hasMatchingLocalItem =
             localItem && (!localItem.email || localItem.email === email);
@@ -1574,10 +1586,6 @@ export function usePublicServicePortal() {
       320,
     );
 
-    const qrService = new URLSearchParams(window.location.search).get("service");
-    if (qrService === "clean" || qrService === "repair") {
-      navigate(qrService);
-    }
   });
 
   onUnmounted(() => {

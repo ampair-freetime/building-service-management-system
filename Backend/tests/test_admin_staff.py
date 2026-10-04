@@ -71,7 +71,9 @@ def test_delivery_failure_keeps_account_and_reports_false(test_context, monkeypa
     response = client.post("/api/v1/staff", headers=headers, json=staff_payload())
 
     assert response.status_code == 201
-    assert response.json()["email_sent"] is False
+    body = response.json()
+    assert body["email_sent"] is False
+    assert "temporary_password" not in body
     listing = client.get("/api/v1/staff", headers=headers)
     assert [item["email"] for item in listing.json()] == ["admin@example.com", "hk@example.com"]
 

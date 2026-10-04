@@ -1,4 +1,6 @@
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000/api/v1").replace(/\/+$/, "");
+import { fetchPublicLostFoundItems } from "./api.js";
+
+const API_BASE_URL = (import.meta.env?.VITE_API_BASE_URL ?? "http://localhost:8000/api/v1").replace(/\/+$/, "");
 
 export class ClerkApiError extends Error {
   constructor(message, status) {
@@ -107,24 +109,10 @@ export async function getPendingLostItems() {
 }
 
 export async function getApprovedLostFoundItems() {
-  const params = new URLSearchParams({ limit: "200", offset: "0" });
-  const [foundResponse, lostResponse] = await Promise.all([
-    fetch(`${API_BASE_URL}/guest/found-items?${params}`),
-    fetch(`${API_BASE_URL}/guest/lost-items?${params}`),
-  ]);
-
-  const found = await parseResponse(
-    foundResponse,
-    "ไม่สามารถโหลดรายการของที่รับฝากได้",
-  );
-  const lost = await parseResponse(
-    lostResponse,
-    "ไม่สามารถโหลดประกาศของหายได้",
-  );
-
+  const { items } = await fetchPublicLostFoundItems();
   return {
-    foundItems: found.items || [],
-    lostItems: lost.items || [],
+    foundItems: items.filter((item) => item.report_type === "found"),
+    lostItems: items.filter((item) => item.report_type === "lost"),
   };
 }
 

@@ -1,6 +1,6 @@
 /**
  * เมนูและลำดับหน้าที่แต่ละ Role เข้าถึงได้
- * แต่ละ Role มีชุดหน้าและประวัติของตัวเอง ตัวสลับ Role มีไว้สำหรับ demo เท่านั้น
+ * แต่ละ Role มีชุดหน้าและประวัติของตัวเอง
  */
 export const STAFF_ROLE_PAGES = {
   housekeeper: [
@@ -22,10 +22,10 @@ export const STAFF_ROLE_PAGES = {
     { id: "my-history", label: "ประวัติงานของฉัน" },
   ],
   admin: [
-    { id: "staff-overview", label: "ภาพรวมงาน Staff" },
+    { id: "staff-overview", label: "ภาพรวมงานของเจ้าหน้าที่" },
     { id: "history", label: "ของหายและรับฝาก" },
     { id: "staff", label: "บัญชีเจ้าหน้าที่" },
-    { id: "qr", label: "QR ประจำห้อง" },
+    { id: "qr", label: "จัดการสถานที่" },
   ],
 };
 

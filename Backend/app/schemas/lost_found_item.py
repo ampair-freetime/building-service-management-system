@@ -1,7 +1,6 @@
 """Schemas สำหรับ guest API ของประกาศของหายและของที่พบ."""
 
 from datetime import UTC, datetime, timedelta
-import string
 from uuid import UUID
 from zoneinfo import ZoneInfo
 
@@ -123,12 +122,11 @@ class GuestItemPublicResponse(BaseModel):
 
 
 class GuestItemListResponse(BaseModel):
-    """รายการประกาศพร้อมจำนวนทั้งหมดสำหรับทำ pagination."""
+    """รายการ public ครบทุกแถว พร้อมจำนวนทั้งหมดสำหรับ client-side search."""
 
     items: list[GuestItemPublicResponse]
     total: int
-    limit: int
-    offset: int
+
 
 class GuestItemClaim(BaseModel):
     """ข้อมูลที่ guest กรอกเพื่อขอรับของคืน.

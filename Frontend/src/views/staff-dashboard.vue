@@ -11,7 +11,12 @@ const { activeRole } = useStaffDashboard();
 <template>
   <div
     class="staff-dashboard-page"
-    :class="{ 'is-admin': activeRole === 'admin' }"
+    :class="{
+      'is-admin': activeRole === 'admin',
+      'is-technician': activeRole === 'technician',
+      'is-housekeeper': activeRole === 'housekeeper',
+      'is-clerk': activeRole === 'clerk',
+    }"
   >
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
     <svg
@@ -62,6 +67,10 @@ const { activeRole } = useStaffDashboard();
       </symbol>
       <symbol id="i-check" viewBox="0 0 24 24">
         <path d="m5 12 4 4L19 6" />
+      </symbol>
+      <symbol id="i-copy" viewBox="0 0 24 24">
+        <rect x="9" y="9" width="11" height="11" rx="2" />
+        <path d="M15 9V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h3" />
       </symbol>
       <symbol id="i-upload" viewBox="0 0 24 24">
         <path d="M12 16V4m0 0L7 9m5-5 5 5M4 16v4h16v-4" />
@@ -143,7 +152,7 @@ const { activeRole } = useStaffDashboard();
             <span class="nav-icon">H</span>ประวัติงานของฉัน
           </button>
           <button class="nav-item" data-page="staff-overview" data-roles="admin">
-            <span class="nav-icon">WO</span>ภาพรวมงาน Staff
+            <span class="nav-icon">WO</span>ภาพรวมงานของเจ้าหน้าที่
           </button>
           <button v-if="activeRole === 'clerk'" class="nav-item" data-page="lost" data-roles="clerk">
             <span class="nav-icon">03</span>ของหายและรับฝาก
@@ -155,7 +164,7 @@ const { activeRole } = useStaffDashboard();
             <span class="nav-icon">03</span>บัญชีเจ้าหน้าที่
           </button>
           <button class="nav-item" data-page="qr" data-roles="admin">
-            <span class="nav-icon">QR</span>QR ประจำห้อง
+            <span class="nav-icon">QR</span>จัดการสถานที่
           </button>
         </nav>
         <div class="sidebar-foot">
@@ -181,9 +190,7 @@ const { activeRole } = useStaffDashboard();
 
       <main>
         <header class="topbar">
-          
           <div class="top-actions">
-            <span class="ready-pill">พร้อมปฏิบัติงาน</span>
             <div class="notification-wrap">
               <button
                 class="icon-btn"
@@ -218,11 +225,26 @@ const { activeRole } = useStaffDashboard();
                   id="notificationPanel"
                   aria-label="รายการแจ้งเตือน"
                 >
-                  <div class="notification-head">
-                    <h3 id="notificationTitle">การแจ้งเตือนของแอดมิน</h3>
-                    <button id="markAllRead">อ่านทั้งหมดแล้ว</button>
+                  <div class="notification-dialog" role="dialog" aria-modal="true" aria-labelledby="notificationTitle">
+                    <div class="notification-head">
+                      <div class="notification-head-copy">
+                        <h3 id="notificationTitle">การแจ้งเตือนของแอดมิน</h3>
+                        <p>รายการอัปเดตล่าสุดของคุณ</p>
+                      </div>
+                      <div class="notification-head-actions">
+                        <button id="markAllRead">อ่านทั้งหมดแล้ว</button>
+                        <button
+                          class="notification-close"
+                          type="button"
+                          data-close-notifications
+                          aria-label="ปิดการแจ้งเตือน"
+                        >
+                          <svg class="icon" aria-hidden="true"><use href="#i-close" /></svg>
+                        </button>
+                      </div>
+                    </div>
+                    <div class="notification-list" id="notificationList"></div>
                   </div>
-                  <div class="notification-list" id="notificationList"></div>
                 </section>
               </Teleport>
             </div>
@@ -250,7 +272,10 @@ const { activeRole } = useStaffDashboard();
 
     <nav
       class="bottom-nav"
-      :class="{ 'admin-bottom-nav': activeRole === 'admin' }"
+      :class="{
+        'admin-bottom-nav': activeRole === 'admin',
+        'technician-bottom-nav': ['technician', 'housekeeper'].includes(activeRole),
+      }"
       aria-label="เมนูด้านล่าง"
     >
       <template v-if="activeRole === 'admin'">
@@ -265,6 +290,31 @@ const { activeRole } = useStaffDashboard();
         </button>
         <button type="button" data-mobile-page="qr">
           <svg class="icon"><use href="#i-qr" /></svg><span>QR ห้อง</span>
+        </button>
+      </template>
+      <template v-else-if="['technician', 'housekeeper'].includes(activeRole)">
+        <button type="button" class="active" data-mobile-page="dashboard">
+          <svg class="icon"><use href="#i-home" /></svg><span>ภาพรวม</span>
+        </button>
+        <button type="button" data-mobile-page="jobs">
+          <svg class="icon"><use href="#i-list" /></svg><span>งาน</span>
+        </button>
+        <button type="button" data-mobile-page="my-history">
+          <svg class="icon"><use href="#i-history" /></svg><span>ประวัติงาน</span>
+        </button>
+      </template>
+      <template v-else-if="activeRole === 'clerk'">
+        <button type="button" class="active" data-mobile-page="dashboard">
+          <svg class="icon"><use href="#i-home" /></svg><span>ภาพรวม</span>
+        </button>
+        <button type="button" data-mobile-page="clerk-center">
+          <svg class="icon"><use href="#i-list" /></svg><span>ศูนย์งาน</span>
+        </button>
+        <button type="button" data-mobile-page="lost">
+          <svg class="icon"><use href="#i-box" /></svg><span>ของหาย-รับฝาก</span>
+        </button>
+        <button type="button" data-mobile-page="my-history">
+          <svg class="icon"><use href="#i-history" /></svg><span>ประวัติงาน</span>
         </button>
       </template>
       <template v-else>

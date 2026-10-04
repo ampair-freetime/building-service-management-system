@@ -2,6 +2,11 @@ import asyncio
 from datetime import datetime, timezone
 
 from uuid import uuid4
+from unittest.mock import Mock
+
+import pytest
+
+from app.api.dependencies import provide_object_storage
 from conftest import seed_staff
 from sqlalchemy import select
 from app.models.enums import ClaimStatus, LostStatus, LostType, ReturnStatus
@@ -10,6 +15,17 @@ from app.models.lost_found import (
     LostClaimReturnStatusHistory,
     LostItem,
 )
+
+
+@pytest.fixture
+def public_list_storage(test_context):
+    """Public-list regression tests ต้องไม่ขึ้นกับการตั้งค่า R2 จริง."""
+    client, _ = test_context
+    client.app.dependency_overrides[provide_object_storage] = lambda: Mock(
+        create_download_url=lambda key: f"https://signed.example/{key}",
+    )
+    yield
+    client.app.dependency_overrides.pop(provide_object_storage, None)
 
 
 def test_clerk_can_view_found_item_detail(test_context):
@@ -750,7 +766,7 @@ def test_approved_lost_item_is_removed_from_pending_list(test_context):
     )
 
 
-def test_approved_lost_item_is_published(test_context):
+def test_approved_lost_item_is_published(test_context, public_list_storage):
     client, session_factory = test_context
 
     seed_staff(
@@ -1652,7 +1668,9 @@ def test_lost_item_rejection_reason_is_required(test_context):
     assert item.review_note is None
 
 
-def test_rejected_lost_item_is_not_published_and_removed_from_pending_list(test_context):
+def test_rejected_lost_item_is_not_published_and_removed_from_pending_list(
+    test_context, public_list_storage,
+):
     client, session_factory = test_context
 
     seed_staff(

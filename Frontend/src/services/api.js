@@ -1,3 +1,5 @@
+import { sortLostFoundItems } from "./lostFoundSearch.js";
+
 // ตัด / ท้าย URL เพื่อให้ต่อ path ได้โดยไม่เกิด // ระหว่าง base URL กับ endpoint
 const API_BASE_URL = (import.meta.env?.VITE_API_BASE_URL ?? 'http://localhost:8000/api/v1').replace(/\/+$/, '')
 
@@ -115,46 +117,35 @@ export async function getLostFoundItem(itemCode, reportType) {
     clearTimeout(timeout)
   }
 }
-// ค้นหารายการของหายและพบของจาก guest API โดยใช้ search query และ type (lost, found, all)
-export async function searchLostFoundItems({
-  type = "all",
-  search = "",
-}) {
-  // endpoint ของ guest API สำหรับ lost-items และ found-items
-  const collections = {
-    lost: "lost-items",
-    found: "found-items",
-  };
-  // ถ้า type เป็น "all" ให้ค้นหาทั้ง lost และ found, ถ้าไม่ใช่ให้ค้นหาเฉพาะประเภทนั้น
-  const types = type === "all" ? ["lost", "found"] : [type];
-
-  // สร้าง query string สำหรับ search, limit, offset
-  const params = new URLSearchParams({
-    search: search.trim(),
-    limit: "20",
-    offset: "0",
-  });
-  // ใช้ Promise.all เพื่อรัน fetch ทั้งหมดพร้อมกัน และรอผลลัพธ์ทั้งหมด
-  const results = await Promise.all(
-    types.map(async (kind) => {
-      const response = await fetch(
-        `${API_BASE_URL}/guest/${collections[kind]}?${params}`,
-      );
-
-      if (!response.ok) {
-        throw new Error("ไม่สามารถค้นหาประกาศได้");
-      }
-
-      return response.json();
-    }),
-  );
-  // รวมผลลัพธ์จากทั้ง lost และ found items, เรียงตามวันที่สร้างใหม่สุด และรวม total ของแต่ละประเภท
-  return {
-    items: results
-      .flatMap((result) => result.items)
-      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at)),
-    total: results.reduce((sum, result) => sum + result.total, 0),
-  };
+// โหลดทั้งสองประเภทครบก่อนส่งผล เพื่อไม่ให้ caller ใช้ข้อมูลเพียงครึ่งชุด
+export async function fetchPublicLostFoundItems() {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 30_000);
+  try {
+    const results = await Promise.all(
+      ["lost-items", "found-items"].map(async (collection) => {
+        const response = await fetch(`${API_BASE_URL}/guest/${collection}`, {
+          signal: controller.signal,
+        });
+        if (!response.ok) throw new Error("ไม่สามารถโหลดประกาศได้ กรุณารีเฟรชอีกครั้ง");
+        const result = await response.json();
+        if (!Array.isArray(result.items) || result.total !== result.items.length) {
+          throw new Error("ได้รับรายการประกาศไม่ครบ กรุณาลองใหม่");
+        }
+        return result;
+      }),
+    );
+    const items = sortLostFoundItems(results.flatMap((result) => result.items));
+    return { items, total: items.length };
+  } catch (error) {
+    const timedOut = controller.signal.aborted;
+    controller.abort();
+    if (timedOut) throw new Error("โหลดประกาศนานเกินไป กรุณารีเฟรชอีกครั้ง");
+    if (error instanceof TypeError) throw new Error("เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ กรุณาลองใหม่");
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 // ตรวจสอบสถานะของรายการของหายหรือพบของด้วยรหัสและอีเมลของผู้แจ้ง

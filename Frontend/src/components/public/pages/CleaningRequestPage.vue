@@ -13,7 +13,6 @@ import {
   resolveCleaningLocationByQr,
   uploadCleaningRequest,
 } from "../../../services/cleaningRequests.js";
-import { mockServiceLocations } from "../../../services/mockServiceLocations.js";
 import LocationCombobox from "../LocationCombobox.vue";
 
 const priorityValues = {
@@ -91,12 +90,12 @@ const MAX_PHOTO_BYTES = 5 * 1024 * 1024;
 const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
 
 const floorOptions = computed(() => [...new Set([
-  ...mockServiceLocations.map((location) => location.floor || "ไม่ระบุชั้น"),
+  ...locations.value.map((location) => location.floor || "ไม่ระบุชั้น"),
   ...(qrLocation.value ? [qrLocation.value.floor || "ไม่ระบุชั้น"] : []),
 ])].map((floor) => floor === "ไม่ระบุชั้น" ? floor : `ชั้น ${floor}`));
 
 const areaOptions = computed(() => [...new Set([
-  ...mockServiceLocations,
+  ...locations.value,
   ...(qrLocation.value ? [qrLocation.value] : []),
 ].filter((location) => (location.floor || "ไม่ระบุชั้น") === selectedFloor.value.replace(/^ชั้น /, ""))
   .map((location) => location.area))]);
@@ -110,13 +109,6 @@ const selectedLocation = computed(() => {
     (location.floor || "ไม่ระบุชั้น") === floor && location.area === selectedArea.value);
   return matches.length === 1 ? matches[0] : null;
 });
-
-const isQrLocation = computed(
-  () =>
-    qrLocation.value !== null &&
-    selectedFloor.value.replace(/^ชั้น /, "") === (qrLocation.value.floor || "ไม่ระบุชั้น") &&
-    selectedArea.value === qrLocation.value.area,
-);
 
 function formatLocation(location) {
   if (!location) return "";
@@ -296,9 +288,6 @@ onBeforeUnmount(clearPhotos);
             />
             <input type="hidden" name="location_id" :value="selectedLocation?.id || ''" />
           </div>
-          <p v-if="isQrLocation" class="qr-location-message" role="status" aria-live="polite">
-            📍 เลือก {{ formatLocation(qrLocation) }} จาก QR แล้ว · เปลี่ยนสถานที่ได้จากรายการ
-          </p>
           <p v-if="qrMessage" class="qr-location-message" role="status" aria-live="polite">
             {{ qrMessage }}
             <button v-if="qrRetry" type="button" class="secondary" @click="loadQrLocation">

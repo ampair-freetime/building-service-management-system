@@ -82,10 +82,6 @@ async def add_found_item(
 async def read_found_items(
     session: DbSession,
     storage: ObjectStorageClient,
-    limit: Annotated[int, Query(ge=1, le=200)] = 200,
-    offset: Annotated[int, Query(ge=0)] = 0,
-    category: Annotated[str | None, Query(max_length=100)] = None,
-    search: Annotated[str | None, Query(max_length=200)] = None,
 ) -> GuestItemListResponse:
     """แสดงเฉพาะประกาศพบของที่เจ้าหน้าที่อนุมัติแล้ว."""
     try:
@@ -93,10 +89,6 @@ async def read_found_items(
             session,
             report_type=LostType.FOUND,
             storage=storage,
-            limit=limit,
-            offset=offset,
-            category=category,
-            search=search,
         )
     except StorageOperationError as exc:
         raise HTTPException(
@@ -191,5 +183,5 @@ async def read_found_item_claim(
     except (ClaimItemNotFoundError, ClaimNotFoundError) as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=str("ไม่พบคำขอนี้"),
+            detail="ไม่พบคำขอนี้",
         ) from exc

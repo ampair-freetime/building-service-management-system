@@ -20,6 +20,7 @@ import ClerkApprovalsOverviewPage from "./ClerkApprovalsOverviewPage.vue";
         <p>ค้นหาและเปิดดูโพสต์ที่ธุรการอนุมัติแล้ว รวมถึงคำขอรับของ</p>
       </div>
       <form class="history-controls admin-history-controls" id="historySearchForm" role="search">
+        <button class="small-btn" id="staffLostRefreshButton" type="button">รีเฟรชประกาศ</button>
         <input class="field-compact search" id="historySearch" type="search" placeholder="ค้นหารหัส ชื่อรายการ สถานที่ หรือสถานะ" aria-label="ค้นหารายการของหายและรับฝาก" />
         <button class="primary" type="submit">แสดงผล</button>
       </form>

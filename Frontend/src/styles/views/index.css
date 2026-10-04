@@ -490,6 +490,10 @@ main {
   padding: 24px;
   margin-bottom: 24px;
 }
+.service-menu-section {
+  position: relative;
+  z-index: 3;
+}
 .section-head {
   display: flex;
   align-items: center;
@@ -1084,7 +1088,8 @@ main {
   background: #fff;
   text-align: center;
 }
-.no-search-results[hidden] {
+.no-search-results[hidden],
+#lostPagination[hidden] {
   display: none;
 }
 .no-search-results strong {
@@ -3327,6 +3332,10 @@ textarea:focus-visible {
     margin-bottom: 12px;
     padding: 14px;
     border-radius: 18px;
+  }
+
+  .user-page #dashboard > .mobile-hero + .service-menu-section {
+    margin-top: -52px;
   }
 
   .user-page .section-head {

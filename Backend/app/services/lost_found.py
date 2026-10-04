@@ -6,7 +6,7 @@ from datetime import datetime
 from uuid import UUID, uuid4
 
 from fastapi import UploadFile
-from sqlalchemy import func, or_, select
+from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -169,48 +169,24 @@ async def list_public_items(
     *,
     report_type: LostType,
     storage: ObjectStorage,
-    limit: int,
-    offset: int,
-    category: str | None = None,
-    search: str | None = None,
 ) -> GuestItemListResponse:
-    """อ่านเฉพาะประกาศ approved และไม่ถูก soft-delete."""
+    """คืนประกาศ public ครบทุกแถว ให้ frontend ค้นหาในข้อมูลชุดนี้."""
     filters = [
         LostItem.report_type == report_type,
         LostItem.status == LostStatus.APPROVED,
         LostItem.deleted_at.is_(None),
     ]
-    if category:
-        # ตอนสร้างใช้ " ".join(split()) จึงต้อง normalize เหมือนกัน ไม่งั้นค่าที่มีเว้นวรรคซ้อนกรองไม่เจอ
-        normalized_category = " ".join(category.split())
-        if normalized_category:
-            filters.append(LostItem.item_category == normalized_category)
-    if search:
-        pattern = f"%{search.strip()}%"
-        filters.append(
-            or_(
-                LostItem.item_name.ilike(pattern),
-                LostItem.description.ilike(pattern),
-                LostItem.location_detail.ilike(pattern),
-            )
-        )
-
-    total = await session.scalar(select(func.count(LostItem.id)).where(*filters))
     result = await session.scalars(
         select(LostItem)
         .where(*filters)
         .order_by(LostItem.created_at.desc(), LostItem.id.desc())
-        .limit(limit)
-        .offset(offset)
     )
     items = list(result)
     image_map = await _load_image_map(session, [item.id for item in items])
 
     return GuestItemListResponse(
         items=[_to_public_response(item, image_map.get(item.id, []), storage) for item in items],
-        total=int(total or 0),
-        limit=limit,
-        offset=offset,
+        total=len(items),
     )
 
 

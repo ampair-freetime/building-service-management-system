@@ -4,7 +4,7 @@
             <div>
               <div class="eyebrow">Access administration</div>
               <h2>บัญชีและสิทธิ์เจ้าหน้าที่</h2>
-              <p>สร้างบัญชี เปลี่ยน Role ปิดใช้งาน หรือลบบัญชีออกจากระบบ</p>
+              <p>สร้างและจัดการบัญชีเจ้าหน้าที่</p>
             </div>
             <button class="primary" id="openStaffModal">
               + สร้างบัญชี Staff
@@ -44,7 +44,7 @@
               class="field-compact search"
               id="staffAccountSearch"
               type="search"
-              placeholder="ค้นหาชื่อ, Staff ID หรือพื้นที่รับผิดชอบ"
+              placeholder="ค้นหาชื่อหรือ Role"
               aria-label="ค้นหาบัญชีเจ้าหน้าที่"
             />
             <button class="secondary" id="resetStaffAccountFilters" type="button">
