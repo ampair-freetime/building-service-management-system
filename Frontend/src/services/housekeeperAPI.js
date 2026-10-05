@@ -1,5 +1,5 @@
 const API_BASE_URL = (
-  import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000/api/v1"
+  import.meta.env?.VITE_API_BASE_URL ?? "http://localhost:8000/api/v1"
 ).replace(/\/+$/, "");
 
 export class HousekeeperApiError extends Error {
@@ -42,6 +42,24 @@ export async function markStaffNotificationRead(notificationId) {
   return parseResponse(response, "ไม่สามารถอัปเดตการแจ้งเตือนได้");
 }
 
+/** งานที่ยังว่างให้รับ และงานที่แม่บ้านคนนี้รับไว้ สำหรับแสดงตอนเปิด Dashboard */
+export async function getCleaningTasks() {
+  const response = await fetch(`${API_BASE_URL}/cleaning-tasks`, {
+    method: "GET",
+    headers: authHeaders(),
+  });
+  return parseResponse(response, "ไม่สามารถโหลดรายการงานทำความสะอาดได้");
+}
+
+/** รายละเอียด Cleaning Task หนึ่งรายการ พร้อมสถานที่และรูปที่ผู้แจ้งแนบ */
+export async function getCleaningTaskDetail(requestId) {
+  const response = await fetch(
+    `${API_BASE_URL}/cleaning-tasks/${encodeURIComponent(requestId)}`,
+    { method: "GET", headers: authHeaders() },
+  );
+  return parseResponse(response, "ไม่สามารถโหลดรายละเอียดงานทำความสะอาดได้");
+}
+
 /** ให้แม่บ้านที่ login รับ Cleaning Task ที่ยังไม่มีผู้รับผิดชอบ */
 export async function acceptCleaningTask(requestId) {
   const response = await fetch(
@@ -65,6 +83,19 @@ export async function updateCleaningTaskStatus(requestId, status) {
     },
   );
   return parseResponse(response, "ไม่สามารถอัปเดตสถานะงานทำความสะอาดได้");
+}
+
+/** คืน Cleaning Task ที่ตัวเองรับไว้กลับเข้าคิวกลาง พร้อมเหตุผล */
+export async function returnCleaningTask(requestId, { reason, note }) {
+  const response = await fetch(
+    `${API_BASE_URL}/cleaning-tasks/${encodeURIComponent(requestId)}/return`,
+    {
+      method: "POST",
+      headers: { ...authHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify({ reason, note }),
+    },
+  );
+  return parseResponse(response, "ไม่สามารถคืนงานทำความสะอาดได้");
 }
 
 /** บันทึกหมายเหตุสรุปหลังงานเสร็จ */

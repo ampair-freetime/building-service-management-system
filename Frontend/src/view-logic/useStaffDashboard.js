@@ -54,9 +54,12 @@ import {
 import {
   acceptCleaningTask,
   addCleaningCompletionNote,
+  getCleaningTaskDetail,
   getCleaningTaskHistory,
+  getCleaningTasks,
   getStaffNotifications,
   markStaffNotificationRead,
+  returnCleaningTask,
   updateCleaningTaskStatus,
   uploadCleaningCompletionPhotos,
 } from "../services/housekeeperAPI.js";
@@ -67,6 +70,7 @@ import {
   getRepairRequestDetail,
   getRepairRequestHistory,
   getRepairRequests,
+  returnRepairRequest,
   updateRepairRequestStatus,
   uploadRepairCompletionPhotos,
 } from "../services/technicianAPI.js";
@@ -455,10 +459,12 @@ export function useStaffDashboard() {
     }
 
     const cleaningStatusLabels = {
+      waiting: "รอรับงาน",
       assigned: "รับงานแล้ว",
       received: "รับทราบงาน",
       in_progress: "กำลังดำเนินการ",
       completed: "เสร็จสิ้น",
+      cancelled: "ยกเลิก",
     };
     const nextCleaningStatuses = {
       assigned: "received",
@@ -544,6 +550,59 @@ export function useStaffDashboard() {
         if (await handleUnauthorizedResponse(error.status)) return;
         console.error("Loading repair requests failed:", error);
         toast(error.message || "ไม่สามารถโหลดรายการงานซ่อมได้");
+      }
+    }
+    // โหลดงานทำความสะอาดจาก Backend ตอนเปิด Dashboard ไม่ต้องรอให้กดการแจ้งเตือนก่อน
+    async function loadCleaningTasks() {
+      if (currentRole !== "housekeeper") return;
+      try {
+        const result = await getCleaningTasks();
+        const staffId = JSON.parse(
+          localStorage.getItem("buildingCareStaff") || "null",
+        )?.id;
+        const tasks = Array.isArray(result.requests) ? result.requests : [];
+        const ids = new Set(tasks.map((task) => task.id));
+        for (const task of tasks) {
+          let job = allJobs.find((item) => item.backendId === task.id);
+          if (!job) {
+            job = {
+              type: "cleaning",
+              category: "งานทำความสะอาด",
+              reporter: "ผู้ใช้งานอาคาร",
+              timeline: [],
+            };
+            allJobs.push(job);
+          }
+          Object.assign(job, {
+            backendId: task.id,
+            id: task.request_code,
+            title: task.title,
+            detail: task.description,
+            room: repairLocation(task.location),
+            priority: task.priority === "urgent" ? "เร่งด่วน" : "ปกติ",
+            backendStatus: task.status,
+            status: cleaningStatusLabels[task.status] || task.status,
+            assigneeId: task.assigned_staff_id,
+            assignee: task.assigned_staff_id
+              ? task.assigned_staff_id === staffId
+                ? activeStaffName()
+                : "แม่บ้านผู้รับผิดชอบ"
+              : null,
+            time: new Date(task.created_at).toLocaleString("th-TH"),
+          });
+        }
+        // ลบการ์ดงานทำความสะอาดที่ Backend ไม่ส่งมาแล้ว (เช่น คนอื่นรับไป)
+        allJobs = allJobs.filter(
+          (job) =>
+            job.type !== "cleaning" || !job.backendId || ids.has(job.backendId),
+        );
+        renderJobs();
+        renderMetrics();
+        renderQueue();
+      } catch (error) {
+        if (await handleUnauthorizedResponse(error.status)) return;
+        console.error("Loading cleaning tasks failed:", error);
+        toast(error.message || "ไม่สามารถโหลดรายการงานทำความสะอาดได้");
       }
     }
     function populateCategoryFilter() {
@@ -1055,7 +1114,7 @@ export function useStaffDashboard() {
               : error.message || "ไม่สามารถรับงานได้",
           );
           if (job.type === "repair") await loadRepairRequests();
-          else await loadStaffNotifications();
+          else await loadCleaningTasks();
           return false;
         }
       } else {
@@ -2992,6 +3051,27 @@ export function useStaffDashboard() {
           return;
         }
       }
+      if (job.type === "cleaning" && job.backendId && currentRole === "housekeeper") {
+        try {
+          const detail = await getCleaningTaskDetail(job.backendId);
+          job.detail = detail.description;
+          job.room = repairLocation(detail.location);
+          job.reporterContact = detail.reporter_email;
+          job.backendStatus = detail.status;
+          job.status = cleaningStatusLabels[detail.status] || detail.status;
+          job.requestImageUrl = detail.images?.[0]?.url || job.requestImageUrl || "";
+        } catch (error) {
+          if (await handleUnauthorizedResponse(error.status)) return;
+          console.error("Loading cleaning task detail failed:", error);
+          toast(
+            error.status === 404
+              ? "งานนี้ถูกรับไปแล้วหรือไม่อยู่ในรายการของคุณ"
+              : error.message || "ไม่สามารถโหลดรายละเอียดงานทำความสะอาดได้",
+          );
+          if (error.status === 404) await loadCleaningTasks();
+          return;
+        }
+      }
       selectedJobId = id;
       $("#jobDetailModal")?.classList.remove("lost-post-detail");
       $("#jobDetailCode").textContent = `${id} · ${job.category}`;
@@ -3102,48 +3182,21 @@ export function useStaffDashboard() {
       }
     }
 
-    // Notification มี request_id และข้อความรูปแบบ "request_code: title"
-    // จึงสร้างรายการงานจากข้อมูลจริงที่ Backend ส่งมาแล้วเปิด modal รายละเอียด
-    function openCleaningRequestFromNotification(
+    // หางานจาก request_id ของการแจ้งเตือน ถ้ายังไม่มีในรายการให้โหลดจาก Backend ใหม่
+    async function openCleaningRequestFromNotification(
       notification,
       trigger = document.activeElement,
     ) {
       if (!notification.requestId) return false;
-
-      const separatorIndex = notification.text.indexOf(":");
-      const requestCode =
-        separatorIndex > 0
-          ? notification.text.slice(0, separatorIndex).trim()
-          : `CLEAN-${notification.requestId.slice(0, 8).toUpperCase()}`;
-      const requestTitle =
-        separatorIndex > 0
-          ? notification.text.slice(separatorIndex + 1).trim()
-          : notification.title;
-
-      let job = allJobs.find(
-        (item) =>
-          item.backendId === notification.requestId || item.id === requestCode,
-      );
+      let job = allJobs.find((item) => item.backendId === notification.requestId);
       if (!job) {
-        job = {
-          backendId: notification.requestId,
-          id: requestCode,
-          type: "cleaning",
-          category: "งานทำความสะอาด",
-          title: requestTitle || notification.title,
-          room: "ดูสถานที่จากรายละเอียดคำร้อง",
-          reporter: "ผู้ใช้งานอาคาร",
-          reporterContact: "ติดต่อผ่านระบบ CS Building Care",
-          time: notification.time,
-          status: "รอรับงาน",
-          priority: "ปกติ",
-          detail: notification.text,
-          assignee: null,
-          timeline: [],
-        };
-        allJobs.unshift(job);
+        await loadCleaningTasks();
+        job = allJobs.find((item) => item.backendId === notification.requestId);
       }
-
+      if (!job) {
+        toast("งานนี้ถูกรับไปแล้วหรือไม่อยู่ในรายการของคุณ");
+        return true;
+      }
       navigate("jobs");
       renderJobs();
       renderMetrics();
@@ -4612,7 +4665,7 @@ export function useStaffDashboard() {
       $("#notificationPanel").classList.remove("open");
       if (
         currentRole === "housekeeper" &&
-        openCleaningRequestFromNotification(item, itemButton)
+        (await openCleaningRequestFromNotification(item, itemButton))
       ) {
         return;
       }
@@ -4995,14 +5048,37 @@ export function useStaffDashboard() {
       requestConfirmation(
         "ยืนยันคืนงานเข้าคิวกลาง",
         `ยืนยันคืนงาน ${id} เพราะ “${reason}” หรือไม่?`,
-        () => {
+        async () => {
           const job = allJobs.find((item) => item.id === id);
           if (!job || job.assignee !== activeStaffName()) {
             toast("งานนี้ไม่อยู่ในความรับผิดชอบของคุณแล้ว");
             renderJobs();
             return;
           }
-          const fullReason = `${reason} — ${note}`;
+          const fullReason = note ? `${reason} — ${note}` : reason;
+          // งานจริงต้องให้ Backend ปลดผู้รับผิดชอบและบันทึกประวัติก่อน แล้วค่อยเปลี่ยน UI
+          if (job.backendId && ["cleaning", "repair"].includes(job.type)) {
+            try {
+              const returned =
+                job.type === "repair"
+                  ? await returnRepairRequest(job.backendId, { reason, note })
+                  : await returnCleaningTask(job.backendId, { reason, note });
+              job.backendStatus = returned.status;
+              job.assigneeId = null;
+              job.assigneeCode = "";
+            } catch (error) {
+              if (await handleUnauthorizedResponse(error.status)) return;
+              console.error("Returning staff task failed:", error);
+              toast(
+                [403, 409].includes(error.status)
+                  ? "งานนี้ไม่อยู่ในความรับผิดชอบของคุณแล้ว หรือปิดงานไปแล้ว"
+                  : error.message || "ไม่สามารถคืนงานได้",
+              );
+              if (job.type === "repair") await loadRepairRequests();
+              else await loadCleaningTasks();
+              return;
+            }
+          }
           job.returnReason = fullReason;
           job.returnedBy = activeStaffName();
           job.returnedAt = nowThai();
@@ -5297,6 +5373,7 @@ export function useStaffDashboard() {
       await loadApprovedLostFoundItems();
       await loadPendingOwnershipRequests();
       await loadRepairRequests();
+      await loadCleaningTasks();
       await loadStaffNotifications();
       setRole(allowedRoles.includes(currentRole) ? currentRole : "admin");
     }

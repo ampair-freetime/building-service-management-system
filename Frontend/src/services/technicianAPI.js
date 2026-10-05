@@ -1,5 +1,5 @@
 const API_BASE_URL = (
-  import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000/api/v1"
+  import.meta.env?.VITE_API_BASE_URL ?? "http://localhost:8000/api/v1"
 ).replace(/\/+$/, "");
 
 export class TechnicianApiError extends Error {
@@ -66,6 +66,19 @@ export async function acceptRepairRequest(requestId) {
     { method: "PATCH", headers: authHeaders() },
   );
   return parseResponse(response, "ไม่สามารถรับงานซ่อมได้");
+}
+
+/** คืน Repair Request ที่ตัวเองรับไว้กลับเข้าคิวกลาง พร้อมเหตุผล */
+export async function returnRepairRequest(requestId, { reason, note }) {
+  const response = await fetch(
+    `${API_BASE_URL}/repair-requests/${encodeURIComponent(requestId)}/return`,
+    {
+      method: "POST",
+      headers: { ...authHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify({ reason, note }),
+    },
+  );
+  return parseResponse(response, "ไม่สามารถคืนงานซ่อมได้");
 }
 
 /** อัปเดต Repair Requests ตามลำดับสถานะที่ Backend อนุญาต */

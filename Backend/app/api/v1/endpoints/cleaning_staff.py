@@ -4,8 +4,18 @@ from uuid import UUID
 
 from fastapi import APIRouter, File, HTTPException, UploadFile, status
 
-from app.api.dependencies import DbSession, HousekeeperStaff, ObjectStorageClient
+from app.api.dependencies import (
+    DbSession,
+    HousekeeperStaff,
+    ObjectStorageClient,
+    OptionalObjectStorageClient,
+)
 from app.schemas.cleaning_staff import (
+    CleaningTaskDetailResponse,
+    CleaningTaskImageResponse,
+    CleaningTaskListItem,
+    CleaningTaskListResponse,
+    CleaningTaskLocationResponse,
     AssignedCleanerResponse,
     CleaningStatusUpdateRequest,
     CleaningTaskResponse,
@@ -17,6 +27,8 @@ from app.schemas.cleaning_staff import (
     CompletionPhotoUploadResponse,
 )
 from app.services.cleaning_staff import (
+    get_cleaning_task_detail,
+    list_cleaning_tasks,
     CleaningTaskAlreadyAssignedError,
     CleaningTaskNotCompletedError,
     CleaningTaskNotFoundError,
@@ -30,7 +42,103 @@ from app.services.cleaning_staff import (
 from app.services.images import InvalidImageError
 from app.services.object_storage import StorageOperationError
 
+from app.models.enums import RequestType
+from app.schemas.task_return import TaskReturnRequest, TaskReturnResponse
+from app.services.task_return import (
+    TaskNotFoundError,
+    TaskNotOwnedError,
+    TaskNotReturnableError,
+    return_task_to_pool,
+)
+
 router = APIRouter()
+
+
+def _location(task) -> CleaningTaskLocationResponse:
+    return CleaningTaskLocationResponse(
+        id=task.location.id, floor=task.location.floor, area=task.location.area
+    )
+
+
+@router.get("", response_model=CleaningTaskListResponse)
+async def read_cleaning_tasks(
+    session: DbSession,
+    housekeeper: HousekeeperStaff,
+) -> CleaningTaskListResponse:
+    """งานที่ยังว่างให้รับ และงานที่แม่บ้านคนนี้รับไว้ สำหรับแสดงทันทีที่เปิด dashboard."""
+    tasks = await list_cleaning_tasks(session, staff_id=housekeeper.id)
+    return CleaningTaskListResponse(
+        requests=[
+            CleaningTaskListItem(
+                id=task.id,
+                request_code=task.request_code,
+                title=task.title,
+                description=task.description,
+                priority=task.priority,
+                status=task.status,
+                location=_location(task),
+                assigned_staff_id=task.assigned_staff_id,
+                created_at=task.created_at,
+            )
+            for task in tasks
+        ]
+    )
+
+
+@router.get("/{request_id}", response_model=CleaningTaskDetailResponse)
+async def read_cleaning_task_detail(
+    request_id: UUID,
+    session: DbSession,
+    housekeeper: HousekeeperStaff,
+    storage: OptionalObjectStorageClient,
+) -> CleaningTaskDetailResponse:
+    try:
+        task = await get_cleaning_task_detail(
+            session, request_id=request_id, staff_id=housekeeper.id
+        )
+    except CleaningTaskNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+    images = []
+    # ไม่มี R2 config ก็ยังแสดงรายละเอียดงานได้ เพียงไม่มีรูป
+    if storage is not None:
+        images = [
+            CleaningTaskImageResponse(
+                id=image.id,
+                image_type=image.image_type.value,
+                content_type=image.content_type,
+                size_bytes=image.size_bytes,
+                width=image.width,
+                height=image.height,
+                sort_order=image.sort_order,
+                url=storage.create_download_url(image.object_key),
+                created_at=image.created_at,
+            )
+            for image in sorted(
+                (image for image in task.images if image.deleted_at is None),
+                key=lambda image: (
+                    image.sort_order is None,
+                    image.sort_order or 0,
+                    image.created_at,
+                ),
+            )
+        ]
+
+    return CleaningTaskDetailResponse(
+        id=task.id,
+        request_code=task.request_code,
+        title=task.title,
+        description=task.description,
+        priority=task.priority,
+        status=task.status,
+        reporter_email=task.reporter_email,
+        location=_location(task),
+        assigned_staff_id=task.assigned_staff_id,
+        images=images,
+        created_at=task.created_at,
+        updated_at=task.updated_at,
+        completed_at=task.completed_at,
+    )
 
 
 @router.patch(
@@ -268,4 +376,39 @@ async def read_cleaning_work_history(
             )
             for item in history
         ],
+    )
+
+
+@router.post(
+    "/{request_id}/return",
+    response_model=TaskReturnResponse,
+)
+async def return_task(
+    request_id: UUID,
+    payload: TaskReturnRequest,
+    session: DbSession,
+    housekeeper: HousekeeperStaff,
+) -> TaskReturnResponse:
+    """คืนงานที่ตัวเองรับไว้กลับเข้าคิวกลาง พร้อมบันทึกเหตุผลลงประวัติงาน."""
+    try:
+        task = await return_task_to_pool(
+            session,
+            request_id=request_id,
+            request_type=RequestType.CLEANING,
+            staff_id=housekeeper.id,
+            reason=payload.reason,
+            note=payload.note,
+        )
+    except TaskNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except TaskNotOwnedError as exc:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
+    except TaskNotReturnableError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+
+    return TaskReturnResponse(
+        id=task.id,
+        request_code=task.request_code,
+        title=task.title,
+        status=task.status.value,
     )

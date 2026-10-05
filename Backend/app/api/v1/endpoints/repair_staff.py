@@ -44,6 +44,15 @@ from app.services.repair_staff import (
     upload_repair_completion_photos,
 )
 
+from app.models.enums import RequestType
+from app.schemas.task_return import TaskReturnRequest, TaskReturnResponse
+from app.services.task_return import (
+    TaskNotFoundError,
+    TaskNotOwnedError,
+    TaskNotReturnableError,
+    return_task_to_pool,
+)
+
 router = APIRouter()
 
 
@@ -408,4 +417,39 @@ async def get_work_history(
             )
             for item in history
         ],
+    )
+
+
+@router.post(
+    "/{request_id}/return",
+    response_model=TaskReturnResponse,
+)
+async def return_task(
+    request_id: UUID,
+    payload: TaskReturnRequest,
+    session: DbSession,
+    technician: TechnicianStaff,
+) -> TaskReturnResponse:
+    """คืนงานที่ตัวเองรับไว้กลับเข้าคิวกลาง พร้อมบันทึกเหตุผลลงประวัติงาน."""
+    try:
+        task = await return_task_to_pool(
+            session,
+            request_id=request_id,
+            request_type=RequestType.REPAIR,
+            staff_id=technician.id,
+            reason=payload.reason,
+            note=payload.note,
+        )
+    except TaskNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except TaskNotOwnedError as exc:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
+    except TaskNotReturnableError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+
+    return TaskReturnResponse(
+        id=task.id,
+        request_code=task.request_code,
+        title=task.title,
+        status=task.status.value,
     )

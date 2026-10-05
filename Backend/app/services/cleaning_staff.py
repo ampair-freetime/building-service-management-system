@@ -4,9 +4,10 @@ from dataclasses import dataclass
 from uuid import UUID, uuid4
 
 from fastapi import UploadFile
-from sqlalchemy import select, update
+from sqlalchemy import and_, or_, select, update
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.models.enums import ImageType, RequestAction, RequestStatus, RequestType
 from app.models.image import Image
@@ -36,6 +37,59 @@ class _PreparedCompletionPhoto:
     image_id: UUID
     processed: ProcessedImage
     stored: StoredObject
+
+def _visible_to_cleaner(staff_id: UUID):
+    """แม่บ้านเห็นงานที่ยังว่างให้รับ และงานทุกสถานะที่ตัวเองรับไว้ ไม่เห็นงานของคนอื่น."""
+    return or_(
+        and_(
+            ServiceRequest.status == RequestStatus.WAITING,
+            ServiceRequest.assigned_staff_id.is_(None),
+        ),
+        ServiceRequest.assigned_staff_id == staff_id,
+    )
+
+
+async def list_cleaning_tasks(
+    session: AsyncSession,
+    *,
+    staff_id: UUID,
+) -> list[ServiceRequest]:
+    """งานทำความสะอาดสำหรับ dashboard เรียงรายการล่าสุดก่อน พร้อมสถานที่ในคำสั่งเดียว."""
+    tasks = await session.scalars(
+        select(ServiceRequest)
+        .options(selectinload(ServiceRequest.location))
+        .where(
+            ServiceRequest.request_type == RequestType.CLEANING,
+            _visible_to_cleaner(staff_id),
+        )
+        .order_by(ServiceRequest.created_at.desc(), ServiceRequest.id.desc())
+    )
+    return list(tasks)
+
+
+async def get_cleaning_task_detail(
+    session: AsyncSession,
+    *,
+    request_id: UUID,
+    staff_id: UUID,
+) -> ServiceRequest:
+    """รายละเอียดงานพร้อมรูป; งานของแม่บ้านคนอื่นตอบเหมือนไม่พบ เพื่อไม่เปิดเผยอีเมลผู้แจ้ง."""
+    task = await session.scalar(
+        select(ServiceRequest)
+        .options(
+            selectinload(ServiceRequest.location),
+            selectinload(ServiceRequest.images),
+        )
+        .where(
+            ServiceRequest.id == request_id,
+            ServiceRequest.request_type == RequestType.CLEANING,
+            _visible_to_cleaner(staff_id),
+        )
+    )
+    if task is None:
+        raise CleaningTaskNotFoundError("Cleaning task not found")
+    return task
+
 
 async def accept_cleaning_task(
     session: AsyncSession,
