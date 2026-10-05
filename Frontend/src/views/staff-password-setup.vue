@@ -20,7 +20,13 @@ const {
       </symbol>
       <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6" /></symbol>
     </svg>
-    <div class="visual-brand"><span class="brand-mark">CS</span><span>CS Building Care</span></div>
+    <div class="visual-brand" aria-label="CS Building Care">
+      <span class="brand-mark">BC</span>
+      <span class="visual-brand-copy">
+        <strong>CS Building Care</strong>
+        <small>Staff operations portal</small>
+      </span>
+    </div>
     <div class="page-visual" aria-hidden="true"></div>
     <main class="login-shell">
       <section class="login-panel" aria-label="ตั้งรหัสผ่านเจ้าหน้าที่">

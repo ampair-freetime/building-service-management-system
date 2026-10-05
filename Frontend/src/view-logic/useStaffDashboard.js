@@ -138,6 +138,9 @@ export function useStaffDashboard() {
     const clerkApprovalLoadState = { found: "loading", lost: "loading", claims: "loading" };
     const readClaimNotifications = new Set();
     let currentBoardView = "unassigned";
+    let currentPage = STAFF_ROLE_PAGES[currentRole]?.[0]?.id || "dashboard";
+    let navigationReady = false;
+    let restoringNavigation = false;
     let selectedJobId = "";
     let overviewData = null;
     let overviewRequest = 0;
@@ -548,6 +551,28 @@ export function useStaffDashboard() {
         )
         .join("");
     }
+    function renderProfileAvatar(element) {
+      if (!element) return;
+      element.innerHTML =
+        '<svg class="icon profile-person-icon" aria-hidden="true"><use href="#i-user"></use></svg>';
+      element.setAttribute("aria-hidden", "true");
+    }
+    function staffRoleColor(role) {
+      return {
+        admin: "#335e8a",
+        แอดมิน: "#335e8a",
+        housekeeper: "#24613a",
+        แม่บ้าน: "#24613a",
+        technician: "#b45309",
+        ช่าง: "#b45309",
+        clerk: "#9a6508",
+        ธุรการ: "#9a6508",
+      }[role] || "#335e8a";
+    }
+    function staffRoleAvatar(role, neutral = false) {
+      const color = neutral ? "#526b83" : staffRoleColor(role);
+      return `<div class="person-avatar role-person-avatar" style="--avatar-role:${color}" aria-hidden="true"><svg class="icon profile-person-icon"><use href="#i-user"></use></svg></div>`;
+    }
     function setRole(role) {
       currentRole = role;
       activeRole.value = role;
@@ -569,7 +594,7 @@ export function useStaffDashboard() {
       if (staffRoleLabel) staffRoleLabel.textContent = c.label;
 
       const avatar = $("#avatar");
-      if (avatar) avatar.textContent = c.avatar;
+      renderProfileAvatar(avatar);
 
       const eyebrow = $("#eyebrow");
       if (eyebrow) eyebrow.textContent = c.eyebrow;
@@ -600,7 +625,7 @@ export function useStaffDashboard() {
       if (heroPrimary) heroPrimary.textContent = c.primary;
 
       const headerAvatar = $("#headerAvatar");
-      if (headerAvatar) headerAvatar.textContent = c.avatar;
+      renderProfileAvatar(headerAvatar);
 
       const headerName = $("#headerName");
       if (headerName) {
@@ -610,8 +635,19 @@ export function useStaffDashboard() {
       const headerRole = $("#headerRole");
       if (headerRole) headerRole.textContent = c.label;
 
+      const compactHeaderAvatar = $("#compactHeaderAvatar");
+      renderProfileAvatar(compactHeaderAvatar);
+
+      const compactHeaderName = $("#compactHeaderName");
+      if (compactHeaderName) {
+        compactHeaderName.textContent = currentUserName[role].split(" ")[0];
+      }
+
+      const compactHeaderRole = $("#compactHeaderRole");
+      if (compactHeaderRole) compactHeaderRole.textContent = c.label;
+
       const profileAvatar = $("#profileAvatar");
-      if (profileAvatar) profileAvatar.textContent = c.avatar;
+      renderProfileAvatar(profileAvatar);
 
       const profileName = $("#profileName");
       if (profileName) profileName.textContent = currentUserName[role];
@@ -681,7 +717,43 @@ export function useStaffDashboard() {
     // -------------------------------------------------------------------------
 
     // เปลี่ยนหน้าภายใน Staff Dashboard โดยตรวจสิทธิ์ของ role ก่อนเสมอ
-    function navigate(page) {
+    function modalSlug(id) {
+      return id
+        .replace(/Modal$/, "")
+        .replace(/([a-z0-9])([A-Z])/g, "$1-$2")
+        .toLowerCase();
+    }
+
+    function modalIdFromSlug(slug) {
+      return $$(".modal").find((modal) => modalSlug(modal.id) === slug)?.id;
+    }
+
+    function dashboardBasePath() {
+      return currentRole === "admin" ? "/admin-dashboard" : "/staff-dashboard";
+    }
+
+    function readDashboardRoute() {
+      const match = window.location.pathname.match(
+        /\/(?:admin-dashboard|staff-dashboard)(?:\/([^/]+))?(?:\/([^/]+))?\/?$/,
+      );
+      return {
+        page: match?.[1] ? decodeURIComponent(match[1]) : "",
+        dialog: match?.[2] ? decodeURIComponent(match[2]) : "",
+      };
+    }
+
+    function updateDashboardRoute(modalId = "", mode = "push") {
+      if (!navigationReady || restoringNavigation) return;
+      const dialog = modalId ? `/${modalSlug(modalId)}` : "";
+      const path = `${dashboardBasePath()}/${currentPage}${dialog}`;
+      const query = { ...router.currentRoute.value.query };
+      const target = router.resolve({ path, query }).fullPath;
+      const current = `${window.location.pathname}${window.location.search}`;
+      if (target === current) return;
+      void router[mode]({ path, query });
+    }
+
+    function navigate(page, historyMode = "push") {
       const destinationPage = page === "my-jobs" ? "jobs" : page;
       if (!canRoleOpenPage(currentRole, page)) {
         toast("บทบาทนี้ไม่มีสิทธิ์เข้าถึงเมนูดังกล่าว");
@@ -697,6 +769,7 @@ export function useStaffDashboard() {
         toast("ไม่พบหน้าที่เลือก");
         return;
       }
+      currentPage = page;
       $$(".page").forEach((p) => p.classList.remove("active"));
       destination.classList.add("active");
       $$(".nav-item").forEach((n) =>
@@ -730,6 +803,7 @@ export function useStaffDashboard() {
           ? "auto"
           : "smooth",
       });
+      if (historyMode !== "none") updateDashboardRoute("", historyMode);
     }
     function renderMetrics() {
       if (!$("#metricGrid")) return;
@@ -1983,10 +2057,10 @@ export function useStaffDashboard() {
           return `<article class="staff-overview-card">
             <header class="staff-overview-card-head">
               <div class="overview-staff-name">
-                <div class="person-avatar">${escapeHtml(person.full_name.slice(0, 2))}</div>
+                ${staffRoleAvatar(person.role, true)}
                 <div><strong>${escapeHtml(person.full_name)}</strong><small>${escapeHtml(person.email)}</small></div>
               </div>
-              <span class="badge neutral">${role}</span>
+              <span class="badge overview-role-badge" style="--badge-role:${staffRoleColor(person.role)}">${role}</span>
             </header>
             <div class="staff-overview-card-stats">
               <div><span>กำลังรับผิดชอบ</span><strong>${person.counts.current_assigned}</strong></div>
@@ -2114,7 +2188,7 @@ export function useStaffDashboard() {
     // อัปเดต badge ทั้ง Desktop/Mobile และซ่อนเมื่อไม่มีรายการที่ยังไม่อ่าน
     function updateUnreadNotificationCount(unreadCount) {
       const visibleCount = unreadCount > 99 ? "99+" : String(unreadCount);
-      [$("#notificationCount"), $("#mobileNotificationCount")].forEach(
+      [$("#notificationCount")].forEach(
         (badge) => {
           if (!badge) return;
           badge.textContent = visibleCount;
@@ -2128,12 +2202,6 @@ export function useStaffDashboard() {
       );
 
       $("#notificationButton")?.setAttribute(
-        "aria-label",
-        unreadCount > 0
-          ? `เปิดการแจ้งเตือน มี ${unreadCount} รายการที่ยังไม่ได้อ่าน`
-          : "เปิดการแจ้งเตือน",
-      );
-      $("#mobileNotification")?.setAttribute(
         "aria-label",
         unreadCount > 0
           ? `เปิดการแจ้งเตือน มี ${unreadCount} รายการที่ยังไม่ได้อ่าน`
@@ -2281,12 +2349,6 @@ export function useStaffDashboard() {
     // แสดงตารางบัญชีและ action ที่ผู้ดูแลระบบสามารถดำเนินการได้
     function renderStaff() {
       if (!$("#staffTable")) return;
-      const roleColors = {
-        แม่บ้าน: "#24613a",
-        ช่าง: "#f97316",
-        ธุรการ: "#9a6508",
-        แอดมิน: "#6757d9",
-      };
       const roleLabels = {
         admin: "แอดมิน",
         clerk: "ธุรการ",
@@ -2318,11 +2380,7 @@ export function useStaffDashboard() {
           };
           return `<article class="staff-account-card">
             <header class="staff-account-card-head">
-              <div class="person"><div class="person-avatar" style="background:${
-                roleColors[s.role]
-              }18;color:${roleColors[s.role]}">${
-                s.name.slice(0, 2) ? escapeHtml(s.name.slice(0, 2)) : "-"
-              }</div><div><strong>${escapeHtml(s.name)}</strong><small>${
+              <div class="person">${staffRoleAvatar(s.role)}<div><strong>${escapeHtml(s.name)}</strong><small>${
                 s.status === "ใช้งาน" ? escapeHtml(s.email || "-") : "บัญชีระงับ"
               }</small></div></div>
               <span class="badge ${s.status === "ใช้งาน" ? "done" : "wait"}">${
@@ -2680,7 +2738,11 @@ export function useStaffDashboard() {
     // -------------------------------------------------------------------------
 
     // เปิด modal และจดจำ element ต้นทางเพื่อคืน focus เมื่อปิด
-    function openModal(id, trigger = document.activeElement) {
+    function openModal(
+      id,
+      trigger = document.activeElement,
+      historyMode = "push",
+    ) {
       const modal = $(`#${id}`);
       if (!modal) return;
       $$(".modal.open").forEach((item) => closeModal(item.id, false));
@@ -2688,6 +2750,7 @@ export function useStaffDashboard() {
       modal.classList.add("open");
       modal.removeAttribute("aria-hidden");
       document.body.classList.add("modal-open");
+      if (historyMode !== "none") updateDashboardRoute(id, historyMode);
       requestAnimationFrame(() =>
         modal
           .querySelector(
@@ -2696,7 +2759,11 @@ export function useStaffDashboard() {
           ?.focus(),
       );
     }
-    function closeModal(id, restoreFocus = true) {
+    function closeModal(
+      id,
+      restoreFocus = true,
+      updateHistory = restoreFocus,
+    ) {
       const modal = $(`#${id}`);
       if (!modal) return;
       modal.classList.remove("open");
@@ -2708,6 +2775,30 @@ export function useStaffDashboard() {
         document.contains(lastModalTrigger)
       )
         lastModalTrigger.focus();
+      if (
+        updateHistory &&
+        !restoringNavigation &&
+        readDashboardRoute().dialog === modalSlug(id)
+      ) {
+        router.back();
+      }
+    }
+    function syncDashboardFromRoute() {
+      const routeState = readDashboardRoute();
+      const page = canRoleOpenPage(currentRole, routeState.page)
+        ? routeState.page
+        : STAFF_ROLE_PAGES[currentRole][0].id;
+
+      restoringNavigation = true;
+      $$(".modal.open").forEach((modal) =>
+        closeModal(modal.id, false, false),
+      );
+      navigate(page, "none");
+      const modalId = modalIdFromSlug(routeState.dialog);
+      if (modalId) openModal(modalId, document.activeElement, "none");
+      restoringNavigation = false;
+
+      return modalId || "";
     }
     function closeSidebar() {
       $("#sidebar").classList.remove("open");
@@ -3763,8 +3854,11 @@ export function useStaffDashboard() {
       updateMenuToggle(false);
     }
     window.addEventListener("resize", syncNavigationForViewport);
+    const handleBrowserNavigation = () => syncDashboardFromRoute();
+    window.addEventListener("popstate", handleBrowserNavigation);
     cleanupDashboardEvents = () => {
       window.removeEventListener("resize", syncNavigationForViewport);
+      window.removeEventListener("popstate", handleBrowserNavigation);
     };
     syncNavigationForViewport();
     $("#dashboardQuickActions")?.addEventListener("click", (event) => {
@@ -4437,7 +4531,7 @@ export function useStaffDashboard() {
       const panel = $("#notificationPanel"),
         open = !panel.classList.contains("open");
       panel.classList.toggle("open", open);
-      $("#notificationButton").setAttribute("aria-expanded", String(open));
+      $("#notificationButton")?.setAttribute("aria-expanded", String(open));
       if (open) {
         if (!panel.classList.contains("technician-notifications")) {
           const triggerRect = trigger.getBoundingClientRect();
@@ -4450,10 +4544,6 @@ export function useStaffDashboard() {
       }
     }
     $("#notificationButton")?.addEventListener("click", (event) => {
-      event.stopPropagation();
-      toggleNotificationPanel(event.currentTarget);
-    });
-    $("#mobileNotification")?.addEventListener("click", (event) => {
       event.stopPropagation();
       toggleNotificationPanel(event.currentTarget);
     });
@@ -5185,6 +5275,9 @@ export function useStaffDashboard() {
     }
 
     await loadInitialDashboardData();
+    const initialModalId = syncDashboardFromRoute();
+    navigationReady = true;
+    updateDashboardRoute(initialModalId, "replace");
     cleanupFilterSelects = enhanceFilterSelects();
 
     // DOM พร้อมใช้งานแล้ว จึงแสดงรายการสถานที่และปิด loading mask

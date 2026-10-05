@@ -25,6 +25,7 @@
   --radius-sm: 18px;
   --font: "Sarabun", "Open Sans", system-ui, sans-serif;
 }
+
 * {
   box-sizing: border-box;
 }
@@ -3021,8 +3022,7 @@ textarea:focus-visible {
   position: relative;
   isolation: isolate;
   min-height: 100vh;
-  background: radial-gradient(circle at 85px 0, #ffffff 0 170px, transparent 171px),
-    linear-gradient(145deg, #f1f7fc 0%, #fdfefe 46%, #f5f9fc 100%);
+  background: linear-gradient(145deg, #f1f7fc 0%, #fdfefe 46%, #f5f9fc 100%);
 }
 .user-page > .app-shell {
   position: relative;
@@ -3334,7 +3334,7 @@ textarea:focus-visible {
   }
 
   .user-page #dashboard > .mobile-hero + .service-menu-section {
-    margin-top: -52px;
+    margin-top: 0;
   }
 
   .user-page .section-head {
@@ -3531,6 +3531,46 @@ textarea:focus-visible {
     height: 20px;
   }
 
+  .user-page .bottom-nav .mobile-overview-tab {
+    z-index: 1;
+    overflow: visible;
+  }
+
+  .user-page .bottom-nav .mobile-overview-tab .nav-glyph {
+    width: 56px;
+    height: 56px;
+    margin-top: -30px;
+    display: grid;
+    place-items: center;
+    border-radius: 19px;
+    background: #17324d;
+    color: #fff;
+    box-shadow: 0 10px 24px rgba(23, 50, 77, 0.32);
+  }
+
+  .user-page .bottom-nav .mobile-overview-tab .nav-glyph .icon {
+    display: none;
+  }
+
+  .user-page .bottom-nav .mobile-overview-tab .nav-glyph::before {
+    content: "";
+    width: 25px;
+    height: 25px;
+    background: center / contain no-repeat
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23fff' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m3 11 9-8 9 8v9h-6v-6H9v6H3z'/%3E%3C/svg%3E");
+  }
+
+  .user-page .bottom-nav .mobile-overview-tab > span:last-child {
+    margin-top: 1px;
+    color: #77727f;
+    font-weight: 400;
+  }
+
+  .user-page .bottom-nav .mobile-overview-tab.active > span:last-child {
+    color: #17324d;
+    font-weight: 800;
+  }
+
   #detailModal .ui-modal-card {
     width: min(350px, 100%);
     max-height: min(82dvh, 650px);
@@ -3698,4 +3738,12 @@ textarea:focus-visible {
     font-size: 12px;
   }
 
+}
+
+/* The BC identity stays blue on every Guest service theme. */
+.user-page .sidebar .brand-mark {
+  border-color: transparent !important;
+  background: linear-gradient(145deg, #335e8a, #5d89b3) !important;
+  color: #fff !important;
+  box-shadow: 0 8px 20px rgba(51, 94, 138, 0.25) !important;
 }

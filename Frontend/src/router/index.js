@@ -10,7 +10,7 @@ const routes = [
 
   // ผู้ใช้งานทั่วไป -> ไม่ต้อง Login
   {
-    path: "/user",
+    path: "/user/:page?/:dialog?",
     name: "user",
     component: PublicServicePortal,
   },
@@ -37,14 +37,14 @@ const routes = [
 
   // Dashboard เจ้าหน้าที่
   {
-    path: "/staff-dashboard",
+    path: "/staff-dashboard/:page?/:dialog?",
     name: "staff-dashboard",
     component: StaffDashboard,
     meta: { requiresAuth: true },
   },
 
   {
-    path: "/admin-dashboard",
+    path: "/admin-dashboard/:page?/:dialog?",
     name: "admin-dashboard",
     component: StaffDashboard,
     meta: { requiresAuth: true },

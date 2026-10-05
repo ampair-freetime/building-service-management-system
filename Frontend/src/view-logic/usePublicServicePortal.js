@@ -6,6 +6,7 @@ import {
   serviceTypeForRequest,
 } from "../services/requestStatus.js";
 import { onMounted, onUnmounted, ref } from "vue";
+import { useRouter } from "vue-router";
 import {
   createFoundItem,
   createFoundItemClaim,
@@ -17,7 +18,9 @@ import {
 } from "../services/api";
 
 export function usePublicServicePortal() {
+  const router = useRouter();
   const validationCleanups = [];
+  let cleanupPortalNavigation = () => {};
   const sidebarOpen = ref(false);
   const closeSidebar = () => {
     sidebarOpen.value = false;
@@ -49,6 +52,8 @@ export function usePublicServicePortal() {
     let detailRequestId = 0;
     let selectedClaimItem = "";
     let selectedClaimItemCode = "";
+    let navigationReady = false;
+    let restoringNavigation = false;
     // เก็บเฉพาะคำร้องที่ผู้ใช้ส่งจริงในรอบการเปิดหน้านี้ ไม่มีข้อมูลตัวอย่างปะปน
     const trackedRequests = new Map();
 
@@ -80,7 +85,42 @@ export function usePublicServicePortal() {
       );
     }
 
-    function navigate(pageId) {
+    function modalSlug(id) {
+      return id
+        .replace(/Modal$/, "")
+        .replace(/([a-z0-9])([A-Z])/g, "$1-$2")
+        .toLowerCase();
+    }
+
+    function modalIdFromSlug(slug) {
+      return [...document.querySelectorAll(".ui-modal")].find(
+        (modal) => modalSlug(modal.id) === slug,
+      )?.id;
+    }
+
+    function readPortalRoute() {
+      const match = window.location.pathname.match(
+        /\/user(?:\/([^/]+))?(?:\/([^/]+))?\/?$/,
+      );
+      return {
+        page: match?.[1] ? decodeURIComponent(match[1]) : "",
+        dialog: match?.[2] ? decodeURIComponent(match[2]) : "",
+      };
+    }
+
+    function updatePortalRoute(modalId = "", mode = "push") {
+      if (!navigationReady || restoringNavigation) return;
+      const query = { ...router.currentRoute.value.query };
+      delete query.service;
+      const dialog = modalId ? `/${modalSlug(modalId)}` : "";
+      const path = `/user/${currentPage}${dialog}`;
+      const target = router.resolve({ path, query }).fullPath;
+      const current = `${window.location.pathname}${window.location.search}`;
+      if (target === current) return;
+      void router[mode]({ path, query });
+    }
+
+    function navigate(pageId, historyMode = "push") {
       const destination = document.getElementById(pageId);
       if (!destination || !destination.classList.contains("page")) return;
       currentPage = pageId;
@@ -101,6 +141,8 @@ export function usePublicServicePortal() {
         openLostView("browse", false);
         void filterPosts();
       }
+
+      if (historyMode !== "none") updatePortalRoute("", historyMode);
     }
 
     navItems.forEach((item) =>
@@ -210,7 +252,11 @@ export function usePublicServicePortal() {
       );
     }
 
-    function closeUiModal(id, restoreFocus = true) {
+    function closeUiModal(
+      id,
+      restoreFocus = true,
+      updateHistory = restoreFocus,
+    ) {
       const modal = document.getElementById(id);
       if (!modal || !modal.classList.contains("open")) return;
       modal.classList.remove("open");
@@ -227,9 +273,21 @@ export function usePublicServicePortal() {
       ) {
         lastModalTrigger.focus();
       }
+
+      if (
+        updateHistory &&
+        !restoringNavigation &&
+        readPortalRoute().dialog === modalSlug(id)
+      ) {
+        router.back();
+      }
     }
 
-    function openUiModal(id, trigger = document.activeElement) {
+    function openUiModal(
+      id,
+      trigger = document.activeElement,
+      historyMode = "push",
+    ) {
       const modal = document.getElementById(id);
       if (!modal) return;
       document
@@ -240,6 +298,7 @@ export function usePublicServicePortal() {
       modal.removeAttribute("aria-hidden");
       document.body.classList.add("modal-open");
       syncBottomNavigation(id);
+      if (historyMode !== "none") updatePortalRoute(id, historyMode);
       // เลื่อน focus หลังเปลี่ยนสถานะ modal เพื่อให้ช่องเป้าหมายพร้อมแสดงผล
       window.requestAnimationFrame(() => {
         const focusTarget = modal.querySelector(
@@ -274,6 +333,36 @@ export function usePublicServicePortal() {
         else if (sidebar.classList.contains("open")) closeSidebar();
       }
     });
+
+    function syncPortalFromRoute() {
+      const routeState = readPortalRoute();
+      const service = new URLSearchParams(window.location.search).get(
+        "service",
+      );
+      const requestedPage = routeState.page || service;
+      const validPage = [...pages].some((page) => page.id === requestedPage);
+      const page = validPage
+        ? requestedPage
+        : ["clean", "repair"].includes(service)
+          ? service
+          : "dashboard";
+
+      restoringNavigation = true;
+      document
+        .querySelectorAll(".ui-modal.open")
+        .forEach((modal) => closeUiModal(modal.id, false, false));
+      navigate(page, "none");
+      const modalId = modalIdFromSlug(routeState.dialog);
+      if (modalId) openUiModal(modalId, document.activeElement, "none");
+      restoringNavigation = false;
+
+      return modalId || "";
+    }
+
+    const handleBrowserNavigation = () => syncPortalFromRoute();
+    window.addEventListener("popstate", handleBrowserNavigation);
+    cleanupPortalNavigation = () =>
+      window.removeEventListener("popstate", handleBrowserNavigation);
     // นับลำดับการค้นหา เพื่อป้องกันผลเก่าทับผลล่าสุด
     let searchRequestId = 0;
 
@@ -1490,11 +1579,6 @@ export function usePublicServicePortal() {
         submitButton.disabled = false;
         submitButton.textContent = "ส่งคำขอรับคืน";
       }
-      const urlParams = new URLSearchParams(window.location.search);
-
-      if (urlParams.get("service") === "clean") {
-        navigate("clean");
-      }
     });
 
     const viewStatusButton = document.getElementById("viewStatusButton");
@@ -1531,6 +1615,9 @@ export function usePublicServicePortal() {
     document
       .querySelectorAll(".ui-modal")
       .forEach((modal) => modal.setAttribute("aria-hidden", "true"));
+    const initialModalId = syncPortalFromRoute();
+    navigationReady = true;
+    updatePortalRoute(initialModalId, "replace");
     window.setTimeout(
       () => document.querySelector(".loading-mask")?.remove(),
       320,
@@ -1539,6 +1626,7 @@ export function usePublicServicePortal() {
   });
 
   onUnmounted(() => {
+    cleanupPortalNavigation();
     validationCleanups.forEach((cleanup) => cleanup());
     document.body.classList.remove("modal-open", "offline");
   });

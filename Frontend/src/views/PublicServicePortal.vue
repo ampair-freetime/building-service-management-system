@@ -149,16 +149,6 @@ const { sidebarOpen, closeSidebar, toggleSidebar } = usePublicServicePortal();
         <PublicLostPage />
       </main>
       <nav class="bottom-nav" aria-label="เมนูด้านล่าง">
-        <button
-          type="button"
-          class="active"
-          data-go="dashboard"
-          data-bottom-page="dashboard"
-        >
-          <span class="nav-glyph"
-            ><svg class="icon"><use href="#i-home" /></svg></span
-          ><span>หน้าหลัก</span>
-        </button>
         <button type="button" data-go="repair" data-bottom-page="repair">
           <span class="nav-glyph"
             ><svg class="icon"><use href="#i-tools" /></svg></span
@@ -168,6 +158,16 @@ const { sidebarOpen, closeSidebar, toggleSidebar } = usePublicServicePortal();
           <span class="nav-glyph"
             ><svg class="icon"><use href="#i-broom" /></svg></span
           ><span>แจ้งทำความสะอาด</span>
+        </button>
+        <button
+          type="button"
+          class="mobile-overview-tab active"
+          data-go="dashboard"
+          data-bottom-page="dashboard"
+        >
+          <span class="nav-glyph"
+            ><svg class="icon"><use href="#i-home" /></svg></span
+          ><span>หน้าหลัก</span>
         </button>
         <button
           type="button"

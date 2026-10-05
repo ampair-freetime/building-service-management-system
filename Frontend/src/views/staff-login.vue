@@ -7,6 +7,8 @@ const {
   rememberMe,
   showPassword,
   loading,
+  identifierError,
+  passwordError,
   forgotModalOpen,
   resetEmail,
   toastMessage,
@@ -14,6 +16,8 @@ const {
   togglePassword,
   openForgotModal,
   closeForgotModal,
+  validateIdentifier,
+  validatePassword,
   handleForgotPassword,
   handleLogin,
   loginWithGoogle,
@@ -61,7 +65,11 @@ const {
       </symbol>
     </svg>
     <div class="visual-brand" aria-label="CS Building Care">
-      <span class="brand-mark">CS</span><span>CS Building Care</span>
+      <span class="brand-mark">BC</span>
+      <span class="visual-brand-copy">
+        <strong>CS Building Care</strong>
+        <small>Staff operations portal</small>
+      </span>
     </div>
     <div class="page-visual" aria-hidden="true">
       <div class="visual-copy">
@@ -90,21 +98,23 @@ const {
               <div class="eyebrow">สำหรับเจ้าหน้าที่</div>
               <h2>เข้าสู่ระบบเจ้าหน้าที่</h2>
             </header>
-            <form id="login-form" class="login-form" @submit.prevent="handleLogin">
+            <form id="login-form" class="login-form" novalidate @submit.prevent="handleLogin">
             <div class="field">
-              <label for="staff-id">อีเมลหรือรหัสเจ้าหน้าที่</label
+              <label for="staff-id">อีเมล</label
               ><input
                 id="staff-id"
                 v-model="identifier"
                 autocomplete="username"
-                placeholder="name@cmu.ac.th"
+                placeholder="example@gmail.com"
                 required
                 aria-describedby="staffIdError"
+                :aria-invalid="String(Boolean(identifierError))"
+                @blur="validateIdentifier"
               /><small
                 class="field-error"
                 id="staffIdError"
                 aria-live="polite"
-              ></small>
+              >{{ identifierError }}</small>
             </div>
             <div class="field">
               <label for="password">รหัสผ่าน</label>
@@ -117,6 +127,8 @@ const {
                   placeholder="กรอกรหัสผ่าน"
                   required
                   aria-describedby="passwordError"
+                  :aria-invalid="String(Boolean(passwordError))"
+                  @blur="validatePassword"
                 /><button
                   type="button"
                   class="password-toggle"
@@ -133,7 +145,7 @@ const {
                 class="field-error"
                 id="passwordError"
                 aria-live="polite"
-              ></small>
+              >{{ passwordError }}</small>
             </div>
             <div class="form-options">
               <label class="remember"

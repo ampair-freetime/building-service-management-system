@@ -35,6 +35,12 @@ const { activeRole } = useStaffDashboard();
         <circle cx="12" cy="8" r="4" />
         <path d="M4 21a8 8 0 0 1 16 0" />
       </symbol>
+      <symbol id="i-users" viewBox="0 0 24 24">
+        <circle cx="9" cy="8" r="3.5" />
+        <path d="M2.5 20a6.5 6.5 0 0 1 13 0" />
+        <circle cx="17" cy="9" r="2.5" />
+        <path d="M15.5 14.5A5.5 5.5 0 0 1 21.5 20" />
+      </symbol>
       <symbol id="i-home" viewBox="0 0 24 24">
         <path d="m3 11 9-8 9 8v9h-6v-6H9v6H3z" />
       </symbol>
@@ -168,7 +174,31 @@ const { activeRole } = useStaffDashboard();
           </button>
         </nav>
         <div class="sidebar-foot">
-          <button class="logout" id="logoutBtn">ออกจากระบบ</button>
+          <div class="sidebar-profile-card">
+            <button
+              class="sidebar-profile"
+              id="profileButton"
+              type="button"
+              aria-label="เปิดโปรไฟล์"
+            >
+              <span class="avatar" id="headerAvatar" aria-hidden="true">
+                <svg class="icon profile-person-icon"><use href="#i-user" /></svg>
+              </span>
+              <span class="sidebar-profile-copy">
+                <strong id="headerName">พิมพ์ชนก</strong>
+                <small id="headerRole">แอดมิน</small>
+              </span>
+            </button>
+            <button
+              class="sidebar-profile-logout"
+              id="logoutBtn"
+              type="button"
+              aria-label="ออกจากระบบ"
+              title="ออกจากระบบ"
+            >
+              <svg class="icon" aria-hidden="true"><use href="#i-log-out" /></svg>
+            </button>
+          </div>
         </div>
       </aside>
       <button
@@ -188,80 +218,54 @@ const { activeRole } = useStaffDashboard();
         aria-label="ปิดเมนู"
       ></button>
 
-      <main>
-        <header class="topbar">
-          <div class="top-actions">
-            <div class="notification-wrap">
-              <button
-                class="icon-btn"
-                id="notificationButton"
-                aria-label="เปิดการแจ้งเตือน"
-                aria-expanded="false"
-              >
-                <svg
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  aria-hidden="true"
-                >
-                  <path
-                    d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"
-                  ></path>
-                  <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
-                </svg>
-                <span
-                  class="notification-count"
-                  id="notificationCount"
-                  aria-live="polite"
-                  hidden
-                ></span>
-              </button>
-              <Teleport to="body">
-                <section
-                  class="notification-panel"
-                  id="notificationPanel"
-                  aria-label="รายการแจ้งเตือน"
-                >
-                  <div class="notification-dialog" role="dialog" aria-modal="true" aria-labelledby="notificationTitle">
-                    <div class="notification-head">
-                      <div class="notification-head-copy">
-                        <h3 id="notificationTitle">การแจ้งเตือนของแอดมิน</h3>
-                        <p>รายการอัปเดตล่าสุดของคุณ</p>
-                      </div>
-                      <div class="notification-head-actions">
-                        <button id="markAllRead">อ่านทั้งหมดแล้ว</button>
-                        <button
-                          class="notification-close"
-                          type="button"
-                          data-close-notifications
-                          aria-label="ปิดการแจ้งเตือน"
-                        >
-                          <svg class="icon" aria-hidden="true"><use href="#i-close" /></svg>
-                        </button>
-                      </div>
-                    </div>
-                    <div class="notification-list" id="notificationList"></div>
-                  </div>
-                </section>
-              </Teleport>
+      <div class="notification-wrap mobile-notification-launcher">
+        <button
+          v-if="['housekeeper', 'technician', 'clerk'].includes(activeRole)"
+          class="icon-btn"
+          id="notificationButton"
+          type="button"
+          aria-label="เปิดการแจ้งเตือน"
+          aria-expanded="false"
+        >
+          <svg class="icon" aria-hidden="true"><use href="#i-bell" /></svg>
+          <span
+            class="notification-count"
+            id="notificationCount"
+            aria-live="polite"
+            hidden
+          ></span>
+        </button>
+        <Teleport to="body">
+          <section
+            class="notification-panel"
+            id="notificationPanel"
+            aria-label="รายการแจ้งเตือน"
+          >
+            <div class="notification-dialog" role="dialog" aria-modal="true" aria-labelledby="notificationTitle">
+              <div class="notification-head">
+                <div class="notification-head-copy">
+                  <h3 id="notificationTitle">การแจ้งเตือนของเจ้าหน้าที่</h3>
+                  <p>รายการอัปเดตล่าสุดของคุณ</p>
+                </div>
+                <div class="notification-head-actions">
+                  <button id="markAllRead">อ่านทั้งหมดแล้ว</button>
+                  <button
+                    class="notification-close"
+                    type="button"
+                    data-close-notifications
+                    aria-label="ปิดการแจ้งเตือน"
+                  >
+                    <svg class="icon" aria-hidden="true"><use href="#i-close" /></svg>
+                  </button>
+                </div>
+              </div>
+              <div class="notification-list" id="notificationList"></div>
             </div>
-            <button
-              class="header-profile"
-              id="profileButton"
-              type="button"
-              aria-label="เปิดโปรไฟล์"
-            >
-              <span class="avatar" id="headerAvatar">AD</span
-              ><span
-                ><strong id="headerName">พิมพ์ชนก</strong
-                ><small id="headerRole">แอดมิน</small></span
-              >
-            </button>
-          </div>
-        </header>
+          </section>
+        </Teleport>
+      </div>
+
+      <main>
 
         <HousekeeperPages v-if="activeRole === 'housekeeper'" />
         <TechnicianPages v-else-if="activeRole === 'technician'" />
@@ -275,63 +279,89 @@ const { activeRole } = useStaffDashboard();
       :class="{
         'admin-bottom-nav': activeRole === 'admin',
         'technician-bottom-nav': ['technician', 'housekeeper'].includes(activeRole),
+        'clerk-bottom-nav': activeRole === 'clerk',
       }"
       aria-label="เมนูด้านล่าง"
     >
       <template v-if="activeRole === 'admin'">
-        <button type="button" class="active" data-mobile-page="staff-overview">
-          <svg class="icon"><use href="#i-home" /></svg><span>ภาพรวม Staff</span>
-        </button>
         <button type="button" data-mobile-page="history">
           <svg class="icon"><use href="#i-box" /></svg><span>ของหาย-รับฝาก</span>
         </button>
         <button type="button" data-mobile-page="staff">
-          <svg class="icon"><use href="#i-user" /></svg><span>บัญชี Staff</span>
+          <svg class="icon"><use href="#i-users" /></svg><span>บัญชี Staff</span>
+        </button>
+        <button
+          type="button"
+          class="admin-overview-tab mobile-overview-tab active"
+          data-mobile-page="staff-overview"
+        >
+          <svg class="icon"><use href="#i-home" /></svg><span>ภาพรวม Staff</span>
         </button>
         <button type="button" data-mobile-page="qr">
           <svg class="icon"><use href="#i-qr" /></svg><span>QR ห้อง</span>
         </button>
+        <button type="button" id="mobileProfile">
+          <svg class="icon"><use href="#i-user" /></svg><span>โปรไฟล์</span>
+        </button>
       </template>
       <template v-else-if="['technician', 'housekeeper'].includes(activeRole)">
-        <button type="button" class="active" data-mobile-page="dashboard">
-          <svg class="icon"><use href="#i-home" /></svg><span>ภาพรวม</span>
-        </button>
         <button type="button" data-mobile-page="jobs">
           <svg class="icon"><use href="#i-list" /></svg><span>งาน</span>
+        </button>
+        <button type="button" data-mobile-page="my-jobs">
+          <svg class="icon"><use href="#i-user" /></svg><span>งานของฉัน</span>
+        </button>
+        <button
+          type="button"
+          class="mobile-overview-tab active"
+          data-mobile-page="dashboard"
+        >
+          <svg class="icon"><use href="#i-home" /></svg><span>ภาพรวม</span>
         </button>
         <button type="button" data-mobile-page="my-history">
           <svg class="icon"><use href="#i-history" /></svg><span>ประวัติงาน</span>
         </button>
+        <button type="button" id="mobileProfile">
+          <svg class="icon"><use href="#i-user" /></svg><span>โปรไฟล์</span>
+        </button>
       </template>
       <template v-else-if="activeRole === 'clerk'">
-        <button type="button" class="active" data-mobile-page="dashboard">
-          <svg class="icon"><use href="#i-home" /></svg><span>ภาพรวม</span>
-        </button>
         <button type="button" data-mobile-page="clerk-center">
           <svg class="icon"><use href="#i-list" /></svg><span>ศูนย์งาน</span>
         </button>
         <button type="button" data-mobile-page="lost">
           <svg class="icon"><use href="#i-box" /></svg><span>ของหาย-รับฝาก</span>
         </button>
+        <button
+          type="button"
+          class="mobile-overview-tab active"
+          data-mobile-page="dashboard"
+        >
+          <svg class="icon"><use href="#i-home" /></svg><span>ภาพรวม</span>
+        </button>
         <button type="button" data-mobile-page="my-history">
           <svg class="icon"><use href="#i-history" /></svg><span>ประวัติงาน</span>
         </button>
+        <button type="button" id="mobileProfile">
+          <svg class="icon"><use href="#i-user" /></svg><span>โปรไฟล์</span>
+        </button>
       </template>
       <template v-else>
-        <button type="button" class="active" data-mobile-page="dashboard">
-          <svg class="icon"><use href="#i-home" /></svg><span>ภาพรวม</span>
-        </button>
         <button type="button" data-mobile-page="jobs">
           <svg class="icon"><use href="#i-list" /></svg><span>งาน</span>
         </button>
-        <button type="button" id="mobileNotification">
-          <svg class="icon"><use href="#i-bell" /></svg><span>แจ้งเตือน</span
-          ><span
-            class="notification-count"
-            id="mobileNotificationCount"
-            aria-live="polite"
-            hidden
-          ></span>
+        <button type="button" data-mobile-page="my-jobs">
+          <svg class="icon"><use href="#i-user" /></svg><span>งานของฉัน</span>
+        </button>
+        <button
+          type="button"
+          class="mobile-overview-tab active"
+          data-mobile-page="dashboard"
+        >
+          <svg class="icon"><use href="#i-home" /></svg><span>ภาพรวม</span>
+        </button>
+        <button type="button" data-mobile-page="my-history">
+          <svg class="icon"><use href="#i-history" /></svg><span>ประวัติงาน</span>
         </button>
         <button type="button" id="mobileProfile">
           <svg class="icon"><use href="#i-user" /></svg><span>โปรไฟล์</span>

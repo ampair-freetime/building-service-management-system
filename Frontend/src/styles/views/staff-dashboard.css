@@ -24,6 +24,39 @@
   --font: "Sarabun", "Open Sans", system-ui, sans-serif;
 }
 
+/* Admin follows the same calm blue design system as the Guest landing page. */
+.staff-dashboard-page.is-admin {
+  --primary: #335e8a;
+  --primary-2: #4c76a8;
+  --primary-soft: #edf3f8;
+  --role: #335e8a;
+  --role-soft: #edf3f8;
+  --ink: #17212b;
+  --muted: #74717f;
+  --line: #e2ebf3;
+  --canvas: #f3f8fc;
+  --shadow: 0 12px 36px rgba(35, 72, 105, 0.08);
+  --shadow-sm: 0 6px 20px rgba(35, 72, 105, 0.07);
+  min-height: 100vh;
+  background: linear-gradient(145deg, #f1f7fc 0%, #fdfefe 46%, #f5f9fc 100%);
+}
+
+.staff-dashboard-page.is-admin .sidebar .brand-mark {
+  background: linear-gradient(145deg, #335e8a, #5d89b3);
+  box-shadow: 0 8px 20px rgba(51, 94, 138, 0.25);
+}
+
+@media (min-width: 981px) {
+  .staff-dashboard-page.is-admin {
+    background: linear-gradient(145deg, #f1f7fc 0%, #fdfefe 46%, #f5f9fc 100%);
+  }
+}
+
+/* Keep every English page kicker in Admin consistent with the Guest header. */
+.staff-dashboard-page.is-admin .eyebrow {
+  color: #4c76a8;
+}
+
 /* Technician uses the same orange palette as the Guest repair request flow. */
 .staff-dashboard-page.is-technician {
   --primary: #b45309;
@@ -566,12 +599,16 @@ body {
 .avatar {
   width: 42px;
   height: 42px;
-  border-radius: 14px;
-  background: var(--primary);
+  border-radius: 50%;
+  background: var(--role, var(--primary));
   color: #fff;
   display: grid;
   place-items: center;
   font-weight: 900;
+}
+.avatar .profile-person-icon {
+  width: 21px;
+  height: 21px;
 }
 .shift-top strong,
 .shift-top small {
@@ -1338,6 +1375,24 @@ body {
   display: grid;
   place-items: center;
   font-weight: 900;
+}
+.person-avatar.role-person-avatar {
+  width: 44px;
+  height: 44px;
+  flex: 0 0 44px;
+  border-radius: 50%;
+  background: var(--avatar-role, #335e8a);
+  color: #fff;
+  box-shadow: 0 6px 16px color-mix(in srgb, var(--avatar-role, #335e8a) 22%, transparent);
+}
+.person-avatar.role-person-avatar .profile-person-icon {
+  width: 22px;
+  height: 22px;
+}
+.overview-role-badge {
+  border: 1px solid color-mix(in srgb, var(--badge-role, #64748b) 24%, transparent);
+  background: color-mix(in srgb, var(--badge-role, #64748b) 12%, #fff);
+  color: var(--badge-role, #64748b);
 }
 .history-action,
 .history-source {
@@ -2371,13 +2426,18 @@ textarea:focus-visible,
 .profile-avatar-large {
   width: 92px;
   height: 92px;
-  border-radius: 25px;
-  background: var(--role-soft);
-  color: var(--role);
+  border-radius: 50%;
+  background: var(--role);
+  color: #fff;
   display: grid;
   place-items: center;
   font-size: 25px;
   font-weight: 900;
+  box-shadow: 0 12px 28px color-mix(in srgb, var(--role) 24%, transparent);
+}
+.profile-avatar-large .profile-person-icon {
+  width: 40px;
+  height: 40px;
 }
 .profile-data {
   display: grid;
@@ -2567,7 +2627,13 @@ textarea:focus-visible,
     box-shadow: 0 -8px 28px rgba(35, 28, 66, 0.08);
   }
   .bottom-nav.technician-bottom-nav {
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+  .bottom-nav.admin-bottom-nav {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+  .bottom-nav.clerk-bottom-nav {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
   }
   .bottom-nav button {
     position: relative;
@@ -2586,6 +2652,51 @@ textarea:focus-visible,
   .bottom-nav .icon {
     width: 21px;
     height: 21px;
+  }
+  .bottom-nav.admin-bottom-nav .admin-overview-tab {
+    z-index: 1;
+    overflow: visible;
+  }
+  .bottom-nav.admin-bottom-nav .admin-overview-tab .icon {
+    width: 56px;
+    height: 56px;
+    margin-top: -30px;
+    padding: 16px;
+    border-radius: 19px;
+    background: var(--primary);
+    color: #fff;
+    box-shadow: 0 10px 24px rgba(51, 94, 138, 0.3);
+  }
+  .bottom-nav.admin-bottom-nav .admin-overview-tab span {
+    margin-top: 1px;
+    color: var(--primary);
+    font-weight: 800;
+  }
+  .bottom-nav .mobile-overview-tab {
+    z-index: 1;
+    overflow: visible;
+  }
+  .bottom-nav .mobile-overview-tab .icon,
+  .bottom-nav.admin-bottom-nav .mobile-overview-tab .icon {
+    width: 56px;
+    height: 56px;
+    margin-top: -30px;
+    padding: 16px;
+    border-radius: 19px;
+    background: #17324d;
+    color: #fff;
+    box-shadow: 0 10px 24px rgba(23, 50, 77, 0.32);
+  }
+  .bottom-nav .mobile-overview-tab > span,
+  .bottom-nav.admin-bottom-nav .mobile-overview-tab > span {
+    margin-top: 1px;
+    color: #76717f;
+    font-weight: 400;
+  }
+  .bottom-nav .mobile-overview-tab.active > span,
+  .bottom-nav.admin-bottom-nav .mobile-overview-tab.active > span {
+    color: #17324d;
+    font-weight: 800;
   }
   .bottom-nav .new-action {
     width: 56px;
@@ -4423,13 +4534,15 @@ body {
     display: none;
   }
 
-  .staff-dashboard-page .admin-bottom-nav button {
+  .staff-dashboard-page .admin-bottom-nav button,
+  .staff-dashboard-page .clerk-bottom-nav button {
     gap: 3px;
     padding-inline: 2px;
     font-size: clamp(7px, 2.2vw, 9px);
   }
 
-  .staff-dashboard-page .admin-bottom-nav button span {
+  .staff-dashboard-page .admin-bottom-nav button span,
+  .staff-dashboard-page .clerk-bottom-nav button span {
     white-space: nowrap;
   }
 }
@@ -5085,6 +5198,143 @@ body {
   color: #24613a;
 }
 .housekeeper-notifications .notification-actions { border-top-color: #e1eee5; }
+
+/* Match the Guest shell spacing and prevent collapsed page margins from exposing the old violet body. */
+body:has(.staff-dashboard-page) {
+  background: #f4f7fb;
+}
+
+.staff-dashboard-page,
+.staff-dashboard-page > .app {
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+.staff-dashboard-page .app main,
+.staff-dashboard-page .app.sidebar-collapsed main {
+  padding: 24px 42px 110px;
+}
+
+.staff-dashboard-page .app main > .page {
+  margin-top: 0;
+}
+
+@media (max-width: 680px) {
+  .staff-dashboard-page .app main,
+  .staff-dashboard-page .app.sidebar-collapsed main {
+    padding: 18px 12px 86px;
+  }
+}
+
+/* Keep the signed-in staff identity and exit action together at the foot of the desktop sidebar. */
+.staff-dashboard-page .sidebar-foot {
+  width: 100%;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.staff-dashboard-page .sidebar-profile-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 42px;
+  align-items: center;
+  gap: 6px;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 8px 24px rgba(42, 35, 85, 0.06);
+}
+
+.staff-dashboard-page .sidebar-profile {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  min-height: 48px;
+  padding: 3px;
+  border: 0;
+  border-radius: 13px;
+  background: transparent;
+  color: var(--ink);
+  text-align: left;
+}
+
+.staff-dashboard-page .sidebar-profile:hover {
+  background: var(--primary-soft);
+}
+
+.staff-dashboard-page .sidebar-profile .avatar {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: var(--role, var(--primary));
+}
+
+.staff-dashboard-page .sidebar-profile-copy {
+  display: block;
+  min-width: 0;
+}
+
+.staff-dashboard-page .sidebar-profile-copy strong,
+.staff-dashboard-page .sidebar-profile-copy small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.staff-dashboard-page .sidebar-profile-copy strong {
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.staff-dashboard-page .sidebar-profile-copy small {
+  margin-top: 2px;
+  color: var(--role, var(--primary));
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.staff-dashboard-page .sidebar-profile-logout {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  min-height: 42px;
+  padding: 0;
+  border: 0;
+  border-radius: 13px;
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.staff-dashboard-page .sidebar-profile-logout:hover {
+  background: var(--danger);
+  color: #fff;
+}
+
+.staff-dashboard-page .sidebar-profile-logout .icon {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+@media (min-width: 981px) {
+  .staff-dashboard-page .top-actions .header-profile.compact-profile {
+    display: none !important;
+  }
+}
+
+@media (max-width: 980px) {
+  .staff-dashboard-page .top-actions .header-profile.compact-profile {
+    display: flex !important;
+  }
+}
 
 /* Clerk uses the same gold palette as the Guest lost-and-found flow. */
 .staff-dashboard-page.is-clerk {
@@ -5990,3 +6240,66 @@ body {
   color: #24613a;
 }
 .housekeeper-notifications .notification-actions { border-top-color: #e1eee5; }
+
+/* Final responsive shell alignment with the Guest page. */
+@media (min-width: 681px) and (max-width: 720px) {
+  .staff-dashboard-page:is(.is-admin, .is-technician, .is-housekeeper, .is-clerk) .app main,
+  .staff-dashboard-page:is(.is-admin, .is-technician, .is-housekeeper, .is-clerk) .app.sidebar-collapsed main {
+    padding: 24px 42px 110px !important;
+  }
+}
+
+@media (max-width: 680px) {
+  .staff-dashboard-page:is(.is-admin, .is-technician, .is-housekeeper, .is-clerk) .app main,
+  .staff-dashboard-page:is(.is-admin, .is-technician, .is-housekeeper, .is-clerk) .app.sidebar-collapsed main {
+    padding: 18px 12px 86px !important;
+  }
+}
+
+/* Use one blue BC logo across Admin and every staff role. */
+.staff-dashboard-page .sidebar .brand-mark {
+  border-color: transparent !important;
+  background: linear-gradient(145deg, #335e8a, #5d89b3) !important;
+  color: #fff !important;
+  box-shadow: 0 8px 20px rgba(51, 94, 138, 0.25) !important;
+}
+
+/* Keep the notification action floating at the top-right on every screen size. */
+.staff-dashboard-page .mobile-notification-launcher {
+  position: fixed;
+  top: 24px;
+  right: 24px;
+  z-index: 60;
+  display: block;
+  width: 46px;
+  height: 46px;
+  overflow: visible;
+}
+
+.staff-dashboard-page .mobile-notification-launcher #notificationButton {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 46px;
+  min-width: 46px;
+  height: 46px;
+  min-height: 46px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: #fff;
+  color: var(--role, var(--primary));
+  box-shadow: 0 8px 24px rgba(35, 72, 105, 0.16);
+}
+
+.staff-dashboard-page .mobile-notification-launcher #notificationButton .icon {
+  width: 22px;
+  height: 22px;
+}
+
+@media (max-width: 720px) {
+  .staff-dashboard-page .mobile-notification-launcher {
+    top: max(14px, env(safe-area-inset-top));
+    right: 14px;
+  }
+}

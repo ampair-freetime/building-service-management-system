@@ -3,12 +3,12 @@
   --primary: #335e8a;
   --primary-dark: #23527c;
   --primary-soft: #edf3f8;
-  --ink: #1b1926;
-  --muted: #716d7d;
-  --line: #e9e7ef;
-  --canvas: #f7f7fb;
+  --ink: #17212b;
+  --muted: #667788;
+  --line: #dce7f0;
+  --canvas: #f3f8fc;
   --danger: #dc4c4c;
-  --shadow: 0 18px 50px rgba(46, 37, 91, 0.1);
+  --shadow: 0 18px 50px rgba(35, 72, 105, 0.12);
   --font: "Sarabun", "Open Sans", system-ui, sans-serif;
 }
 * {
@@ -61,7 +61,7 @@ a:focus-visible {
   display: grid;
   place-items: center;
   padding: 32px;
-  background: #5c4be9;
+  background: linear-gradient(145deg, #17324d 0%, #335e8a 58%, #5d89b3 100%);
 }
 .login-shell {
   position: relative;
@@ -84,15 +84,34 @@ a:focus-visible {
   color: #fff;
   font-weight: 800;
 }
-.brand-mark {
-  width: 48px;
-  height: 48px;
+.staff-login-page .brand-mark {
+  width: 46px;
+  height: 46px;
   border-radius: 16px;
   display: grid;
   place-items: center;
-  background: rgba(255, 255, 255, 0.18);
-  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: linear-gradient(145deg, #335e8a, #5d89b3) !important;
+  border: 0;
   color: #fff;
+  font-weight: 900;
+  box-shadow: 0 8px 20px rgba(7, 30, 50, 0.26);
+}
+.visual-brand-copy {
+  display: grid;
+  gap: 1px;
+  line-height: 1.25;
+}
+.visual-brand-copy strong,
+.visual-brand-copy small {
+  display: block;
+}
+.visual-brand-copy strong {
+  font-size: 16px;
+}
+.visual-brand-copy small {
+  color: rgba(255, 255, 255, 0.74);
+  font-size: 10px;
+  font-weight: 500;
 }
 .login-panel {
   width: 100%;
@@ -105,7 +124,7 @@ a:focus-visible {
   border: 1px solid var(--line);
   border-radius: 24px;
   background: #fff;
-  box-shadow: 0 18px 50px rgba(46, 37, 91, 0.1);
+  box-shadow: 0 18px 50px rgba(35, 72, 105, 0.14);
 }
 .page-visual {
   position: absolute;
@@ -114,8 +133,8 @@ a:focus-visible {
   display: flex;
   align-items: flex-end;
   padding: 56px;
-  background: linear-gradient(145deg, #5c4be9, #7a6cf8 66%, #9a8eff);
-  color: rgba(255, 255, 255, 0.42);
+  background: linear-gradient(145deg, #17324d 0%, #2d587f 62%, #5d89b3 100%);
+  color: rgba(255, 255, 255, 0.34);
 }
 .page-visual::before {
   content: "";
@@ -124,8 +143,20 @@ a:focus-visible {
   height: 520px;
   top: -210px;
   right: -240px;
-  border: 1px solid rgba(255, 255, 255, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.16);
   border-radius: 50%;
+}
+.page-visual::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.12;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.18) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.18) 1px, transparent 1px);
+  background-size: 46px 46px;
+  mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.7), transparent 72%);
 }
 .building-art {
   position: relative;
@@ -142,6 +173,9 @@ a:focus-visible {
 }
 .login-head {
   margin-bottom: 25px;
+}
+.login-head .eyebrow {
+  color: #335e8a;
 }
 .eyebrow {
   color: var(--primary);
@@ -177,7 +211,7 @@ a:focus-visible {
   min-height: 50px;
   border: 1px solid var(--line);
   border-radius: 15px;
-  background: #fafafd;
+  background: #f7fafc;
   padding: 0 14px;
   color: var(--ink);
 }
@@ -231,7 +265,7 @@ a:focus-visible {
   width: 42px;
   height: 42px;
   border-radius: 13px;
-  background: #f5f3fb;
+  background: var(--primary-soft);
   color: var(--primary);
   display: grid;
   place-items: center;
@@ -301,7 +335,7 @@ a:focus-visible {
   width: 100%;
   border: 0;
   border-radius: 16px;
-  background: linear-gradient(135deg, var(--primary), #8173f8);
+  background: linear-gradient(135deg, #284f74, #4c76a8);
   color: #fff;
   font-weight: 800;
   min-height: 52px;
@@ -358,7 +392,7 @@ a:focus-visible {
   border-radius: 14px;
   background: var(--primary-soft);
   padding: 11px 13px;
-  color: #645b9c;
+  color: #335e8a;
   font-size: 9px;
   text-align: center;
 }
@@ -383,7 +417,7 @@ a:focus-visible {
   display: grid;
   place-items: center;
   padding: 18px;
-  background: rgba(25, 20, 45, 0.42);
+  background: rgba(16, 42, 65, 0.5);
   backdrop-filter: blur(7px);
   opacity: 0;
   visibility: hidden;
@@ -400,7 +434,7 @@ a:focus-visible {
   border-radius: 24px;
   background: #fff;
   padding: 22px;
-  box-shadow: 0 28px 80px rgba(35, 27, 68, 0.25);
+  box-shadow: 0 28px 80px rgba(23, 50, 77, 0.28);
   transform: translateY(14px);
   transition: 0.2s;
 }
@@ -461,7 +495,7 @@ a:focus-visible {
   max-width: calc(100% - 28px);
   padding: 12px 17px;
   border-radius: 14px;
-  background: #211d35;
+  background: #17324d;
   color: #fff;
   font-size: 12px;
   box-shadow: var(--shadow);
@@ -479,15 +513,20 @@ a:focus-visible {
   overflow: hidden;
 }
 .field-error {
-  display: block;
-  min-height: 17px;
-  margin-top: -2px;
+  display: none;
+  margin: 0;
   color: #d33b49;
-  font-size: 10px;
+  font-size: 11px;
+  line-height: 1.45;
+  font-weight: 600;
+}
+.field-error:not(:empty) {
+  display: block;
 }
 .field input[aria-invalid="true"] {
   border-color: #d33b49;
   background: #fff7f8;
+  box-shadow: 0 0 0 3px rgba(211, 59, 73, 0.1);
 }
 .back-link {
   display: inline-flex;
@@ -520,7 +559,7 @@ a:focus-visible {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     place-items: stretch;
     padding: 0;
-    background: #fff;
+    background: #f3f8fc;
   }
   .page-visual {
     position: relative;
@@ -545,7 +584,7 @@ a:focus-visible {
     color: #fff;
   }
   .visual-copy small {
-    color: #ded9ff;
+    color: #d9e8f5;
     font-size: 11px;
     font-weight: 800;
     letter-spacing: 0.14em;
@@ -576,7 +615,7 @@ a:focus-visible {
     padding: clamp(40px, 6vw, 88px);
     align-self: stretch;
     justify-self: stretch;
-    background: #fff;
+    background: linear-gradient(145deg, #f4f8fc 0%, #ffffff 64%);
   }
   .login-panel {
     width: min(560px, 100%);
@@ -597,7 +636,7 @@ a:focus-visible {
   .role-card:hover,
   .google-button:hover {
     transform: translateY(-2px);
-    box-shadow: 0 8px 22px rgba(42, 35, 85, 0.08);
+    box-shadow: 0 8px 22px rgba(35, 72, 105, 0.1);
   }
   .login-button:hover {
     transform: translateY(-2px);
@@ -641,8 +680,8 @@ a:focus-visible {
     left: 20px;
   }
   .brand-mark {
-    width: 42px;
-    height: 42px;
+    width: 46px;
+    height: 46px;
     border-radius: 14px;
   }
   .login-card {

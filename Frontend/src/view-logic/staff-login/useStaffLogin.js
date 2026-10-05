@@ -1,4 +1,4 @@
-import { onMounted, ref } from "vue";
+import { onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 
 const API_BASE_URL = "http://localhost:8000/api/v1";
@@ -11,6 +11,9 @@ export function useStaffLogin() {
   const rememberMe = ref(false);
   const showPassword = ref(false);
   const loading = ref(false);
+  const identifierError = ref("");
+  const passwordError = ref("");
+  const loginSubmitted = ref(false);
   const forgotModalOpen = ref(false);
   const resetEmail = ref("");
   const toastMessage = ref("");
@@ -46,6 +49,25 @@ export function useStaffLogin() {
     forgotModalOpen.value = false;
   }
 
+  function validateIdentifier() {
+    identifierError.value = identifier.value.trim()
+      ? ""
+      : "กรุณากรอกอีเมลหรือรหัสเจ้าหน้าที่";
+    return !identifierError.value;
+  }
+
+  function validatePassword() {
+    passwordError.value = password.value.trim() ? "" : "กรุณากรอกรหัสผ่าน";
+    return !passwordError.value;
+  }
+
+  watch(identifier, () => {
+    if (loginSubmitted.value || identifierError.value) validateIdentifier();
+  });
+  watch(password, () => {
+    if (loginSubmitted.value || passwordError.value) validatePassword();
+  });
+
   // ส่วนนี้ยังแสดงผลจำลอง ไม่มีการเรียก API ส่งอีเมลรีเซ็ตรหัสผ่าน
   function handleForgotPassword() {
     if (!resetEmail.value.trim()) {
@@ -58,8 +80,15 @@ export function useStaffLogin() {
   }
 
   async function handleLogin() {
-    if (!identifier.value.trim() || !password.value) {
-      showToast("กรุณากรอกอีเมลหรือรหัสเจ้าหน้าที่ และรหัสผ่าน");
+    loginSubmitted.value = true;
+    const identifierIsValid = validateIdentifier();
+    const passwordIsValid = validatePassword();
+    if (!identifierIsValid || !passwordIsValid) {
+      window.requestAnimationFrame(() => {
+        document
+          .getElementById(identifierIsValid ? "password" : "staff-id")
+          ?.focus();
+      });
       return;
     }
 
@@ -75,7 +104,13 @@ export function useStaffLogin() {
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
-        showToast(data.detail || "อีเมล/รหัสเจ้าหน้าที่ หรือรหัสผ่านไม่ถูกต้อง");
+        passwordError.value =
+          typeof data.detail === "string"
+            ? data.detail
+            : "อีเมล/รหัสเจ้าหน้าที่ หรือรหัสผ่านไม่ถูกต้อง";
+        window.requestAnimationFrame(() =>
+          document.getElementById("password")?.focus(),
+        );
         return;
       }
 
@@ -108,8 +143,10 @@ export function useStaffLogin() {
 
   return {
     identifier, password, rememberMe, showPassword, loading,
+    identifierError, passwordError,
     forgotModalOpen, resetEmail, toastMessage, toastVisible,
     togglePassword, openForgotModal, closeForgotModal,
+    validateIdentifier, validatePassword,
     handleForgotPassword, handleLogin, loginWithGoogle,
   };
 }
