@@ -24,13 +24,14 @@ from app.schemas.cleaning_guest import (
     GuestTrackingResponse,
 )
 from app.services.images import ProcessedImage, prepare_guest_image
+from app.services.notification import create_cleaning_request_notifications
 from app.services.object_storage import (
     ObjectStorage,
     StorageConfigurationError,
     StorageOperationError,
     StoredObject,
 )
-from app.services.notification import create_cleaning_request_notifications
+
 logger = logging.getLogger(__name__)
 BANGKOK_TIMEZONE = ZoneInfo("Asia/Bangkok")
 
@@ -261,26 +262,26 @@ async def get_guest_request_status(
         )
     ).all()
 
-    # Request ที่ไม่มี completion photo ยังติดตามสถานะได้ตามปกติ
-    # แต่ถ้ามีรูป ต้องมี Object Storage เพื่อสร้าง URL สำหรับแสดงรูป
-    if completion_images and storage is None:
-        raise StorageConfigurationError(
-            "Object storage is required to access completion photos"
-        )
-
     completion_photos: list[GuestCompletionPhotoResponse] = []
-
-    if storage is not None:
-        completion_photos = [
-            GuestCompletionPhotoResponse(
-                id=image.id,
-                url=storage.create_download_url(image.object_key),
-                content_type=image.content_type,
-                width=image.width,
-                height=image.height,
-            )
-            for image in completion_images
-        ]
+    photos_status = "none"
+    if completion_images:
+        photos_status = "unavailable"
+        if storage is not None:
+            try:
+                completion_photos = [
+                    GuestCompletionPhotoResponse(
+                        id=image.id,
+                        url=storage.create_download_url(image.object_key),
+                        content_type=image.content_type,
+                        width=image.width,
+                        height=image.height,
+                    )
+                    for image in completion_images
+                ]
+                photos_status = "available"
+            except StorageOperationError:
+                # Request details remain readable even if signing is unavailable.
+                pass
 
     return GuestTrackingResponse(
         request_type=service_request.request_type,
@@ -289,6 +290,7 @@ async def get_guest_request_status(
         created_at=service_request.created_at,
         updated_at=service_request.updated_at,
         completed_at=service_request.completed_at,
+        completion_photos_status=photos_status,
         completion_photos=completion_photos,
     )
 

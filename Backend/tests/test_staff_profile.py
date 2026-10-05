@@ -195,7 +195,7 @@ def test_email_change_invalidates_old_link_and_resend_uses_new_email(test_contex
     )
     assert (
         client.post(
-            "/api/v1/auth/activation", json={"token": old_token, "password": "chosen-password"}
+            "/api/v1/auth/activation", json={"token": old_token, "password": "Chosen-Pass1!"}
         ).status_code
         == 400
     )
@@ -207,7 +207,7 @@ def test_email_change_invalidates_old_link_and_resend_uses_new_email(test_contex
     new_token = parse_qs(urlparse(sent[-1]["activation_link"]).query)["token"][0]
     assert (
         client.post(
-            "/api/v1/auth/activation", json={"token": new_token, "password": "chosen-password"}
+            "/api/v1/auth/activation", json={"token": new_token, "password": "Chosen-Pass1!"}
         ).status_code
         == 204
     )
@@ -271,7 +271,7 @@ def test_inactive_accounts_cannot_resend_or_activate(test_context, monkeypatch, 
     assert client.post("/api/v1/auth/activation/validate", json={"token": token}).status_code == 400
     assert (
         client.post(
-            "/api/v1/auth/activation", json={"token": token, "password": "chosen-password"}
+            "/api/v1/auth/activation", json={"token": token, "password": "Chosen-Pass1!"}
         ).status_code
         == 400
     )

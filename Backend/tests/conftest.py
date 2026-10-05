@@ -1,8 +1,13 @@
 import asyncio
+import os
 from collections.abc import AsyncIterator
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
+
+# Never load real SMTP/R2 credentials or connect to live services in unit tests.
+os.environ["BSMS_ENV_FILE"] = ""
 from fastapi.testclient import TestClient
 from sqlalchemy import event
 from sqlalchemy.ext.asyncio import (
@@ -13,7 +18,7 @@ from sqlalchemy.ext.asyncio import (
 
 from app.core.security import hash_password
 from app.db.base import Base
-from app.db.session import get_db_session
+from app.db.session import get_db_session, get_session_factory
 from app.main import create_application
 from app.models.enums import AccountStatus
 from app.models.staff import Staff
@@ -48,6 +53,8 @@ def test_context(
 
     application = create_application()
     application.dependency_overrides[get_db_session] = override_db_session
+    # Background tasks (password reset email) open their own session on the test DB.
+    application.dependency_overrides[get_session_factory] = lambda: session_factory
 
     with TestClient(application) as client:
         yield client, session_factory
@@ -64,6 +71,7 @@ def seed_staff(
     role: str,
     full_name: str = "Test Staff",
     status: str = "active",
+    activated: bool = True,
 ) -> Staff:
     async def seed() -> Staff:
         async with session_factory() as session:
@@ -76,6 +84,8 @@ def seed_staff(
                 **payload.model_dump(),
                 password_hash=hash_password(password),
                 status=AccountStatus(status),
+                # Seeded accounts behave like staff who already chose a password.
+                password_changed_at=datetime.now(UTC) if activated else None,
             )
             session.add(account)
             await session.commit()

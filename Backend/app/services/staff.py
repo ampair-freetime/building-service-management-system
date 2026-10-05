@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.enums import AccountStatus, RequestStatus, StaffRole
 from app.models.invitation import StaffInvitation
+from app.models.password_reset import StaffPasswordReset
 from app.models.service_request import ServiceRequest
 from app.models.staff import Staff
 from app.models.staff_deletion_audit import StaffDeletionAudit
@@ -50,6 +51,21 @@ async def get_staff_for_update(session: AsyncSession, staff_id: UUID) -> Staff |
     )
 
 
+async def _invalidate_pending_links(session: AsyncSession, staff_id: UUID) -> None:
+    """Invalidate unused invitation and password reset links; the caller commits."""
+    now = datetime.now(UTC)
+    for model in (StaffInvitation, StaffPasswordReset):
+        await session.execute(
+            update(model)
+            .where(
+                model.staff_id == staff_id,
+                model.used_at.is_(None),
+                model.invalidated_at.is_(None),
+            )
+            .values(invalidated_at=now)
+        )
+
+
 def _is_duplicate_staff_email(exc: IntegrityError) -> bool:
     original = exc.orig
     for error in (original, getattr(original, "__cause__", None)):
@@ -81,15 +97,8 @@ async def update_staff_profile(
 
     try:
         if "email" in changes:
-            await session.execute(
-                update(StaffInvitation)
-                .where(
-                    StaffInvitation.staff_id == staff_id,
-                    StaffInvitation.used_at.is_(None),
-                    StaffInvitation.invalidated_at.is_(None),
-                )
-                .values(invalidated_at=datetime.now(UTC))
-            )
+            # Links already sent to the old address must stop working.
+            await _invalidate_pending_links(session, staff_id)
         for key, value in changes.items():
             setattr(account, key, value)
         await session.commit()
@@ -165,4 +174,5 @@ async def delete_staff_account(
     )
     # Keeping the row preserves foreign-key references and historical staff identity.
     account.status = AccountStatus.DELETED
+    await _invalidate_pending_links(session, account.id)
     await session.commit()

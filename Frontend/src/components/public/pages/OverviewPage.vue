@@ -173,6 +173,9 @@ onMounted(async () => {
                 <strong id="trackingProgressTitle">ความคืบหน้าของคำร้อง</strong>
                 <ol id="trackingProgressSteps" class="tracking-progress-steps"></ol>
               </div>
+              <p id="trackingPhotosNotice" role="status" hidden>
+                รูปหลังทำงานยังไม่พร้อมแสดง กรุณารีเฟรชภายหลัง
+              </p>
               <div class="tracking-result-actions">
                 <small id="trackingRefreshTime"></small>
                 <button

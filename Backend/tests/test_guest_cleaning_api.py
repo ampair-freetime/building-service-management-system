@@ -7,6 +7,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.api.dependencies import provide_optional_object_storage
+from app.models.enums import ImageType
 from app.models.image import Image
 from app.models.location import Location
 from app.models.service_request import RequestHistory, ServiceRequest
@@ -127,6 +128,7 @@ def test_qr_flow_create_and_track(test_context, fake_storage) -> None:
     )
     assert tracked.status_code == 200
     assert tracked.json()["status"] == "waiting"
+    assert tracked.json()["completion_photos_status"] == "none"
     assert "request_code" not in tracked.json()
 
     for code, email in (
@@ -140,6 +142,68 @@ def test_qr_flow_create_and_track(test_context, fake_storage) -> None:
         assert response.status_code == 404
         assert response.json()["detail"] == "ไม่พบคำร้องนี้"
     assert client.get(f"/api/v1/guest/cleaning-requests/{body['request_code']}").status_code == 422
+
+
+@pytest.mark.parametrize("storage_state", ["missing", "signing_failure", "available"])
+def test_tracking_keeps_request_details_when_completion_photos_are_unavailable(
+    test_context,
+    fake_storage,
+    monkeypatch,
+    storage_state,
+) -> None:
+    client, factory = test_context
+    seed_locations(factory)
+    created = client.post("/api/v1/guest/cleaning-requests", data=cleaning_form())
+    assert created.status_code == 201
+    code = created.json()["request_code"]
+
+    async def add_completion_photo():
+        async with factory() as session:
+            request = await session.scalar(
+                select(ServiceRequest).where(ServiceRequest.request_code == code)
+            )
+            session.add(
+                Image(
+                    request_id=request.id,
+                    image_type=ImageType.AFTER,
+                    object_key="completion/test.webp",
+                    content_type="image/webp",
+                    width=32,
+                    height=24,
+                )
+            )
+            await session.commit()
+
+    asyncio.run(add_completion_photo())
+
+    def sign(key):
+        if storage_state == "signing_failure":
+            raise StorageOperationError("Simulated signing failure")
+        return f"https://signed.example/{key}"
+
+    monkeypatch.setattr(fake_storage, "create_download_url", sign, raising=False)
+    if storage_state == "missing":
+        client.app.dependency_overrides[provide_optional_object_storage] = lambda: None
+
+    tracked = client.get(
+        f"/api/v1/guest/cleaning-requests/{code}",
+        params={"reporter_email": "guest@example.com"},
+    )
+    assert tracked.status_code == 200
+    body = tracked.json()
+    assert body["status"] == "waiting"
+    assert body["location"] == "ชั้น 2 ห้อง 201"
+    assert body["completion_photos_status"] == (
+        "available" if storage_state == "available" else "unavailable"
+    )
+    assert len(body["completion_photos"]) == (1 if storage_state == "available" else 0)
+    assert (
+        client.get(
+            f"/api/v1/guest/cleaning-requests/{code}",
+            params={"reporter_email": "wrong@example.com"},
+        ).status_code
+        == 404
+    )
 
 
 def test_inactive_location_between_qr_and_post_is_rejected(test_context, fake_storage) -> None:
@@ -241,10 +305,7 @@ def test_storage_failure_returns_502_and_rolls_back(test_context, fake_storage) 
 def test_five_images_and_empty_field_are_saved_in_order(test_context, fake_storage) -> None:
     client, factory = test_context
     seed_locations(factory)
-    files = [
-        ("image", (f"floor-{index}.png", make_png(), "image/png"))
-        for index in range(5)
-    ]
+    files = [("image", (f"floor-{index}.png", make_png(), "image/png")) for index in range(5)]
     files.append(("image", ("", b"", "application/octet-stream")))
 
     response = client.post(
@@ -260,9 +321,7 @@ def test_five_images_and_empty_field_are_saved_in_order(test_context, fake_stora
 
     async def read_sort_orders() -> list[int | None]:
         async with factory() as session:
-            return list(
-                await session.scalars(select(Image.sort_order).order_by(Image.sort_order))
-            )
+            return list(await session.scalars(select(Image.sort_order).order_by(Image.sort_order)))
 
     assert asyncio.run(read_sort_orders()) == [0, 1, 2, 3, 4]
 
@@ -273,10 +332,7 @@ def test_six_images_are_rejected_before_storage(test_context, fake_storage) -> N
     response = client.post(
         "/api/v1/guest/cleaning-requests",
         data=cleaning_form(),
-        files=[
-            ("image", (f"floor-{index}.png", make_png(), "image/png"))
-            for index in range(6)
-        ],
+        files=[("image", (f"floor-{index}.png", make_png(), "image/png")) for index in range(6)],
     )
 
     assert response.status_code == 422

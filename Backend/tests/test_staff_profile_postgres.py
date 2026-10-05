@@ -232,3 +232,47 @@ def test_email_changed_between_creation_and_delivery_does_not_send_stale_link(
             assert sent == []
 
     asyncio.run(run())
+
+
+def test_concurrent_password_reset_confirms_use_link_once(postgres_factory):
+    """Two tabs confirming the same reset link: exactly one wins under row locks."""
+    from app.core.security import verify_password
+    from app.models.password_reset import StaffPasswordReset
+    from app.services import password_reset
+
+    factory = postgres_factory
+    account = seed_staff(factory, email="tech@example.com", password="Old-Pass1!", role="clerk")
+    token = "concurrent-reset-token-value"
+
+    async def run():
+        async with factory() as session:
+            session.add(
+                StaffPasswordReset(
+                    staff_id=account.id,
+                    token_hash=password_reset._hash_token(token),
+                    recipient_email=account.email,
+                    expires_at=datetime.now(UTC) + timedelta(minutes=30),
+                    created_at=datetime.now(UTC),
+                )
+            )
+            await session.commit()
+
+        async def confirm(new_password):
+            async with factory() as session:
+                await password_reset.confirm_password_reset(
+                    session, token=token, new_password=new_password
+                )
+                return new_password
+
+        results = await asyncio.gather(
+            confirm("First-Pass1!"), confirm("Second-Pass2!"), return_exceptions=True
+        )
+        winners = [r for r in results if isinstance(r, str)]
+        assert len(winners) == 1
+        assert sum(isinstance(r, password_reset.InvalidResetTokenError) for r in results) == 1
+        async with factory() as session:
+            stored = await session.get(Staff, account.id)
+            assert verify_password(winners[0], stored.password_hash)
+            assert stored.password_changed_at is not None
+
+    asyncio.run(asyncio.wait_for(run(), timeout=20))

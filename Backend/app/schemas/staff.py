@@ -5,6 +5,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
+from app.core.security import validate_password_strength
 from app.models.enums import AccountStatus, StaffRole
 
 
@@ -85,7 +86,13 @@ class ActivationTokenRequest(BaseModel):
 
 
 class ActivationRequest(ActivationTokenRequest):
-    password: str = Field(min_length=8, max_length=128)
+    password: str
+
+    @field_validator("password")
+    @classmethod
+    def check_strength(cls, value: str) -> str:
+        """ใช้กฎรหัสผ่านกลางเดียวกับการรีเซ็ตรหัสผ่าน."""
+        return validate_password_strength(value)
 
 
 class ActivationValidationResponse(BaseModel):

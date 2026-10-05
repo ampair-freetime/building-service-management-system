@@ -9,7 +9,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from app.api.dependencies import provide_object_storage
+from app.api.dependencies import provide_object_storage, provide_optional_object_storage
 from app.models.enums import ImageType, RequestAction, RequestStatus
 from app.models.image import Image
 from app.models.location import Location
@@ -51,10 +51,12 @@ def fake_storage(test_context) -> FakeStorage:
     storage = FakeStorage()
 
     client.app.dependency_overrides[provide_object_storage] = lambda: storage
+    client.app.dependency_overrides[provide_optional_object_storage] = lambda: storage
 
     yield storage
 
     client.app.dependency_overrides.pop(provide_object_storage, None)
+    client.app.dependency_overrides.pop(provide_optional_object_storage, None)
 
 
 def make_png() -> bytes:

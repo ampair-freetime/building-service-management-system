@@ -1229,6 +1229,10 @@ export function usePublicServicePortal() {
     function renderTrackingResult(item, code, ids, { refreshed = false } = {}) {
       const result = document.getElementById(ids.result);
       const statusBadge = document.getElementById(ids.status);
+      const photosNotice = document.getElementById("trackingPhotosNotice");
+      if (photosNotice) {
+        photosNotice.hidden = item?.completion_photos_status !== "unavailable";
+      }
 
       // แสดงรหัสที่ผู้ใช้กรอก
       document.getElementById(ids.code).textContent = code;
@@ -1382,6 +1386,7 @@ export function usePublicServicePortal() {
           }).format(new Date())}`;
       } catch (error) {
         // แสดงกรอบผลลัพธ์แม้เกิดปัญหาการเชื่อมต่อ และให้ผู้ใช้กดรีเฟรชซ้ำได้
+        document.getElementById("trackingPhotosNotice").hidden = true;
         document.getElementById(trackingIds.code).textContent = code;
         document.getElementById(trackingIds.text).textContent =
           error.message || "ไม่สามารถตรวจสอบสถานะได้";

@@ -16,6 +16,7 @@ if TYPE_CHECKING:
     from app.models.image import Image
     from app.models.lost_found import LostClaim, LostItem, LostItemHistory
     from app.models.notification import Notification
+    from app.models.password_reset import StaffPasswordReset
     from app.models.service_request import RequestHistory, ServiceRequest
 
 
@@ -46,6 +47,10 @@ class Staff(Base):
         server_default=AccountStatus.ACTIVE.value,
     )
     last_login_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    # null = ยังไม่เคยตั้งรหัสเอง (ยังไม่ activate); JWT ที่ออกก่อนเวลานี้ถูกตัดสิทธิ์
+    password_changed_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
     created_at: Mapped[datetime] = mapped_column(
@@ -87,5 +92,8 @@ class Staff(Base):
         back_populates="staff"
     )
     invitations: Mapped[list["StaffInvitation"]] = relationship(
+        back_populates="staff", cascade="all, delete-orphan"
+    )
+    password_resets: Mapped[list["StaffPasswordReset"]] = relationship(
         back_populates="staff", cascade="all, delete-orphan"
     )

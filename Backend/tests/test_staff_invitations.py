@@ -63,19 +63,19 @@ def test_create_invitation_activate_once_and_never_expose_password(
     )
     activated = client.post(
         "/api/v1/auth/setup-password",
-        json={"token": token, "password": "chosen-password"},
+        json={"token": token, "password": "Chosen-Pass1!"},
     )
     assert activated.status_code == 204
     reused = client.post(
         "/api/v1/auth/setup-password",
-        json={"token": token, "password": "another-password"},
+        json={"token": token, "password": "Another-Pass2!"},
     )
     assert reused.status_code == 400
     assert "Request a new invitation" in reused.json()["detail"]
 
     login = client.post(
         "/api/v1/auth/login",
-        json={"identifier": "new.tech@example.com", "password": "chosen-password"},
+        json={"identifier": "new.tech@example.com", "password": "Chosen-Pass1!"},
     )
     assert login.status_code == 200
 

@@ -19,6 +19,7 @@ from app.models.invitation import StaffInvitation
 from app.models.staff import Staff
 from app.schemas.staff import StaffCreate
 from app.services.invitation_email import EmailDeliveryError, send_invitation_email
+from app.services.password_reset import invalidate_pending_resets
 from app.services.staff import DuplicateStaffError, get_staff_for_update
 
 logger = logging.getLogger(__name__)
@@ -217,4 +218,6 @@ async def activate_staff_account(session: AsyncSession, *, token: str, password:
             "Invalid or expired activation link. Request a new invitation."
         )
     staff.password_hash = hash_password(password)
+    staff.password_changed_at = _now()
+    await invalidate_pending_resets(session, staff.id)
     await session.commit()

@@ -1,7 +1,9 @@
 from datetime import datetime
+from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
+
 from app.models.enums import PriorityLevel, RequestStatus, RequestType
 
 
@@ -53,6 +55,7 @@ class GuestTrackingResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     completed_at: datetime | None
+    completion_photos_status: Literal["none", "available", "unavailable"] = "none"
     completion_photos: list[GuestCompletionPhotoResponse] = Field(
         default_factory=list
     )

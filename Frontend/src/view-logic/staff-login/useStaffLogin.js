@@ -1,7 +1,11 @@
 import { onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 
-const API_BASE_URL = "http://localhost:8000/api/v1";
+import { requestPasswordReset } from "../../services/staffPasswordResetApi.js";
+
+const API_BASE_URL = (
+  import.meta.env?.VITE_API_BASE_URL ?? "http://localhost:8000/api/v1"
+).replace(/\/+$/, "");
 const LOGIN_ENDPOINT = `${API_BASE_URL}/auth/login`;
 
 export function useStaffLogin() {
@@ -13,6 +17,7 @@ export function useStaffLogin() {
   const loading = ref(false);
   const forgotModalOpen = ref(false);
   const resetEmail = ref("");
+  const resetLoading = ref(false);
   const toastMessage = ref("");
   const toastVisible = ref(false);
   let toastTimer;
@@ -46,15 +51,33 @@ export function useStaffLogin() {
     forgotModalOpen.value = false;
   }
 
-  // ส่วนนี้ยังแสดงผลจำลอง ไม่มีการเรียก API ส่งอีเมลรีเซ็ตรหัสผ่าน
-  function handleForgotPassword() {
-    if (!resetEmail.value.trim()) {
+  // ขอลิงก์รีเซ็ตรหัสผ่านทางอีเมล; Backend ตอบเหมือนกันทุกกรณีเพื่อไม่เปิดเผยว่าอีเมลมีบัญชีไหม
+  async function handleForgotPassword() {
+    const email = resetEmail.value.trim();
+    if (!email) {
       showToast("กรุณากรอกอีเมลเจ้าหน้าที่ของคุณ");
       return;
     }
+    if (resetLoading.value) return;
+    resetLoading.value = true;
+    try {
+      await requestPasswordReset(email);
+    } catch (error) {
+      // 422 = รูปแบบอีเมลไม่ถูกต้อง; ไม่มี status = เชื่อมต่อไม่ได้
+      if (error.status === 422) {
+        showToast("รูปแบบอีเมลไม่ถูกต้อง");
+        return;
+      }
+      if (!error.status) {
+        showToast("ไม่สามารถเชื่อมต่อระบบได้ กรุณาลองใหม่");
+        return;
+      }
+    } finally {
+      resetLoading.value = false;
+    }
     closeForgotModal();
     resetEmail.value = "";
-    showToast("ส่งรหัสผ่านใหม่ไปยังอีเมลของคุณแล้ว");
+    showToast("ถ้าอีเมลนี้มีบัญชี ระบบจะส่งลิงก์ตั้งรหัสผ่านใหม่ให้ภายในไม่กี่นาที (ตรวจในกล่อง Spam ด้วย)");
   }
 
   async function handleLogin() {
@@ -108,7 +131,7 @@ export function useStaffLogin() {
 
   return {
     identifier, password, rememberMe, showPassword, loading,
-    forgotModalOpen, resetEmail, toastMessage, toastVisible,
+    forgotModalOpen, resetEmail, resetLoading, toastMessage, toastVisible,
     togglePassword, openForgotModal, closeForgotModal,
     handleForgotPassword, handleLogin, loginWithGoogle,
   };

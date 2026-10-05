@@ -9,6 +9,7 @@ const {
   loading,
   forgotModalOpen,
   resetEmail,
+  resetLoading,
   toastMessage,
   toastVisible,
   togglePassword,
@@ -214,7 +215,7 @@ const {
               @click="closeForgotModal"
             >
               ยกเลิก</button
-            ><button type="submit" class="primary">ส่งลิงก์</button>
+            ><button type="submit" class="primary" :disabled="resetLoading">{{ resetLoading ? "กำลังส่ง…" : "ส่งลิงก์" }}</button>
           </div>
         </form>
       </section>
