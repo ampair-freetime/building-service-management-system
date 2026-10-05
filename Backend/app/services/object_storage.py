@@ -54,7 +54,15 @@ class ObjectStorage:
             aws_access_key_id=configuration.r2_access_key_id,
             aws_secret_access_key=configuration.r2_secret_access_key,
             region_name="auto",
-            config=Config(signature_version="s3v4"),
+            config=Config(
+                signature_version="s3v4",
+                connect_timeout=configuration.r2_connect_timeout_seconds,
+                read_timeout=configuration.r2_read_timeout_seconds,
+                retries={
+                    "mode": "standard",
+                    "total_max_attempts": configuration.r2_total_max_attempts,
+                },
+            ),
         )
 
     async def put(

@@ -17,6 +17,7 @@ from app.models.invitation import StaffInvitation
 from app.models.location import Location
 from app.models.lost_found import LostClaim, LostItem, LostItemHistory
 from app.models.notification import Notification
+from app.models.password_reset import StaffPasswordReset
 from app.models.service_request import RequestHistory, ServiceRequest
 from app.models.staff import Staff
 from app.models.staff_deletion_audit import StaffDeletionAudit
@@ -42,5 +43,6 @@ __all__ = [
     "Staff",
     "StaffDeletionAudit",
     "StaffInvitation",
+    "StaffPasswordReset",
     "StaffRole",
 ]

@@ -1,6 +1,7 @@
 import { computed, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { setupStaffPassword, validateStaffInvitation } from "../../services/staffInvitationApi.js";
+import { passwordRequirements } from "../../services/passwordRules.js";
 
 export function useStaffPasswordSetup() {
   const route = useRoute();
@@ -50,13 +51,7 @@ export function useStaffPasswordSetup() {
     }
   }, { immediate: true });
 
-  const requirements = computed(() => [
-    { label: "อย่างน้อย 8 ตัวอักษร", passed: password.value.length >= 8 },
-    { label: "มีตัวพิมพ์ใหญ่", passed: /[A-Z]/.test(password.value) },
-    { label: "มีตัวพิมพ์เล็ก", passed: /[a-z]/.test(password.value) },
-    { label: "มีตัวเลข", passed: /\d/.test(password.value) },
-    { label: "มีอักขระพิเศษ", passed: /[^A-Za-z0-9]/.test(password.value) },
-  ]);
+  const requirements = computed(() => passwordRequirements(password.value));
   const passwordIsValid = computed(() =>
     requirements.value.every((item) => item.passed),
   );

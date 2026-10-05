@@ -5,7 +5,7 @@ from uuid import UUID
 from fastapi import APIRouter, HTTPException, status
 
 from app.api.dependencies import AdminStaff, DbSession
-from app.schemas.staff import StaffCreate, StaffCreatedResponse, StaffResponse
+from app.schemas.staff import StaffCreate, StaffCreatedResponse, StaffResponse, StaffUpdate
 from app.services.invitations import (
     InvitationNotAvailableError,
     create_staff_and_invite,
@@ -16,6 +16,7 @@ from app.services.staff import (
     StaffDeletionBlockedError,
     delete_staff_account,
     list_staff,
+    update_staff_profile,
 )
 
 router = APIRouter()
@@ -57,6 +58,22 @@ async def resend_invitation(
     return StaffCreatedResponse(
         **StaffResponse.model_validate(result.staff).model_dump(), email_sent=result.invitation_sent
     )
+
+
+@router.patch("/{staff_id}", response_model=StaffResponse)
+async def edit_staff(
+    staff_id: UUID, payload: StaffUpdate, session: DbSession, admin: AdminStaff
+) -> StaffResponse:
+    """Admin แก้ชื่อ/email โดยคง role, password และประวัติงานเดิม."""
+    try:
+        account = await update_staff_profile(
+            session, staff_id=staff_id, payload=payload, actor=admin
+        )
+    except LookupError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except DuplicateStaffError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    return StaffResponse.model_validate(account)
 
 
 @router.delete("/{staff_id}", status_code=status.HTTP_204_NO_CONTENT)

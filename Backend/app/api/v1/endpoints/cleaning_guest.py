@@ -4,9 +4,9 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, UploadFile, status
 from pydantic import EmailStr
+
 from app.api.dependencies import (
     DbSession,
-    ObjectStorageClient,
     OptionalObjectStorageClient,
 )
 from app.api.v1.forms import (
@@ -104,7 +104,7 @@ async def create_cleaning_request(
 async def read_cleaning_request(
     request_code: Annotated[str, Path(min_length=1, max_length=32)],
     session: DbSession,
-    storage: ObjectStorageClient,
+    storage: OptionalObjectStorageClient,
     reporter_email: Annotated[EmailStr, Query()],
 ) -> GuestTrackingResponse:
     """ติดตามคำร้องด้วยรหัสและอีเมลของผู้แจ้ง."""

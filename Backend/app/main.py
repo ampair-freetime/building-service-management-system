@@ -21,8 +21,13 @@ def create_application() -> FastAPI:
         allow_headers=["*"],
     )
     application.include_router(api_router, prefix=settings.api_v1_prefix)
+
+    @application.get("/health", include_in_schema=False)
+    async def health() -> dict[str, str]:
+        """Liveness only: this does not verify database, SMTP or R2 readiness."""
+        return {"status": "ok"}
+
     return application
 
 
 app = create_application()
-

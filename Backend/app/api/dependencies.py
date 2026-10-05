@@ -1,5 +1,6 @@
 """Dependencies ที่ FastAPI ใช้เปิด session, ตรวจ JWT และตรวจสิทธิ์ผู้ใช้."""
 
+from datetime import UTC
 from typing import Annotated
 
 from fastapi import Depends, HTTPException, status
@@ -38,14 +39,21 @@ async def get_current_staff(
         raise unauthorized
 
     try:
-        staff_id = decode_access_token(credentials.credentials)
+        claims = decode_access_token(credentials.credentials)
     except ValueError as exc:
         raise unauthorized from exc
 
     # อ่านข้อมูลล่าสุดจากฐานข้อมูลทุกครั้ง ไม่เชื่อ role/status ใน token เพียงอย่างเดียว
-    account = await get_staff_by_id(session, staff_id)
+    account = await get_staff_by_id(session, claims.staff_id)
     if account is None or account.status != AccountStatus.ACTIVE:
         raise unauthorized
+    # token ที่ออกก่อนเปลี่ยน/รีเซ็ตรหัสผ่านครั้งล่าสุดถือว่าหมดสิทธิ์ (logout ทุกเครื่อง)
+    changed_at = account.password_changed_at
+    if changed_at is not None:
+        if changed_at.tzinfo is None:  # SQLite คืนค่าแบบไม่มี timezone
+            changed_at = changed_at.replace(tzinfo=UTC)
+        if claims.issued_at < changed_at:
+            raise unauthorized
     return account
 
 

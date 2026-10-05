@@ -6,6 +6,7 @@ EXPECTED_TABLES = {
     "staff",
     "staff_deletion_audit",
     "staff_invitations",
+    "staff_password_resets",
     "locations",
     "service_requests",
     "request_history",

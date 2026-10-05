@@ -1,8 +1,8 @@
 <template>
   <section class="page" id="lost" data-theme="lost">
     <header class="page-header lost-page-header">
-      <svg class="lost-illustration" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-        <use href="#i-box" />
+      <svg class="lost-illustration" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+        <rect width="20" height="5" x="2" y="3" rx="1" /><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8" /><path d="M10 12h4" />
       </svg>
       <div>
         <div class="eyebrow">Lost &amp; found</div>
@@ -75,6 +75,9 @@
               <h3>ประกาศล่าสุด</h3>
               <p id="resultSummary">แสดงรายการที่กำลังตามหาและของที่พบแล้ว</p>
             </div>
+            <button id="lostRefreshButton" type="button" class="filter-chip">
+              รีเฟรชประกาศ
+            </button>
           </div>
           <div class="filter-row">
             <button type="button" class="filter-chip active" data-filter="all">
@@ -86,6 +89,11 @@
             </button>
           </div>
           <div class="post-grid" id="postGrid"></div>
+          <nav id="lostPagination" class="filter-row" aria-label="หน้าประกาศ" hidden>
+            <button id="lostPreviousPage" class="filter-chip" type="button" disabled>ก่อนหน้า</button>
+            <span id="lostPageSummary" aria-live="polite"></span>
+            <button id="lostNextPage" class="filter-chip" type="button" disabled>ถัดไป</button>
+          </nav>
           <div
             id="noSearchResults"
             class="no-search-results"

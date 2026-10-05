@@ -1,14 +1,22 @@
 """Business logic และคำสั่งฐานข้อมูลที่เกี่ยวกับบัญชีพนักงาน."""
 
+import logging
+from datetime import UTC, datetime
 from uuid import UUID
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.enums import AccountStatus, RequestStatus, StaffRole
+from app.models.invitation import StaffInvitation
+from app.models.password_reset import StaffPasswordReset
 from app.models.service_request import ServiceRequest
 from app.models.staff import Staff
 from app.models.staff_deletion_audit import StaffDeletionAudit
+from app.schemas.staff import StaffUpdate
+
+logger = logging.getLogger(__name__)
 
 
 class DuplicateStaffError(Exception):
@@ -33,6 +41,77 @@ async def get_staff_by_email(session: AsyncSession, email: str) -> Staff | None:
     return await session.scalar(select(Staff).where(Staff.email == email.strip().lower()))
 
 
+async def get_staff_for_update(session: AsyncSession, staff_id: UUID) -> Staff | None:
+    """ใช้ lock บัญชีเดียวกันใน profile update, invitation และ deletion."""
+    return await session.scalar(
+        select(Staff)
+        .where(Staff.id == staff_id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    )
+
+
+async def _invalidate_pending_links(session: AsyncSession, staff_id: UUID) -> None:
+    """Invalidate unused invitation and password reset links; the caller commits."""
+    now = datetime.now(UTC)
+    for model in (StaffInvitation, StaffPasswordReset):
+        await session.execute(
+            update(model)
+            .where(
+                model.staff_id == staff_id,
+                model.used_at.is_(None),
+                model.invalidated_at.is_(None),
+            )
+            .values(invalidated_at=now)
+        )
+
+
+def _is_duplicate_staff_email(exc: IntegrityError) -> bool:
+    original = exc.orig
+    for error in (original, getattr(original, "__cause__", None)):
+        if getattr(error, "constraint_name", None) == "ix_staff_email":
+            return True
+    return "UNIQUE constraint failed: staff.email" in str(original)
+
+
+async def update_staff_profile(
+    session: AsyncSession, *, staff_id: UUID, payload: StaffUpdate, actor: Staff
+) -> Staff:
+    account = await get_staff_for_update(session, staff_id)
+    if account is None or account.status == AccountStatus.DELETED:
+        raise LookupError("Staff account not found")
+    changes = {
+        key: value
+        for key, value in payload.model_dump(exclude_unset=True).items()
+        if getattr(account, key) != value
+    }
+    if not changes:
+        return account
+
+    if "email" in changes:
+        duplicate = await session.scalar(
+            select(Staff.id).where(Staff.email == changes["email"], Staff.id != staff_id)
+        )
+        if duplicate is not None:
+            raise DuplicateStaffError("Email already exists")
+
+    try:
+        if "email" in changes:
+            # Links already sent to the old address must stop working.
+            await _invalidate_pending_links(session, staff_id)
+        for key, value in changes.items():
+            setattr(account, key, value)
+        await session.commit()
+    except IntegrityError as exc:
+        await session.rollback()
+        if _is_duplicate_staff_email(exc):
+            raise DuplicateStaffError("Email already exists") from exc
+        raise
+    await session.refresh(account)
+    logger.info("Staff profile updated; staff_id=%s actor_id=%s", staff_id, actor.id)
+    return account
+
+
 async def list_staff(session: AsyncSession) -> list[Staff]:
     """คืนเฉพาะบัญชีที่ยังไม่ถูกลบ เรียงตามลำดับที่สร้าง."""
     result = await session.scalars(
@@ -47,7 +126,7 @@ async def delete_staff_account(
     session: AsyncSession, *, staff_id: UUID, deleted_by: Staff
 ) -> None:
     """Soft-delete a staff account after checking work and administrator safeguards."""
-    account = await session.get(Staff, staff_id)
+    account = await get_staff_for_update(session, staff_id)
     if account is None or account.status == AccountStatus.DELETED:
         raise LookupError("Staff account not found")
     if account.id == deleted_by.id:
@@ -95,4 +174,5 @@ async def delete_staff_account(
     )
     # Keeping the row preserves foreign-key references and historical staff identity.
     account.status = AccountStatus.DELETED
+    await _invalidate_pending_links(session, account.id)
     await session.commit()

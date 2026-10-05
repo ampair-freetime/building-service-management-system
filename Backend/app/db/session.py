@@ -12,3 +12,8 @@ async def get_db_session() -> AsyncIterator[AsyncSession]:
     """Provide one database session for a request or unit of work."""
     async with AsyncSessionLocal() as session:
         yield session
+
+
+def get_session_factory() -> async_sessionmaker[AsyncSession]:
+    """Session factory for work that outlives the request, such as background tasks."""
+    return AsyncSessionLocal

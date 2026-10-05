@@ -4,6 +4,8 @@
 
 ## เริ่มใช้งาน
 
+สำหรับ production และเซิร์ฟเวอร์ภาควิชา ดู [คู่มือ deployment](deploy/README.md) และ `.env.production.example` ชุดเริ่มใช้งานด้านล่างเป็น development
+
 ```bash
 docker compose up --build
 ```

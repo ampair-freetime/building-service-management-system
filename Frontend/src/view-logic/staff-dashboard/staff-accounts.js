@@ -1,5 +1,5 @@
 const API_BASE_URL = (
-  import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000/api/v1"
+  import.meta.env?.VITE_API_BASE_URL ?? "http://localhost:8000/api/v1"
 ).replace(/\/+$/, "");
 
 const STAFF_ENDPOINT = `${API_BASE_URL}/staff`;
@@ -100,6 +100,26 @@ export async function createStaffAccount(payload) {
     body: JSON.stringify(payload),
   });
   return parseResponse(response, "สร้างบัญชีไม่สำเร็จ");
+}
+
+export async function updateStaffProfile(staffId, changes) {
+  const response = await fetch(`${STAFF_ENDPOINT}/${encodeURIComponent(staffId)}`, {
+    method: "PATCH",
+    headers: authHeaders(true),
+    body: JSON.stringify(changes),
+  });
+  return parseResponse(response, "บันทึกข้อมูล Staff ไม่สำเร็จ");
+}
+
+export function toUpdatedDashboardStaff(previous, account) {
+  const emailChanged = previous.email !== account.email;
+  if (emailChanged) forgetInvitationDelivery(account.id);
+  const updated = toDashboardStaff(account);
+  if (!emailChanged) {
+    updated.invitationDeliveryStatus = previous.invitationDeliveryStatus;
+    updated.invitationStatusSource = previous.invitationStatusSource;
+  }
+  return updated;
 }
 
 export async function resendStaffInvitation(staffId) {

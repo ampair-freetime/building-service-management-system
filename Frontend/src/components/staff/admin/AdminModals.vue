@@ -86,6 +86,48 @@
 
   <div
     class="modal"
+    id="editStaffModal"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="editStaffTitle"
+  >
+    <section class="modal-card">
+      <header class="modal-head">
+        <h3 id="editStaffTitle">แก้ไข Staff</h3>
+        <button
+          type="button"
+          class="close"
+          data-close="editStaffModal"
+          aria-label="ปิด"
+        >
+          <svg class="icon"><use href="#i-close" /></svg>
+        </button>
+      </header>
+      <form id="editStaffForm">
+        <input type="hidden" id="editStaffIndex" />
+        <div class="field">
+          <label for="editStaffName">ชื่อ-นามสกุล</label
+          ><input id="editStaffName" required maxlength="150" />
+        </div>
+        <div class="field">
+          <label for="editStaffEmail">อีเมล</label
+          ><input id="editStaffEmail" type="email" required maxlength="255" />
+        </div>
+        <div class="field">
+          <span>Role</span>
+          <strong id="editStaffRole"></strong>
+          <small>ยังไม่รองรับการเปลี่ยน Role</small>
+        </div>
+        <p id="editStaffError" class="field-error" role="alert" hidden></p>
+        <button id="editStaffButton" type="submit" class="primary" style="width: 100%">
+          บันทึกข้อมูล
+        </button>
+      </form>
+    </section>
+  </div>
+
+  <div
+    class="modal"
     id="qrFormModal"
     role="dialog"
     aria-modal="true"

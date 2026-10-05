@@ -6,21 +6,21 @@ import {
   serviceTypeForRequest,
 } from "../services/requestStatus.js";
 import { onMounted, onUnmounted, ref } from "vue";
-import { useRouter } from "vue-router";
 import {
   createFoundItem,
   createFoundItemClaim,
   createLostItem,
   getLostFoundItem,
-  searchLostFoundItems,
+  fetchPublicLostFoundItems,
   trackLostFoundItem,
   trackServiceRequest,
 } from "../services/api";
+import { createLostFoundStore, filterLostFoundItems } from "../services/lostFoundSearch.js";
 
 export function usePublicServicePortal() {
-  const router = useRouter();
   const validationCleanups = [];
-  let cleanupPortalNavigation = () => {};
+  let portalMounted = true;
+  onUnmounted(() => { portalMounted = false; });
   const sidebarOpen = ref(false);
   const closeSidebar = () => {
     sidebarOpen.value = false;
@@ -52,8 +52,6 @@ export function usePublicServicePortal() {
     let detailRequestId = 0;
     let selectedClaimItem = "";
     let selectedClaimItemCode = "";
-    let navigationReady = false;
-    let restoringNavigation = false;
     // เก็บเฉพาะคำร้องที่ผู้ใช้ส่งจริงในรอบการเปิดหน้านี้ ไม่มีข้อมูลตัวอย่างปะปน
     const trackedRequests = new Map();
 
@@ -85,42 +83,7 @@ export function usePublicServicePortal() {
       );
     }
 
-    function modalSlug(id) {
-      return id
-        .replace(/Modal$/, "")
-        .replace(/([a-z0-9])([A-Z])/g, "$1-$2")
-        .toLowerCase();
-    }
-
-    function modalIdFromSlug(slug) {
-      return [...document.querySelectorAll(".ui-modal")].find(
-        (modal) => modalSlug(modal.id) === slug,
-      )?.id;
-    }
-
-    function readPortalRoute() {
-      const match = window.location.pathname.match(
-        /\/user(?:\/([^/]+))?(?:\/([^/]+))?\/?$/,
-      );
-      return {
-        page: match?.[1] ? decodeURIComponent(match[1]) : "",
-        dialog: match?.[2] ? decodeURIComponent(match[2]) : "",
-      };
-    }
-
-    function updatePortalRoute(modalId = "", mode = "push") {
-      if (!navigationReady || restoringNavigation) return;
-      const query = { ...router.currentRoute.value.query };
-      delete query.service;
-      const dialog = modalId ? `/${modalSlug(modalId)}` : "";
-      const path = `/user/${currentPage}${dialog}`;
-      const target = router.resolve({ path, query }).fullPath;
-      const current = `${window.location.pathname}${window.location.search}`;
-      if (target === current) return;
-      void router[mode]({ path, query });
-    }
-
-    function navigate(pageId, historyMode = "push") {
+    function navigate(pageId) {
       const destination = document.getElementById(pageId);
       if (!destination || !destination.classList.contains("page")) return;
       currentPage = pageId;
@@ -141,8 +104,6 @@ export function usePublicServicePortal() {
         openLostView("browse", false);
         void filterPosts();
       }
-
-      if (historyMode !== "none") updatePortalRoute("", historyMode);
     }
 
     navItems.forEach((item) =>
@@ -252,11 +213,7 @@ export function usePublicServicePortal() {
       );
     }
 
-    function closeUiModal(
-      id,
-      restoreFocus = true,
-      updateHistory = restoreFocus,
-    ) {
+    function closeUiModal(id, restoreFocus = true) {
       const modal = document.getElementById(id);
       if (!modal || !modal.classList.contains("open")) return;
       modal.classList.remove("open");
@@ -273,21 +230,9 @@ export function usePublicServicePortal() {
       ) {
         lastModalTrigger.focus();
       }
-
-      if (
-        updateHistory &&
-        !restoringNavigation &&
-        readPortalRoute().dialog === modalSlug(id)
-      ) {
-        router.back();
-      }
     }
 
-    function openUiModal(
-      id,
-      trigger = document.activeElement,
-      historyMode = "push",
-    ) {
+    function openUiModal(id, trigger = document.activeElement) {
       const modal = document.getElementById(id);
       if (!modal) return;
       document
@@ -298,7 +243,6 @@ export function usePublicServicePortal() {
       modal.removeAttribute("aria-hidden");
       document.body.classList.add("modal-open");
       syncBottomNavigation(id);
-      if (historyMode !== "none") updatePortalRoute(id, historyMode);
       // เลื่อน focus หลังเปลี่ยนสถานะ modal เพื่อให้ช่องเป้าหมายพร้อมแสดงผล
       window.requestAnimationFrame(() => {
         const focusTarget = modal.querySelector(
@@ -333,72 +277,72 @@ export function usePublicServicePortal() {
         else if (sidebar.classList.contains("open")) closeSidebar();
       }
     });
-
-    function syncPortalFromRoute() {
-      const routeState = readPortalRoute();
-      const service = new URLSearchParams(window.location.search).get(
-        "service",
-      );
-      const requestedPage = routeState.page || service;
-      const validPage = [...pages].some((page) => page.id === requestedPage);
-      const page = validPage
-        ? requestedPage
-        : ["clean", "repair"].includes(service)
-          ? service
-          : "dashboard";
-
-      restoringNavigation = true;
-      document
-        .querySelectorAll(".ui-modal.open")
-        .forEach((modal) => closeUiModal(modal.id, false, false));
-      navigate(page, "none");
-      const modalId = modalIdFromSlug(routeState.dialog);
-      if (modalId) openUiModal(modalId, document.activeElement, "none");
-      restoringNavigation = false;
-
-      return modalId || "";
-    }
-
-    const handleBrowserNavigation = () => syncPortalFromRoute();
-    window.addEventListener("popstate", handleBrowserNavigation);
-    cleanupPortalNavigation = () =>
-      window.removeEventListener("popstate", handleBrowserNavigation);
-    // นับลำดับการค้นหา เพื่อป้องกันผลเก่าทับผลล่าสุด
+    const postsStore = createLostFoundStore(fetchPublicLostFoundItems);
+    let appliedPostQuery = "";
+    const postPageSize = 20;
+    let postPage = 0;
+    // นับ event เพื่อให้ผลโหลดแสดงด้วยคำค้นและประเภทล่าสุด
     let searchRequestId = 0;
 
-    // ค้นหาประกาศตามคำค้นและประเภท แล้วแสดงผลจาก API
-    async function filterPosts() {
+    function renderFilteredPosts() {
+      const items = filterLostFoundItems(postsStore.items, {
+        type: activePostFilter,
+        search: appliedPostQuery,
+      });
+      const lastPage = Math.max(0, Math.ceil(items.length / postPageSize) - 1);
+      postPage = Math.min(postPage, lastPage);
+      const start = postPage * postPageSize;
+      const visibleItems = items.slice(start, start + postPageSize);
+      renderSearchPosts(visibleItems);
+      document.getElementById("resultSummary").textContent =
+        items.length
+          ? `แสดง ${start + 1}–${start + visibleItems.length} จาก ${items.length} รายการที่ตรงกับตัวกรอง`
+          : "ไม่พบรายการ";
+      document.getElementById("lostPagination").hidden = items.length <= postPageSize;
+      document.getElementById("lostPageSummary").textContent =
+        `หน้า ${postPage + 1} จาก ${lastPage + 1}`;
+      document.getElementById("lostPreviousPage").disabled = postPage === 0;
+      document.getElementById("lostNextPage").disabled = postPage === lastPage;
+      const empty = document.getElementById("noSearchResults");
+      empty.hidden = items.length !== 0;
+      empty.querySelector("strong").textContent = postsStore.items.length
+        ? "ไม่พบประกาศที่ตรงกับคำค้นหรือประเภท"
+        : "ยังไม่มีประกาศที่เผยแพร่";
+      empty.querySelector("p").textContent = postsStore.items.length
+        ? "ลองเปลี่ยนคำค้น หรือเลือกประเภท “ทั้งหมด” แล้วค้นหาอีกครั้ง"
+        : "กดรีเฟรชเพื่อตรวจสอบประกาศใหม่อีกครั้ง";
+    }
+
+    async function filterPosts({ force = false } = {}) {
       const requestId = ++searchRequestId;
-      const query = document.getElementById("lostSearch").value.trim();
       const summary = document.getElementById("resultSummary");
       const empty = document.getElementById("noSearchResults");
       const grid = document.getElementById("postGrid");
 
       openLostView("browse", false);
-      summary.textContent = "กำลังค้นหา...";
+      if (force) postPage = 0;
+      summary.textContent = "กำลังโหลดประกาศ...";
       empty.hidden = true;
       grid.setAttribute("aria-busy", "true");
       grid.classList.add("is-loading");
+      document.getElementById("lostPreviousPage").disabled = true;
+      document.getElementById("lostNextPage").disabled = true;
 
       try {
-        const result = await searchLostFoundItems({
-          type: activePostFilter,
-          search: query,
-        });
-
-        // ป้องกันผลจากการค้นหาเก่าทับการค้นหาครั้งล่าสุด
-        if (requestId !== searchRequestId) return;
-
-        renderSearchPosts(result.items);
-        summary.textContent = `แสดง ${result.items.length} จาก ${result.total} รายการ`;
-        empty.hidden = result.items.length !== 0;
-        grid.removeAttribute("aria-busy");
-        grid.classList.remove("is-loading");
+        await postsStore.ensureLoaded({ force });
+        if (!portalMounted || requestId !== searchRequestId) return;
+        renderFilteredPosts();
       } catch (error) {
-        if (requestId !== searchRequestId) return;
-        summary.textContent = error.message;
-        grid.removeAttribute("aria-busy");
-        grid.classList.remove("is-loading");
+        if (!portalMounted || requestId !== searchRequestId) return;
+        if (postsStore.loaded) renderFilteredPosts();
+        summary.textContent = postsStore.loaded
+          ? `${error.message} · กำลังแสดงข้อมูลที่โหลดไว้ก่อนหน้า`
+          : error.message;
+      } finally {
+        if (portalMounted && requestId === searchRequestId) {
+          grid.removeAttribute("aria-busy");
+          grid.classList.remove("is-loading");
+        }
       }
     }
 
@@ -481,11 +425,12 @@ export function usePublicServicePortal() {
       grid.replaceChildren(...cards);
     }
 
-    document.querySelectorAll(".filter-chip").forEach((chip) =>
+    document.querySelectorAll(".filter-chip[data-filter]").forEach((chip) =>
       chip.addEventListener("click", () => {
         activePostFilter = chip.dataset.filter;
+        postPage = 0;
         document
-          .querySelectorAll(".filter-chip")
+          .querySelectorAll(".filter-chip[data-filter]")
           .forEach((item) => item.classList.toggle("active", item === chip));
         filterPosts();
       }),
@@ -494,6 +439,8 @@ export function usePublicServicePortal() {
       .getElementById("lostSearchForm")
       .addEventListener("submit", (event) => {
         event.preventDefault();
+        appliedPostQuery = document.getElementById("lostSearch").value.trim();
+        postPage = 0;
         const searchButton = document.getElementById("lostSearchButton");
         searchButton.classList.add("pressed");
         window.setTimeout(() => {
@@ -507,6 +454,19 @@ export function usePublicServicePortal() {
           });
         }, 120);
       });
+
+    document.getElementById("lostRefreshButton")?.addEventListener("click", () => {
+      void filterPosts({ force: true });
+    });
+    document.getElementById("lostPreviousPage")?.addEventListener("click", () => {
+      if (postPage === 0) return;
+      postPage--;
+      renderFilteredPosts();
+    });
+    document.getElementById("lostNextPage")?.addEventListener("click", () => {
+      postPage++;
+      renderFilteredPosts();
+    });
 
     // โหลดประกาศจริงจากฐานข้อมูลทันที
     filterPosts();
@@ -634,6 +594,7 @@ export function usePublicServicePortal() {
 
         if (!item) {
           setItemDetailState("not-found");
+          void filterPosts({ force: true });
           return;
         }
 
@@ -1268,6 +1229,10 @@ export function usePublicServicePortal() {
     function renderTrackingResult(item, code, ids, { refreshed = false } = {}) {
       const result = document.getElementById(ids.result);
       const statusBadge = document.getElementById(ids.status);
+      const photosNotice = document.getElementById("trackingPhotosNotice");
+      if (photosNotice) {
+        photosNotice.hidden = item?.completion_photos_status !== "unavailable";
+      }
 
       // แสดงรหัสที่ผู้ใช้กรอก
       document.getElementById(ids.code).textContent = code;
@@ -1421,6 +1386,7 @@ export function usePublicServicePortal() {
           }).format(new Date())}`;
       } catch (error) {
         // แสดงกรอบผลลัพธ์แม้เกิดปัญหาการเชื่อมต่อ และให้ผู้ใช้กดรีเฟรชซ้ำได้
+        document.getElementById("trackingPhotosNotice").hidden = true;
         document.getElementById(trackingIds.code).textContent = code;
         document.getElementById(trackingIds.text).textContent =
           error.message || "ไม่สามารถตรวจสอบสถานะได้";
@@ -1579,6 +1545,11 @@ export function usePublicServicePortal() {
         submitButton.disabled = false;
         submitButton.textContent = "ส่งคำขอรับคืน";
       }
+      const urlParams = new URLSearchParams(window.location.search);
+
+      if (urlParams.get("service") === "clean") {
+        navigate("clean");
+      }
     });
 
     const viewStatusButton = document.getElementById("viewStatusButton");
@@ -1615,9 +1586,6 @@ export function usePublicServicePortal() {
     document
       .querySelectorAll(".ui-modal")
       .forEach((modal) => modal.setAttribute("aria-hidden", "true"));
-    const initialModalId = syncPortalFromRoute();
-    navigationReady = true;
-    updatePortalRoute(initialModalId, "replace");
     window.setTimeout(
       () => document.querySelector(".loading-mask")?.remove(),
       320,
@@ -1626,7 +1594,6 @@ export function usePublicServicePortal() {
   });
 
   onUnmounted(() => {
-    cleanupPortalNavigation();
     validationCleanups.forEach((cleanup) => cleanup());
     document.body.classList.remove("modal-open", "offline");
   });

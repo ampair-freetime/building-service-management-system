@@ -3,6 +3,7 @@ import { createRouter, createWebHistory } from "vue-router";
 import PublicServicePortal from "../views/PublicServicePortal.vue";
 import StaffLogin from "../views/staff-login.vue";
 import StaffPasswordSetup from "../views/staff-password-setup.vue";
+import StaffResetPassword from "../views/staff-reset-password.vue";
 import StaffDashboard from "../views/staff-dashboard.vue";
 import MobileDemo from "../views/MobileDemo.vue";
 
@@ -33,6 +34,12 @@ const routes = [
     path: "/staff/setup-password",
     name: "staff-password-setup",
     component: StaffPasswordSetup,
+  },
+  {
+    // เปิดจากลิงก์ในอีเมล จึงต้องเข้าได้โดยไม่ต้อง login
+    path: "/staff/reset-password",
+    name: "staff-reset-password",
+    component: StaffResetPassword,
   },
 
   // Dashboard เจ้าหน้าที่

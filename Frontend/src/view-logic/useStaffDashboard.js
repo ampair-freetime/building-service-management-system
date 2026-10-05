@@ -48,6 +48,8 @@ import {
   rememberInvitationDelivery,
   resendStaffInvitation,
   toDashboardStaff,
+  toUpdatedDashboardStaff,
+  updateStaffProfile,
 } from "./staff-dashboard/staff-accounts.js";
 import {
   acceptCleaningTask,
@@ -269,13 +271,20 @@ export function useStaffDashboard() {
       }
     }
 
+    let approvedLoadVersion = 0;
     // โหลดของพบและประกาศของหายที่ผ่านการอนุมัติแล้ว
     async function loadApprovedLostFoundItems() {
       if (currentRole !== "clerk" && currentRole !== "admin") return;
+      const version = ++approvedLoadVersion;
       try {
         const { foundItems, lostItems } = await getApprovedLostFoundItems();
+        if (version !== approvedLoadVersion) return;
         const completedIds = completedLostFoundIds();
+        const deletedIds = new Set(deletedRecords
+          .filter((entry) => entry.source === "lost")
+          .map((entry) => entry.itemId));
         const mapApprovedItem = (item, tab) => ({
+          publicListItem: true,
           backendId: item.id,
           id: item.item_code,
           title: item.item_name,
@@ -292,12 +301,13 @@ export function useStaffDashboard() {
           assignee: null,
         });
         const mergeApproved = (tab, items) => {
+          const previous = new Map(lostSets[tab].map((item) => [item.backendId, item]));
           const approved = items
-            .filter((item) => !completedIds.has(item.item_code))
-            .map((item) => mapApprovedItem(item, tab));
+            .filter((item) => !completedIds.has(item.item_code) && !deletedIds.has(item.item_code))
+            .map((item) => ({ ...previous.get(item.id), ...mapApprovedItem(item, tab) }));
           const approvedIds = new Set(approved.map((item) => item.backendId));
           lostSets[tab] = [
-            ...lostSets[tab].filter((item) => !approvedIds.has(item.backendId)),
+            ...lostSets[tab].filter((item) => !item.publicListItem && !approvedIds.has(item.backendId)),
             ...approved,
           ];
         };
@@ -306,6 +316,7 @@ export function useStaffDashboard() {
         renderLost();
         renderMetrics();
       } catch (error) {
+        if (version !== approvedLoadVersion) return;
         console.error("Loading approved lost-and-found items failed:", error);
         toast(error.message || "ไม่สามารถโหลดรายการที่อนุมัติแล้วได้");
       }
@@ -1712,6 +1723,7 @@ export function useStaffDashboard() {
       renderQueue();
       renderNotifications();
       currentLostTab = tab;
+      if (item.backendId) await loadApprovedLostFoundItems();
       $$("#lostTabs .tab").forEach((tabButton) => {
         const active = tabButton.dataset.tab === tab;
         tabButton.classList.toggle("active", active);
@@ -2392,7 +2404,7 @@ export function useStaffDashboard() {
               <div><span>สถานะการส่งคำเชิญ</span><strong class="invitation-delivery-status ${invitationDelivery.className}">${invitationDelivery.label}</strong></div>
             </div>
             <button class="small-btn resend-invitation-button" type="button" data-staff-action="resend-invitation" data-staff-index="${i}" ${s.status === "ใช้งาน" ? "" : "disabled"}>ส่งคำเชิญซ้ำ</button>
-            <footer class="staff-account-actions"><button class="small-btn" type="button" data-staff-action="detail" data-staff-index="${i}">ดูรายละเอียด</button><button class="small-btn" type="button" data-staff-action="toggle" data-staff-index="${i}">${
+            <footer class="staff-account-actions"><button class="small-btn" type="button" data-staff-action="detail" data-staff-index="${i}">ดูรายละเอียด</button><button class="small-btn" type="button" data-staff-action="edit" data-staff-index="${i}">แก้ไขข้อมูล</button><button class="small-btn" type="button" data-staff-action="toggle" data-staff-index="${i}">${
               s.status === "ใช้งาน" ? "ปิดบัญชี" : "เปิดใช้"
             }</button><button class="small-btn delete" type="button" data-staff-action="remove" data-staff-index="${i}">ลบ</button></footer>
           </article>`;
@@ -2415,6 +2427,77 @@ export function useStaffDashboard() {
       $("#adminTotal").textContent = staffData.filter(
         (staff) => staff.role === "แอดมิน"
       ).length;
+    }
+    function openEditStaff(index, trigger = document.activeElement) {
+      const staff = staffData[index];
+      if (!staff || currentRole !== "admin") return;
+      $("#editStaffIndex").value = staff.id;
+      $("#editStaffName").value = staff.name;
+      $("#editStaffEmail").value = staff.email;
+      $("#editStaffRole").textContent = staff.role;
+      $("#editStaffError").hidden = true;
+      $("#editStaffButton").disabled = false;
+      openModal("editStaffModal", trigger);
+    }
+    async function performStaffProfileUpdate(staff, changes) {
+      const button = $("#editStaffButton");
+      if (currentRole !== "admin" || button.disabled) return;
+      // The confirmation dialog closes the edit modal; restore the retained form.
+      if (!$("#editStaffModal").classList.contains("open")) openModal("editStaffModal");
+      const errorMessage = $("#editStaffError");
+      errorMessage.hidden = true;
+      button.disabled = true;
+      button.textContent = "กำลังบันทึก…";
+      try {
+        const account = await updateStaffProfile(staff.id, changes);
+        const index = staffData.findIndex((item) => item.id === staff.id);
+        if (index !== -1) staffData[index] = toUpdatedDashboardStaff(staff, account);
+        const emailChanged = staff.email !== account.email;
+        let signedIn;
+        try {
+          signedIn = JSON.parse(localStorage.getItem("buildingCareStaff") || "null");
+        } catch {
+          // A browser cache problem must not turn a successful API save into an error.
+        }
+        if (signedIn?.id === account.id) {
+          try {
+            localStorage.setItem("buildingCareStaff", JSON.stringify(account));
+          } catch {
+            // The saved profile can still be displayed when storage is unavailable.
+          }
+          currentUserName[currentRole] = account.full_name;
+          roleConfig[currentRole].name = account.full_name;
+          const headerName = $("#headerName");
+          if (headerName) headerName.textContent = account.full_name.split(" ")[0];
+          const profileName = $("#profileName");
+          if (profileName) profileName.textContent = account.full_name;
+          const profileEmail = $("#profileEmail");
+          if (profileEmail) profileEmail.textContent = account.email;
+        }
+        addAudit("staff", "แก้ไข Staff", account.id, account.full_name,
+          `แก้ไข ${Object.keys(changes).join(", ")}`);
+        closeModal("editStaffModal", false);
+        renderStaff();
+        loadStaffWorkOverview();
+        showSuccess(emailChanged
+          ? "บันทึกชื่อและอีเมลแล้ว ลิงก์คำเชิญเดิมใช้ไม่ได้ หาก Staff ยังไม่ได้ตั้งรหัสผ่าน ให้กดส่งคำเชิญซ้ำไปอีเมลใหม่"
+          : "บันทึกข้อมูล Staff แล้ว");
+      } catch (error) {
+        if (await handleUnauthorizedResponse(error.status)) return;
+        errorMessage.textContent = error.status === 409
+          ? "อีเมลนี้ถูกใช้แล้ว กรุณาใช้อีเมลอื่น"
+          : error.status === 422
+            ? "กรุณาตรวจสอบชื่อและอีเมลให้ถูกต้อง"
+            : error.status === 403
+              ? "เฉพาะ Admin เท่านั้นที่แก้ข้อมูล Staff ได้"
+              : error.status === 404
+                ? "ไม่พบบัญชี Staff นี้ กรุณาโหลดรายการใหม่"
+                : "บันทึกไม่สำเร็จ กรุณาลองใหม่";
+        errorMessage.hidden = false;
+      } finally {
+        button.disabled = false;
+        button.textContent = "บันทึกข้อมูล";
+      }
     }
     function toggleStaff(i) {
       const staff = staffData[i];
@@ -3534,6 +3617,7 @@ export function useStaffDashboard() {
             );
             claim.custody = `ส่งคืนโดย ${activeStaffName()} · ${nowThai()}`;
             item.status = "คืนของแล้ว";
+            item.publicListItem = false;
             item.returnStatus = claim.returnStatus;
             item.decisionReason = `สถานะการคืน: ${previousReturnStatus} → ${claim.returnStatus}`;
             addAudit(
@@ -3559,6 +3643,7 @@ export function useStaffDashboard() {
               `${id} · ${item.title} เปลี่ยนสถานะจาก “${previousReturnStatus}” เป็น “${claim.returnStatus}” แล้ว`,
               "ส่งคืนเจ้าของสำเร็จ",
             );
+            await loadApprovedLostFoundItems();
           } catch (error) {
             if (await handleUnauthorizedResponse(error.status)) return;
             console.error("Updating return status failed:", error);
@@ -3679,6 +3764,7 @@ export function useStaffDashboard() {
           );
           if (action === "returned") {
             item.custody = `ส่งคืนโดย ${activeStaffName()} · ${nowThai()}`;
+            await loadApprovedLostFoundItems();
           }
           item.assignee = activeStaffName();
           addAudit("lost", title, id, item.title, `เปลี่ยนสถานะเป็น ${status}`);
@@ -4438,6 +4524,7 @@ export function useStaffDashboard() {
       const button = event.target.closest("[data-staff-action]");
       if (!button) return;
       const index = Number(button.dataset.staffIndex);
+      if (button.dataset.staffAction === "edit") openEditStaff(index, button);
       if (button.dataset.staffAction === "toggle") toggleStaff(index);
       if (button.dataset.staffAction === "remove") removeStaff(index);
       if (button.dataset.staffAction === "resend-invitation")
@@ -4462,6 +4549,15 @@ export function useStaffDashboard() {
       });
       currentLostTab = button.dataset.tab;
       renderLost();
+    });
+    $("#staffLostRefreshButton")?.addEventListener("click", async (event) => {
+      const button = event.currentTarget;
+      button.disabled = true;
+      try {
+        await loadApprovedLostFoundItems();
+      } finally {
+        button.disabled = false;
+      }
     });
     $("#page-dashboard")?.addEventListener("click", (event) => {
       if (currentRole !== "clerk") return;
@@ -4853,6 +4949,27 @@ export function useStaffDashboard() {
         account.email_sent ? "ส่งคำเชิญสำเร็จ" : "ส่งคำเชิญไม่สำเร็จ",
         account.email_sent ? "success" : "error",
       );
+    });
+    $("#editStaffForm")?.addEventListener("submit", (event) => {
+      event.preventDefault();
+      if (!event.currentTarget.checkValidity()) {
+        event.currentTarget.reportValidity();
+        return;
+      }
+      const staff = staffData.find((item) => item.id === $("#editStaffIndex").value);
+      if (!staff || currentRole !== "admin" || $("#editStaffButton").disabled) return;
+      const name = $("#editStaffName").value.trim().replace(/\s+/g, " ");
+      const email = $("#editStaffEmail").value.trim().toLowerCase();
+      const changes = {};
+      if (name !== staff.name) changes.full_name = name;
+      if (email !== staff.email) changes.email = email;
+      if (changes.email) {
+        requestConfirmation("ยืนยันเปลี่ยนอีเมล Staff",
+          `ตรวจสอบว่า ${email} เป็นอีเมลของ Staff คนนี้แล้วหรือไม่? ลิงก์คำเชิญเดิมจะใช้ไม่ได้ และต้องใช้อีเมลใหม่เพื่อเข้าสู่ระบบ`,
+          () => performStaffProfileUpdate(staff, changes), "ยืนยันและบันทึก");
+      } else {
+        performStaffProfileUpdate(staff, changes);
+      }
     });
     $("#claimActions")?.addEventListener("click", (event) => {
       const button = event.target.closest("[data-claim-action]");
