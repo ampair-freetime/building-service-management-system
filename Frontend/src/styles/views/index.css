@@ -359,7 +359,6 @@ main {
   display: none;
   max-width: 1080px;
   margin: auto;
-  animation: pageIn 0.32s ease;
 }
 .page.active {
   display: block;
@@ -374,16 +373,16 @@ main {
   position: relative;
   isolation: isolate;
   container-type: inline-size;
-  min-height: 0;
-  padding: 34px 300px 16px 0;
+  min-height: 260px;
+  padding: 34px 500px 16px 0;
 }
 .mobile-hero:after {
   content: "";
   position: absolute;
-  right: 20px;
-  top: 0;
-  width: 260px;
-  height: 200px;
+  right: -28px;
+  top: -18px;
+  width: 540px;
+  height: 270px;
   background: linear-gradient(
     145deg,
     rgba(51, 94, 138, 0.04),
@@ -1803,11 +1802,10 @@ h4,
 }
 .building-illustration {
   position: absolute;
-  right: 140px;
-  top: 20px;
-  width: 190px;
-  height: 155px;
-  color: rgba(51, 94, 138, 0.16);
+  right: 0;
+  top: -28px;
+  width: 620px;
+  height: auto;
   z-index: 0;
   pointer-events: none;
 }
@@ -2874,10 +2872,9 @@ textarea:focus-visible {
   }
   .mobile-hero .building-illustration {
     right: 0;
-    top: 12px;
-    width: min(190px, 50cqi);
+    top: 8px;
+    width: min(220px, 52cqi);
     height: auto;
-    aspect-ratio: 220 / 170;
   }
   .header-actions {
     top: 28px;
@@ -3302,7 +3299,7 @@ textarea:focus-visible {
 
   .user-page .mobile-hero .building-illustration {
     top: 8px;
-    width: min(156px, 43cqi);
+    width: min(180px, 48cqi);
   }
 
   .user-page .location-card {
