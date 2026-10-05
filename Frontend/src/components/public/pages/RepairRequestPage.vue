@@ -19,9 +19,12 @@ const { isSubmitting, status, message, submit, markChanged } = useRepairSubmissi
 async function submitRepair(event) {
   if (isSubmitting.value) return;
   const form = event.currentTarget;
-  if (!form.checkValidity()) return;
+  if (!form.reportValidity()) return;
   if (!selectedLocation.value) {
     locationError.value = "ยังระบุสถานที่จริงไม่ได้ กรุณาตรวจสอบชั้นและห้อง/สถานที่";
+    message.value = locationError.value;
+    document.getElementById("repairArea")?.scrollIntoView({ block: "center" });
+    document.getElementById("repairArea")?.focus();
     return;
   }
 

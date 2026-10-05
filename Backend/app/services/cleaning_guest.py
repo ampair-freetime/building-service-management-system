@@ -123,6 +123,7 @@ async def create_guest_cleaning_request(
         request_type=RequestType.CLEANING,
         location_id=location.id,
         title=payload.title,
+        cleaning_category=payload.cleaning_category,
         description=payload.description,
         priority=payload.priority,
         status=RequestStatus.WAITING,

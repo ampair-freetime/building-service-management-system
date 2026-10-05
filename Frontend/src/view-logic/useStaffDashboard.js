@@ -8,6 +8,8 @@ import {
   setAdminLocationActive,
 } from "../services/adminLocations.js";
 import { createStaffDashboardData } from "./staff-dashboard/data.js";
+import { taskHistoryRows } from "./staff-dashboard/work-history.js";
+import { jobMetrics } from "./staff-dashboard/job-metrics.js";
 import {
   STAFF_ROLE_PAGES,
   canRoleOpenPage,
@@ -144,6 +146,7 @@ export function useStaffDashboard() {
     const clerkApprovalLoadState = { found: "loading", lost: "loading", claims: "loading" };
     const readClaimNotifications = new Set();
     let currentBoardView = "unassigned";
+    let currentHistoryTab = "work";
     let selectedJobId = "";
     let overviewData = null;
     let overviewRequest = 0;
@@ -461,7 +464,7 @@ export function useStaffDashboard() {
     const cleaningStatusLabels = {
       waiting: "รอรับงาน",
       assigned: "รับงานแล้ว",
-      received: "รับทราบงาน",
+      received: "รับเรื่องแล้ว",
       in_progress: "กำลังดำเนินการ",
       completed: "เสร็จสิ้น",
       cancelled: "ยกเลิก",
@@ -481,13 +484,13 @@ export function useStaffDashboard() {
     const repairStatusLabels = {
       waiting: "รอรับงาน",
       assigned: "รับงานแล้ว",
-      received: "รับทราบงาน",
+      received: "รับเรื่องแล้ว",
       in_progress: "กำลังดำเนินการ",
       completed: "เสร็จสิ้น",
       cancelled: "ยกเลิก",
     };
     function nextRepairStatus(job) {
-      const next = { assigned: "received", received: "in_progress" }[
+      const next = { assigned: "received", received: "in_progress", in_progress: "completed" }[
         job.backendStatus
       ];
       return next
@@ -576,6 +579,7 @@ export function useStaffDashboard() {
           Object.assign(job, {
             backendId: task.id,
             id: task.request_code,
+            category: task.cleaning_category || "ทำความสะอาดทั่วไป",
             title: task.title,
             detail: task.description,
             room: repairLocation(task.location),
@@ -658,7 +662,8 @@ export function useStaffDashboard() {
 
       const jobsTitle = $("#jobsTitle");
       if (jobsTitle) {
-        jobsTitle.textContent = c.jobTitle || "ศูนย์รับงานรวม";
+        jobsTitle.textContent = ["housekeeper", "technician"].includes(role)
+          ? "ศูนย์รับงาน" : c.jobTitle || "ศูนย์รับงานรวม";
       }
 
       const jobsSubtitle = $("#jobsSubtitle");
@@ -707,9 +712,9 @@ export function useStaffDashboard() {
       if (jobsNavLabel) {
         jobsNavLabel.textContent =
           role === "housekeeper"
-            ? "รับงานแม่บ้าน"
+            ? "ศูนย์รับงาน"
             : role === "technician"
-              ? "รับงานช่าง"
+              ? "ศูนย์รับงาน"
               : "ศูนย์งานทั้งหมด";
       }
 
@@ -767,6 +772,9 @@ export function useStaffDashboard() {
         toast("ไม่พบหน้าที่เลือก");
         return;
       }
+      if (["housekeeper", "technician"].includes(currentRole) && destinationPage === "jobs") {
+        currentBoardView = page === "my-jobs" ? "mine" : "unassigned";
+      }
       $$(".page").forEach((p) => p.classList.remove("active"));
       destination.classList.add("active");
       $$(".nav-item").forEach((n) =>
@@ -785,9 +793,20 @@ export function useStaffDashboard() {
         if (pageHeading)
           pageHeading.textContent = labelSource.textContent.trim();
       }
-      if (page === "my-jobs") renderJobs();
+      if (destinationPage === "jobs") renderJobs();
       if (page === "clerk-center") renderClerkCenter();
-      if (page === "my-history") renderMyHistory();
+      if (page === "my-history") {
+        currentHistoryTab = "work";
+        $$("#myHistoryTabs [data-history-tab]").forEach(button => {
+          const active = button.dataset.historyTab === currentHistoryTab;
+          button.classList.toggle("active", active);
+          button.setAttribute("aria-selected", String(active));
+        });
+        const historyType = $("#myHistoryType");
+        if (historyType) { historyType.value = "all"; historyType.closest("select").hidden = false; }
+        renderMyHistory();
+        void loadMyTaskHistory();
+      }
       if (page === "staff-overview") loadStaffWorkOverview();
       if (page === "history") {
         renderHistory();
@@ -803,13 +822,11 @@ export function useStaffDashboard() {
     }
     function renderMetrics() {
       if (!$("#metricGrid")) return;
-      const jobs = roleJobs(),
-        unassigned = jobs.filter((j) => !j.assignee).length,
-        mine = jobs.filter((j) => j.assignee === activeStaffName()).length,
-        urgent = jobs.filter(
-          (j) => j.priority === "เร่งด่วน" && j.status !== "เสร็จสิ้น",
-        ).length;
-      const completed = jobs.filter((j) => j.status === "เสร็จสิ้น").length;
+      const jobs = roleJobs();
+      const today = new Intl.DateTimeFormat("en-CA", {
+        timeZone: "Asia/Bangkok", year: "numeric", month: "2-digit", day: "2-digit",
+      }).format(new Date());
+      const { unassigned, mine, urgent, completed } = jobMetrics(jobs, workHistory, activeStaffName(), today);
       let values;
       if (currentRole === "clerk")
         values = [
@@ -844,7 +861,7 @@ export function useStaffDashboard() {
             String(jobs.filter((j) => j.status.includes("กำลัง")).length),
             "ติดตามได้",
           ],
-          ["งานเสร็จวันนี้", String(completed), "ปิดงานแล้ว"],
+          ["งานเสร็จวันนี้", String(jobs.filter((job) => job.status === "เสร็จสิ้น").length), "ปิดงานแล้ว"],
           ["งานเกินกำหนด", "2", "ควรตรวจสอบ"],
           [
             "Staff ปฏิบัติงาน",
@@ -870,7 +887,7 @@ export function useStaffDashboard() {
         .map(
           (v, i) =>
             `<article class="metric ${
-              v[0].includes("เร่ง") || v[0].includes("เกิน") ? "warn" : ""
+              v[0].includes("เร่ง") ? "urgent" : v[0].includes("เกิน") ? "warn" : ""
             }"><span>${v[0]}</span><strong>${v[1]}</strong><small>${
               v[2]
             }</small></article>`,
@@ -957,7 +974,7 @@ export function useStaffDashboard() {
     function jobMatchesView(job) {
       if (currentRole === "admin" && currentBoardView === "mine")
         return job.assignee === activeStaffName();
-      if (currentBoardView === "unassigned") return !job.assignee;
+      if (currentBoardView === "unassigned") return !job.assignee && !isTerminalStatus(job.status) && job.backendStatus !== "cancelled" && job.status !== "ยกเลิก";
       if (currentBoardView === "mine")
         return job.assignee === activeStaffName();
       if (currentBoardView === "team")
@@ -1009,7 +1026,8 @@ export function useStaffDashboard() {
                 isUnassigned = !j.assignee,
                 canEdit = isMine || currentRole === "admin";
               let actions;
-              if (isUnassigned && currentRole !== "admin")
+              if (isTerminalStatus(j.status)) actions = "";
+              else if (isUnassigned && currentRole !== "admin")
                 actions = `<button class="accept-btn" type="button" data-job-action="accept" data-job-id="${j.id}">รับงาน</button>`;
               else if (isUnassigned && currentRole === "admin")
                 actions = `<button class="accept-btn" type="button" data-job-action="assign" data-job-id="${j.id}">มอบหมายงาน</button>`;
@@ -1026,15 +1044,13 @@ export function useStaffDashboard() {
                   j.assignee,
                 )}</div>`;
               const icon = j.type === "repair" ? "#i-tools" : "#i-broom";
-              const photo = j.completionPhotoUrl
-                ? `<div class="job-photo has-image"><img src="${escapeHtml(j.completionPhotoUrl)}" alt="รูปหลังดำเนินการ ${escapeHtml(j.title)}" /></div>`
-                : `<div class="job-photo"><svg class="icon"><use href="${icon}"/></svg></div>`;
+              const photo = `<div class="job-photo"><svg class="icon"><use href="${icon}"/></svg></div>`;
               return `<article class="job-card ${
                 isMine ? "owned" : ""
               }" tabindex="0" data-job-card="${
                 j.id
               }">${photo}<div><div class="job-meta"><span class="badge ${
-                j.priority === "เร่งด่วน" ? "danger" : "wait"
+                j.priority === "เร่งด่วน" ? "danger" : "normal"
               }">${j.priority}</span><span class="badge neutral">${
                 j.category
               }</span><span class="badge ${badgeClass(j.status)}">${
@@ -1045,7 +1061,7 @@ export function useStaffDashboard() {
                 j.room
               }</span><span>${
                 j.time
-              }</span><span class="assignee"><span class="assignee-dot"></span>${escapeHtml(
+              }</span><span class="assignee ${isUnassigned ? "is-unassigned" : ""}"><span class="assignee-dot"></span>${escapeHtml(
                 assignedCleanerLabel(j),
               )}</span></div></div><div class="job-actions">${actions}<button class="small-btn" type="button" data-job-action="detail" data-job-id="${
                 j.id
@@ -1074,6 +1090,11 @@ export function useStaffDashboard() {
           if (selectedJobId === id) {
             $("#jobTimeline").innerHTML = jobTimeline(job);
           }
+          closeModal("jobDetailModal", false);
+          $("#jobSearch").value = "";
+          $("#categoryFilter").value = "all";
+          $("#jobStatusFilter").value = "all";
+          navigate("my-jobs");
           showSuccess(
             `เลขงาน: ${acceptedJob.id}\nสถานะ: ${acceptedJob.status}\nผู้รับผิดชอบ: ${assignedCleanerLabel(acceptedJob)}`,
             job.type === "repair"
@@ -1140,6 +1161,7 @@ export function useStaffDashboard() {
       renderQueue();
       if (selectedJobId === id) {
         $("#jobDetailAssignee").textContent = assignedCleanerLabel(job);
+        $("#jobDetailAssignee").classList.toggle("is-unassigned", !job.assignee);
         $("#jobTimeline").innerHTML = jobTimeline(job);
         renderJobQuickActions(job);
       }
@@ -1880,16 +1902,56 @@ export function useStaffDashboard() {
               "ปิดคำขอ",
               "รับฝากรายการใหม่",
             ]
-          : ["all", "รับงาน", "อัปเดตสถานะ", "ปิดงาน", "คืนงาน"];
+          : ["all", "เสร็จสิ้น", "ยังไม่เสร็จ"];
       select.innerHTML = base
         .map(
           (x) =>
-            `<option value="${x}">${x === "all" ? "ทุกกิจกรรม" : x}</option>`,
+            `<option value="${x}">${x === "all" ? currentRole === "clerk" ? "ทุกกิจกรรม" : "ทุกงาน" : x}</option>`,
         )
         .join("");
     }
     function inDateRange(date, from, to) {
       return (!from || date >= from) && (!to || date <= to);
+    }
+    async function loadMyTaskHistory() {
+      if (!["housekeeper", "technician"].includes(currentRole)) return;
+      const staffId = JSON.parse(localStorage.getItem("buildingCareStaff") || "null")?.id;
+      if (!staffId) return;
+      const jobs = roleJobs().filter((job) => job.backendId && job.assigneeId === staffId);
+      const results = await Promise.allSettled(jobs.map(async (job) => {
+        const result = job.type === "repair"
+          ? await getRepairRequestHistory(job.backendId)
+          : await getCleaningTaskHistory(job.backendId);
+        try {
+          const detail = job.type === "repair" ? await getRepairRequestDetail(job.backendId) : await getCleaningTaskDetail(job.backendId);
+          job.historyPhotos = (detail.images || [])
+            .filter(image => image.image_type === "after")
+            .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+            .slice(0, 1);
+        } catch (error) {
+          job.historyPhotos = [];
+          console.warn("Loading history photos failed:", error);
+        }
+        const rows = taskHistoryRows(job, result.history || [], {
+          staff: activeStaffName(), role: roleConfig[currentRole].label,
+          statusLabels: job.type === "repair" ? repairStatusLabels : cleaningStatusLabels,
+        });
+        for (let index = workHistory.length - 1; index >= 0; index--) {
+          if (workHistory[index].itemId === job.id) workHistory.splice(index, 1);
+        }
+        workHistory.push(...rows);
+      }));
+      for (const result of results) {
+        if (result.status === "rejected") {
+          if (await handleUnauthorizedResponse(result.reason.status)) return;
+          console.error("Loading personal work history failed:", result.reason);
+          toast("โหลดประวัติบางงานไม่สำเร็จ กรุณาเปิดหน้าประวัติอีกครั้ง");
+          break;
+        }
+      }
+      renderMyHistory();
+      renderStaffOverview();
+      renderMetrics();
     }
     function renderMyHistory() {
       if (!$("#myHistoryList")) return;
@@ -1914,11 +1976,13 @@ export function useStaffDashboard() {
           .sort((a, b) =>
             `${b.date} ${b.time}`.localeCompare(`${a.date} ${a.time}`),
           );
-      const closed = own.filter(
-          (x) =>
-            ["ปิดงาน", "ปิดคำขอ"].includes(x.action) ||
-            isTerminalStatus(x.status),
-        ).length,
+      if (["housekeeper", "technician"].includes(currentRole)) {
+        renderGroupedMyHistory(own, {from, to, type, q}, list, summary);
+        return;
+      }
+      const closed = new Set(own.filter(
+          (x) => ["ปิดงาน", "ปิดคำขอ"].includes(x.action),
+        ).map((x) => x.itemId)).size,
         returned = own.filter((x) => x.action === "คืนงาน").length,
         decisions = own.filter((x) =>
           ["อนุมัติ", "ไม่อนุมัติ"].includes(x.action),
@@ -1961,6 +2025,51 @@ export function useStaffDashboard() {
             )
             .join("")
         : '<div class="empty">ไม่พบประวัติงานในช่วงวันที่หรือตัวกรองที่เลือก</div>';
+    }
+    function renderGroupedMyHistory(own, filters, list, summary) {
+      const groups = new Map();
+      for (const entry of own) {
+        if (!groups.has(entry.itemId)) groups.set(entry.itemId, []);
+        groups.get(entry.itemId).push(entry);
+      }
+      const jobs = [...groups].map(([id, events]) => {
+        events.sort((a,b) => `${a.date} ${a.time}`.localeCompare(`${b.date} ${b.time}`));
+        const latest = events.at(-1);
+        const job = allJobs.find(job => job.id === id);
+        const completed = events.findLast(event => event.action === "ปิดงาน");
+        const returned = events.findLast(event => event.action === "คืนงาน");
+        const note = events.findLast(event => event.action === "เพิ่มหมายเหตุ");
+        return {id, events, latest, job, completed, returned, note, status: job?.status || latest.status};
+      });
+      const counts = [
+        [jobs.length, "งานทั้งหมด", "หนึ่งรายการต่อหนึ่งงาน"],
+        [jobs.filter(job => job.status === "เสร็จสิ้น").length, "เสร็จสิ้น", "งานที่ปิดแล้ว"],
+        [jobs.filter(job => job.returned).length, "คืนเข้ากองกลาง", "งานที่เคยคืนพร้อมเหตุผล"],
+      ];
+      summary.innerHTML = counts.map(([count,label,description]) => `<article class="metric"><span>${label}</span><strong>${count}</strong><small>${description}</small></article>`).join("");
+      const dateLabel = event => event ? `${new Date(`${event.date}T00:00:00`).toLocaleDateString("th-TH")} ${event.time} น.` : "–";
+      const rows = jobs.filter(({events,status,returned,latest,job}) =>
+        events.some(event => inDateRange(event.date, filters.from, filters.to)) &&
+        (filters.type === "all" || (filters.type === "เสร็จสิ้น" && status === "เสร็จสิ้น") || (filters.type === "คืนเข้ากองกลาง" && returned) || (filters.type === "ยังไม่เสร็จ" && !isTerminalStatus(status))) &&
+        `${latest.itemId} ${latest.title} ${job?.room || ""} ${events.map(event => event.detail).join(" ")}`.toLowerCase().includes(filters.q)
+      ).sort((a,b) => `${b.latest.date} ${b.latest.time}`.localeCompare(`${a.latest.date} ${a.latest.time}`));
+      const mainRows = rows.filter(row => row.latest.action !== "คืนงาน" && filters.type !== "คืนเข้ากองกลาง");
+      const mainMarkup = mainRows.length ? mainRows.map(({id,events,latest,job,status,completed,returned,note}) => `<article class="grouped-history-card">
+        <header><div><span class="badge neutral">${escapeHtml(latest.category)}</span><h3>${escapeHtml(id)} · ${escapeHtml(latest.title)}</h3></div><span class="badge ${badgeClass(status)}">${escapeHtml(status)}</span></header>
+        <div class="detail-meta"><div><small>สถานที่</small><strong>${escapeHtml(job?.room || "–")}</strong></div><div><small>วันที่รับงาน</small><strong>${dateLabel(events.find(event => event.action === "รับงาน"))}</strong></div><div><small>วันที่เสร็จ</small><strong>${dateLabel(completed)}</strong></div></div>
+        ${note ? `<p class="history-note"><strong>หมายเหตุปิดงาน</strong><br>${escapeHtml(note.detail)}</p>` : ""}
+        ${job?.historyPhotos?.length ? `<div class="history-photos">${job.historyPhotos.map(photo => `<img src="${escapeHtml(photo.url)}" alt="รูปหลังดำเนินการ ${escapeHtml(latest.title)}" loading="lazy" />`).join("")}</div>` : ""}
+        <details><summary>ดูลำดับเหตุการณ์</summary><div class="timeline">${events.filter(event => event.action !== "คืนงาน").map(event => `<div class="timeline-item"><span class="timeline-dot"></span><div><strong>${escapeHtml(event.action)}</strong><small>${dateLabel(event)} · ${escapeHtml(event.staff)}</small><p>${escapeHtml(event.detail)}</p></div></div>`).join("")}</div></details>
+      </article>`).join("") : '<div class="empty">ไม่พบประวัติงานที่ตรงกับตัวกรอง</div>';
+      const returns = own.filter(event => event.action === "คืนงาน" &&
+        inDateRange(event.date, filters.from, filters.to) &&
+        ["all", "คืนเข้ากองกลาง"].includes(filters.type) &&
+        `${event.itemId} ${event.title} ${event.detail}`.toLowerCase().includes(filters.q)
+      ).sort((a,b) => `${b.date} ${b.time}`.localeCompare(`${a.date} ${a.time}`));
+      const returnMarkup = returns.length ? returns.map(event => `<article class="grouped-history-card"><header><div><span class="badge wait">คืนเข้ากองกลาง</span><h3>${escapeHtml(event.itemId)} · ${escapeHtml(event.title)}</h3></div></header><p>คืนเมื่อ ${dateLabel(event)} · ${escapeHtml(event.staff)}</p><p class="history-note"><strong>เหตุผลในการคืนงาน</strong><br>${escapeHtml(event.detail)}</p></article>`).join("") : '<div class="empty">ไม่มีประวัติคืนงานที่ตรงกับตัวกรอง</div>';
+      list.innerHTML = currentHistoryTab === "returns"
+        ? `<section class="history-group"><h3>ประวัติคืนเข้ากองกลาง</h3>${returnMarkup}</section>`
+        : `<section class="history-group"><h3>ประวัติการทำงาน</h3>${mainMarkup}</section>`;
     }
     function activeWorkCountForStaff(staff) {
       const jobs = allJobs.filter(
@@ -2089,11 +2198,15 @@ export function useStaffDashboard() {
       ].map(([label, value]) => `<div><span>${label}</span><strong>${value}</strong></div>`).join("");
       $("#overviewDetailCount").textContent = "กำลังโหลด…";
       $("#staffOverviewDetail").innerHTML = '<div class="empty overview-state" role="status">กำลังโหลดงานปัจจุบัน…</div>';
+      $("#staffOverviewReturned").innerHTML = '<div class="empty" role="status">กำลังโหลดประวัติคืนงาน…</div>';
       openModal("staffOverviewModal", trigger);
       try {
         const result = await fetchStaffCurrentWork(staffId);
         if (selectedOverviewStaff !== staffId || !$("#staffOverviewModal")?.classList.contains("open")) return;
         $("#overviewDetailCount").textContent = `${result.current_work_count} รายการ`;
+        $("#staffOverviewReturned").innerHTML = result.returned_work?.length
+          ? result.returned_work.map((item) => `<article class="overview-detail-item"><div><strong>${escapeHtml(item.request_code)}</strong><p>${escapeHtml(item.title)}</p><p>คืนโดย ${escapeHtml(item.returned_by)} · ${escapeHtml(new Date(item.returned_at).toLocaleString("th-TH", {timeZone: "Asia/Bangkok"}))}</p><p style="white-space:pre-wrap;overflow-wrap:anywhere">เหตุผล: ${escapeHtml(item.reason || "ไม่ได้ระบุเหตุผล")}</p></div><span class="badge neutral">ปัจจุบัน: ${escapeHtml((item.request_type === "cleaning" ? cleaningStatusLabels : repairStatusLabels)[item.status] || item.status)}</span></article>`).join("")
+          : '<div class="empty">ไม่มีประวัติคืนงานเข้ากองกลาง</div>';
         $("#staffOverviewDetail").innerHTML = result.current_work.length
           ? result.current_work.map((item) => overviewWorkItemMarkup(item)).join("")
           : '<div class="empty">ไม่มีงานที่กำลังรับผิดชอบ</div>';
@@ -2101,6 +2214,7 @@ export function useStaffDashboard() {
         if (selectedOverviewStaff !== staffId) return;
         if (await handleUnauthorizedResponse(error.status)) return;
         $("#overviewDetailCount").textContent = "ไม่สามารถโหลดได้";
+        $("#staffOverviewReturned").innerHTML = '<div class="empty" role="alert">ไม่สามารถโหลดประวัติคืนงานได้ กรุณากดลองใหม่ด้านบน</div>';
         $("#staffOverviewDetail").innerHTML = '<div class="empty overview-state" role="alert">ไม่สามารถโหลดงานปัจจุบันได้ <button type="button" class="overview-retry" data-overview-retry="staff-work">ลองใหม่</button></div>';
       }
     }
@@ -2759,6 +2873,7 @@ export function useStaffDashboard() {
                   class="secondary"
                   type="button"
                   data-view-qr-location="${escapeHtml(location.id)}"
+                  ${location.isActive ? "" : "disabled"}
                 >${location.url ? "ดูรายละเอียด" : "สร้าง QR"}</button>
                 <button
                   class="${location.isActive ? "danger" : "secondary"} qr-location-status-button"
@@ -2789,6 +2904,10 @@ export function useStaffDashboard() {
     }
     function showQrLocation(location) {
       if (!location || !$("#qrCode")) return false;
+      if (!location.isActive) {
+        toast("สถานที่นี้ปิดใช้งานอยู่ กรุณาเปิดใช้งานก่อนดูรายละเอียด QR");
+        return false;
+      }
       if (!location.url) {
         toast("สถานที่นี้ยังไม่มี QR Code");
         return false;
@@ -2882,6 +3001,7 @@ export function useStaffDashboard() {
       $("#confirmModalTitle").textContent = title;
       $("#confirmModalText").textContent = text;
       $("#confirmActionButton").textContent = label;
+      $("#confirmActionButton").classList.toggle("confirm-accept", ["ยืนยันรับงาน", "ยืนยันคืนงาน"].includes(label));
       openModal("confirmModal");
     }
     function showSuccess(message, title = "บันทึกสำเร็จ", variant = "success") {
@@ -2981,9 +3101,9 @@ export function useStaffDashboard() {
       const isMine = job.assignee === activeStaffName(),
         canEdit = isMine || currentRole === "admin",
         buttons = [];
-      if (!job.assignee && currentRole !== "admin")
+      if (!job.assignee && !isTerminalStatus(job.status) && currentRole !== "admin")
         buttons.push(["accept", "รับงาน", "primary-action"]);
-      if (!job.assignee && currentRole === "admin")
+      if (!job.assignee && !isTerminalStatus(job.status) && currentRole === "admin")
         buttons.push(["assign", "มอบหมายงาน", "primary-action"]);
       if (canEdit && !isTerminalStatus(job.status)) {
         const backendNext = job.backendId
@@ -2999,19 +3119,10 @@ export function useStaffDashboard() {
               "primary-action",
             ]);
           }
-          if (job.type === "repair" && job.backendStatus === "in_progress")
-            buttons.push(["complete", "เสร็จสิ้น", ""]);
-          if (job.type === "cleaning")
-            buttons.push(
-              ["note", "เพิ่มหมายเหตุ", ""],
-              ["upload", "เพิ่มรูป", ""],
-            );
         } else {
           buttons.push(
             ["start", "เริ่มดำเนินการ", "primary-action"],
             ["status", "อัปเดตสถานะ", ""],
-            ["note", "เพิ่มหมายเหตุ", ""],
-            ["upload", "เพิ่มรูป", ""],
             ["complete", "เสร็จสิ้น", ""],
           );
         }
@@ -3083,6 +3194,7 @@ export function useStaffDashboard() {
         job.reporterContact || "ติดต่อผ่านระบบ CS Building Care";
       $("#jobDetailAssignee").textContent =
         assignedCleanerLabel(job);
+      $("#jobDetailAssignee").classList.toggle("is-unassigned", !job.assignee);
       [
         ["#jobDetailRoomLabel", "สถานที่"],
         ["#jobDetailReporterLabel", "ผู้แจ้ง"],
@@ -3095,7 +3207,7 @@ export function useStaffDashboard() {
       const returnStatusGroup = $("#jobDetailReturnStatusGroup");
       if (returnStatusGroup) returnStatusGroup.hidden = true;
       $("#jobDetailBadges").innerHTML = `<span class="badge ${
-        job.priority === "เร่งด่วน" ? "danger" : "wait"
+        job.priority === "เร่งด่วน" ? "danger" : "normal"
       }">${job.priority}</span><span class="badge ${badgeClass(job.status)}">${
         job.status
       }</span><span class="badge neutral">${job.time}</span>`;
@@ -3105,17 +3217,23 @@ export function useStaffDashboard() {
       );
       const detailImage = $("#jobDetailImage");
       const detailIcon = $("#jobDetailIcon");
+      if (detailImage) {
+        detailImage.onerror = () => {
+          detailImage.hidden = true;
+          if (detailIcon) detailIcon.removeAttribute("hidden");
+        };
+      }
       if (detailImage && (job.completionPhotoUrl || job.requestImageUrl)) {
         detailImage.src = job.completionPhotoUrl || job.requestImageUrl;
-        detailImage.alt = `รูปหลังดำเนินการ ${job.title}`;
+        detailImage.alt = `${job.completionPhotoUrl ? "รูปหลังดำเนินการ" : "รูปประกอบคำร้อง"} ${job.title}`;
         detailImage.hidden = false;
-        if (detailIcon) detailIcon.hidden = true;
+        if (detailIcon) detailIcon.setAttribute("hidden", "");
       } else {
         if (detailImage) {
           detailImage.hidden = true;
           detailImage.removeAttribute("src");
         }
-        if (detailIcon) detailIcon.hidden = false;
+        if (detailIcon) detailIcon.removeAttribute("hidden");
       }
       $("#jobTimeline").innerHTML = jobTimeline(job);
       $("#jobDetailNotes").textContent = job.note || "ยังไม่มีหมายเหตุ";
@@ -3203,9 +3321,28 @@ export function useStaffDashboard() {
       openJobDetail(job.id, trigger);
       return true;
     }
+    function updateStatusFields() {
+      const needsReason = ["พักงาน", "รอข้อมูลเพิ่มเติม", "ขอข้อมูลเพิ่มเติม", "ยกเลิก"].includes($("#newJobStatus")?.value);
+      const note = $("#statusNote");
+      if (note) {
+        note.closest(".field").hidden = !needsReason;
+        note.required = needsReason;
+        if (!needsReason) note.value = "";
+      }
+      const image = $("#statusImage");
+      if (image) {
+        image.closest(".field").hidden = true;
+        image.value = "";
+      }
+    }
+    $("#newJobStatus")?.addEventListener("change", updateStatusFields);
     function openStatusUpdate(id, trigger = document.activeElement) {
       const job = allJobs.find((item) => item.id === id);
       if (!job) return;
+      if (isTerminalStatus(job.status)) {
+        toast("งานนี้สิ้นสุดแล้ว ดูรายละเอียดได้อย่างเดียว");
+        return;
+      }
       const backendNext = job.backendId
         ? job.type === "repair"
           ? nextRepairStatus(job)
@@ -3249,6 +3386,7 @@ export function useStaffDashboard() {
         .join("");
       const statusNote = $("#statusNote");
       if (statusNote) statusNote.value = "";
+      updateStatusFields();
       $("#statusImage").value = "";
       $("#statusTime").value = nowThai();
       $("#statusUpdateTitle").textContent = `อัปเดตสถานะ · ${id}`;
@@ -3463,6 +3601,7 @@ export function useStaffDashboard() {
       $("#jobDetailContact").textContent = reporterEmail || "อีเมลของผู้แจ้ง";
       const assigneeLabel = $("#jobDetailAssigneeLabel");
       if (assigneeLabel) assigneeLabel.textContent = "ผู้ตรวจสอบ";
+      $("#jobDetailAssignee").classList.remove("is-unassigned");
       const reviewerName = item.reviewerName ||
         staffData.find((staff) => staff.id === item.reviewerId)?.name ||
         item.decidedBy || item.assignee;
@@ -3483,10 +3622,10 @@ export function useStaffDashboard() {
         detailImage.src = item.imageUrl;
         detailImage.alt = `รูป ${item.title}`;
         detailImage.hidden = false;
-        if (detailIcon) detailIcon.hidden = true;
+        if (detailIcon) detailIcon.setAttribute("hidden", "");
         detailImage.onerror = () => {
           detailImage.hidden = true;
-          if (detailIcon) detailIcon.hidden = false;
+          if (detailIcon) detailIcon.removeAttribute("hidden");
         };
       } else {
         if (detailImage) {
@@ -3494,7 +3633,7 @@ export function useStaffDashboard() {
           detailImage.removeAttribute("src");
           detailImage.onerror = null;
         }
-        if (detailIcon) detailIcon.hidden = false;
+        if (detailIcon) detailIcon.removeAttribute("hidden");
       }
       detailIcon
         ?.querySelector("use")
@@ -3942,7 +4081,7 @@ export function useStaffDashboard() {
       $$("#boardTabs .board-tab").forEach((tab) =>
         tab.classList.toggle("active", tab.dataset.view === currentBoardView),
       );
-      navigate("jobs");
+      navigate(index === 0 ? "jobs" : "my-jobs");
       renderJobs();
       const candidate = roleJobs().find((job) =>
         index === 0 ? !job.assignee : job.assignee === activeStaffName(),
@@ -4002,7 +4141,7 @@ export function useStaffDashboard() {
         renderJobs();
       } else if (action === "mine") {
         currentBoardView = "mine";
-        navigate("jobs");
+        navigate("my-jobs");
         renderJobs();
       } else if (action === "scan") toast("เปิดกล้องสแกน QR ห้องแล้ว");
       else if (action === "schedule") {
@@ -4024,6 +4163,19 @@ export function useStaffDashboard() {
         navigate("qr");
         openModal("qrFormModal", button);
       }
+    });
+    $("#myHistoryTabs")?.addEventListener("click", event => {
+      const button = event.target.closest("[data-history-tab]");
+      if (!button) return;
+      currentHistoryTab = button.dataset.historyTab;
+      $$("#myHistoryTabs [data-history-tab]").forEach(tab => {
+        const active = tab === button;
+        tab.classList.toggle("active", active);
+        tab.setAttribute("aria-selected", String(active));
+      });
+      const type = $("#myHistoryType");
+      if (type) { type.value = "all"; type.hidden = currentHistoryTab === "returns"; }
+      renderMyHistory();
     });
     $("#myHistoryFrom")?.addEventListener("change", renderMyHistory);
     $("#myHistoryTo")?.addEventListener("change", renderMyHistory);
@@ -4388,7 +4540,7 @@ export function useStaffDashboard() {
         return;
       }
       completionNoteInput.setCustomValidity("");
-      const summary = `${$("#completeResult").value.trim()} · ${completionNote}`;
+      const summary = [$("#completeResult").value.trim(), completionNote].filter(Boolean).join(" · ");
       if (!(job.backendId && job.backendStatus === "completed")) {
         const updated = await applyJobStatus(job, "เสร็จสิ้น", summary);
         if (!updated) return;
@@ -4398,7 +4550,7 @@ export function useStaffDashboard() {
       if (job.backendId) {
         try {
           // บันทึกผลทันทีเพื่อไม่สร้างหมายเหตุซ้ำ หากรูปอัปโหลดไม่สำเร็จ
-          if (!job.completionNoteId) {
+          if (completionNote && !job.completionNoteId) {
             const noteResult =
               job.type === "repair"
                 ? await addRepairCompletionNote(job.backendId, completionNote)
@@ -4409,7 +4561,7 @@ export function useStaffDashboard() {
             job.completionNoteId = noteResult.id;
             job.note = noteResult.note;
           }
-          if (job.type === "cleaning" || file) {
+          if (file) {
             const photoResult =
               job.type === "repair"
                 ? await uploadRepairCompletionPhotos(job.backendId, [file])
@@ -4479,6 +4631,55 @@ export function useStaffDashboard() {
       $("#staffAccountSearch").value = "";
       renderStaff();
     });
+    let selectedAccountDetailId = null;
+    async function showStaffAccountDetail(index, trigger) {
+      const staff = staffData[index];
+      if (!staff) return;
+      selectedAccountDetailId = staff.id;
+      $("#staffAccountDetailTitle").textContent = `รายละเอียดบัญชี · ${staff.name}`;
+      const invitation = {sent: "ส่งสำเร็จ", failed: "ส่งไม่สำเร็จ", pending: "รอส่ง"}[staff.invitationDeliveryStatus] || "ไม่มีข้อมูล";
+      $("#staffAccountDetailInfo").innerHTML = [
+        ["ชื่อ", staff.name], ["อีเมล", staff.email], ["บทบาท", staff.role],
+        ["สถานะบัญชี", staff.status], ["สถานะคำเชิญ", invitation],
+      ].map(([label, value]) => `<div><small>${label}</small><strong>${escapeHtml(value || "–")}</strong></div>`).join("");
+      const work = $("#staffAccountDetailWork");
+      const isWorker = ["แม่บ้าน", "ช่าง"].includes(staff.role);
+      work.innerHTML = isWorker && staff.status === "ใช้งาน" ? '<p role="status">กำลังโหลดสถิติงาน…</p>' : "";
+      openModal("staffAccountDetailModal", trigger);
+      if (!isWorker || staff.status !== "ใช้งาน") return;
+      try {
+        const data = await fetchStaffWorkOverview();
+        if (selectedAccountDetailId !== staff.id || !$("#staffAccountDetailModal").classList.contains("open")) return;
+        const person = data.staff.find(person => person.id === staff.id);
+        if (!person) { work.innerHTML = '<p>ไม่มีข้อมูลสถิติงานของบัญชีนี้</p>'; return; }
+        work.innerHTML = `<h4 class="overview-work-heading" style="margin-top:24px;margin-bottom:14px">ข้อมูลการทำงาน</h4><div class="staff-overview-card-stats overview-person-stats">${[
+          ["กำลังรับผิดชอบ", person.counts.current_assigned], ["ปิดแล้ว", person.counts.closed], ["คืนเข้ากองกลาง", person.counts.returned],
+        ].map(([label, count]) => `<div><span>${label}</span><strong>${count}</strong></div>`).join("")}</div><button type="button" class="small-btn" data-account-work-history="${staff.id}">ดูประวัติงาน</button>`;
+      } catch (error) {
+        if (selectedAccountDetailId !== staff.id) return;
+        if (await handleUnauthorizedResponse(error.status)) return;
+        work.innerHTML = '<p role="alert">โหลดสถิติงานไม่สำเร็จ <button type="button" class="small-btn" data-account-detail-retry>ลองใหม่</button></p>';
+      }
+    }
+    $("#staffAccountDetailWork")?.addEventListener("click", async (event) => {
+      const retry = event.target.closest("[data-account-detail-retry]");
+      if (retry) { showStaffAccountDetail(staffData.findIndex(staff => staff.id === selectedAccountDetailId), retry); return; }
+      const button = event.target.closest("[data-account-work-history]");
+      if (!button) return;
+      button.disabled = true;
+      try {
+        overviewData = await fetchStaffWorkOverview();
+      } catch (error) {
+        if (!(await handleUnauthorizedResponse(error.status))) toast("โหลดประวัติงานไม่สำเร็จ กรุณาลองใหม่");
+        button.disabled = false;
+        return;
+      }
+      button.disabled = false;
+      if (!$("#staffAccountDetailModal").classList.contains("open") || selectedAccountDetailId !== button.dataset.accountWorkHistory) return;
+      if (!overviewData?.staff.some(person => person.id === button.dataset.accountWorkHistory)) return;
+      closeModal("staffAccountDetailModal", false);
+      showStaffOverview(button.dataset.accountWorkHistory, $("#staffTable")?.querySelector(`[data-staff-action="detail"][data-staff-index="${staffData.findIndex(staff => staff.id === button.dataset.accountWorkHistory)}"]`));
+    });
     $("#staffTable")?.addEventListener("click", (event) => {
       const button = event.target.closest("[data-staff-action]");
       if (!button) return;
@@ -4489,11 +4690,7 @@ export function useStaffDashboard() {
       if (button.dataset.staffAction === "resend-invitation")
         resendInvitation(index, button);
       if (button.dataset.staffAction === "detail") {
-        const staffId = staffData[index]?.id;
-        $("#overviewRoleFilter").value = "all";
-        $("#overviewSearch").value = "";
-        navigate("staff-overview");
-        if (staffId) loadStaffWorkOverview().then(() => showStaffOverview(staffId, button));
+        showStaffAccountDetail(index, button);
       }
     });
     $("#lostTabs")?.addEventListener("click", (event) => {
@@ -5337,6 +5534,10 @@ export function useStaffDashboard() {
       let location = qrLocations.find(
         (item) => item.id === button.dataset.viewQrLocation,
       );
+      if (!location?.isActive) {
+        toast("สถานที่นี้ปิดใช้งานอยู่ กรุณาเปิดใช้งานก่อนดูรายละเอียด QR");
+        return;
+      }
       if (location && !location.url) {
         button.disabled = true;
         try {
@@ -5374,6 +5575,7 @@ export function useStaffDashboard() {
       await loadPendingOwnershipRequests();
       await loadRepairRequests();
       await loadCleaningTasks();
+      await loadMyTaskHistory();
       await loadStaffNotifications();
       setRole(allowedRoles.includes(currentRole) ? currentRole : "admin");
     }

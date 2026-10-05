@@ -37,7 +37,16 @@ const { sidebarOpen, closeSidebar, toggleSidebar } = usePublicServicePortal();
         <path d="m5 4 4 4" />
       </symbol>
       <symbol id="i-broom" viewBox="0 0 24 24">
-        <path d="m14 11 6-8M12 10l4 3-5 8H4l5-11zM7 16h6M6 19h5" />
+        <path d="M11 2v2" />
+        <path d="M12 3h-2" />
+        <path d="M13.5 10.5 22 2" />
+        <path d="M14.734 13.841a2 2 0 00-.314-2.42L12.58 9.58a2 2 0 00-2.421-.314l-7.657 4.461A1 1 0 002.3 15.3l6.403 6.403a1 1 0 001.571-.204z" />
+        <path d="M20 15v4" />
+        <path d="M22 17h-4" />
+        <path d="M4 4v4" />
+        <path d="m5 18 2-2" />
+        <path d="M6 6H2" />
+        <path d="m7.699 10.7 5.602 5.601" />
       </symbol>
       <symbol id="i-box" viewBox="0 0 24 24">
         <path d="m3 7 9-4 9 4-9 4-9-4Z" />

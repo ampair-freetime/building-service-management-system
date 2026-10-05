@@ -122,7 +122,7 @@ def test_create_list_qr_and_tracking(test_context):
                     await resolve_location_by_qr(session, qr_token=token)
             response = await create_guest_cleaning_request(
                 session,
-                payload=payload(),
+                payload=payload(cleaning_category="ขยะ/กลิ่น"),
                 image_uploads=[],
                 storage=None,
             )
@@ -132,6 +132,7 @@ def test_create_list_qr_and_tracking(test_context):
             request = await session.scalar(select(ServiceRequest))
             assert request.location_id == 1
             assert request.description == "ข้างลิฟต์ตัวซ้าย"
+            assert request.cleaning_category == "ขยะ/กลิ่น"
             assert request.reporter_email == "guest@example.com"
             assert await session.scalar(select(func.count()).select_from(RequestHistory)) == 1
             tracked = await get_guest_request_status(
@@ -333,3 +334,9 @@ def test_database_enforces_location_and_type(test_context, location_id, request_
             await session.rollback()
 
     asyncio.run(run())
+
+
+def test_cleaning_category_defaults_and_rejects_unknown():
+    assert payload().cleaning_category == "ทำความสะอาดทั่วไป"
+    with pytest.raises(ValidationError):
+        payload(cleaning_category="urgent")

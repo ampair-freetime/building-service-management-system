@@ -94,6 +94,7 @@ def test_admin_can_view_filtered_statistics_and_current_work(
                     RequestHistory(
                         request_id=returned.id,
                         action=RequestAction.RETURNED,
+                        note="ติดภารกิจด่วน — ต้องไปอีกอาคาร",
                         performed_by=technician.id,
                         target_staff_id=technician.id,
                         old_status=RequestStatus.ASSIGNED,
@@ -134,6 +135,12 @@ def test_admin_can_view_filtered_statistics_and_current_work(
     assert current_work.status_code == 200
     assert current_work.json()["current_work_count"] == 1
     assert current_work.json()["current_work"][0]["request_code"] == "OVERVIEW-OPEN"
+    [returned] = current_work.json()["returned_work"]
+    assert returned["request_code"] == "OVERVIEW-RETURNED"
+    assert returned["reason"] == "ติดภารกิจด่วน — ต้องไปอีกอาคาร"
+    assert returned["returned_by"] == technician.full_name
+    assert returned["returned_at"]
+    assert returned["status"] == "waiting"
 
     empty = client.get(
         f"/api/v1/staff-work-overview/{cleaner.id}/current-work", headers=headers
@@ -141,13 +148,15 @@ def test_admin_can_view_filtered_statistics_and_current_work(
     assert empty.status_code == 200
     assert empty.json()["current_work_count"] == 0
     assert empty.json()["current_work"] == []
+    assert empty.json()["returned_work"] == []
 
 
 def test_only_admin_can_view_staff_work_overview(
     test_context: tuple[TestClient, async_sessionmaker[AsyncSession]],
 ) -> None:
     client, factory = test_context
-    seed_staff(factory, email="tech@example.com", password="tech-password", role="technician")
+    technician = seed_staff(factory, email="tech@example.com", password="tech-password", role="technician")
     headers = _login_headers(client, "tech@example.com", "tech-password")
 
     assert client.get("/api/v1/staff-work-overview", headers=headers).status_code == 403
+    assert client.get(f"/api/v1/staff-work-overview/{technician.id}/current-work", headers=headers).status_code == 403

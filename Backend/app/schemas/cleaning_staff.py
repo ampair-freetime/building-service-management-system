@@ -87,6 +87,7 @@ class CleaningTaskListItem(BaseModel):
     request_code: str
     title: str
     description: str
+    cleaning_category: str | None = None
     priority: PriorityLevel
     status: RequestStatus
     location: CleaningTaskLocationResponse
@@ -115,6 +116,7 @@ class CleaningTaskDetailResponse(BaseModel):
     request_code: str
     title: str
     description: str
+    cleaning_category: str | None = None
     priority: PriorityLevel
     status: RequestStatus
     reporter_email: str

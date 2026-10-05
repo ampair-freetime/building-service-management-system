@@ -144,6 +144,19 @@ def test_another_staff_can_accept_after_return(setup) -> None:
     assert task.assigned_staff_id == s["second"].id
 
 
+def test_same_staff_can_accept_again_after_return(setup) -> None:
+    s = setup
+    assert _accept(s, s["first_headers"]).status_code == 200
+    assert _return(s, s["first_headers"]).status_code == 200
+    response = _accept(s, s["first_headers"])
+    assert response.status_code == 200
+    task, history = _load(s["factory"], s["task_id"])
+    assert task.assigned_staff_id == s["first"].id
+    assert task.status == RequestStatus.ASSIGNED
+    assert sum(entry.action == RequestAction.RETURNED for entry in history) == 1
+    assert sum(entry.action == RequestAction.ACCEPTED for entry in history) == 2
+
+
 def test_only_the_assigned_staff_can_return(setup) -> None:
     s = setup
     assert _accept(s, s["first_headers"]).status_code == 200

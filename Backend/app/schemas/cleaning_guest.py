@@ -12,6 +12,7 @@ class GuestCleaningCreate(BaseModel):
 
     title: str = Field(min_length=1, max_length=200)
     description: str = Field(default="", max_length=255)
+    cleaning_category: Literal["พื้นเปียก/คราบสกปรก", "ขยะ/กลิ่น", "ห้องน้ำ/อุปกรณ์สิ้นเปลือง", "ทำความสะอาดทั่วไป", "อื่น ๆ"] = "ทำความสะอาดทั่วไป"
     priority: PriorityLevel = PriorityLevel.NORMAL
     reporter_email: EmailStr
     location_id: int = Field(gt=0)

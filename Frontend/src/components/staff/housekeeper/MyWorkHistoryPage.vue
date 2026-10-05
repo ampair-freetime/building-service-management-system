@@ -11,19 +11,23 @@
             </div>
           </div>
           <div class="history-summary" id="myHistorySummary"></div>
+          <div class="tabs" id="myHistoryTabs" role="tablist" aria-label="ประเภทประวัติ">
+            <button type="button" class="tab active" role="tab" aria-selected="true" data-history-tab="work">ประวัติงาน</button>
+            <button type="button" class="tab" role="tab" aria-selected="false" data-history-tab="returns">คืนเข้ากองกลาง</button>
+          </div>
           <div class="history-filter-panel">
-            <input
+            <label>ตั้งแต่วันที่<input
               class="field-compact"
               id="myHistoryFrom"
               type="date"
               aria-label="วันที่เริ่มต้น"
-            />
-            <input
+            /></label>
+            <label>ถึงวันที่<input
               class="field-compact"
               id="myHistoryTo"
               type="date"
               aria-label="วันที่สิ้นสุด"
-            />
+            /></label>
             <select
               class="field-compact"
               id="myHistoryType"

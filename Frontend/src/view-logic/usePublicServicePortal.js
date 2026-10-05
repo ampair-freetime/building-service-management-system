@@ -558,6 +558,7 @@ export function usePublicServicePortal() {
       return new Intl.DateTimeFormat("th-TH", {
         dateStyle: "medium",
         timeStyle: "short",
+        timeZone: "Asia/Bangkok",
       }).format(date);
     }
 
@@ -1298,7 +1299,9 @@ export function usePublicServicePortal() {
           requestTitleForTracking(item);
 
         document.getElementById(ids.updatedAt).textContent =
-          item.updatedAt || formatItemDate(item.updated_at);
+          item.updated_at
+            ? formatItemDate(item.updated_at)
+            : item.updatedAt || "–";
       }
 
       renderTrackingProgress(item, code, ids);
