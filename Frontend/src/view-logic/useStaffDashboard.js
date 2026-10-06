@@ -4119,6 +4119,23 @@ export function useStaffDashboard() {
             item.custody = `ส่งคืนโดย ${activeStaffName()} · ${nowThai()}`;
             await loadApprovedLostFoundItems();
           }
+          if (action === "verify" && result.status === "approved") {
+            // backend ปฏิเสธคำขออื่นของของชิ้นเดียวกันให้แล้ว ทำตามในหน้าจอโดยไม่ต้องโหลดใหม่
+            // (โหลดใหม่ไม่ได้ เพราะ API คืนเฉพาะคำขอ pending คำขอที่เพิ่งอนุมัติจะหายไป)
+            lostSets.claims
+              .filter(
+                (claim) =>
+                  claim !== item &&
+                  claim.foundItemBackendId === item.foundItemBackendId &&
+                  ["pending", "additional_info_required"].includes(claim.backendStatus),
+              )
+              .forEach((claim) => {
+                claim.backendStatus = "rejected";
+                claim.status = "ไม่ผ่านการตรวจสอบ";
+              });
+            // ของถูกเอาออกจากหน้า guest แล้ว จึงไม่อยู่ในรายการรับฝากที่ดึงจาก public API อีก
+            await loadApprovedLostFoundItems();
+          }
           item.assignee = activeStaffName();
           addAudit("lost", title, id, item.title, `เปลี่ยนสถานะเป็น ${status}`);
           recordWorkHistory({

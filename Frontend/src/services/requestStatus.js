@@ -29,7 +29,7 @@ const serviceStatus = {
 const lostFoundStatus = {
   pending: { label: "รอเจ้าหน้าที่ตรวจสอบ", className: "wait" },
   approved: { label: "เผยแพร่แล้ว", className: "done" },
-  claimed: { label: "คืนเจ้าของแล้ว", className: "done" },
+  claimed: { label: "ยืนยันเจ้าของแล้ว · รอคืนของ", className: "progress" },
   closed: { label: "ปิดประกาศแล้ว", className: "done" },
   rejected: { label: "ไม่อนุมัติ", className: "not-found" },
 };
@@ -134,7 +134,7 @@ export function requestProgress(item = {}, code = "") {
   const currentIndex = {
     pending: 0,
     approved: 1,
-    claimed: 2,
+    claimed: 1,
     closed: 2,
     rejected: 2,
   }[status];

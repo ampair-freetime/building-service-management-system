@@ -31,6 +31,13 @@ class ActiveClaimExistsError(Exception):
     """ปิดรายการพบของไม่ได้เพราะยังมีคำขอรับของคืนที่ยังไม่จบ"""
 
 
+class ItemAlreadyClaimedError(Exception):
+    """ยืนยันเจ้าของไม่ได้เพราะรายการนี้ยืนยันเจ้าของคนอื่นไปแล้วหรือไม่ได้เผยแพร่อยู่"""
+
+
+AUTO_REJECT_NOTE = "รายการนี้ยืนยันเจ้าของแล้ว"
+
+
 async def load_staff_image_urls(
     session: AsyncSession,
     item_ids: list[UUID],
@@ -340,24 +347,66 @@ async def approve_ownership_request(
     claim_id: UUID,
     staff_id: UUID,
 ) -> LostClaim | None:
-    """อนุมัติคำขอรับของคืนและบันทึกเจ้าหน้าที่ผู้ตรวจสอบ"""
+    """อนุมัติคำขอรับของคืน แล้วเอาของออกจากหน้า guest ใน commit เดียวกัน
 
-    statement = (
+    ล็อก item ก่อน claim เสมอ ถ้า clerk สองคนอนุมัติคำขอคนละคนของ item เดียวกันพร้อมกัน
+    คนที่สองจะรอ lock ของ item แล้วเจอสถานะ CLAIMED จึงไม่เกิด deadlock และไม่ได้เจ้าของสองคน
+    """
+
+    found_item_id = await session.scalar(
+        select(LostClaim.found_item_id).where(
+            LostClaim.id == claim_id,
+            LostClaim.status.in_([ClaimStatus.PENDING, ClaimStatus.ADDITIONAL_INFO_REQUIRED]),
+        )
+    )
+    if found_item_id is None:
+        return None
+
+    item = await session.scalar(
+        select(LostItem).where(LostItem.id == found_item_id).with_for_update()
+    )
+    claim = await session.scalar(
         select(LostClaim)
         .where(
             LostClaim.id == claim_id,
             LostClaim.status.in_([ClaimStatus.PENDING, ClaimStatus.ADDITIONAL_INFO_REQUIRED]),
         )
+        .with_for_update()
     )
-
-    claim = await session.scalar(statement)
-
     if claim is None:
         return None
+    if item is None or item.status != LostStatus.APPROVED:
+        raise ItemAlreadyClaimedError("รายการนี้ยืนยันเจ้าของไปแล้วหรือไม่ได้เผยแพร่อยู่")
 
     claim.status = ClaimStatus.APPROVED
     claim.return_status = ReturnStatus.PENDING
     claim.reviewed_by = staff_id
+
+    item.status = LostStatus.CLAIMED
+    session.add(
+        LostItemHistory(
+            lost_item_id=item.id,
+            staff_id=staff_id,
+            old_status=LostStatus.APPROVED,
+            new_status=LostStatus.CLAIMED,
+            note="ยืนยันเจ้าของแล้ว",
+        )
+    )
+
+    # คำขอของคนอื่นที่ยังค้างจะไม่มีวันผ่านแล้ว ปิดให้เลยเพื่อไม่ให้ผู้ยื่นเห็นว่ารอตรวจสอบตลอดไป
+    other_claims = await session.scalars(
+        select(LostClaim).where(
+            LostClaim.found_item_id == item.id,
+            LostClaim.id != claim.id,
+            LostClaim.status.in_(
+                [ClaimStatus.PENDING, ClaimStatus.ADDITIONAL_INFO_REQUIRED]
+            ),
+        )
+    )
+    for other_claim in other_claims:
+        other_claim.status = ClaimStatus.REJECTED
+        other_claim.reviewed_by = staff_id
+        other_claim.review_note = AUTO_REJECT_NOTE
 
     await session.commit()
     await session.refresh(claim)
@@ -439,14 +488,15 @@ async def update_ownership_return_status(
         claim.status = ClaimStatus.COMPLETED
         # คืนของให้เจ้าของแล้ว จึงต้องเอาประกาศออกจากหน้า guest ใน commit เดียวกับ claim
         item = await session.get(LostItem, claim.found_item_id)
-        if item is not None and item.status == LostStatus.APPROVED:
-            item.status = LostStatus.CLAIMED
+        if item is not None and item.status in (LostStatus.APPROVED, LostStatus.CLAIMED):
+            previous_item_status = item.status
+            item.status = LostStatus.CLOSED
             session.add(
                 LostItemHistory(
                     lost_item_id=item.id,
                     staff_id=staff_id,
-                    old_status=LostStatus.APPROVED,
-                    new_status=LostStatus.CLAIMED,
+                    old_status=previous_item_status,
+                    new_status=LostStatus.CLOSED,
                     note="คืนของให้ผู้ยื่นคำขอแล้ว",
                 )
             )

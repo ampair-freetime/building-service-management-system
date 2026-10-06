@@ -1075,6 +1075,8 @@ def test_clerk_can_approve_ownership_request(test_context):
 
     assert claim.status == ClaimStatus.APPROVED
     assert claim.reviewed_by is not None
+    # ยืนยันเจ้าของแล้วต้องเอาประกาศออกจากหน้า guest ทันที ไม่ต้องรอวันคืนของ
+    assert _item_status(session_factory, claim.found_item_id) == LostStatus.CLAIMED
 
 
 def test_clerk_can_request_additional_ownership_information(test_context):
@@ -1330,7 +1332,7 @@ def test_clerk_can_update_return_status_to_returned(test_context):
             return (await session.get(LostItem, claim.found_item_id)).status
 
     # คืนของแล้วต้องเอาประกาศออกจากหน้า guest ด้วย
-    assert asyncio.run(get_item_status()) == LostStatus.CLAIMED
+    assert asyncio.run(get_item_status()) == LostStatus.CLOSED
 
 
 def test_invalid_return_status_returns_422(test_context):
@@ -2053,7 +2055,7 @@ def _seed_item(session_factory, *, report_type, status, claim_status=None):
     async def seed():
         async with session_factory() as session:
             item = LostItem(
-                item_code=f"{report_type.value.upper()}-{uuid4().hex[:8]}",
+                item_code=f"{report_type.value.upper()}-{uuid4().hex[:8].upper()}",
                 report_type=report_type,
                 item_category="Accessories",
                 item_name="Wallet",
@@ -2312,3 +2314,118 @@ def test_reject_ownership_requires_reason_and_preserves_found_item(test_context,
         async with session_factory() as session:
             assert (await session.get(LostItem, item_id)).status == LostStatus.APPROVED
     asyncio.run(check_item())
+
+
+def _seed_claim(session_factory, item_id, *, email, status=ClaimStatus.PENDING):
+    async def seed():
+        async with session_factory() as session:
+            claim = LostClaim(
+                found_item_id=item_id,
+                claimant_name="Claimant",
+                claimant_email=email,
+                proof_detail="มีสติกเกอร์สีแดงด้านหลังเครื่อง",
+                status=status,
+            )
+            session.add(claim)
+            await session.commit()
+            return claim.id
+
+    return asyncio.run(seed())
+
+
+def _claim(session_factory, claim_id):
+    async def read():
+        async with session_factory() as session:
+            return await session.get(LostClaim, claim_id)
+
+    return asyncio.run(read())
+
+
+def _item_code(session_factory, item_id):
+    async def read():
+        async with session_factory() as session:
+            return (await session.get(LostItem, item_id)).item_code
+
+    return asyncio.run(read())
+
+
+def test_approving_ownership_hides_found_item_from_guest_list(test_context, public_list_storage):
+    client, session_factory = test_context
+    headers = _clerk_headers(client, session_factory)
+    item_id = _seed_item(session_factory, report_type=LostType.FOUND, status=LostStatus.APPROVED)
+    claim_id = _seed_claim(session_factory, item_id, email="owner@example.com")
+
+    response = client.post(f"/api/v1/lost-found/ownership-requests/{claim_id}/approve", headers=headers)
+
+    assert response.status_code == 200
+    assert _item_status(session_factory, item_id) == LostStatus.CLAIMED
+    public_items = client.get("/api/v1/guest/found-items").json()["items"]
+    assert all(item["id"] != str(item_id) for item in public_items)
+
+
+def test_approving_ownership_rejects_other_open_claims(test_context):
+    client, session_factory = test_context
+    headers = _clerk_headers(client, session_factory)
+    item_id = _seed_item(session_factory, report_type=LostType.FOUND, status=LostStatus.APPROVED)
+    owner_claim_id = _seed_claim(session_factory, item_id, email="owner@example.com")
+    pending_id = _seed_claim(session_factory, item_id, email="other@example.com")
+    info_id = _seed_claim(
+        session_factory,
+        item_id,
+        email="info@example.com",
+        status=ClaimStatus.ADDITIONAL_INFO_REQUIRED,
+    )
+    other_item_id = _seed_item(session_factory, report_type=LostType.FOUND, status=LostStatus.APPROVED)
+    unrelated_id = _seed_claim(session_factory, other_item_id, email="other@example.com")
+
+    response = client.post(
+        f"/api/v1/lost-found/ownership-requests/{owner_claim_id}/approve", headers=headers
+    )
+
+    assert response.status_code == 200
+    for claim_id in (pending_id, info_id):
+        claim = _claim(session_factory, claim_id)
+        assert claim.status == ClaimStatus.REJECTED
+        assert claim.review_note == "รายการนี้ยืนยันเจ้าของแล้ว"
+    assert _claim(session_factory, unrelated_id).status == ClaimStatus.PENDING
+
+
+def test_second_ownership_approval_for_same_item_returns_409(test_context):
+    client, session_factory = test_context
+    headers = _clerk_headers(client, session_factory)
+    item_id = _seed_item(session_factory, report_type=LostType.FOUND, status=LostStatus.CLAIMED)
+    # จำลองคำขอที่ยังค้างจากข้อมูลเก่า ก่อนมีการ reject อัตโนมัติ
+    claim_id = _seed_claim(session_factory, item_id, email="late@example.com")
+
+    response = client.post(f"/api/v1/lost-found/ownership-requests/{claim_id}/approve", headers=headers)
+
+    assert response.status_code == 409
+    assert _claim(session_factory, claim_id).status == ClaimStatus.PENDING
+
+
+def test_guest_cannot_claim_but_owner_can_still_track_after_approval(test_context):
+    client, session_factory = test_context
+    headers = _clerk_headers(client, session_factory)
+    item_id = _seed_item(session_factory, report_type=LostType.FOUND, status=LostStatus.APPROVED)
+    claim_id = _seed_claim(session_factory, item_id, email="owner@example.com")
+    item_code = _item_code(session_factory, item_id)
+
+    approve = client.post(f"/api/v1/lost-found/ownership-requests/{claim_id}/approve", headers=headers)
+    new_claim = client.post(
+        f"/api/v1/guest/found-items/{item_code}/claims",
+        json={
+            "claimant_name": "คนอื่น",
+            "claimant_email": "someone@example.com",
+            "proof_detail": "พวงกุญแจมีหมายเลข 1042 สลักด้านหลัง",
+        },
+    )
+    tracking = client.get(
+        f"/api/v1/guest/found-items/{item_code}/claims/{claim_id}",
+        params={"claimant_email": "owner@example.com"},
+    )
+
+    assert approve.status_code == 200
+    assert new_claim.status_code == 409
+    assert tracking.status_code == 200
+    assert tracking.json()["status"] == "approved"
+    assert tracking.json()["custody_location"] == "Clerk Office"

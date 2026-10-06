@@ -23,6 +23,7 @@ from app.services.lost_found_clerk import (
     list_personal_lost_found_history,
     reject_ownership_request,
     ActiveClaimExistsError,
+    ItemAlreadyClaimedError,
     approve_found_item,
     approve_lost_item,
     close_lost_found_item,
@@ -354,11 +355,14 @@ async def approve_ownership_request_endpoint(
 ) -> OwnershipRequestListResponse:
     """อนุมัติคำขอรับของคืน"""
 
-    claim = await approve_ownership_request(
-        session,
-        claim_id,
-        current_staff.id,
-    )
+    try:
+        claim = await approve_ownership_request(
+            session,
+            claim_id,
+            current_staff.id,
+        )
+    except ItemAlreadyClaimedError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
 
     if claim is None:
         raise HTTPException(
