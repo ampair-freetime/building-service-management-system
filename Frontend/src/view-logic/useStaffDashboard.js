@@ -663,19 +663,21 @@ export function useStaffDashboard() {
       const profileName = $("#profileName");
       if (profileName) profileName.textContent = currentUserName[role];
 
-      const profileEmail = $("#profileEmail");
-      if (profileEmail) {
-        try {
-          const signedInStaff = JSON.parse(
-            localStorage.getItem("buildingCareStaff") || "null",
-          );
-          if (signedInStaff?.role === role && signedInStaff?.email) {
-            profileEmail.textContent = signedInStaff.email;
-          }
-        } catch (error) {
-          console.warn("Stored staff email is invalid:", error);
-        }
+      let signedInProfile = null;
+      try {
+        signedInProfile = JSON.parse(
+          localStorage.getItem("buildingCareStaff") || "null",
+        );
+      } catch (error) {
+        console.warn("Stored staff profile is invalid:", error);
       }
+
+      const profileEmail = $("#profileEmail");
+      if (profileEmail)
+        profileEmail.textContent =
+          signedInProfile?.role === role && signedInProfile?.email
+            ? signedInProfile.email
+            : "-";
 
       const profileRole = $("#profileRole");
       if (profileRole) profileRole.textContent = c.label;
@@ -802,6 +804,7 @@ export function useStaffDashboard() {
       if (page === "my-jobs") renderJobs();
       if (page === "clerk-center") renderClerkCenter();
       if (page === "my-history") renderMyHistory();
+      if (page === "notifications") renderNotifications();
       if (page === "staff-overview") loadStaffWorkOverview();
       if (page === "history") {
         renderHistory();
@@ -2200,7 +2203,7 @@ export function useStaffDashboard() {
     // อัปเดต badge ทั้ง Desktop/Mobile และซ่อนเมื่อไม่มีรายการที่ยังไม่อ่าน
     function updateUnreadNotificationCount(unreadCount) {
       const visibleCount = unreadCount > 99 ? "99+" : String(unreadCount);
-      [$("#notificationCount")].forEach(
+      [$("#notificationCount"), ...$$('[data-notification-count]')].forEach(
         (badge) => {
           if (!badge) return;
           badge.textContent = visibleCount;
@@ -2213,12 +2216,15 @@ export function useStaffDashboard() {
         },
       );
 
-      $("#notificationButton")?.setAttribute(
-        "aria-label",
-        unreadCount > 0
-          ? `เปิดการแจ้งเตือน มี ${unreadCount} รายการที่ยังไม่ได้อ่าน`
-          : "เปิดการแจ้งเตือน",
-      );
+      const pageCount = $("#notificationPageCount");
+      if (pageCount) pageCount.textContent = visibleCount;
+
+      const summaryText = $("#notificationSummaryText");
+      if (summaryText) {
+        summaryText.textContent = unreadCount > 0
+          ? `มี ${unreadCount} รายการที่ยังไม่ได้อ่าน`
+          : "คุณอ่านการแจ้งเตือนทั้งหมดแล้ว";
+      }
 
       const markAllButton = $("#markAllRead");
       if (markAllButton) markAllButton.disabled = unreadCount === 0;
@@ -2227,17 +2233,18 @@ export function useStaffDashboard() {
     // รวม notification ของ role ปัจจุบันและคำร้องใหม่ก่อน render
     function renderNotifications() {
       const list = notificationSets[currentRole] || [];
-      $("#notificationPanel")?.classList.toggle(
-        "technician-notifications",
-        ["technician", "housekeeper", "clerk"].includes(currentRole)
-      );
-      $("#notificationPanel")?.classList.toggle(
+      const notificationPage = $("#page-notifications");
+      notificationPage?.classList.toggle(
         "housekeeper-notifications",
-        currentRole === "housekeeper"
+        currentRole === "housekeeper",
       );
-      $("#notificationPanel")?.classList.toggle(
+      notificationPage?.classList.toggle(
+        "technician-notifications",
+        currentRole === "technician",
+      );
+      notificationPage?.classList.toggle(
         "clerk-notifications",
-        currentRole === "clerk"
+        currentRole === "clerk",
       );
       const approvals = currentRole === "clerk" ? pendingApprovalRequests() : [];
       const claims = currentRole === "clerk" ? activeClaimNotifications() : [];
@@ -2245,7 +2252,8 @@ export function useStaffDashboard() {
         list.filter((n) => n.unread).length +
         approvals.length +
         claims.filter((n) => n.unread).length;
-      $("#notificationTitle").textContent =
+      $("#notificationTitle").textContent = "ศูนย์การแจ้งเตือน";
+      $("#notificationSummaryTitle").textContent =
         currentRole === "clerk"
           ? "การแจ้งเตือนของธุรการ"
           : `การแจ้งเตือนของ${roleConfig[currentRole].label}`;
@@ -3931,6 +3939,9 @@ export function useStaffDashboard() {
       }),
     );
     $("#menuToggle")?.addEventListener("click", toggleSidebar);
+    $("#mobileNotificationButton")?.addEventListener("click", () =>
+      navigate("notifications"),
+    );
     $(".sidebar-close")?.addEventListener("click", closeSidebar);
     $("#sidebarBackdrop")?.addEventListener("click", closeSidebar);
     function syncNavigationForViewport() {
@@ -4622,39 +4633,8 @@ export function useStaffDashboard() {
     // 19) Event binding: Notification, Staff, Lost & Found, QR และประกาศ
     // -------------------------------------------------------------------------
 
-    // เปิด/ปิด notification panel และอัปเดตค่า accessibility ให้ตรงกัน
-    function toggleNotificationPanel(trigger) {
-      const panel = $("#notificationPanel"),
-        open = !panel.classList.contains("open");
-      panel.classList.toggle("open", open);
-      $("#notificationButton")?.setAttribute("aria-expanded", String(open));
-      if (open) {
-        if (!panel.classList.contains("technician-notifications")) {
-          const triggerRect = trigger.getBoundingClientRect();
-          panel.style.setProperty(
-            "--notification-panel-top",
-            `${Math.round(triggerRect.bottom + 12)}px`
-          );
-        }
-        panel.querySelector("button")?.focus();
-      }
-    }
-    $("#notificationButton")?.addEventListener("click", (event) => {
-      event.stopPropagation();
-      toggleNotificationPanel(event.currentTarget);
-    });
-    $("#notificationPanel")?.addEventListener("click", async (event) => {
-      event.stopPropagation();
-      if (event.target.closest("[data-close-notifications]")) {
-        event.currentTarget.classList.remove("open");
-        $("#notificationButton")?.setAttribute("aria-expanded", "false");
-        return;
-      }
-      if (event.target === event.currentTarget) {
-        event.currentTarget.classList.remove("open");
-        $("#notificationButton")?.setAttribute("aria-expanded", "false");
-        return;
-      }
+    // จัดการรายการภายในหน้าศูนย์การแจ้งเตือน
+    $("#notificationList")?.addEventListener("click", async (event) => {
       const clerkTarget = event.target.closest("[data-clerk-notification-target]");
       if (clerkTarget) {
         if (clerkTarget.dataset.clerkNotificationTarget === "claim")
@@ -4663,7 +4643,6 @@ export function useStaffDashboard() {
           clerkTarget.dataset.clerkNotificationTarget === "claim"
             ? "claims"
             : "approvals";
-        $("#notificationPanel").classList.remove("open");
         navigate("clerk-center");
         renderClerkCenter();
         return;
@@ -4699,7 +4678,6 @@ export function useStaffDashboard() {
         item.unread = false;
       }
       renderNotifications();
-      $("#notificationPanel").classList.remove("open");
       if (
         currentRole === "housekeeper" &&
         openCleaningRequestFromNotification(item, itemButton)
@@ -4724,10 +4702,6 @@ export function useStaffDashboard() {
       if (match) openJobDetail(match[0], itemButton);
       else if (currentRole === "clerk") navigate("clerk-center");
       else toast(item.title);
-    });
-    document.addEventListener("click", () => {
-      $("#notificationPanel")?.classList.remove("open");
-      $("#notificationButton")?.setAttribute("aria-expanded", "false");
     });
     $("#markAllRead")?.addEventListener("click", markNotificationsRead);
     $("#openStaffModal")?.addEventListener("click", (event) => {

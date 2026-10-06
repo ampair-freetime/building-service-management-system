@@ -8,24 +8,28 @@ export const STAFF_ROLE_PAGES = {
     { id: "jobs", label: "คิวงานทำความสะอาด" },
     { id: "my-jobs", label: "งานของฉัน" },
     { id: "my-history", label: "ประวัติงานของฉัน" },
+    { id: "notifications", label: "ศูนย์การแจ้งเตือน" },
   ],
   technician: [
     { id: "dashboard", label: "ภาพรวมงาน" },
     { id: "jobs", label: "คิวงานแจ้งซ่อม" },
     { id: "my-jobs", label: "งานของฉัน" },
     { id: "my-history", label: "ประวัติงานของฉัน" },
+    { id: "notifications", label: "ศูนย์การแจ้งเตือน" },
   ],
   clerk: [
     { id: "dashboard", label: "ภาพรวมงาน" },
     { id: "clerk-center", label: "ศูนย์รับงาน" },
     { id: "lost", label: "ของหาย จุดรับฝาก และคำขอรับคืน" },
     { id: "my-history", label: "ประวัติงานของฉัน" },
+    { id: "notifications", label: "ศูนย์การแจ้งเตือน" },
   ],
   admin: [
     { id: "staff-overview", label: "ภาพรวมงานของเจ้าหน้าที่" },
     { id: "history", label: "ของหายและรับฝาก" },
     { id: "staff", label: "บัญชีเจ้าหน้าที่" },
     { id: "qr", label: "จัดการสถานที่" },
+    { id: "notifications", label: "ศูนย์การแจ้งเตือน" },
   ],
 };
 

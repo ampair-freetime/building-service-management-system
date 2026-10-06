@@ -3745,3 +3745,11 @@ textarea:focus-visible {
   color: #fff !important;
   box-shadow: 0 8px 20px rgba(51, 94, 138, 0.25) !important;
 }
+
+/* Match every Guest page title to the staff notification-center title scale. */
+.user-page .greeting-name,
+.user-page .page-header h2,
+.user-page :is(#repair, #clean, #lost) .page-header h2 {
+  font-size: clamp(26px, 3vw, 38px);
+  line-height: 1.25;
+}

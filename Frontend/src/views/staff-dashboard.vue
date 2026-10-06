@@ -3,6 +3,7 @@ import AdminPages from "../components/staff/admin/AdminPages.vue";
 import ClerkPages from "../components/staff/clerk/ClerkPages.vue";
 import HousekeeperPages from "../components/staff/housekeeper/HousekeeperPages.vue";
 import TechnicianPages from "../components/staff/technician/TechnicianPages.vue";
+import NotificationCenterPage from "../components/staff/NotificationCenterPage.vue";
 import { useStaffDashboard } from "../view-logic/useStaffDashboard.js";
 
 const { activeRole } = useStaffDashboard();
@@ -172,6 +173,22 @@ const { activeRole } = useStaffDashboard();
           <button class="nav-item" data-page="qr" data-roles="admin">
             <span class="nav-icon">QR</span>จัดการสถานที่
           </button>
+          <button
+            class="nav-item notification-nav-item"
+            data-page="notifications"
+            data-roles="housekeeper,technician,clerk,admin"
+          >
+            <span class="nav-icon">
+              <svg class="icon" aria-hidden="true"><use href="#i-bell" /></svg>
+            </span>
+            <span>ศูนย์การแจ้งเตือน</span>
+            <span
+              class="notification-count notification-nav-count"
+              id="notificationCount"
+              aria-live="polite"
+              hidden
+            ></span>
+          </button>
         </nav>
         <div class="sidebar-foot">
           <div class="sidebar-profile-card">
@@ -218,55 +235,25 @@ const { activeRole } = useStaffDashboard();
         aria-label="ปิดเมนู"
       ></button>
 
-      <div class="notification-wrap mobile-notification-launcher">
+      <div class="mobile-notification-launcher">
         <button
-          v-if="['housekeeper', 'technician', 'clerk'].includes(activeRole)"
           class="icon-btn"
-          id="notificationButton"
+          id="mobileNotificationButton"
           type="button"
-          aria-label="เปิดการแจ้งเตือน"
-          aria-expanded="false"
+          aria-label="เปิดศูนย์การแจ้งเตือน"
         >
           <svg class="icon" aria-hidden="true"><use href="#i-bell" /></svg>
           <span
             class="notification-count"
-            id="notificationCount"
+            data-notification-count
             aria-live="polite"
             hidden
           ></span>
         </button>
-        <Teleport to="body">
-          <section
-            class="notification-panel"
-            id="notificationPanel"
-            aria-label="รายการแจ้งเตือน"
-          >
-            <div class="notification-dialog" role="dialog" aria-modal="true" aria-labelledby="notificationTitle">
-              <div class="notification-head">
-                <div class="notification-head-copy">
-                  <h3 id="notificationTitle">การแจ้งเตือนของเจ้าหน้าที่</h3>
-                  <p>รายการอัปเดตล่าสุดของคุณ</p>
-                </div>
-                <div class="notification-head-actions">
-                  <button id="markAllRead">อ่านทั้งหมดแล้ว</button>
-                  <button
-                    class="notification-close"
-                    type="button"
-                    data-close-notifications
-                    aria-label="ปิดการแจ้งเตือน"
-                  >
-                    <svg class="icon" aria-hidden="true"><use href="#i-close" /></svg>
-                  </button>
-                </div>
-              </div>
-              <div class="notification-list" id="notificationList"></div>
-            </div>
-          </section>
-        </Teleport>
       </div>
 
       <main>
-
+        <NotificationCenterPage />
         <HousekeeperPages v-if="activeRole === 'housekeeper'" />
         <TechnicianPages v-else-if="activeRole === 'technician'" />
         <ClerkPages v-else-if="activeRole === 'clerk'" />
