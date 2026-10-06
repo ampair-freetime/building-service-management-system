@@ -466,6 +466,7 @@ export function useStaffDashboard() {
         time,
         timestamp: Date.now(),
       });
+      renderActivities();
       renderMyHistory();
       renderActivities();
       renderStaffOverview();
@@ -1056,7 +1057,6 @@ export function useStaffDashboard() {
           return `<div class="activity-item"><div class="activity-dot"></div><div><strong>${escapeHtml(record.action)} · ${escapeHtml(record.itemId || "")}</strong><p>${escapeHtml(record.title || "งาน")} · ${escapeHtml(record.status || "")} · ${escapeHtml(when)}</p></div></div>`;
         }).join("")
         : '<div class="empty">ยังไม่มีกิจกรรมที่คุณดำเนินการ</div>';
-
     }
 
     // -------------------------------------------------------------------------
@@ -4959,14 +4959,14 @@ export function useStaffDashboard() {
       event.stopPropagation();
       toggleNotificationPanel();
     });
-    $$("#mobileNotification, #mobileNotificationAdmin").forEach((button) =>
-      button.addEventListener("click", (event) => {
-        event.stopPropagation();
-        if (window.matchMedia("(max-width: 1024px)").matches)
-          openMobileNotifications(button);
-        else toggleNotificationPanel();
-      })
-    );
+    $(".bottom-nav")?.addEventListener("click", (event) => {
+      const button = event.target.closest("[data-mobile-notification]");
+      if (!button) return;
+      event.stopPropagation();
+      if (window.matchMedia("(max-width: 1024px)").matches)
+        openMobileNotifications(button);
+      else toggleNotificationPanel();
+    });
     $("#notificationPanel")?.addEventListener("click", async (event) => {
       event.stopPropagation();
       if (event.target.closest("[data-close-notifications]")) {

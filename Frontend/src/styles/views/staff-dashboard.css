@@ -21,7 +21,7 @@
   --shadow-sm: 0 6px 20px rgba(42, 35, 85, 0.07);
   --radius: 24px;
   --radius-sm: 18px;
-  --font: "Sarabun", "Open Sans", system-ui, sans-serif;
+  --font: "Sarabun", sans-serif;
 }
 
 /* Admin follows the same calm blue design system as the Guest landing page. */
@@ -1922,7 +1922,7 @@ h4,
 .eyebrow,
 .brand,
 .brand * {
-  font-family: "Sarabun", "Open Sans", system-ui, sans-serif !important;
+  font-family: "Sarabun", sans-serif !important;
 }
 .loading-mask {
   position: fixed;
@@ -3600,7 +3600,7 @@ body {
     ),
     linear-gradient(145deg, #f7f5ff 0, #f8f8fb 48%, #fff 100%);
   color: var(--ink);
-  font-family: "Sarabun", "Open Sans", system-ui, sans-serif;
+  font-family: "Sarabun", sans-serif;
 }
 .app {
   width: 100%;
@@ -6635,6 +6635,16 @@ body:has(.staff-dashboard-page) {
     background: #f8f8fc;
     animation: none;
   }
+  body > .notification-panel.mobile-notification-page .notification-dialog {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: 100%;
+    max-height: none;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
   body > .notification-panel.mobile-notification-page .notification-head {
     flex: 0 0 auto;
     min-height: 72px;
@@ -6683,6 +6693,9 @@ body:has(.staff-dashboard-page) {
 
 @media (max-width: 1024px) {
   .staff-dashboard-page .bottom-nav.admin-bottom-nav {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+  .staff-dashboard-page .bottom-nav.clerk-bottom-nav {
     grid-template-columns: repeat(5, minmax(0, 1fr));
   }
 }
