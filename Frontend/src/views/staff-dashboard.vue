@@ -293,8 +293,9 @@ const { activeRole } = useStaffDashboard();
         <button type="button" data-mobile-page="qr">
           <svg class="icon"><use href="#i-qr" /></svg><span>QR ห้อง</span>
         </button>
-        <button type="button" id="mobileProfile">
-          <svg class="icon"><use href="#i-user" /></svg><span>โปรไฟล์</span>
+        <button type="button" id="mobileNotificationAdmin">
+          <svg class="icon"><use href="#i-bell" /></svg><span>แจ้งเตือน</span>
+          <span class="notification-count" id="mobileAdminNotificationCount" aria-live="polite" hidden></span>
         </button>
       </template>
       <template v-else-if="['technician', 'housekeeper'].includes(activeRole)">

@@ -6616,6 +6616,77 @@ body:has(.staff-dashboard-page) {
   color: var(--muted);
 }
 
+/* Bottom navigation opens notifications in the content area on phones and tablets. */
+@media (max-width: 1024px) {
+  .staff-dashboard-page .bottom-nav.admin-bottom-nav {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+  body > .notification-panel.mobile-notification-page.open {
+    display: flex;
+    flex-direction: column;
+    position: fixed;
+    z-index: 34;
+    inset: 0 0 calc(78px + env(safe-area-inset-bottom)) 0;
+    width: 100%;
+    max-height: none;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    background: #f8f8fc;
+    animation: none;
+  }
+  body > .notification-panel.mobile-notification-page .notification-head {
+    flex: 0 0 auto;
+    min-height: 72px;
+    padding: 20px max(20px, env(safe-area-inset-left));
+    background: #fff;
+  }
+  body > .notification-panel.mobile-notification-page .notification-head h3 {
+    font-size: 18px;
+  }
+  body > .notification-panel.mobile-notification-page .notification-list {
+    flex: 1 1 auto;
+    max-height: none;
+    overflow: auto;
+    overscroll-behavior: contain;
+  }
+  body > .notification-panel.mobile-notification-page .notification-item { background-color: #fff; }
+  body > .notification-panel.mobile-notification-page .notification-item.unread { background-color: #f7f5ff; }
+}
+
+@media (min-width: 721px) and (max-width: 1024px) {
+  .staff-dashboard-page .bottom-nav {
+    position: fixed;
+    z-index: 35;
+    inset: auto 0 0;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    height: 78px;
+    padding: 7px 4px max(7px, env(safe-area-inset-bottom));
+    border-top: 1px solid var(--line);
+    background: rgba(255, 255, 255, 0.96);
+    box-shadow: 0 -8px 28px rgba(35, 28, 66, 0.08);
+  }
+  .staff-dashboard-page .bottom-nav button {
+    position: relative;
+    display: grid;
+    place-items: center;
+    align-content: center;
+    gap: 3px;
+    border: 0;
+    background: transparent;
+    color: #76717f;
+  }
+  .staff-dashboard-page .bottom-nav button.active { color: var(--role); }
+  .staff-dashboard-page .bottom-nav .icon { width: 21px; height: 21px; }
+}
+
+@media (max-width: 1024px) {
+  .staff-dashboard-page .bottom-nav.admin-bottom-nav {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+}
+
 /* Keep housekeeper notification accents green after the shared modal rules. */
 .notification-panel.housekeeper-notifications .notification-dialog {
   border-color: #b9dac3;
