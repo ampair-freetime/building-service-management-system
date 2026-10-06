@@ -76,6 +76,11 @@
           </div>
           <div>
             <div class="job-meta" id="jobDetailBadges"></div>
+            <div class="job-detail-progress" id="jobDetailProgress" hidden>
+              <p id="jobDetailProgressText"></p>
+              <strong>ความคืบหน้าของคำร้อง</strong>
+              <ol class="job-detail-progress-steps" id="jobDetailProgressSteps"></ol>
+            </div>
             <div class="detail-meta">
               <div class="detail-description" style="grid-column: 1 / -1">
                 <small>รายละเอียดสิ่งของ</small>

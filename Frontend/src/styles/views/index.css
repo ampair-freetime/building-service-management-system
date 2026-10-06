@@ -3758,3 +3758,18 @@ textarea:focus-visible {
   font-size: clamp(26px, 3vw, 38px);
   line-height: 1.25;
 }
+
+/* Fieldsets use the same spacing as the public service forms. */
+.user-page :is(.clean-fields, .repair-fields) {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.user-page :is(.clean-fields, .repair-fields) > .field {
+  margin: 0;
+  min-width: 0;
+}
+.user-page :is(.clean-fields, .repair-fields) .field label {
+  display: block;
+  margin-bottom: 8px;
+}
