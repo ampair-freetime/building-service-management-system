@@ -183,7 +183,7 @@ async def list_public_items(
         .order_by(LostItem.created_at.desc(), LostItem.id.desc())
     )
     items = list(result)
-    image_map = await _load_image_map(session, [item.id for item in items])
+    image_map = await load_image_map(session, [item.id for item in items])
 
     return GuestItemListResponse(
         items=[_to_public_response(item, image_map.get(item.id, []), storage) for item in items],
@@ -221,11 +221,11 @@ async def get_public_item(
         # ใช้ข้อความเดียวกันทั้งกรณีไม่มีรหัสนี้และกรณีอีเมลไม่ตรง เพื่อกันการไล่เดาอีเมลผู้แจ้ง
         raise PublicItemNotFoundError("ไม่พบประกาศนี้")
 
-    image_map = await _load_image_map(session, [item.id])
+    image_map = await load_image_map(session, [item.id])
     return _to_public_response(item, image_map.get(item.id, []), storage)
 
 
-async def _load_image_map(
+async def load_image_map(
     session: AsyncSession,
     item_ids: list[UUID],
 ) -> dict[UUID, list[Image]]:

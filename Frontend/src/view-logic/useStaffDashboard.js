@@ -229,6 +229,7 @@ export function useStaffDashboard() {
           custody: `รายงานเมื่อ ${new Date(item.created_at).toLocaleString("th-TH")}`,
           status: "รออนุมัติรับฝาก",
           createdAt: item.created_at,
+          imageUrl: item.images?.[0]?.url || "",
           assignee: null,
         }));
         const processedItems = lostSets.inventory.filter(
@@ -263,6 +264,7 @@ export function useStaffDashboard() {
           custody: `ส่งประกาศเมื่อ ${new Date(item.created_at).toLocaleString("th-TH")}`,
           status: "รออนุมัติเผยแพร่",
           createdAt: item.created_at,
+          imageUrl: item.images?.[0]?.url || "",
           assignee: null,
         }));
         const processedItems = lostSets.lostposts.filter(
@@ -3714,6 +3716,8 @@ export function useStaffDashboard() {
           item.custody = detail.custody_location || "ไม่ระบุจุดรับฝาก";
           item.reporterEmail = detail.reporter_email;
           item.eventDatetime = detail.event_datetime;
+          // ขอ signed URL ใหม่ทุกครั้งที่เปิด เพราะ URL จากรายการอาจหมดอายุแล้ว
+          if (detail.images?.length) item.imageUrl = detail.images[0].url;
         } catch (error) {
           if (await handleUnauthorizedResponse(error.status)) return;
           console.error("Loading found item detail failed:", error);

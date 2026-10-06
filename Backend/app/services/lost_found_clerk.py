@@ -1,3 +1,4 @@
+import logging
 from uuid import UUID
 
 from sqlalchemy import select
@@ -11,6 +12,11 @@ from app.models.lost_found import (
     LostItem,
     LostItemHistory,
 )
+from app.schemas.lost_found_item import GuestImageResponse
+from app.services.lost_found import load_image_map
+from app.services.object_storage import ObjectStorage, StorageOperationError
+
+logger = logging.getLogger(__name__)
 
 # คำขอรับของที่ยังไม่จบ ถ้าปิดรายการทั้งที่ยังมีคำขอพวกนี้ ผู้ยื่นจะค้างโดยไม่มีใครดูแล
 ACTIVE_CLAIM_STATUSES = (
@@ -23,6 +29,38 @@ ACTIVE_CLAIM_STATUSES = (
 
 class ActiveClaimExistsError(Exception):
     """ปิดรายการพบของไม่ได้เพราะยังมีคำขอรับของคืนที่ยังไม่จบ"""
+
+
+async def load_staff_image_urls(
+    session: AsyncSession,
+    item_ids: list[UUID],
+    storage: ObjectStorage | None,
+) -> dict[UUID, list[GuestImageResponse]]:
+    """สร้าง signed URL ของรูปทุกสถานะ เพื่อให้ staff เห็นรูปก่อนกดอนุมัติ
+
+    ถ้า R2 ยังไม่ตั้งค่าหรือสร้าง URL ไม่ได้ จะคืน dict ว่าง ให้ staff ยังอ่านข้อมูลอื่นได้
+    """
+    if storage is None or not item_ids:
+        return {}
+
+    image_map = await load_image_map(session, item_ids)
+    try:
+        return {
+            item_id: [
+                GuestImageResponse(
+                    id=image.id,
+                    url=storage.create_download_url(image.object_key),
+                    content_type=image.content_type,
+                    width=image.width,
+                    height=image.height,
+                )
+                for image in images
+            ]
+            for item_id, images in image_map.items()
+        }
+    except StorageOperationError:
+        logger.warning("Creating staff lost-found image URLs failed", exc_info=True)
+        return {}
 
 
 async def list_pending_found_items(session: AsyncSession) -> list[LostItem]:

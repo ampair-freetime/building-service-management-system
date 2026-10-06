@@ -6,10 +6,11 @@ from unittest.mock import Mock
 
 import pytest
 
-from app.api.dependencies import provide_object_storage
+from app.api.dependencies import provide_object_storage, provide_optional_object_storage
 from conftest import seed_staff
 from sqlalchemy import select
 from app.models.enums import ClaimStatus, LostStatus, LostType, ReturnStatus
+from app.models.image import Image
 from app.models.lost_found import (
     LostClaim,
     LostClaimReturnStatusHistory,
@@ -2134,3 +2135,98 @@ def test_close_requires_clerk_login(test_context):
 
     assert response.status_code == 401
     assert _item_status(session_factory, item_id) == LostStatus.APPROVED
+
+
+@pytest.fixture
+def staff_image_storage(test_context):
+    """R2 ตัวปลอมสำหรับ endpoint staff ที่สร้าง signed URL ของรูป"""
+    client, _ = test_context
+    client.app.dependency_overrides[provide_optional_object_storage] = lambda: Mock(
+        create_download_url=lambda key: f"https://signed.example/{key}",
+    )
+    yield
+    client.app.dependency_overrides.pop(provide_optional_object_storage, None)
+
+
+def _seed_image(session_factory, item_id, *, sort_order=0):
+    async def seed():
+        async with session_factory() as session:
+            image = Image(
+                lost_item_id=item_id,
+                object_key=f"lost-found/{item_id}/{sort_order}.webp",
+                content_type="image/webp",
+                width=32,
+                height=24,
+                sort_order=sort_order,
+            )
+            session.add(image)
+            await session.commit()
+            return image.object_key
+
+    return asyncio.run(seed())
+
+
+@pytest.mark.parametrize(
+    ("report_type", "collection"),
+    [(LostType.FOUND, "found-items"), (LostType.LOST, "lost-items")],
+)
+def test_clerk_sees_images_of_pending_item_before_approval(
+    test_context, staff_image_storage, report_type, collection
+):
+    client, session_factory = test_context
+    headers = _clerk_headers(client, session_factory)
+    item_id = _seed_item(session_factory, report_type=report_type, status=LostStatus.PENDING)
+    second_key = _seed_image(session_factory, item_id, sort_order=1)
+    first_key = _seed_image(session_factory, item_id, sort_order=0)
+
+    detail = client.get(f"/api/v1/lost-found/{collection}/{item_id}", headers=headers)
+    pending = client.get(f"/api/v1/lost-found/pending-{collection}", headers=headers)
+
+    assert detail.status_code == 200
+    assert [image["url"] for image in detail.json()["images"]] == [
+        f"https://signed.example/{first_key}",
+        f"https://signed.example/{second_key}",
+    ]
+    assert pending.status_code == 200
+    pending_item = next(item for item in pending.json() if item["id"] == str(item_id))
+    assert pending_item["images"][0]["url"] == f"https://signed.example/{first_key}"
+
+
+def test_item_without_images_returns_empty_list(test_context, staff_image_storage):
+    client, session_factory = test_context
+    headers = _clerk_headers(client, session_factory)
+    item_id = _seed_item(session_factory, report_type=LostType.FOUND, status=LostStatus.PENDING)
+
+    response = client.get(f"/api/v1/lost-found/found-items/{item_id}", headers=headers)
+
+    assert response.status_code == 200
+    assert response.json()["images"] == []
+
+
+def test_detail_still_works_when_image_storage_is_not_configured(test_context):
+    client, session_factory = test_context
+    client.app.dependency_overrides[provide_optional_object_storage] = lambda: None
+    try:
+        headers = _clerk_headers(client, session_factory)
+        item_id = _seed_item(session_factory, report_type=LostType.FOUND, status=LostStatus.PENDING)
+        _seed_image(session_factory, item_id)
+
+        response = client.get(f"/api/v1/lost-found/found-items/{item_id}", headers=headers)
+    finally:
+        client.app.dependency_overrides.pop(provide_optional_object_storage, None)
+
+    assert response.status_code == 200
+    assert response.json()["images"] == []
+
+
+def test_approve_response_does_not_lazy_load_item_images(test_context):
+    """approve คืน schema เดียวกับ detail ต้องไม่ไปแตะ relationship LostItem.images"""
+    client, session_factory = test_context
+    headers = _clerk_headers(client, session_factory)
+    item_id = _seed_item(session_factory, report_type=LostType.FOUND, status=LostStatus.PENDING)
+    _seed_image(session_factory, item_id)
+
+    response = client.post(f"/api/v1/lost-found/found-items/{item_id}/approve", headers=headers)
+
+    assert response.status_code == 200
+    assert response.json()["images"] == []
