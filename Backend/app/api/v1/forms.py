@@ -94,10 +94,11 @@ async def parse_guest_cleaning_form(
     location_id: Annotated[int, Form(gt=0)],
     description: Annotated[str, Form(max_length=255)] = "",
     priority: Annotated[PriorityLevel, Form()] = PriorityLevel.NORMAL,
+    cleaning_category: Annotated[str, Form(max_length=100)] = "ทำความสะอาดทั่วไป",
 ) -> GuestCleaningCreate:
     """แปลง multipart form เป็นคำร้อง Cleaning แล้วให้ schema ตรวจซ้ำ."""
     form = await request.form()
-    allowed_fields = {"title", "description", "priority", "reporter_email", "location_id", "image"}
+    allowed_fields = {"cleaning_category", "title", "description", "priority", "reporter_email", "location_id", "image"}
     unexpected_fields = sorted(set(form) - allowed_fields)
     if unexpected_fields:
         raise HTTPException(
@@ -113,6 +114,7 @@ async def parse_guest_cleaning_form(
         )
     return _build_payload(
         GuestCleaningCreate,
+        cleaning_category=cleaning_category,
         title=title,
         description=description,
         priority=priority,

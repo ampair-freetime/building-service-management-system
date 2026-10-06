@@ -58,6 +58,8 @@
               <div class="staff-overview-card-stats overview-person-stats" id="overviewPersonStats"></div>
               <h4 class="overview-work-heading">งานที่กำลังรับผิดชอบ <span class="badge neutral" id="overviewDetailCount">0 รายการ</span></h4>
               <div class="overview-detail-list" id="staffOverviewDetail" aria-live="polite"></div>
+              <h4 class="overview-work-heading">ประวัติคืนเข้ากองกลาง</h4>
+              <div class="overview-detail-list" id="staffOverviewReturned" aria-live="polite"></div>
             </section>
           </div>
         </Teleport>

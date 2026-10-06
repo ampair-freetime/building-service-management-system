@@ -21,7 +21,40 @@
   --shadow-sm: 0 6px 20px rgba(42, 35, 85, 0.07);
   --radius: 24px;
   --radius-sm: 18px;
-  --font: "Sarabun", "Open Sans", system-ui, sans-serif;
+  --font: "Sarabun", sans-serif;
+}
+
+/* Admin follows the same calm blue design system as the Guest landing page. */
+.staff-dashboard-page.is-admin {
+  --primary: #335e8a;
+  --primary-2: #4c76a8;
+  --primary-soft: #edf3f8;
+  --role: #335e8a;
+  --role-soft: #edf3f8;
+  --ink: #17212b;
+  --muted: #74717f;
+  --line: #e2ebf3;
+  --canvas: #f3f8fc;
+  --shadow: 0 12px 36px rgba(35, 72, 105, 0.08);
+  --shadow-sm: 0 6px 20px rgba(35, 72, 105, 0.07);
+  min-height: 100vh;
+  background: linear-gradient(145deg, #f1f7fc 0%, #fdfefe 46%, #f5f9fc 100%);
+}
+
+.staff-dashboard-page.is-admin .sidebar .brand-mark {
+  background: linear-gradient(145deg, #335e8a, #5d89b3);
+  box-shadow: 0 8px 20px rgba(51, 94, 138, 0.25);
+}
+
+@media (min-width: 981px) {
+  .staff-dashboard-page.is-admin {
+    background: linear-gradient(145deg, #f1f7fc 0%, #fdfefe 46%, #f5f9fc 100%);
+  }
+}
+
+/* Keep every English page kicker in Admin consistent with the Guest header. */
+.staff-dashboard-page.is-admin .eyebrow {
+  color: #4c76a8;
 }
 
 /* Technician uses the same orange palette as the Guest repair request flow. */
@@ -566,12 +599,16 @@ body {
 .avatar {
   width: 42px;
   height: 42px;
-  border-radius: 14px;
-  background: var(--primary);
+  border-radius: 50%;
+  background: var(--role, var(--primary));
   color: #fff;
   display: grid;
   place-items: center;
   font-weight: 900;
+}
+.avatar .profile-person-icon {
+  width: 21px;
+  height: 21px;
 }
 .shift-top strong,
 .shift-top small {
@@ -956,6 +993,9 @@ body {
 .metric:nth-child(3):before {
   background: var(--clean);
 }
+.staff-dashboard-page .metric.urgent:before {
+  background: #e55b3c;
+}
 .metric:nth-child(4):before,
 .metric.warn:before {
   background: var(--lost);
@@ -1246,6 +1286,23 @@ body {
   background: var(--clean);
   margin-right: 4px;
 }
+.staff-dashboard-page .assignee.is-unassigned {
+  color: #9a3412;
+  background: #fff0df;
+  border-radius: 8px;
+  padding: 4px 8px;
+  font-weight: 700;
+}
+.staff-dashboard-page #jobDetailAssignee.is-unassigned {
+  color: #9a3412;
+}
+.staff-dashboard-page .job-meta .badge.normal {
+  color: #276640;
+  background: #e0f2e7;
+}
+.staff-dashboard-page .assignee.is-unassigned .assignee-dot {
+  background: #ea580c;
+}
 .work-history-card {
   display: grid;
   grid-template-columns: 100px 1fr auto;
@@ -1339,6 +1396,24 @@ body {
   place-items: center;
   font-weight: 900;
 }
+.person-avatar.role-person-avatar {
+  width: 44px;
+  height: 44px;
+  flex: 0 0 44px;
+  border-radius: 50%;
+  background: var(--avatar-role, #335e8a);
+  color: #fff;
+  box-shadow: 0 6px 16px color-mix(in srgb, var(--avatar-role, #335e8a) 22%, transparent);
+}
+.person-avatar.role-person-avatar .profile-person-icon {
+  width: 22px;
+  height: 22px;
+}
+.overview-role-badge {
+  border: 1px solid color-mix(in srgb, var(--badge-role, #64748b) 24%, transparent);
+  background: color-mix(in srgb, var(--badge-role, #64748b) 12%, #fff);
+  color: var(--badge-role, #64748b);
+}
 .history-action,
 .history-source {
   font-weight: 800;
@@ -1406,6 +1481,39 @@ body {
   flex: 1;
   min-width: 0;
   overflow-wrap: anywhere;
+}
+.staff-overview-modal-card #staffOverviewDetail + .overview-work-heading {
+  margin-top: 24px;
+}
+.staff-overview-modal-card #staffOverviewReturned {
+  display: grid;
+  gap: 14px;
+}
+.staff-overview-modal-card #staffOverviewReturned .overview-detail-item {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: #fafbfd;
+  line-height: 1.65;
+}
+.staff-overview-modal-card #staffOverviewReturned .overview-detail-item > div {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.staff-overview-modal-card #staffOverviewReturned p {
+  margin: 8px 0 0;
+  line-height: 1.65;
+}
+.staff-overview-modal-card #staffOverviewReturned .badge {
+  align-self: flex-start;
+  flex: none;
+  max-width: 100%;
+  white-space: normal;
+  line-height: 1.6;
 }
 .overview-number {
   font-size: 24px;
@@ -1814,7 +1922,7 @@ h4,
 .eyebrow,
 .brand,
 .brand * {
-  font-family: "Sarabun", "Open Sans", system-ui, sans-serif !important;
+  font-family: "Sarabun", sans-serif !important;
 }
 .loading-mask {
   position: fixed;
@@ -2173,12 +2281,65 @@ textarea:focus-visible,
 }
 .detail-photo img {
   width: 100%;
-  height: 210px;
-  object-fit: cover;
+  height: auto;
+  object-fit: contain;
   display: block;
 }
-.detail-photo img[hidden] {
+.detail-photo img[hidden],
+.detail-photo .icon[hidden] {
   display: none;
+}
+.staff-dashboard-page .field[hidden] {
+  display: none;
+}
+.grouped-history-card {
+  padding: 24px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  min-width: 0;
+  line-height: 1.65;
+}
+.history-group {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  background: #fafbfd;
+}
+.history-group > h3 { margin: 0; line-height: 1.65; }
+.staff-dashboard-page #myHistoryTabs .tab {
+  box-shadow: none;
+}
+.staff-dashboard-page #myHistoryTabs .tab.active {
+  background: var(--role);
+  box-shadow: none;
+}
+.grouped-history-card header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+.grouped-history-card h3 { margin: 10px 0; line-height: 1.65; overflow-wrap: anywhere; }
+.grouped-history-card .history-note { padding: 14px; background: #fafbfd; border-radius: 14px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.grouped-history-card details { margin-top: 16px; border-top: 1px solid var(--line); padding-top: 16px; }
+.grouped-history-card summary { cursor: pointer; color: var(--primary); font-weight: 700; }
+.grouped-history-card .timeline p { margin: 8px 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.history-photos { display: flex; flex-wrap: wrap; gap: 12px; }
+.history-photos img { width: 180px; max-width: 100%; height: 140px; object-fit: contain; border-radius: 14px; background: #fafbfd; }
+#page-my-history .history-filter-panel label { display: grid; gap: 8px; min-width: 0; }
+.staff-dashboard-page #page-my-history .history-filter-panel {
+  align-items: end;
+}
+.staff-dashboard-page #page-my-history .history-filter-panel :is(input.field-compact, .filter-select-trigger, #resetMyHistoryFilters) {
+  height: 58px;
+  min-height: 58px;
+  box-sizing: border-box;
 }
 .job-detail-modal.lost-post-detail .detail-photo {
   min-height: 320px;
@@ -2192,6 +2353,16 @@ textarea:focus-visible,
 #confirmModalText {
   white-space: pre-line;
 }
+#returnJobForm .return-btn,
+#confirmModal #confirmActionButton.confirm-accept {
+  background: var(--role, #276640);
+  border-color: var(--role, #276640);
+  color: #fff;
+}
+#returnJobForm .return-btn:hover,
+#confirmModal #confirmActionButton.confirm-accept:hover {
+  filter: brightness(0.9);
+}
 #successModalText {
   white-space: pre-line;
 }
@@ -2204,6 +2375,14 @@ textarea:focus-visible,
 .detail-photo .icon {
   width: 72px;
   height: 72px;
+}
+.staff-dashboard-page #jobQuickActions [data-detail-action="accept"] {
+  background: var(--role, #276640);
+  border-color: var(--role, #276640);
+  color: #fff;
+}
+.staff-dashboard-page #jobQuickActions [data-detail-action="accept"]:hover {
+  filter: brightness(0.9);
 }
 .detail-meta {
   display: grid;
@@ -2371,13 +2550,18 @@ textarea:focus-visible,
 .profile-avatar-large {
   width: 92px;
   height: 92px;
-  border-radius: 25px;
-  background: var(--role-soft);
-  color: var(--role);
+  border-radius: 50%;
+  background: var(--role);
+  color: #fff;
   display: grid;
   place-items: center;
   font-size: 25px;
   font-weight: 900;
+  box-shadow: 0 12px 28px color-mix(in srgb, var(--role) 24%, transparent);
+}
+.profile-avatar-large .profile-person-icon {
+  width: 40px;
+  height: 40px;
 }
 .profile-data {
   display: grid;
@@ -2396,6 +2580,42 @@ textarea:focus-visible,
 .profile-data small {
   font-size: 9px;
   color: var(--muted);
+}
+.profile-data {
+  grid-template-columns: 1fr;
+}
+.profile-data .profile-name-field {
+  width: 100%;
+}
+.profile-data .profile-name-field strong {
+  margin-top: 3px;
+  font-size: 16px;
+  overflow-wrap: anywhere;
+}
+.profile-data .profile-meta-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  padding: 0;
+  background: transparent;
+}
+.profile-data .profile-meta-row > span {
+  display: block;
+  min-width: 0;
+  padding: 11px;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  background: #f8f7fb;
+}
+.profile-data .profile-meta-row strong {
+  margin-top: 3px;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 480px) {
+  .profile-data .profile-meta-row {
+    grid-template-columns: 1fr;
+    gap: 9px;
+  }
 }
 .announcement-list {
   display: grid;
@@ -2567,7 +2787,13 @@ textarea:focus-visible,
     box-shadow: 0 -8px 28px rgba(35, 28, 66, 0.08);
   }
   .bottom-nav.technician-bottom-nav {
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+  .bottom-nav.admin-bottom-nav {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+  .bottom-nav.clerk-bottom-nav {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
   }
   .bottom-nav button {
     position: relative;
@@ -2586,6 +2812,51 @@ textarea:focus-visible,
   .bottom-nav .icon {
     width: 21px;
     height: 21px;
+  }
+  .bottom-nav.admin-bottom-nav .admin-overview-tab {
+    z-index: 1;
+    overflow: visible;
+  }
+  .bottom-nav.admin-bottom-nav .admin-overview-tab .icon {
+    width: 56px;
+    height: 56px;
+    margin-top: -30px;
+    padding: 16px;
+    border-radius: 19px;
+    background: var(--primary);
+    color: #fff;
+    box-shadow: 0 10px 24px rgba(51, 94, 138, 0.3);
+  }
+  .bottom-nav.admin-bottom-nav .admin-overview-tab span {
+    margin-top: 1px;
+    color: var(--primary);
+    font-weight: 800;
+  }
+  .bottom-nav .mobile-overview-tab {
+    z-index: 1;
+    overflow: visible;
+  }
+  .bottom-nav .mobile-overview-tab .icon,
+  .bottom-nav.admin-bottom-nav .mobile-overview-tab .icon {
+    width: 56px;
+    height: 56px;
+    margin-top: -30px;
+    padding: 16px;
+    border-radius: 19px;
+    background: #17324d;
+    color: #fff;
+    box-shadow: 0 10px 24px rgba(23, 50, 77, 0.32);
+  }
+  .bottom-nav .mobile-overview-tab > span,
+  .bottom-nav.admin-bottom-nav .mobile-overview-tab > span {
+    margin-top: 1px;
+    color: #76717f;
+    font-weight: 400;
+  }
+  .bottom-nav .mobile-overview-tab.active > span,
+  .bottom-nav.admin-bottom-nav .mobile-overview-tab.active > span {
+    color: #17324d;
+    font-weight: 800;
   }
   .bottom-nav .new-action {
     width: 56px;
@@ -3329,7 +3600,7 @@ body {
     ),
     linear-gradient(145deg, #f7f5ff 0, #f8f8fb 48%, #fff 100%);
   color: var(--ink);
-  font-family: "Sarabun", "Open Sans", system-ui, sans-serif;
+  font-family: "Sarabun", sans-serif;
 }
 .app {
   width: 100%;
@@ -3488,7 +3759,10 @@ body {
 .job-card > div {
   min-width: 0;
 }
-.job-card h3 {
+.staff-dashboard-page .job-card h3 {
+  margin: 10px 0 12px;
+  font-size: 17px;
+  line-height: 1.65;
   overflow-wrap: anywhere;
 }
 .job-photo {
@@ -4423,13 +4697,15 @@ body {
     display: none;
   }
 
-  .staff-dashboard-page .admin-bottom-nav button {
+  .staff-dashboard-page .admin-bottom-nav button,
+  .staff-dashboard-page .clerk-bottom-nav button {
     gap: 3px;
     padding-inline: 2px;
     font-size: clamp(7px, 2.2vw, 9px);
   }
 
-  .staff-dashboard-page .admin-bottom-nav button span {
+  .staff-dashboard-page .admin-bottom-nav button span,
+  .staff-dashboard-page .clerk-bottom-nav button span {
     white-space: nowrap;
   }
 }
@@ -5086,6 +5362,143 @@ body {
 }
 .housekeeper-notifications .notification-actions { border-top-color: #e1eee5; }
 
+/* Match the Guest shell spacing and prevent collapsed page margins from exposing the old violet body. */
+body:has(.staff-dashboard-page) {
+  background: #f4f7fb;
+}
+
+.staff-dashboard-page,
+.staff-dashboard-page > .app {
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+.staff-dashboard-page .app main,
+.staff-dashboard-page .app.sidebar-collapsed main {
+  padding: 24px 42px 110px;
+}
+
+.staff-dashboard-page .app main > .page {
+  margin-top: 0;
+}
+
+@media (max-width: 680px) {
+  .staff-dashboard-page .app main,
+  .staff-dashboard-page .app.sidebar-collapsed main {
+    padding: 18px 12px 86px;
+  }
+}
+
+/* Keep the signed-in staff identity and exit action together at the foot of the desktop sidebar. */
+.staff-dashboard-page .sidebar-foot {
+  width: 100%;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.staff-dashboard-page .sidebar-profile-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 42px;
+  align-items: center;
+  gap: 6px;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 8px 24px rgba(42, 35, 85, 0.06);
+}
+
+.staff-dashboard-page .sidebar-profile {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  min-height: 48px;
+  padding: 3px;
+  border: 0;
+  border-radius: 13px;
+  background: transparent;
+  color: var(--ink);
+  text-align: left;
+}
+
+.staff-dashboard-page .sidebar-profile:hover {
+  background: var(--primary-soft);
+}
+
+.staff-dashboard-page .sidebar-profile .avatar {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: var(--role, var(--primary));
+}
+
+.staff-dashboard-page .sidebar-profile-copy {
+  display: block;
+  min-width: 0;
+}
+
+.staff-dashboard-page .sidebar-profile-copy strong,
+.staff-dashboard-page .sidebar-profile-copy small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.staff-dashboard-page .sidebar-profile-copy strong {
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.staff-dashboard-page .sidebar-profile-copy small {
+  margin-top: 2px;
+  color: var(--role, var(--primary));
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.staff-dashboard-page .sidebar-profile-logout {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  min-height: 42px;
+  padding: 0;
+  border: 0;
+  border-radius: 13px;
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.staff-dashboard-page .sidebar-profile-logout:hover {
+  background: var(--danger);
+  color: #fff;
+}
+
+.staff-dashboard-page .sidebar-profile-logout .icon {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+@media (min-width: 981px) {
+  .staff-dashboard-page .top-actions .header-profile.compact-profile {
+    display: none !important;
+  }
+}
+
+@media (max-width: 980px) {
+  .staff-dashboard-page .top-actions .header-profile.compact-profile {
+    display: flex !important;
+  }
+}
+
 /* Clerk uses the same gold palette as the Guest lost-and-found flow. */
 .staff-dashboard-page.is-clerk {
   --primary: #9a6508;
@@ -5211,6 +5624,10 @@ body {
   background: linear-gradient(135deg, #9a4708, #b45309 52%, #d97706);
   color: #fff;
   box-shadow: 0 9px 20px rgba(180, 83, 9, 0.24);
+}
+.staff-dashboard-page.is-technician .job-meta .badge.normal {
+  background: var(--role-soft);
+  color: var(--role);
 }
 
 .staff-dashboard-page.is-technician .sidebar .brand-mark {
@@ -5444,6 +5861,235 @@ body {
 
 .staff-dashboard-page #page-staff-overview .filter-select-dropdown {
   flex: 1 1 180px;
+}
+
+/* Notification center is a full dashboard page, not an interrupting overlay. */
+.notification-nav-item {
+  position: relative;
+}
+
+.notification-nav-item .nav-icon {
+  display: grid;
+  place-items: center;
+}
+
+.notification-nav-item .nav-icon .icon {
+  width: 16px;
+  height: 16px;
+}
+
+.notification-nav-count {
+  position: static;
+  margin-left: auto;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 6px;
+  border: 2px solid rgba(255, 255, 255, 0.82);
+  border-radius: 999px;
+  background: #dc2626;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 850;
+  line-height: 1;
+}
+
+.app.sidebar-collapsed .notification-nav-item > span:nth-child(2),
+.app.sidebar-collapsed .notification-nav-item .notification-nav-count {
+  display: none !important;
+}
+
+.notification-center-page {
+  width: min(1080px, 100%);
+  margin: 0 auto;
+}
+
+.notification-center-hero {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 20px;
+  padding: 8px 2px 4px;
+}
+
+.notification-center-hero h2 {
+  margin: 3px 0 7px;
+  color: var(--ink);
+  font-size: clamp(26px, 3vw, 38px);
+  letter-spacing: -0.03em;
+}
+
+.notification-center-hero p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.notification-mark-all {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 16px;
+  border: 1px solid color-mix(in srgb, var(--role) 34%, #fff);
+  border-radius: 13px;
+  background: rgba(255, 255, 255, 0.86);
+  color: var(--role);
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.notification-mark-all:disabled {
+  opacity: .48;
+  cursor: default;
+}
+
+.notification-mark-all .icon {
+  width: 17px;
+  height: 17px;
+}
+
+.notification-center-summary {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 15px;
+  margin-bottom: 18px;
+  padding: 17px 20px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 9px 24px color-mix(in srgb, var(--role) 8%, transparent);
+}
+
+.notification-summary-icon {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 16px;
+  background: var(--role-soft);
+  color: var(--role);
+}
+
+.notification-summary-icon .icon { width: 23px; height: 23px; }
+.notification-center-summary strong { display: block; color: var(--ink); }
+.notification-center-summary p { margin: 3px 0 0; color: var(--muted); font-size: 13px; }
+
+.notification-center-count {
+  display: grid;
+  place-items: center;
+  min-width: 42px;
+  height: 42px;
+  padding: 0 10px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, var(--role), var(--primary-2));
+  color: #fff;
+  font-size: 15px;
+  font-weight: 850;
+}
+
+.notification-center-panel { overflow: hidden; }
+.notification-center-list,
+.technician-notifications .notification-center-list {
+  display: grid;
+  gap: 10px;
+  max-height: none;
+  padding: 8px 20px 24px;
+  overflow: visible;
+  border-radius: 0;
+}
+
+.notification-center-list .notification-group-label,
+.technician-notifications .notification-center-list .notification-group-label {
+  margin: 14px 2px 2px;
+  color: var(--role);
+  font-size: 11px;
+  font-weight: 850;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+}
+
+.notification-center-list .notification-item,
+.technician-notifications .notification-center-list .notification-item {
+  width: 100%;
+  grid-template-columns: 48px minmax(0, 1fr);
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: none;
+  text-align: left;
+  transition: border-color .18s ease, box-shadow .18s ease, transform .18s ease;
+}
+
+.notification-center-list .notification-item:hover {
+  border-color: color-mix(in srgb, var(--role) 56%, #fff);
+  box-shadow: 0 10px 24px color-mix(in srgb, var(--role) 13%, transparent);
+  transform: translateY(-1px);
+}
+
+.notification-center-list .notification-item.unread {
+  border-color: color-mix(in srgb, var(--role) 58%, #fff);
+  background: linear-gradient(90deg, var(--role-soft) 0, #fff 46%);
+}
+
+.notification-center-list .notification-item.unread::after {
+  align-self: center;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--role);
+  content: "";
+}
+
+.notification-center-list .notification-item.unread {
+  grid-template-columns: 48px minmax(0, 1fr) 8px;
+}
+
+.notification-center-list .notification-symbol,
+.technician-notifications .notification-center-list .notification-symbol {
+  width: 48px;
+  height: 48px;
+  border-radius: 15px;
+  background: var(--role-soft);
+  color: var(--role);
+}
+
+.notification-center-list .notification-item strong {
+  color: var(--ink);
+  font-size: 14px;
+}
+
+.notification-center-list .notification-item p {
+  margin: 5px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.notification-center-list .notification-empty {
+  display: grid;
+  min-height: 230px;
+  place-items: center;
+  color: var(--muted);
+}
+
+@media (max-width: 720px) {
+  .notification-center-hero {
+    align-items: stretch;
+    flex-direction: column;
+    padding: 4px 2px;
+  }
+
+  .notification-mark-all { width: 100%; }
+  .notification-center-summary { grid-template-columns: 44px minmax(0, 1fr) auto; padding: 14px; }
+  .notification-summary-icon { width: 44px; height: 44px; border-radius: 13px; }
+  .notification-center-list,
+  .technician-notifications .notification-center-list { padding: 6px 12px 18px; }
+  .notification-center-list .notification-item,
+  .technician-notifications .notification-center-list .notification-item { padding: 13px; }
 }
 
 @media (max-width: 720px) {
@@ -5970,6 +6616,90 @@ body {
   color: var(--muted);
 }
 
+/* Bottom navigation opens notifications in the content area on phones and tablets. */
+@media (max-width: 1024px) {
+  .staff-dashboard-page .bottom-nav.admin-bottom-nav {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+  body > .notification-panel.mobile-notification-page.open {
+    display: flex;
+    flex-direction: column;
+    position: fixed;
+    z-index: 34;
+    inset: 0 0 calc(78px + env(safe-area-inset-bottom)) 0;
+    width: 100%;
+    max-height: none;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    background: #f8f8fc;
+    animation: none;
+  }
+  body > .notification-panel.mobile-notification-page .notification-dialog {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: 100%;
+    max-height: none;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+  body > .notification-panel.mobile-notification-page .notification-head {
+    flex: 0 0 auto;
+    min-height: 72px;
+    padding: 20px max(20px, env(safe-area-inset-left));
+    background: #fff;
+  }
+  body > .notification-panel.mobile-notification-page .notification-head h3 {
+    font-size: 18px;
+  }
+  body > .notification-panel.mobile-notification-page .notification-list {
+    flex: 1 1 auto;
+    max-height: none;
+    overflow: auto;
+    overscroll-behavior: contain;
+  }
+  body > .notification-panel.mobile-notification-page .notification-item { background-color: #fff; }
+  body > .notification-panel.mobile-notification-page .notification-item.unread { background-color: #f7f5ff; }
+}
+
+@media (min-width: 721px) and (max-width: 1024px) {
+  .staff-dashboard-page .bottom-nav {
+    position: fixed;
+    z-index: 35;
+    inset: auto 0 0;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    height: 78px;
+    padding: 7px 4px max(7px, env(safe-area-inset-bottom));
+    border-top: 1px solid var(--line);
+    background: rgba(255, 255, 255, 0.96);
+    box-shadow: 0 -8px 28px rgba(35, 28, 66, 0.08);
+  }
+  .staff-dashboard-page .bottom-nav button {
+    position: relative;
+    display: grid;
+    place-items: center;
+    align-content: center;
+    gap: 3px;
+    border: 0;
+    background: transparent;
+    color: #76717f;
+  }
+  .staff-dashboard-page .bottom-nav button.active { color: var(--role); }
+  .staff-dashboard-page .bottom-nav .icon { width: 21px; height: 21px; }
+}
+
+@media (max-width: 1024px) {
+  .staff-dashboard-page .bottom-nav.admin-bottom-nav {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+  .staff-dashboard-page .bottom-nav.clerk-bottom-nav {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+}
+
 /* Keep housekeeper notification accents green after the shared modal rules. */
 .notification-panel.housekeeper-notifications .notification-dialog {
   border-color: #b9dac3;
@@ -5990,3 +6720,79 @@ body {
   color: #24613a;
 }
 .housekeeper-notifications .notification-actions { border-top-color: #e1eee5; }
+
+/* Final responsive shell alignment with the Guest page. */
+@media (min-width: 681px) and (max-width: 720px) {
+  .staff-dashboard-page:is(.is-admin, .is-technician, .is-housekeeper, .is-clerk) .app main,
+  .staff-dashboard-page:is(.is-admin, .is-technician, .is-housekeeper, .is-clerk) .app.sidebar-collapsed main {
+    padding: 24px 42px 110px !important;
+  }
+}
+
+@media (max-width: 680px) {
+  .staff-dashboard-page:is(.is-admin, .is-technician, .is-housekeeper, .is-clerk) .app main,
+  .staff-dashboard-page:is(.is-admin, .is-technician, .is-housekeeper, .is-clerk) .app.sidebar-collapsed main {
+    padding: 18px 12px 86px !important;
+  }
+}
+
+/* Use one blue BC logo across Admin and every staff role. */
+.staff-dashboard-page .sidebar .brand-mark {
+  border-color: transparent !important;
+  background: linear-gradient(145deg, #335e8a, #5d89b3) !important;
+  color: #fff !important;
+  box-shadow: 0 8px 20px rgba(51, 94, 138, 0.25) !important;
+}
+
+/* Keep a direct notification shortcut at the top-right on small screens. */
+.staff-dashboard-page .mobile-notification-launcher {
+  position: fixed;
+  top: 24px;
+  right: 24px;
+  z-index: 60;
+  display: none;
+  width: 46px;
+  height: 46px;
+  overflow: visible;
+}
+
+.staff-dashboard-page .mobile-notification-launcher #mobileNotificationButton {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 46px;
+  min-width: 46px;
+  height: 46px;
+  min-height: 46px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: #fff;
+  color: var(--role, var(--primary));
+  box-shadow: 0 8px 24px rgba(35, 72, 105, 0.16);
+}
+
+.staff-dashboard-page .mobile-notification-launcher #mobileNotificationButton .icon {
+  width: 22px;
+  height: 22px;
+}
+
+@media (max-width: 720px) {
+  .staff-dashboard-page .mobile-notification-launcher {
+    display: block;
+    top: max(14px, env(safe-area-inset-top));
+    right: 14px;
+  }
+
+  .staff-dashboard-page #sidebar.open ~ .mobile-notification-launcher {
+    display: none;
+  }
+}
+
+/* Use one clear page-title scale across Admin, clerk, and every staff role. */
+.staff-dashboard-page .section-title h2,
+.staff-dashboard-page .hero-main h2,
+.staff-dashboard-page .notification-center-hero h2 {
+  font-size: clamp(26px, 3vw, 38px);
+  line-height: 1.25;
+}

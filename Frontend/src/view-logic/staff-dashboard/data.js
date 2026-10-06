@@ -1,3 +1,4 @@
+import { cleaningCategories } from "../../services/cleaningCategories.js";
 /**
  * สร้าง state เริ่มต้นสำหรับ Staff Dashboard
  * ข้อมูลรายการทั้งหมดจะถูกโหลดจาก Backend ภายใน useStaffDashboard.js
@@ -55,8 +56,8 @@ export function createStaffDashboardData() {
       name: "แอดมิน",
       staffId: "-",
       avatar: "AD",
-      color: "#6757d9",
-      soft: "#efedff",
+      color: "#335e8a",
+      soft: "#edf3f8",
       eyebrow: "Admin command center",
       hero: "เห็นคิวงานทั้งหมด จัดการสิทธิ์ และควบคุมโครงสร้างห้องจากจุดเดียว",
       text: "เข้าถึงงานแม่บ้าน งานช่าง ของหาย–ของได้คืน บัญชี Staff และ QR ห้อง พร้อมมอบหมายหรือแก้ไขข้อมูลตามสิทธิ์แอดมิน",
@@ -95,13 +96,7 @@ export function createStaffDashboardData() {
 
   // ตัวเลือกหมวดหมู่เป็นค่าคงที่ของฟอร์ม ไม่ใช่ข้อมูลรายการ
   const categories = {
-    housekeeper: [
-      "all",
-      "พื้นเปียก/คราบสกปรก",
-      "ขยะ/กลิ่น",
-      "ห้องน้ำ/อุปกรณ์สิ้นเปลือง",
-      "ทำความสะอาดทั่วไป",
-    ],
+    housekeeper: ["all", ...cleaningCategories],
     technician: [
       "all",
       "เครื่องปรับอากาศ",
@@ -111,10 +106,7 @@ export function createStaffDashboardData() {
     ],
     admin: [
       "all",
-      "พื้นเปียก/คราบสกปรก",
-      "ขยะ/กลิ่น",
-      "ห้องน้ำ/อุปกรณ์สิ้นเปลือง",
-      "ทำความสะอาดทั่วไป",
+      ...cleaningCategories,
       "เครื่องปรับอากาศ",
       "ไฟฟ้า/แสงสว่าง",
       "ประปา/สุขาภิบาล",

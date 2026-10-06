@@ -53,4 +53,14 @@
           </div>
           <div class="staff-account-grid" id="staffTable" aria-live="polite"></div>
         </section>
+  <div class="modal" id="staffAccountDetailModal" role="dialog" aria-modal="true" aria-labelledby="staffAccountDetailTitle">
+    <section class="modal-card staff-overview-modal-card">
+      <header class="modal-head">
+        <h3 id="staffAccountDetailTitle">รายละเอียดบัญชีเจ้าหน้าที่</h3>
+        <button type="button" class="close" data-close="staffAccountDetailModal" aria-label="ปิดรายละเอียด"><svg class="icon"><use href="#i-close" /></svg></button>
+      </header>
+      <div class="detail-meta" id="staffAccountDetailInfo"></div>
+      <div id="staffAccountDetailWork" aria-live="polite"></div>
+    </section>
+  </div>
 </template>

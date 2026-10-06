@@ -23,8 +23,9 @@
   --shadow-sm: 0 6px 20px rgba(35, 72, 105, 0.07);
   --radius: 24px;
   --radius-sm: 18px;
-  --font: "Sarabun", "Open Sans", system-ui, sans-serif;
+  --font: "Sarabun", sans-serif;
 }
+
 * {
   box-sizing: border-box;
 }
@@ -1728,7 +1729,7 @@ h4,
 .eyebrow,
 .brand,
 .brand * {
-  font-family: "Sarabun", "Open Sans", system-ui, sans-serif !important;
+  font-family: "Sarabun", sans-serif !important;
 }
 
 /* enhancements.css */
@@ -3000,7 +3001,7 @@ textarea:focus-visible {
 .user-page .brand strong,
 .staff-dashboard-page .brand strong,
 .staff-login-page .brand {
-  font-family: "Prompt", "Sarabun", sans-serif !important;
+  font-family: "Sarabun", sans-serif !important;
 }
 .user-page .greeting-name,
 .user-page .page-header h2,
@@ -3019,8 +3020,7 @@ textarea:focus-visible {
   position: relative;
   isolation: isolate;
   min-height: 100vh;
-  background: radial-gradient(circle at 85px 0, #ffffff 0 170px, transparent 171px),
-    linear-gradient(145deg, #f1f7fc 0%, #fdfefe 46%, #f5f9fc 100%);
+  background: linear-gradient(145deg, #f1f7fc 0%, #fdfefe 46%, #f5f9fc 100%);
 }
 .user-page > .app-shell {
   position: relative;
@@ -3278,7 +3278,9 @@ textarea:focus-visible {
   }
 
   .user-page .mobile-hero {
-    padding: 12px 0 10px;
+    min-height: 308px;
+    padding: 190px 4px 16px;
+    overflow: hidden;
   }
 
   .user-page .mobile-hero .greeting-name {
@@ -3298,8 +3300,11 @@ textarea:focus-visible {
   }
 
   .user-page .mobile-hero .building-illustration {
-    top: 8px;
-    width: min(180px, 48cqi);
+    top: -12px;
+    right: 50%;
+    width: calc(100% + 56px);
+    max-width: none;
+    transform: translateX(50%);
   }
 
   .user-page .location-card {
@@ -3332,7 +3337,7 @@ textarea:focus-visible {
   }
 
   .user-page #dashboard > .mobile-hero + .service-menu-section {
-    margin-top: -52px;
+    margin-top: 0;
   }
 
   .user-page .section-head {
@@ -3529,6 +3534,46 @@ textarea:focus-visible {
     height: 20px;
   }
 
+  .user-page .bottom-nav .mobile-overview-tab {
+    z-index: 1;
+    overflow: visible;
+  }
+
+  .user-page .bottom-nav .mobile-overview-tab .nav-glyph {
+    width: 56px;
+    height: 56px;
+    margin-top: -30px;
+    display: grid;
+    place-items: center;
+    border-radius: 19px;
+    background: #17324d;
+    color: #fff;
+    box-shadow: 0 10px 24px rgba(23, 50, 77, 0.32);
+  }
+
+  .user-page .bottom-nav .mobile-overview-tab .nav-glyph .icon {
+    display: none;
+  }
+
+  .user-page .bottom-nav .mobile-overview-tab .nav-glyph::before {
+    content: "";
+    width: 25px;
+    height: 25px;
+    background: center / contain no-repeat
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23fff' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m3 11 9-8 9 8v9h-6v-6H9v6H3z'/%3E%3C/svg%3E");
+  }
+
+  .user-page .bottom-nav .mobile-overview-tab > span:last-child {
+    margin-top: 1px;
+    color: #77727f;
+    font-weight: 400;
+  }
+
+  .user-page .bottom-nav .mobile-overview-tab.active > span:last-child {
+    color: #17324d;
+    font-weight: 800;
+  }
+
   #detailModal .ui-modal-card {
     width: min(350px, 100%);
     max-height: min(82dvh, 650px);
@@ -3696,4 +3741,20 @@ textarea:focus-visible {
     font-size: 12px;
   }
 
+}
+
+/* The BC identity stays blue on every Guest service theme. */
+.user-page .sidebar .brand-mark {
+  border-color: transparent !important;
+  background: linear-gradient(145deg, #335e8a, #5d89b3) !important;
+  color: #fff !important;
+  box-shadow: 0 8px 20px rgba(51, 94, 138, 0.25) !important;
+}
+
+/* Match every Guest page title to the staff notification-center title scale. */
+.user-page .greeting-name,
+.user-page .page-header h2,
+.user-page :is(#repair, #clean, #lost) .page-header h2 {
+  font-size: clamp(26px, 3vw, 38px);
+  line-height: 1.25;
 }

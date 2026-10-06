@@ -7,17 +7,7 @@
       </div>
     </div>
     <div class="metrics" id="metricGrid"></div>
-    <section class="panel" style="margin-bottom: 20px">
-      <div class="panel-head">
-        <div>
-          <h3>ดำเนินการด่วน</h3>
-          <p>เลือกสิ่งที่ต้องทำต่อจากสถานะงานปัจจุบัน</p>
-        </div>
-      </div>
-      <div class="panel-body">
-        <div class="quick-action-grid" id="dashboardQuickActions"></div>
-      </div>
-    </section>
+    
     <div class="grid-2">
       <section class="panel">
         <div class="panel-head">
@@ -35,7 +25,7 @@
         <div class="panel-head">
           <div>
             <h3>กิจกรรมล่าสุด</h3>
-            <p>การเปลี่ยนแปลงใน Role ของคุณ</p>
+            <p>งานที่คุณเพิ่งดำเนินการหรืออัปเดต</p>
           </div>
         </div>
         <div class="panel-body">

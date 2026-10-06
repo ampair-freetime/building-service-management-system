@@ -4,6 +4,16 @@ const serviceStatus = {
     className: "wait",
     description: "ระบบรับคำร้องแล้ว และกำลังรอเจ้าหน้าที่ตรวจสอบ",
   },
+  assigned: {
+    label: "เจ้าหน้าที่รับงานแล้ว",
+    className: "progress",
+    description: "มีเจ้าหน้าที่รับผิดชอบแล้ว และกำลังรอยืนยันรับเรื่อง",
+  },
+  received: {
+    label: "เจ้าหน้าที่รับเรื่องแล้ว",
+    className: "progress",
+    description: "เจ้าหน้าที่ยืนยันรับเรื่องแล้ว และกำลังรอเริ่มดำเนินการ",
+  },
   in_progress: {
     label: "กำลังดำเนินการ",
     className: "progress",
@@ -28,10 +38,12 @@ const serviceStatusAliases = {
   "รอเจ้าหน้าที่ตรวจสอบ": "waiting",
   "รอเจ้าหน้าที่รับเรื่อง": "waiting",
   "รอรับงาน": "waiting",
-  // หากข้อมูลเดิมยังมีสถานะขั้นกลาง ให้รวมเป็นกำลังดำเนินการใน UI สามขั้น
-  assigned: "in_progress",
-  "มอบหมายเจ้าหน้าที่แล้ว": "in_progress",
-  "รับงานแล้ว": "in_progress",
+  "มอบหมายเจ้าหน้าที่แล้ว": "assigned",
+  "รับงานแล้ว": "assigned",
+  "เจ้าหน้าที่รับงานแล้ว": "assigned",
+  "รับทราบงาน": "received",
+  "รับเรื่องแล้ว": "received",
+  "เจ้าหน้าที่รับเรื่องแล้ว": "received",
   "กำลังดำเนินการ": "in_progress",
   "ดำเนินการเสร็จสิ้น": "completed",
   "เสร็จสิ้น": "completed",
@@ -103,8 +115,10 @@ export function serviceProgress(item = {}, code = "") {
   const presentation = requestStatusPresentation(item, code);
   if (!presentation.isService) return null;
 
+  const progressStatus = ["assigned", "received"].includes(presentation.status)
+    ? "waiting" : presentation.status;
   const currentIndex = SERVICE_PROGRESS_STEPS.findIndex(
-    (step) => step.status === presentation.status,
+    (step) => step.status === progressStatus,
   );
   return {
     currentIndex: currentIndex < 0 ? 0 : currentIndex,

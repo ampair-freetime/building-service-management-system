@@ -37,8 +37,20 @@ test("recognizes repair and cleaning request codes and Thai status aliases", () 
   assert.equal(presentation.label, "กำลังดำเนินการ");
   assert.equal(
     requestStatusPresentation({ request_type: "repair", status: "assigned" }).status,
-    "in_progress",
+    "assigned",
   );
+});
+
+test("accepting and acknowledging service work do not claim work has started or reset progress", () => {
+  for (const request_type of ["cleaning", "repair"]) {
+    const states = ["waiting", "assigned", "received", "in_progress", "completed"];
+    assert.deepEqual(states.map(status => serviceProgress({request_type, status}).currentIndex), [0, 0, 0, 1, 2]);
+    assert.equal(requestStatusPresentation({request_type, status: "assigned"}).label, "เจ้าหน้าที่รับงานแล้ว");
+    assert.equal(requestStatusPresentation({request_type, status: "received"}).label, "เจ้าหน้าที่รับเรื่องแล้ว");
+    for (const status of ["รับทราบงาน", "รับเรื่องแล้ว"]) {
+      assert.equal(requestStatusPresentation({request_type, status}).status, "received");
+    }
+  }
 });
 
 test("shows the request title first in tracking details", () => {

@@ -76,8 +76,11 @@
           </div>
           <div>
             <div class="job-meta" id="jobDetailBadges"></div>
-            <p id="jobDetailDescription"></p>
             <div class="detail-meta">
+              <div class="detail-description" style="grid-column: 1 / -1">
+                <small>รายละเอียดสิ่งของ</small>
+                <strong id="jobDetailDescription">–</strong>
+              </div>
               <div>
                 <small id="jobDetailRoomLabel">สถานที่</small><strong id="jobDetailRoom">–</strong>
               </div>
@@ -190,7 +193,6 @@
             <label for="statusNote">หมายเหตุ</label
             ><textarea
               id="statusNote"
-              required
               placeholder="สรุปความคืบหน้า"
             ></textarea>
           </div>
@@ -334,11 +336,11 @@
           <input type="hidden" id="completeJobId" />
           <div class="field">
             <label for="completeResult">ผลการดำเนินงาน</label
-            ><textarea id="completeResult" required></textarea>
+            ><textarea id="completeResult"></textarea>
           </div>
           <div class="field">
             <label for="completeNote">หมายเหตุปิดงาน</label
-            ><textarea id="completeNote" required></textarea>
+            ><textarea id="completeNote"></textarea>
           </div>
           <div class="field">
             <label for="completeImage">รูปหลังดำเนินการ</label

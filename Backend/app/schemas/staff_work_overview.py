@@ -1,6 +1,7 @@
 """Response contracts for the admin staff-work overview."""
 
 from typing import Literal
+from datetime import datetime
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict
@@ -41,11 +42,19 @@ class CurrentWorkItem(BaseModel):
     status: RequestStatus
 
 
+class ReturnedWorkItem(CurrentWorkItem):
+    history_id: UUID
+    reason: str | None
+    returned_at: datetime
+    returned_by: str
+
+
 class StaffCurrentWorkResponse(BaseModel):
     staff_id: UUID
     full_name: str
     current_work_count: int
     current_work: list[CurrentWorkItem]
+    returned_work: list[ReturnedWorkItem] = []
 
 
 StaffWorkRoleFilter = Literal["cleaning", "repair"]

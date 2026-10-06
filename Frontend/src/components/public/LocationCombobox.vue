@@ -23,7 +23,7 @@ let parentForm;
 
 const normalizedQuery = computed(() => query.value.trim().toLocaleLowerCase("th"));
 const filteredOptions = computed(() => {
-  if (!normalizedQuery.value) return props.options;
+  if (!props.searchable || !normalizedQuery.value) return props.options;
   return props.options.filter((option) =>
     String(option).toLocaleLowerCase("th").includes(normalizedQuery.value),
   );

@@ -56,16 +56,13 @@
         <div class="profile-grid">
           <div class="profile-avatar-large" id="profileAvatar"></div>
           <div class="profile-data">
-            <div>
+            <div class="profile-name-field">
               <small>ชื่อ</small
               ><strong id="profileName">-</strong>
             </div>
-            <div>
-              <small>อีเมล</small
-              ><strong id="profileEmail">-</strong>
-            </div>
-            <div>
-              <small>Role</small><strong id="profileRole">-</strong>
+            <div class="profile-meta-row">
+              <span><small>อีเมล</small><strong id="profileEmail">-</strong></span>
+              <span><small>Role</small><strong id="profileRole">-</strong></span>
             </div>
           </div>
         </div>
