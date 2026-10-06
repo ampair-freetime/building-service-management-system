@@ -864,6 +864,10 @@ export function useStaffDashboard() {
         toast("ไม่พบหน้าที่เลือก");
         return;
       }
+      currentPage = page;
+      if (["housekeeper", "technician"].includes(currentRole) && destinationPage === "jobs") {
+        currentBoardView = page === "my-jobs" ? "mine" : "unassigned";
+      }
       $("#notificationPanel")?.classList.remove("open", "mobile-notification-page");
       $("#notificationButton")?.setAttribute("aria-expanded", "false");
       $$("#mobileNotification, #mobileNotificationAdmin").forEach((button) => {
@@ -3050,7 +3054,13 @@ export function useStaffDashboard() {
       modal.classList.add("open");
       modal.removeAttribute("aria-hidden");
       document.body.classList.add("modal-open");
-      if (historyMode !== "none") updateDashboardRoute(id, historyMode);
+      if (historyMode !== "none") {
+        // Replace the previous dialog so closing success cannot reopen its form.
+        const mode = historyMode === "push" && readDashboardRoute().dialog
+          ? "replace"
+          : historyMode;
+        updateDashboardRoute(id, mode);
+      }
       requestAnimationFrame(() =>
         modal
           .querySelector(
@@ -3094,7 +3104,9 @@ export function useStaffDashboard() {
         closeModal(modal.id, false, false),
       );
       navigate(page, "none");
-      const modalId = modalIdFromSlug(routeState.dialog);
+      let modalId = modalIdFromSlug(routeState.dialog);
+      // A consumed confirmation cannot be restored from browser history.
+      if (modalId === "confirmModal" && !pendingConfirmAction) modalId = "";
       if (modalId) openModal(modalId, document.activeElement, "none");
       restoringNavigation = false;
 
@@ -3344,7 +3356,7 @@ export function useStaffDashboard() {
       $("#jobDetailModal")?.classList.remove("lost-post-detail");
       $("#jobDetailCode").textContent = `${id} · ${job.category}`;
       $("#jobDetailTitle").textContent = job.title;
-      $("#jobDetailDescription").textContent = job.detail;
+      $("#jobDetailDescription").textContent = job.detail || "ผู้แจ้งไม่ได้ระบุรายละเอียดเพิ่มเติม";
       $("#jobDetailRoom").textContent = job.room;
       $("#jobDetailReporter").textContent = job.reporter;
       $("#jobDetailContact").textContent =
@@ -3476,9 +3488,6 @@ export function useStaffDashboard() {
         toast("งานนี้ถูกรับไปแล้วหรือไม่อยู่ในรายการของคุณ");
         return true;
       }
-      navigate("jobs");
-      renderJobs();
-      renderMetrics();
       openJobDetail(job.id, trigger);
       return true;
     }
@@ -4993,7 +5002,7 @@ export function useStaffDashboard() {
         openMobileNotifications(button);
       else toggleNotificationPanel();
     });
-    $("#notificationPanel")?.addEventListener("click", async (event) => {
+    $("#notificationList")?.addEventListener("click", async (event) => {
       event.stopPropagation();
       if (event.target.closest("[data-close-notifications]")) {
         event.currentTarget.classList.remove("open");
@@ -5061,7 +5070,6 @@ export function useStaffDashboard() {
           job = allJobs.find((entry) => entry.backendId === item.requestId);
         }
         if (job) {
-          navigate("jobs");
           openJobDetail(job.id, itemButton);
         } else {
           toast("ไม่พบงานซ่อมที่เชื่อมกับการแจ้งเตือนนี้");
@@ -5137,6 +5145,7 @@ export function useStaffDashboard() {
       const action = pendingConfirmAction;
       pendingConfirmAction = null;
       closeModal("confirmModal", false);
+      updateDashboardRoute("", "replace");
       if (typeof action === "function") action();
     });
     const staffForm = $("#staffForm");

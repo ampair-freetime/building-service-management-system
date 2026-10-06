@@ -6860,3 +6860,9 @@ body:has(.staff-dashboard-page) {
   font-size: clamp(26px, 3vw, 38px);
   line-height: 1.25;
 }
+
+.staff-dashboard-page .detail-notes small {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.6;
+}
