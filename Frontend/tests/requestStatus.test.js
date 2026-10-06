@@ -77,7 +77,7 @@ test("renders lost-and-found as a three-step progress indicator", () => {
   const expectedIndexes = {
     pending: 0,
     approved: 1,
-    claimed: 1,
+    claimed: 2,
     closed: 2,
     rejected: 2,
   };

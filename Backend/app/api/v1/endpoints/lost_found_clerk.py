@@ -1,9 +1,12 @@
 from uuid import UUID
+from zoneinfo import ZoneInfo
+from app.services.invitation_email import send_email, EmailDeliveryError
 
 from fastapi import APIRouter, HTTPException
 
 from app.api.dependencies import ClerkStaff, DbSession, OptionalObjectStorageClient
 from app.schemas.lost_found_clerk import (
+    PersonalLostFoundHistoryResponse,
     FoundItemDetailResponse,
     LostItemDetailResponse,
     OwnershipRequestDetailResponse,
@@ -17,6 +20,8 @@ from app.schemas.lost_found_clerk import (
 )
 from app.models.enums import LostType
 from app.services.lost_found_clerk import (
+    list_personal_lost_found_history,
+    reject_ownership_request,
     ActiveClaimExistsError,
     approve_found_item,
     approve_lost_item,
@@ -37,6 +42,12 @@ from app.services.lost_found_clerk import (
 )
 
 router = APIRouter()
+
+
+@router.get("/my-history", response_model=list[PersonalLostFoundHistoryResponse])
+async def read_personal_history(session: DbSession, staff: ClerkStaff):
+    return await list_personal_lost_found_history(session, staff.id)
+
 
 @router.get(
     "/pending-found-items",
@@ -426,6 +437,8 @@ async def schedule_ownership_pickup(
         session,
         claim_id,
         request.pickup_datetime,
+        request.pickup_location,
+        request.note,
     )
 
     if claim is None:
@@ -442,4 +455,46 @@ async def schedule_ownership_pickup(
             detail="Ownership request not found",
         )
 
+    local = request.pickup_datetime
+    zone = ZoneInfo("Asia/Bangkok")
+    local = local.replace(tzinfo=zone) if local.tzinfo is None else local.astimezone(zone)
+    try:
+        await send_email(
+            recipient=detail["claimant_email"],
+            subject="นัดหมายรับคืนสิ่งของ · CS Building Care",
+            body=(f"เรียน {detail['claimant_name']}\n\n"
+                  f"นัดรับคืน: {detail['item_name']} ({detail['item_code']})\n"
+                  f"วันที่ {local.strftime('%d/%m/%Y')} เวลา {local.strftime('%H:%M')} น. (เวลาไทย)\n"
+                  f"จุดรับของ: {request.pickup_location or detail['custody_location'] or 'ติดต่อห้องธุรการ CSB'}\n"
+                  f"สิ่งที่ต้องเตรียม / หมายเหตุ: {request.note or 'ไม่มี'}\n\n"
+                  "หากไม่สะดวกตามนัด กรุณาติดต่อธุรการอาคาร CSB"),
+        )
+        detail["email_sent"] = True
+    except EmailDeliveryError:
+        detail["email_sent"] = False
     return detail
+
+@router.post("/ownership-requests/{claim_id}/reject", response_model=OwnershipRequestListResponse)
+async def reject_ownership_request_endpoint(
+    claim_id: UUID, request: RejectFoundItemRequest, session: DbSession, staff: ClerkStaff,
+):
+    claim = await reject_ownership_request(session, claim_id, staff.id, request.reason)
+    if claim is None:
+        raise HTTPException(status_code=409, detail="คำขอนี้ไม่อยู่ในสถานะที่ปฏิเสธได้")
+    detail = await get_ownership_request_detail(session, claim_id)
+    email_sent = False
+    try:
+        await send_email(
+            recipient=claim.claimant_email,
+            subject="ผลการตรวจสอบคำขอรับคืนสิ่งของ · อาคาร CSB",
+            body=(f"เรียน {claim.claimant_name}\n\n"
+                  f"คำขอรับคืน {detail['item_name']} ({detail['item_code']}) ไม่ผ่านการตรวจสอบ\n"
+                  f"เหตุผล: {request.reason}\n\n"
+                  "หากต้องการสอบถามเพิ่มเติม กรุณาติดต่อธุรการอาคาร CSB"),
+        )
+        email_sent = True
+    except EmailDeliveryError:
+        pass
+    return OwnershipRequestListResponse.model_validate(claim).model_copy(
+        update={"email_sent": email_sent}
+    )

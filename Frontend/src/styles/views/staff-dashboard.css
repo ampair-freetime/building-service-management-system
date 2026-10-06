@@ -6866,3 +6866,72 @@ body:has(.staff-dashboard-page) {
   overflow-wrap: anywhere;
   line-height: 1.6;
 }
+
+.staff-dashboard-page.is-clerk #lostTabs .tab,
+.staff-dashboard-page.is-clerk #lostTabs .tab:hover,
+.staff-dashboard-page.is-clerk #lostTabs .tab.active {
+  box-shadow: none;
+  transform: none;
+}
+
+.staff-dashboard-page.is-clerk #jobDetailModal .modal-head > div {
+  min-width: 0;
+  display: grid;
+  gap: 10px;
+}
+.staff-dashboard-page.is-clerk #jobDetailCode {
+  display: block;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.staff-dashboard-page.is-clerk #jobDetailTitle {
+  margin: 0;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.staff-dashboard-page.is-clerk #jobDetailModal .detail-meta {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
+}
+.staff-dashboard-page.is-clerk #jobDetailModal .detail-meta > div {
+  background: transparent;
+  border-radius: 0;
+  padding: 12px 0;
+  border-bottom: 1px solid #eadfbd;
+}
+.staff-dashboard-page.is-clerk #jobDetailModal .detail-meta > div[hidden],
+#jobDetailPrivateGroup[hidden], #jobDetailNotesGroup[hidden] { display: none; }
+.staff-dashboard-page.is-clerk #jobDetailModal .detail-meta strong {
+  line-height: 1.6;
+  font-size: 14px;
+  white-space: pre-wrap;
+}
+.staff-dashboard-page.is-clerk #jobDetailModal .private-verification {
+  background: #fff7dd;
+  border: 1px solid #eadfbd;
+}
+#jobDetailPrivate { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.7; margin: 10px 0 0; }
+
+#claimDetailModal .modal-head > div { display: grid; gap: 10px; min-width: 0; }
+#claimDetailCode { display: block; line-height: 1.6; overflow-wrap: anywhere; }
+#claimDetailTitle { margin: 0; line-height: 1.6; }
+#claimDetailModal h4 { margin: 22px 0 12px; }
+#claimDetailModal .inline-summary strong { overflow-wrap: anywhere; line-height: 1.6; }
+.claim-evidence-columns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.claim-evidence-columns > div { padding: 16px; background: #f8f7fb; border-radius: 16px; }
+.claim-evidence-columns .claim-secret { background: #fff7dd; margin: 0; }
+.claim-evidence-columns p { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.7; margin: 10px 0 0; }
+.claim-next-step { padding: 14px 16px; background: #fffaf0; border-radius: 12px; line-height: 1.7; }
+.claim-history { margin: 16px 0; }
+#claimAppointmentGroup[hidden] { display: none; }
+@media (max-width: 640px) { .claim-evidence-columns { grid-template-columns: 1fr; } }
+
+#claimDetailModal .modal-head > div { gap: 6px; }
+#claimDetailModal .eyebrow { margin: 0; font-size: 11px; }
+#claimDetailModal .modal-head h3 { margin: 0; }
+#claimDetailModal .inline-summary { gap: 0 20px; }
+#claimDetailModal .inline-summary > div { background: transparent; border-radius: 0; padding: 10px 0; border-bottom: 1px solid #eee5d1; }
+#claimDetailModal #claimActions { display: flex; flex-wrap: wrap; gap: 10px; border-top: 1px solid #eee5d1; padding-top: 18px; margin-top: 18px; }
+#claimDetailModal #claimActions .quick-action { flex: 1; min-width: 160px; }
+#claimDetailModal #claimActions .primary-action { background: var(--role); color: #fff; border-color: var(--role); }
+#claimDetailModal #claimActions .claim-reject-action { background: #fff0f0; color: #c03939; border-color: #f2cdcd; }

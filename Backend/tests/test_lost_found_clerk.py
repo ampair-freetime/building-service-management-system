@@ -59,6 +59,7 @@ def test_clerk_can_view_found_item_detail(test_context):
                 item_category="Electronics",
                 item_name="Laptop",
                 description="Silver laptop",
+                private_verification_detail="Secret serial 123",
                 event_datetime=datetime.now(timezone.utc),
                 location_id=None,
                 location_detail="Building B",
@@ -79,6 +80,7 @@ def test_clerk_can_view_found_item_detail(test_context):
     )
 
     assert response.status_code == 200
+    assert response.json()["private_verification_detail"] == "Secret serial 123"
 
     data = response.json()
 
@@ -149,6 +151,19 @@ def test_administrative_can_approve_found_item(test_context):
     assert data["id"] == str(item_id)
     assert data["report_type"] == "found"
     assert data["status"] == "approved"
+
+    history = client.get("/api/v1/lost-found/my-history", headers=headers)
+    assert history.status_code == 200
+    assert len(history.json()) == 1
+    assert history.json()[0]["item_code"] == "FOUND003"
+    assert history.json()[0]["status"] == "approved"
+    assert client.get("/api/v1/lost-found/my-history").status_code == 401
+    seed_staff(session_factory, email="other.clerk@example.com",
+               password="admin-password", role="clerk")
+    other_login = client.post("/api/v1/auth/login", json={
+        "identifier": "other.clerk@example.com", "password": "admin-password"})
+    other_headers = {"Authorization": f"Bearer {other_login.json()['access_token']}"}
+    assert client.get("/api/v1/lost-found/my-history", headers=other_headers).json() == []
 
 
 def test_cannot_approve_already_approved_found_item(test_context):
@@ -1762,7 +1777,10 @@ def test_rejected_lost_item_is_not_published_and_removed_from_pending_list(
     )
 
 
-def test_clerk_can_schedule_pickup(test_context):
+def test_clerk_can_schedule_pickup(test_context, monkeypatch):
+    async def fake_email(**kwargs):
+        assert "CSB office" in kwargs["body"] or "CSB lobby" in kwargs["body"]
+    monkeypatch.setattr("app.api.v1.endpoints.lost_found_clerk.send_email", fake_email)
     client, session_factory = test_context
 
     seed_staff(
@@ -1824,7 +1842,9 @@ def test_clerk_can_schedule_pickup(test_context):
         f"/api/v1/lost-found/ownership-requests/{claim_id}/schedule-pickup",
         headers=headers,
         json={
-            "pickup_datetime": "2026-09-20T13:30:00",
+            "pickup_datetime": "2030-09-20T13:30:00",
+            "pickup_location": "CSB office",
+            "note": "Bring identification",
         },
     )
 
@@ -1833,7 +1853,29 @@ def test_clerk_can_schedule_pickup(test_context):
     data = response.json()
 
     assert data["status"] == "scheduled"
-    assert data["pickup_datetime"] == "2026-09-20T13:30:00"
+    assert data["pickup_datetime"] == "2030-09-20T13:30:00"
+    detail = client.get(f"/api/v1/lost-found/ownership-requests/{claim_id}", headers=headers)
+    assert detail.json()["pickup_location"] == "CSB office"
+    assert detail.json()["pickup_note"] == "Bring identification"
+    changed = client.post(
+        f"/api/v1/lost-found/ownership-requests/{claim_id}/schedule-pickup", headers=headers,
+        json={"pickup_datetime": "2030-09-23T14:30:00", "pickup_location": "CSB lobby"},
+    )
+    assert changed.status_code == 200
+    assert changed.json()["pickup_location"] == "CSB lobby"
+    assert changed.json()["email_sent"] is True
+    for invalid_time in ["2030-09-21T13:30:00+07:00", "2030-09-20T04:30:00+07:00", "2030-09-20T17:00:00+07:00"]:
+        invalid = client.post(
+            f"/api/v1/lost-found/ownership-requests/{claim_id}/schedule-pickup", headers=headers,
+            json={"pickup_datetime": invalid_time},
+        )
+        assert invalid.status_code == 422
+
+    active = client.get("/api/v1/lost-found/ownership-requests", headers=headers)
+    assert active.status_code == 200
+    assert str(claim_id) in {record["id"] for record in active.json()}
+
+
 
     async def get_claim():
         async with session_factory() as session:
@@ -2230,3 +2272,43 @@ def test_approve_response_does_not_lazy_load_item_images(test_context):
 
     assert response.status_code == 200
     assert response.json()["images"] == []
+
+
+def test_reject_ownership_requires_reason_and_preserves_found_item(test_context, monkeypatch):
+    emails = []
+    async def fake_email(**kwargs):
+        emails.append(kwargs)
+    monkeypatch.setattr("app.api.v1.endpoints.lost_found_clerk.send_email", fake_email)
+    client, session_factory = test_context
+    seed_staff(session_factory, email="reviewer@example.com", password="admin-password", role="clerk")
+    login = client.post("/api/v1/auth/login", json={"identifier": "reviewer@example.com", "password": "admin-password"})
+    headers = {"Authorization": f"Bearer {login.json()['access_token']}"}
+    async def seed():
+        async with session_factory() as session:
+            item = LostItem(item_code="REJECT-CLAIM-ITEM", report_type=LostType.FOUND,
+                            item_category="Clothing", item_name="Shirt", event_datetime=datetime.now(timezone.utc),
+                            reporter_email="finder@example.com", status=LostStatus.APPROVED)
+            session.add(item)
+            await session.flush()
+            claim = LostClaim(found_item_id=item.id, claimant_name="Claimant", claimant_email="owner@example.com",
+                              proof_detail="Wrong evidence", status=ClaimStatus.ADDITIONAL_INFO_REQUIRED)
+            session.add(claim)
+            await session.commit()
+            return claim.id, item.id
+    claim_id, item_id = asyncio.run(seed())
+    url = f"/api/v1/lost-found/ownership-requests/{claim_id}/reject"
+    assert client.post(url, headers=headers, json={"reason": " "}).status_code == 422
+    assert client.post(url, json={"reason": "Mismatch"}).status_code == 401
+    response = client.post(url, headers=headers, json={"reason": "Evidence does not match"})
+    assert response.status_code == 200
+    assert response.json()["status"] == "rejected"
+    assert response.json()["email_sent"] is True
+    assert emails[0]["recipient"] == "owner@example.com"
+    assert "Evidence does not match" in emails[0]["body"]
+    detail = client.get(f"/api/v1/lost-found/ownership-requests/{claim_id}", headers=headers).json()
+    assert detail["review_note"] == "Evidence does not match"
+    assert client.post(url, headers=headers, json={"reason": "Again"}).status_code == 409
+    async def check_item():
+        async with session_factory() as session:
+            assert (await session.get(LostItem, item_id)).status == LostStatus.APPROVED
+    asyncio.run(check_item())

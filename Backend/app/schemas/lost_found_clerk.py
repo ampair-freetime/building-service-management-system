@@ -1,4 +1,5 @@
-from datetime import datetime
+from datetime import datetime, time
+from zoneinfo import ZoneInfo
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -51,6 +52,7 @@ class FoundItemDetailResponse(BaseModel):
     item_category: str
     item_name: str
     description: str | None
+    private_verification_detail: str | None = None
     event_datetime: datetime
     location_detail: str | None
     custody_location: str | None
@@ -69,6 +71,7 @@ class LostItemDetailResponse(BaseModel):
     item_category: str
     item_name: str
     description: str | None
+    private_verification_detail: str | None = None
     event_datetime: datetime
     location_detail: str | None
     reporter_email: str
@@ -92,6 +95,7 @@ class RejectFoundItemRequest(BaseModel):
 
 
 class OwnershipRequestListResponse(BaseModel):
+    email_sent: bool | None = None
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
@@ -118,6 +122,10 @@ class OwnershipRequestDetailResponse(BaseModel):
 
     # Request information
     status: ClaimStatus
+    pickup_location: str | None = None
+    email_sent: bool | None = None
+    pickup_note: str | None = None
+    private_verification_detail: str | None = None
     pickup_datetime: datetime | None
     return_status: ReturnStatus | None
     review_note: str | None
@@ -153,3 +161,27 @@ class UpdateReturnStatusRequest(BaseModel):
 
 class SchedulePickupRequest(BaseModel):
     pickup_datetime: datetime
+    pickup_location: str | None = Field(default=None, max_length=255)
+    note: str | None = Field(default=None, max_length=2000)
+
+    @field_validator("pickup_datetime")
+    @classmethod
+    def validate_pickup_hours(cls, value: datetime) -> datetime:
+        zone = ZoneInfo("Asia/Bangkok")
+        local = value.replace(tzinfo=zone) if value.tzinfo is None else value.astimezone(zone)
+        if local.weekday() >= 5 or not time(8, 30) <= local.time() <= time(16, 30):
+            raise ValueError("นัดรับได้เฉพาะจันทร์–ศุกร์ เวลา 08:30–16:30 น.")
+        if local <= datetime.now(zone):
+            raise ValueError("กรุณาเลือกวันและเวลานัดหมายที่ยังมาไม่ถึง")
+        return value
+
+
+class PersonalLostFoundHistoryResponse(BaseModel):
+    uid: str
+    item_id: UUID
+    item_code: str
+    title: str
+    report_type: LostType
+    status: LostStatus
+    note: str | None
+    created_at: datetime

@@ -79,6 +79,7 @@ export function toDashboardStaff(account) {
     email: account.email,
     role: STAFF_ROLE_LABELS[account.role] || account.role,
     zone: "-",
+    isActivated: account.is_activated === true,
     status: account.status === "active" ? "ใช้งาน" : "พักงาน",
     invitationDeliveryStatus: serverStatus || cachedStatus || "unknown",
     invitationStatusSource: serverStatus ? "server" : cachedStatus ? "browser" : "none",

@@ -161,6 +161,8 @@ class LostClaim(Base):
         ),
         nullable=True,
     )
+    pickup_location: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    pickup_note: Mapped[str | None] = mapped_column(Text, nullable=True)
     pickup_datetime: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True),
         nullable=True,

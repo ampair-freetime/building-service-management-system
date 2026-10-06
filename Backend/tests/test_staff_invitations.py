@@ -34,7 +34,7 @@ def test_create_invitation_activate_once_and_never_expose_password(
     sent_links: list[str] = []
 
     async def fake_send(**kwargs: str) -> None:
-        assert kwargs["staff_identifier"] == "new.tech@example.com"
+        assert kwargs["staff_identifier"] in {"new.tech@example.com", "changed.tech@example.com"}
         assert "password" not in kwargs
         sent_links.append(kwargs["activation_link"])
 
@@ -51,6 +51,7 @@ def test_create_invitation_activate_once_and_never_expose_password(
     )
 
     assert response.status_code == 201
+    assert response.json()["is_activated"] is False
     assert response.json()["email_sent"] is True
     assert response.json()["email"] == "new.tech@example.com"
     assert "password" not in response.text
@@ -78,6 +79,28 @@ def test_create_invitation_activate_once_and_never_expose_password(
         json={"identifier": "new.tech@example.com", "password": "Chosen-Pass1!"},
     )
     assert login.status_code == 200
+    staff_id = response.json()["id"]
+    updated = client.patch(
+        f"/api/v1/staff/{staff_id}", headers=headers,
+        json={"email": "changed.tech@example.com"},
+    )
+    assert updated.status_code == 200
+    assert updated.json()["is_activated"] is False
+    resent = client.post(f"/api/v1/staff/{staff_id}/resend-invitation", headers=headers)
+    assert resent.status_code == 200
+    assert len(sent_links) == 2
+    new_token = _token_from_link(sent_links[-1])
+    assert client.post(
+        "/api/v1/auth/setup-password",
+        json={"token": new_token, "password": "Chosen-Pass1!"},
+    ).status_code == 204
+    assert client.post(
+        f"/api/v1/staff/{staff_id}/resend-invitation", headers=headers
+    ).status_code == 409
+    assert client.post(
+        "/api/v1/auth/login",
+        json={"identifier": "changed.tech@example.com", "password": "Chosen-Pass1!"},
+    ).status_code == 200
 
 
 def test_resend_invalidates_previous_link_and_keeps_same_staff_account(

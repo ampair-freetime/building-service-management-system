@@ -97,6 +97,9 @@ async def update_staff_profile(
 
     try:
         if "email" in changes:
+            # Keep activation tied to the address that completed setup.
+            if account.is_activated and account.activated_email is None:
+                account.activated_email = account.email
             # Links already sent to the old address must stop working.
             await _invalidate_pending_links(session, staff_id)
         for key, value in changes.items():

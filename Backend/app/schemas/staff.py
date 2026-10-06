@@ -70,6 +70,7 @@ class StaffResponse(BaseModel):
     full_name: str
     role: StaffRole
     status: AccountStatus
+    is_activated: bool = False
     last_login_at: datetime | None
     created_at: datetime
     updated_at: datetime

@@ -257,8 +257,7 @@ export async function scheduleOwnershipPickup(claimId, appointment) {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        pickup_date: appointment.date,
-        pickup_time: appointment.time,
+        pickup_datetime: new Date(`${appointment.date}T${appointment.time}:00+07:00`).toISOString(),
         pickup_location: appointment.location,
         note: appointment.note || null,
       }),
@@ -370,4 +369,20 @@ export async function rejectLostItemAnnouncement(itemId, reason) {
     response,
     "ไม่สามารถปฏิเสธประกาศของหายได้",
   );
+}
+
+
+export async function getPersonalLostFoundHistory() {
+  const response = await fetch(`${API_BASE_URL}/lost-found/my-history`, {
+    headers: {Authorization: `Bearer ${localStorage.getItem("buildingCareAccessToken") || ""}`},
+  });
+  return parseResponse(response, "ไม่สามารถโหลดประวัติงานธุรการได้");
+}
+
+export async function rejectOwnershipRequest(claimId, reason) {
+  const response = await fetch(`${API_BASE_URL}/lost-found/ownership-requests/${encodeURIComponent(claimId)}/reject`, {
+    method: "POST", headers: {Authorization: `Bearer ${localStorage.getItem("buildingCareAccessToken") || ""}`, "Content-Type": "application/json"},
+    body: JSON.stringify({reason}),
+  });
+  return parseResponse(response, "ไม่สามารถปฏิเสธคำขอได้");
 }

@@ -157,12 +157,7 @@ async def resend_staff_invitation(session: AsyncSession, staff_id: UUID) -> Invi
     if staff.status != AccountStatus.ACTIVE:
         raise InvitationNotAvailableError("Account is not active")
 
-    used_invitation = await session.scalar(
-        select(StaffInvitation.id).where(
-            StaffInvitation.staff_id == staff_id, StaffInvitation.used_at.is_not(None)
-        )
-    )
-    if used_invitation is not None:
+    if staff.is_activated:
         raise InvitationNotAvailableError("Account has already been activated")
 
     invitation, token = await _create_pending_invitation(session, staff)
@@ -219,5 +214,6 @@ async def activate_staff_account(session: AsyncSession, *, token: str, password:
         )
     staff.password_hash = hash_password(password)
     staff.password_changed_at = _now()
+    staff.activated_email = staff.email
     await invalidate_pending_resets(session, staff.id)
     await session.commit()

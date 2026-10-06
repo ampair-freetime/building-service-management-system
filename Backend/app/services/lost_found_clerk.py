@@ -152,6 +152,10 @@ async def approve_found_item(
     if item is None:
         return None
 
+    session.add(LostItemHistory(
+        lost_item_id=item.id, staff_id=staff_id, old_status=item.status,
+        new_status=LostStatus.APPROVED, note="เจ้าหน้าที่อนุมัติรายการ",
+    ))
     item.status = LostStatus.APPROVED
     item.reviewed_by = staff_id
 
@@ -182,6 +186,10 @@ async def approve_lost_item(
     if item is None:
         return None
 
+    session.add(LostItemHistory(
+        lost_item_id=item.id, staff_id=staff_id, old_status=item.status,
+        new_status=LostStatus.APPROVED, note="เจ้าหน้าที่อนุมัติรายการ",
+    ))
     item.status = LostStatus.APPROVED
     item.reviewed_by = staff_id
 
@@ -213,6 +221,10 @@ async def reject_lost_item(
     if item is None:
         return None
 
+    session.add(LostItemHistory(
+        lost_item_id=item.id, staff_id=staff_id, old_status=item.status,
+        new_status=LostStatus.REJECTED, note=reason,
+    ))
     item.status = LostStatus.REJECTED
     item.reviewed_by = staff_id
     item.review_note = reason
@@ -245,6 +257,10 @@ async def reject_found_item(
     if item is None:
         return None
 
+    session.add(LostItemHistory(
+        lost_item_id=item.id, staff_id=staff_id, old_status=item.status,
+        new_status=LostStatus.REJECTED, note=reason,
+    ))
     item.status = LostStatus.REJECTED
     item.reviewed_by = staff_id
     item.review_note = reason
@@ -263,7 +279,7 @@ async def list_pending_ownership_requests(
     statement = (
         select(LostClaim)
         .where(
-            LostClaim.status == ClaimStatus.PENDING,
+            LostClaim.status.in_(ACTIVE_CLAIM_STATUSES),
         )
         .order_by(LostClaim.created_at.desc())
     )
@@ -303,6 +319,9 @@ async def get_ownership_request_detail(
         "proof_detail": claim.proof_detail,
         "status": claim.status,
         "pickup_datetime": claim.pickup_datetime,
+        "pickup_location": claim.pickup_location,
+        "pickup_note": claim.pickup_note,
+        "private_verification_detail": item.private_verification_detail,
         "return_status": claim.return_status,
         "review_note": claim.review_note,
         "created_at": claim.created_at,
@@ -327,7 +346,7 @@ async def approve_ownership_request(
         select(LostClaim)
         .where(
             LostClaim.id == claim_id,
-            LostClaim.status == ClaimStatus.PENDING,
+            LostClaim.status.in_([ClaimStatus.PENDING, ClaimStatus.ADDITIONAL_INFO_REQUIRED]),
         )
     )
 
@@ -358,7 +377,7 @@ async def request_additional_ownership_information(
         select(LostClaim)
         .where(
             LostClaim.id == claim_id,
-            LostClaim.status == ClaimStatus.PENDING,
+            LostClaim.status.in_([ClaimStatus.PENDING, ClaimStatus.ADDITIONAL_INFO_REQUIRED]),
         )
     )
 
@@ -442,6 +461,8 @@ async def schedule_pickup(
     session: AsyncSession,
     claim_id: UUID,
     pickup_datetime: datetime,
+    pickup_location: str | None = None,
+    note: str | None = None,
 ) -> LostClaim | None:
     """นัดวันและเวลารับของสำหรับ ownership request ที่ยืนยันแล้ว"""
 
@@ -449,7 +470,7 @@ async def schedule_pickup(
         select(LostClaim)
         .where(
             LostClaim.id == claim_id,
-            LostClaim.status == ClaimStatus.APPROVED,
+            LostClaim.status.in_([ClaimStatus.APPROVED, ClaimStatus.SCHEDULED]),
         )
     )
 
@@ -459,6 +480,8 @@ async def schedule_pickup(
         return None
 
     claim.pickup_datetime = pickup_datetime
+    claim.pickup_location = pickup_location
+    claim.pickup_note = note
     claim.status = ClaimStatus.SCHEDULED
 
     await session.commit()
@@ -519,3 +542,45 @@ async def close_lost_found_item(
     await session.refresh(item)
 
     return item
+
+
+async def list_personal_lost_found_history(session: AsyncSession, staff_id: UUID):
+    records = (await session.execute(
+        select(LostItemHistory, LostItem)
+        .join(LostItem, LostItem.id == LostItemHistory.lost_item_id)
+        .where(LostItemHistory.staff_id == staff_id)
+        .order_by(LostItemHistory.created_at.desc())
+    )).all()
+    def row(item, status, note, created_at, uid):
+        return dict(uid=uid, item_id=item.id, item_code=item.item_code,
+                    title=item.item_name, report_type=item.report_type,
+                    status=status, note=note, created_at=created_at)
+    rows = [row(item, history.new_status, history.note, history.created_at,
+                f"lost-history-{history.id}") for history, item in records]
+    decision_ids = {item.id for history, item in records
+                    if history.new_status in (LostStatus.APPROVED, LostStatus.REJECTED)}
+    # Earlier approvals recorded only the reviewer on the item.
+    legacy = await session.scalars(select(LostItem).where(
+        LostItem.reviewed_by == staff_id,
+        LostItem.status.in_([LostStatus.APPROVED, LostStatus.REJECTED, LostStatus.CLOSED]),
+    ))
+    rows.extend(row(item, LostStatus.REJECTED if item.status == LostStatus.REJECTED
+                    else LostStatus.APPROVED, item.review_note,
+                    item.updated_at, f"lost-review-{item.id}")
+                for item in legacy if item.id not in decision_ids)
+    return rows
+
+
+async def reject_ownership_request(session: AsyncSession, claim_id: UUID, staff_id: UUID, reason: str):
+    claim = await session.scalar(select(LostClaim).where(
+        LostClaim.id == claim_id,
+        LostClaim.status.in_([ClaimStatus.PENDING, ClaimStatus.ADDITIONAL_INFO_REQUIRED]),
+    ).with_for_update())
+    if claim is None:
+        return None
+    claim.status = ClaimStatus.REJECTED
+    claim.reviewed_by = staff_id
+    claim.review_note = reason
+    await session.commit()
+    await session.refresh(claim)
+    return claim
