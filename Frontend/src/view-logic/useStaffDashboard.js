@@ -1,6 +1,7 @@
 import { onBeforeUnmount, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import { enhanceFilterSelects } from "../services/filterSelectDropdown.js";
+import { requestStatusPresentation, serviceProgress } from "../services/requestStatus.js";
 import {
   createAdminLocation,
   fetchAdminLocations,
@@ -24,6 +25,8 @@ import {
   rejectLostItemAnnouncement,
   approveFoundItem,
   approveLostItemAnnouncement,
+  closeFoundItem,
+  closeLostItemAnnouncement,
   getPendingOwnershipRequests,
   getOwnershipRequestDetail,
   approveOwnershipRequest,
@@ -140,7 +143,24 @@ export function useStaffDashboard() {
       console.warn("Stored staff profile is invalid:", error);
     }
 
-    let currentLostTab = currentRole === "admin" ? "approved" : "inventory";
+    // ผูกงานจำลองกับชื่อ Staff ที่ login เพื่อทดสอบแท็บ "งานของฉัน"
+    allJobs.forEach((job) => {
+      if (job.assignee === "__CURRENT_HOUSEKEEPER__") {
+        job.assignee = currentUserName.housekeeper;
+      }
+      if (job.assignee === "__CURRENT_TECHNICIAN__") {
+        job.assignee = currentUserName.technician;
+      }
+    });
+    workHistory.forEach((record) => {
+      if (record.staff === "__CURRENT_HOUSEKEEPER__") {
+        record.staff = currentUserName.housekeeper;
+      }
+      if (record.staff === "__CURRENT_TECHNICIAN__") {
+        record.staff = currentUserName.technician;
+      }
+    });
+    let currentLostTab = "inventory";
     let appliedHistorySearch = "";
     let currentClerkCenterView = "approvals";
     const clerkApprovalLoadState = { found: "loading", lost: "loading", claims: "loading" };
@@ -210,6 +230,7 @@ export function useStaffDashboard() {
           custody: `รายงานเมื่อ ${new Date(item.created_at).toLocaleString("th-TH")}`,
           status: "รออนุมัติรับฝาก",
           createdAt: item.created_at,
+          imageUrl: item.images?.[0]?.url || "",
           assignee: null,
         }));
         const processedItems = lostSets.inventory.filter(
@@ -244,6 +265,7 @@ export function useStaffDashboard() {
           custody: `ส่งประกาศเมื่อ ${new Date(item.created_at).toLocaleString("th-TH")}`,
           status: "รออนุมัติเผยแพร่",
           createdAt: item.created_at,
+          imageUrl: item.images?.[0]?.url || "",
           assignee: null,
         }));
         const processedItems = lostSets.lostposts.filter(
@@ -263,21 +285,6 @@ export function useStaffDashboard() {
       }
     }
 
-    const completedLostFoundStorageKey = "buildingCareCompletedLostFoundItems";
-
-    // อ่านรหัสรายการที่ปิดงานแล้ว เพื่อไม่ดึงกลับมาแสดงซ้ำ
-    function completedLostFoundIds() {
-      try {
-        return new Set(
-          JSON.parse(
-            localStorage.getItem(completedLostFoundStorageKey) || "[]",
-          ),
-        );
-      } catch {
-        return new Set();
-      }
-    }
-
     let approvedLoadVersion = 0;
     // โหลดของพบและประกาศของหายที่ผ่านการอนุมัติแล้ว
     async function loadApprovedLostFoundItems() {
@@ -286,7 +293,6 @@ export function useStaffDashboard() {
       try {
         const { foundItems, lostItems } = await getApprovedLostFoundItems();
         if (version !== approvedLoadVersion) return;
-        const completedIds = completedLostFoundIds();
         const deletedIds = new Set(deletedRecords
           .filter((entry) => entry.source === "lost")
           .map((entry) => entry.itemId));
@@ -310,7 +316,7 @@ export function useStaffDashboard() {
         const mergeApproved = (tab, items) => {
           const previous = new Map(lostSets[tab].map((item) => [item.backendId, item]));
           const approved = items
-            .filter((item) => !completedIds.has(item.item_code) && !deletedIds.has(item.item_code))
+            .filter((item) => !deletedIds.has(item.item_code))
             .map((item) => ({ ...previous.get(item.id), ...mapApprovedItem(item, tab) }));
           const approvedIds = new Set(approved.map((item) => item.backendId));
           lostSets[tab] = [
@@ -414,6 +420,14 @@ export function useStaffDashboard() {
     }
 
     // เพิ่มกิจกรรมลงประวัติงานของเจ้าหน้าที่ปัจจุบัน
+    function signedInStaffId() {
+      try {
+        return JSON.parse(localStorage.getItem("buildingCareStaff") || "null")?.id || null;
+      } catch {
+        return null;
+      }
+    }
+
     function recordWorkHistory({
       staff = activeStaffName(),
       role = roleConfig[currentRole].label,
@@ -430,6 +444,7 @@ export function useStaffDashboard() {
         uid: `WH-${Date.now()}-${Math.random().toString(16).slice(2)}`,
         staff,
         role,
+        actorId: signedInStaffId(),
         itemId,
         title,
         category,
@@ -438,7 +453,9 @@ export function useStaffDashboard() {
         detail,
         date,
         time,
+        timestamp: Date.now(),
       });
+      renderActivities();
       renderMyHistory();
       renderStaffOverview();
     }
@@ -477,6 +494,7 @@ export function useStaffDashboard() {
       received: "in_progress",
       in_progress: "completed",
     };
+    const serviceProgressStatuses = ["assigned", "received", "in_progress", "completed"];
 
     function nextCleaningStatus(job) {
       const backendStatus = nextCleaningStatuses[job.backendStatus];
@@ -846,10 +864,12 @@ export function useStaffDashboard() {
         toast("ไม่พบหน้าที่เลือก");
         return;
       }
-      currentPage = page;
-      if (["housekeeper", "technician"].includes(currentRole) && destinationPage === "jobs") {
-        currentBoardView = page === "my-jobs" ? "mine" : "unassigned";
-      }
+      $("#notificationPanel")?.classList.remove("open", "mobile-notification-page");
+      $("#notificationButton")?.setAttribute("aria-expanded", "false");
+      $$("#mobileNotification, #mobileNotificationAdmin").forEach((button) => {
+        button.classList.remove("active");
+        button.removeAttribute("aria-current");
+      });
       $$(".page").forEach((p) => p.classList.remove("active"));
       destination.classList.add("active");
       $$(".nav-item").forEach((n) =>
@@ -1006,42 +1026,25 @@ export function useStaffDashboard() {
     }
     function renderActivities() {
       if (!$("#activityList")) return;
-      const content =
-        currentRole === "clerk"
-          ? [
-              [
-                "เปลี่ยนสถานะคำขอได้จากการ์ด",
-                "เลือกสถานะใหม่แล้วกดบันทึกโดยไม่ต้องเปิดหน้าอื่น",
-              ],
-              [
-                "มีของเข้าจุดรับฝาก",
-                "ระบบเก็บจุดจัดเก็บและผู้รับฝากไว้ในประวัติ",
-              ],
-              [
-                "แจ้งเตือนเฉพาะธุรการ",
-                "กระดิ่งจะแสดงคำขอและรายการ Lost & Found เท่านั้น",
-              ],
-            ]
-          : [
-              [
-                "คิวงานเป็นคิวร่วมของบทบาท",
-                "งานใหม่ยังไม่ใช่ของบุคคลใดจนกว่าจะกดรับ",
-              ],
-              [
-                "รับงานก่อนจึงอัปเดตได้",
-                "งานจะย้ายไป “งานของฉัน” หลังรับสำเร็จ",
-              ],
-              [
-                "กรองตามประเภทที่ผู้ใช้เลือก",
-                "Dropdown แสดงหมวดงานที่ตรงกับบทบาทปัจจุบัน",
-              ],
-            ];
-      $("#activityList").innerHTML = content
-        .map(
-          (x) =>
-            `<div class="activity-item"><div class="activity-dot"></div><div><strong>${x[0]}</strong><p>${x[1]}</p></div></div>`,
-        )
-        .join("");
+      if (!["housekeeper", "technician"].includes(currentRole)) return;
+      const staffId = signedInStaffId();
+      const staffName = activeStaffName();
+      const staffActions = new Set(["accepted", "status_changed", "completed", "returned", "completion_note_added"]);
+      const recent = workHistory
+        .filter((record) => record.staff === staffName)
+        .filter((record) => record.sourceAction
+          ? staffActions.has(record.sourceAction)
+          : !record.actorId || record.actorId === staffId)
+        .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0))
+        .slice(0, 5);
+      $("#activityList").innerHTML = recent.length
+        ? recent.map((record) => {
+          const when = Number.isFinite(record.timestamp)
+            ? new Intl.DateTimeFormat("th-TH", { dateStyle: "short", timeStyle: "short" }).format(record.timestamp)
+            : `${record.date || ""} ${record.time || ""}`;
+          return `<div class="activity-item"><div class="activity-dot"></div><div><strong>${escapeHtml(record.action)} · ${escapeHtml(record.itemId || "")}</strong><p>${escapeHtml(record.title || "งาน")} · ${escapeHtml(record.status || "")} · ${escapeHtml(when)}</p></div></div>`;
+        }).join("")
+        : '<div class="empty">ยังไม่มีกิจกรรมที่คุณดำเนินการ</div>';
     }
 
     // -------------------------------------------------------------------------
@@ -1146,7 +1149,7 @@ export function useStaffDashboard() {
               }">ดูรายละเอียด</button></div></article>`;
             })
             .join("")
-        : '<div class="empty">ไม่พบงานที่ตรงกับมุมมองหรือตัวกรองนี้</div>';
+        : '<div class="empty">ยังไม่มีงาน</div>';
     }
     function appendJobTimeline(job, title, detail) {
       job.timeline = job.timeline || [];
@@ -1283,7 +1286,7 @@ export function useStaffDashboard() {
       renderMetrics();
       renderQueue();
     }
-    function openReturnJob(id) {
+    function openReturnJob(id, historyMode = "push") {
       const job = allJobs.find((j) => j.id === id);
       if (
         !job ||
@@ -1297,7 +1300,7 @@ export function useStaffDashboard() {
       $("#returnReason").value = "";
       $("#returnNote").value = "";
       $("#returnJobModalTitle").textContent = `คืนงาน ${id} · ${job.title}`;
-      openModal("returnJobModal");
+      openModal("returnJobModal", document.activeElement, historyMode);
     }
     function addAudit(
       source,
@@ -1409,13 +1412,20 @@ export function useStaffDashboard() {
       requestConfirmation(
         "ยืนยันปิดรายการ",
         `${id} · ยืนยันว่าดำเนินการ “${item.title}” สำเร็จแล้วใช่หรือไม่?`,
-        () => {
-          const completedIds = completedLostFoundIds();
-          completedIds.add(item.id);
-          localStorage.setItem(
-            completedLostFoundStorageKey,
-            JSON.stringify([...completedIds]),
-          );
+        async () => {
+          // ปิดที่ backend ก่อน หน้า guest จะได้เลิกแสดงรายการนี้ด้วย ไม่ใช่แค่ซ่อนในเครื่อง staff
+          if (item.backendId) {
+            try {
+              if (tab === "inventory") await closeFoundItem(item.backendId);
+              else if (tab === "lostposts")
+                await closeLostItemAnnouncement(item.backendId);
+            } catch (error) {
+              if (await handleUnauthorizedResponse(error.status)) return;
+              console.error(`Close ${tab} item failed:`, error);
+              toast(error.message || "ไม่สามารถปิดรายการได้");
+              return;
+            }
+          }
           lostSets[tab] = lostSets[tab].filter((record) => record.id !== id);
           recordWorkHistory({
             itemId: id,
@@ -2028,6 +2038,7 @@ export function useStaffDashboard() {
         }
       }
       renderMyHistory();
+      renderActivities();
       renderStaffOverview();
       renderMetrics();
     }
@@ -2377,7 +2388,7 @@ export function useStaffDashboard() {
     // อัปเดต badge ทั้ง Desktop/Mobile และซ่อนเมื่อไม่มีรายการที่ยังไม่อ่าน
     function updateUnreadNotificationCount(unreadCount) {
       const visibleCount = unreadCount > 99 ? "99+" : String(unreadCount);
-      [$("#notificationCount"), ...$$('[data-notification-count]')].forEach(
+      [$("#notificationCount"), $("#mobileNotificationCount"), $("#mobileAdminNotificationCount")].forEach(
         (badge) => {
           if (!badge) return;
           badge.textContent = visibleCount;
@@ -2390,15 +2401,25 @@ export function useStaffDashboard() {
         },
       );
 
-      const pageCount = $("#notificationPageCount");
-      if (pageCount) pageCount.textContent = visibleCount;
+      $("#notificationButton")?.setAttribute(
+        "aria-label",
+        unreadCount > 0
+          ? `เปิดการแจ้งเตือน มี ${unreadCount} รายการที่ยังไม่ได้อ่าน`
+          : "เปิดการแจ้งเตือน",
+      );
+      $("#mobileNotification")?.setAttribute(
+        "aria-label",
+        unreadCount > 0
+          ? `เปิดการแจ้งเตือน มี ${unreadCount} รายการที่ยังไม่ได้อ่าน`
+          : "เปิดการแจ้งเตือน",
+      );
 
-      const summaryText = $("#notificationSummaryText");
-      if (summaryText) {
-        summaryText.textContent = unreadCount > 0
-          ? `มี ${unreadCount} รายการที่ยังไม่ได้อ่าน`
-          : "คุณอ่านการแจ้งเตือนทั้งหมดแล้ว";
-      }
+      $("#mobileNotificationAdmin")?.setAttribute(
+        "aria-label",
+        unreadCount > 0
+          ? `เปิดการแจ้งเตือน มี ${unreadCount} รายการที่ยังไม่ได้อ่าน`
+          : "เปิดการแจ้งเตือน",
+      );
 
       const markAllButton = $("#markAllRead");
       if (markAllButton) markAllButton.disabled = unreadCount === 0;
@@ -2574,19 +2595,38 @@ export function useStaffDashboard() {
           };
           return `<article class="staff-account-card">
             <header class="staff-account-card-head">
-              <div class="person">${staffRoleAvatar(s.role)}<div><strong>${escapeHtml(s.name)}</strong><small>${escapeHtml(s.email || "-")}</small></div></div>
+              <div class="person"><div class="person-avatar" style="background:${
+            staffRoleColor(s.role)
+          }18;color:${staffRoleColor(s.role)}">${s.name.slice(
+            0,
+            2
+          ) ? escapeHtml(s.name.slice(0, 2)) : "-"}</div><div><strong>${escapeHtml(s.name)}</strong><small>${
+            escapeHtml(s.email)
+            
+          }</small></div></div>
+          
+              <span class="badge ${
+            s.status === "ใช้งาน" ? "done" : "wait"
+          }">${
+            s.status
+          }</span>
             </header>
             <div class="staff-account-meta">
-              <div><span>บทบาท</span><strong>${escapeHtml(s.role)}</strong></div>
+              <div><span>Role</span><strong>${escapeHtml(s.role)}</strong></div>
               <div><span>สถานะการส่งคำเชิญ</span><strong class="invitation-delivery-status ${invitationDelivery.className}">${invitationDelivery.label}</strong></div>
             </div>
             <button class="small-btn resend-invitation-button" type="button" data-staff-action="resend-invitation" data-staff-index="${i}" ${s.status === "ใช้งาน" ? "" : "disabled"}>ส่งคำเชิญซ้ำ</button>
-            <footer class="staff-account-actions"><button class="small-btn" type="button" data-staff-action="detail" data-staff-index="${i}">ดูรายละเอียด</button><button class="small-btn" type="button" data-staff-action="edit" data-staff-index="${i}">แก้ไขข้อมูล</button><button class="small-btn delete" type="button" data-staff-action="remove" data-staff-index="${i}">ลบ</button></footer>
+            <footer class="staff-account-actions"><button class="small-btn" type="button" data-staff-action="detail" data-staff-index="${i}">ดูรายละเอียด</button><button class="small-btn" type="button" data-staff-action="edit" data-staff-index="${i}">แก้ไขข้อมูล</button><button class="small-btn" type="button" data-staff-action="toggle" data-staff-index="${i}">${
+              s.status === "ใช้งาน" ? "ปิดบัญชี" : "เปิดใช้"
+            }</button><button class="small-btn delete" type="button" data-staff-action="remove" data-staff-index="${i}">ลบ</button></footer>
           </article>`;
             })
             .join("")
         : '<div class="history-empty staff-account-empty">ไม่พบบัญชี Staff ที่ตรงกับตัวกรอง</div>';
       $("#staffTotal").textContent = staffData.length;
+      $("#staffActiveTotal").textContent = `ใช้งาน ${
+        staffData.filter((staff) => staff.status === "ใช้งาน").length
+      } บัญชี`;
       $("#housekeeperTotal").textContent = staffData.filter(
         (staff) => staff.role === "แม่บ้าน",
       ).length;
@@ -2606,6 +2646,7 @@ export function useStaffDashboard() {
       $("#editStaffIndex").value = staff.id;
       $("#editStaffName").value = staff.name;
       $("#editStaffEmail").value = staff.email;
+      $("#editStaffRole").textContent = staff.role;
       $("#editStaffError").hidden = true;
       $("#editStaffButton").disabled = false;
       openModal("editStaffModal", trigger);
@@ -2669,6 +2710,27 @@ export function useStaffDashboard() {
         button.disabled = false;
         button.textContent = "บันทึกข้อมูล";
       }
+    }
+    function toggleStaff(i) {
+      const staff = staffData[i];
+      requestConfirmation(
+        staff.status === "ใช้งาน" ? "ยืนยันปิดบัญชี" : "ยืนยันเปิดบัญชี",
+        `${staff.status === "ใช้งาน" ? "ปิด" : "เปิด"}การใช้งานบัญชี ${
+          staff.name
+        } หรือไม่?`,
+        () => {
+          staff.status = staff.status === "ใช้งาน" ? "พักงาน" : "ใช้งาน";
+          addAudit(
+            "staff",
+            "อัปเดตสถานะ",
+            staff.id,
+            staff.name,
+            `เปลี่ยนสถานะบัญชีเป็น ${staff.status}`,
+          );
+          renderStaff();
+          toast("อัปเดตสถานะบัญชีแล้ว");
+        },
+      );
     }
     async function performResendStaffInvitation(index, button) {
       const staff = staffData[index];
@@ -3018,7 +3080,7 @@ export function useStaffDashboard() {
         !restoringNavigation &&
         readDashboardRoute().dialog === modalSlug(id)
       ) {
-        updateDashboardRoute("", "replace");
+        router.back();
       }
     }
     function syncDashboardFromRoute() {
@@ -3064,13 +3126,13 @@ export function useStaffDashboard() {
       $("#sidebarBackdrop").classList.toggle("open", open);
       updateMenuToggle(open);
     }
-    function requestConfirmation(title, text, action, label = "ยืนยัน") {
+    function requestConfirmation(title, text, action, label = "ยืนยัน", historyMode = "push") {
       pendingConfirmAction = action;
       $("#confirmModalTitle").textContent = title;
       $("#confirmModalText").textContent = text;
       $("#confirmActionButton").textContent = label;
       $("#confirmActionButton").classList.toggle("confirm-accept", ["ยืนยันรับงาน", "ยืนยันคืนงาน"].includes(label));
-      openModal("confirmModal");
+      openModal("confirmModal", document.activeElement, historyMode);
     }
     function showSuccess(message, title = "บันทึกสำเร็จ", variant = "success") {
       const successModal = $("#successModal");
@@ -3154,7 +3216,9 @@ export function useStaffDashboard() {
           item.title,
           `${item.detail} · ${item.time}`,
         ]),
-        ["สถานะปัจจุบัน", job.status],
+        ["สถานะปัจจุบัน", job.backendId && ["cleaning", "repair"].includes(job.type)
+          ? requestStatusPresentation({ request_type: job.type, status: job.backendStatus }, job.id).label
+          : job.status],
       ];
       return steps
         .map(
@@ -3164,6 +3228,29 @@ export function useStaffDashboard() {
             )}</strong><small>${escapeHtml(step[1])}</small></div></div>`,
         )
         .join("");
+    }
+    function renderJobDetailProgress(job) {
+      const container = $("#jobDetailProgress");
+      const list = $("#jobDetailProgressSteps");
+      if (!container || !list) return;
+      const supported = ["waiting", "assigned", "received", "in_progress", "completed"];
+      const show = job.backendId && ["cleaning", "repair"].includes(job.type) && supported.includes(job.backendStatus);
+      container.hidden = !show;
+      const timeline = $("#jobTimeline");
+      if (timeline) timeline.hidden = show;
+      if (!show) {
+        list.replaceChildren();
+        return;
+      }
+      const request = { request_type: job.type, status: job.backendStatus };
+      const presentation = requestStatusPresentation(request, job.id);
+      const progress = serviceProgress(request, job.id);
+      $("#jobDetailProgressText").textContent = presentation.description;
+      list.innerHTML = progress.steps.map((step, index) => {
+        const state = index < progress.currentIndex ? "complete" : index === progress.currentIndex ? "current" : "upcoming";
+        const marker = index < progress.currentIndex ? "✓" : String(index + 1);
+        return `<li class="${state}"${index === progress.currentIndex ? ' aria-current="step"' : ""}><span class="job-detail-progress-marker" aria-hidden="true">${marker}</span><span>${escapeHtml(step.label)}</span></li>`;
+      }).join("");
     }
     function renderJobQuickActions(job) {
       const isMine = job.assignee === activeStaffName(),
@@ -3183,7 +3270,7 @@ export function useStaffDashboard() {
           if (backendNext) {
             buttons.push([
               "status",
-              `เปลี่ยนเป็น ${backendNext.label}`,
+              "อัปเดตสถานะ",
               "primary-action",
             ]);
           }
@@ -3219,6 +3306,7 @@ export function useStaffDashboard() {
           job.reporterContact = detail.reporter_email;
           job.backendStatus = detail.status;
           job.status = repairStatusLabels[detail.status] || detail.status;
+          job.updatedAt = new Date(detail.updated_at).toLocaleString("th-TH");
           job.requestImageUrl =
             detail.images?.find((image) => image.image_type === "after")?.url ||
             detail.images?.[0]?.url ||
@@ -3238,6 +3326,7 @@ export function useStaffDashboard() {
           job.reporterContact = detail.reporter_email;
           job.backendStatus = detail.status;
           job.status = cleaningStatusLabels[detail.status] || detail.status;
+          job.updatedAt = new Date(detail.updated_at).toLocaleString("th-TH");
           job.requestImageUrl = detail.images?.[0]?.url || job.requestImageUrl || "";
         } catch (error) {
           if (await handleUnauthorizedResponse(error.status)) return;
@@ -3274,11 +3363,15 @@ export function useStaffDashboard() {
       });
       const returnStatusGroup = $("#jobDetailReturnStatusGroup");
       if (returnStatusGroup) returnStatusGroup.hidden = true;
+      const servicePresentation = job.backendId && ["cleaning", "repair"].includes(job.type)
+        ? requestStatusPresentation({ request_type: job.type, status: job.backendStatus }, job.id)
+        : null;
       $("#jobDetailBadges").innerHTML = `<span class="badge ${
         job.priority === "เร่งด่วน" ? "danger" : "normal"
       }">${job.priority}</span><span class="badge ${badgeClass(job.status)}">${
-        job.status
-      }</span><span class="badge neutral">${job.time}</span>`;
+        escapeHtml(servicePresentation?.label || job.status)
+      }</span><span class="badge neutral">${escapeHtml(job.updatedAt || job.time)}</span>`;
+      renderJobDetailProgress(job);
       $("#jobDetailIcon use").setAttribute(
         "href",
         job.type === "repair" ? "#i-tools" : "#i-broom",
@@ -3424,7 +3517,12 @@ export function useStaffDashboard() {
         toast("ไม่มีสถานะถัดไปที่เปลี่ยนได้");
         return;
       }
-      const options = backendNext
+      const serviceOptions = ["cleaning", "repair"].includes(job.type) && job.backendId
+        ? serviceProgressStatuses
+            .slice(serviceProgressStatuses.indexOf(job.backendStatus) + 1)
+            .map((status) => (job.type === "repair" ? repairStatusLabels : cleaningStatusLabels)[status])
+        : null;
+      const options = serviceOptions || (backendNext
         ? [backendNext.label]
         : currentRole === "technician"
           ? ["กำลังดำเนินการ", "รอข้อมูลเพิ่มเติม", "เสร็จสิ้น"]
@@ -3446,8 +3544,8 @@ export function useStaffDashboard() {
                     "พักงาน",
                     "รอข้อมูลเพิ่มเติม",
                     "เสร็จสิ้น",
-                  ];
-      if (canReturnToPool) options.push("คืนเข้ากองกลาง");
+                  ]);
+      if (canReturnToPool) options.push("คืนเข้าคิวกลาง");
       $("#statusJobId").value = id;
       $("#newJobStatus").innerHTML = options
         .map((value) => `<option>${value}</option>`)
@@ -3473,14 +3571,14 @@ export function useStaffDashboard() {
       resetUploadPreview();
       openModal("uploadModal", trigger);
     }
-    function openCompleteModal(id, trigger = document.activeElement) {
+    function openCompleteModal(id, trigger = document.activeElement, historyMode = "push") {
       $("#completeJobId").value = id;
       $("#completeResult").value = "";
       $("#completeNote").value = "";
       $("#completeImage").value = "";
       resetCompletionPreview();
       $("#completeDate").value = todayISO();
-      openModal("completeModal", trigger);
+      openModal("completeModal", trigger, historyMode);
     }
     function changeJobFromDetail(action) {
       const job = allJobs.find((item) => item.id === selectedJobId);
@@ -3524,7 +3622,10 @@ export function useStaffDashboard() {
         requestConfirmation(
           "ยืนยันเริ่มดำเนินการ",
           `เปลี่ยนสถานะงาน ${job.id} เป็น “${nextStatus}” หรือไม่?`,
-          () => applyJobStatus(job, nextStatus, "อัปเดตจากหน้ารายละเอียดงาน"),
+          async () => {
+            const updated = await applyJobStatus(job, nextStatus, "อัปเดตจากหน้ารายละเอียดงาน");
+            if (updated) updateDashboardRoute("", "replace");
+          },
         );
         return;
       }
@@ -3537,7 +3638,15 @@ export function useStaffDashboard() {
         const transition = isBackendRepair
           ? nextRepairStatus(job)
           : nextCleaningStatus(job);
+        const isBackendService = isBackendCleaning || isBackendRepair;
+        const targetServiceStatus = isBackendService
+          ? serviceProgressStatuses.find((status) =>
+              (isBackendRepair ? repairStatusLabels : cleaningStatusLabels)[status] === next)
+          : null;
+        const currentServiceIndex = serviceProgressStatuses.indexOf(job.backendStatus);
+        const targetServiceIndex = serviceProgressStatuses.indexOf(targetServiceStatus);
         if (
+          !(isBackendService && targetServiceIndex > currentServiceIndex) &&
           (!transition || transition.label !== next) &&
           !(
             isBackendRepair &&
@@ -3549,17 +3658,15 @@ export function useStaffDashboard() {
           return false;
         }
         try {
-          const updatedTask = isBackendRepair
-            ? next === "เสร็จสิ้น"
-              ? await completeRepairRequest(job.backendId)
-              : await updateRepairRequestStatus(
-                  job.backendId,
-                  transition.backendStatus,
-                )
-            : await updateCleaningTaskStatus(
-                job.backendId,
-                transition.backendStatus,
-              );
+          let updatedTask;
+          for (const status of serviceProgressStatuses.slice(currentServiceIndex + 1, targetServiceIndex + 1)) {
+            updatedTask = isBackendRepair
+              ? status === "completed"
+                ? await completeRepairRequest(job.backendId)
+                : await updateRepairRequestStatus(job.backendId, status)
+              : await updateCleaningTaskStatus(job.backendId, status);
+            job.backendStatus = updatedTask.status;
+          }
           job.backendStatus = updatedTask.status;
           job.assignee = updatedTask.assigned_staff?.full_name || job.assignee;
           job.assigneeCode =
@@ -3572,6 +3679,8 @@ export function useStaffDashboard() {
         } catch (error) {
           if (await handleUnauthorizedResponse(error.status)) return false;
           console.error("Updating staff task status failed:", error);
+          if (isBackendCleaning) await loadCleaningTasks();
+          if (isBackendRepair) await loadRepairRequests();
           toast(
             error.status === 409
               ? "ลำดับสถานะไม่ถูกต้อง กรุณาโหลดข้อมูลใหม่"
@@ -3608,15 +3717,7 @@ export function useStaffDashboard() {
       renderMetrics();
       renderQueue();
       renderStaffOverview();
-      if (
-        (isBackendCleaning || isBackendRepair) &&
-        job.backendStatus !== "completed"
-      ) {
-        showSuccess(
-          `เลขงาน: ${job.id}\nสถานะล่าสุด: ${job.status}\nผู้รับผิดชอบ: ${assignedCleanerLabel(job)}`,
-          "อัปเดตสถานะงานสำเร็จ",
-        );
-      }
+      if (job.backendStatus !== "completed") toast("บันทึกสถานะเรียบร้อย");
       return true;
     }
 
@@ -3640,6 +3741,8 @@ export function useStaffDashboard() {
           item.custody = detail.custody_location || "ไม่ระบุจุดรับฝาก";
           item.reporterEmail = detail.reporter_email;
           item.eventDatetime = detail.event_datetime;
+          // ขอ signed URL ใหม่ทุกครั้งที่เปิด เพราะ URL จากรายการอาจหมดอายุแล้ว
+          if (detail.images?.length) item.imageUrl = detail.images[0].url;
         } catch (error) {
           if (await handleUnauthorizedResponse(error.status)) return;
           console.error("Loading found item detail failed:", error);
@@ -3650,6 +3753,8 @@ export function useStaffDashboard() {
       const isLostAnnouncement = tab === "lostposts";
       selectedJobId = "";
       $("#jobDetailModal")?.classList.add("lost-post-detail");
+      $("#jobDetailProgress")?.setAttribute("hidden", "");
+      $("#jobTimeline")?.removeAttribute("hidden");
       $("#jobDetailCode").textContent = `${id} · ${isLostAnnouncement ? "ประกาศของหาย" : "ของที่พบ"}`;
       $("#jobDetailTitle").textContent = item.title;
       $("#jobDetailDescription").textContent = item.description || item.place;
@@ -4186,6 +4291,12 @@ export function useStaffDashboard() {
     $("#mobileProfile")?.addEventListener("click", (event) =>
       openModal("profileModal", event.currentTarget),
     );
+    $("#changePassword")?.addEventListener("click", () =>
+      toast("ส่งลิงก์เปลี่ยนรหัสผ่านไปยังอีเมลเจ้าหน้าที่แล้ว"),
+    );
+    $("#notificationSettings")?.addEventListener("click", () =>
+      toast("บันทึกการตั้งค่าการแจ้งเตือนแล้ว")
+    );
     $(".bottom-nav")?.addEventListener("click", (event) => {
       const button = event.target.closest("[data-mobile-page]");
       if (!button) return;
@@ -4505,19 +4616,21 @@ export function useStaffDashboard() {
       }
       const next = $("#newJobStatus").value,
         note = $("#statusNote")?.value.trim() || "";
-      closeModal("statusUpdateModal", false);
-      if (next === "คืนเข้ากองกลาง") {
-        openReturnJob(job.id);
+      if (["คืนเข้าคิวกลาง", "คืนเข้ากองกลาง"].includes(next)) {
+        closeModal("statusUpdateModal", false, false);
+        openReturnJob(job.id, "replace");
         return;
       }
       if (next === "เสร็จสิ้น") {
-        openCompleteModal(job.id);
+        closeModal("statusUpdateModal", false, false);
+        openCompleteModal(job.id, document.activeElement, "replace");
         $("#completeResult").value = note;
         return;
       }
       const updated = await applyJobStatus(job, next, note);
-      if (updated && !(job.type === "cleaning" && job.backendId)) {
-        toast("บันทึกสถานะเรียบร้อย");
+      if (updated) {
+        closeModal("statusUpdateModal", false, false);
+        updateDashboardRoute("", "replace");
       }
     });
     $("#noteForm")?.addEventListener("submit", (event) => {
@@ -4660,8 +4773,9 @@ export function useStaffDashboard() {
         `เสร็จวันที่ ${$("#completeDate").value}`,
       );
       renderJobs();
-      closeModal("completeModal", false);
-      showSuccess(`ปิดงาน ${job.id} เรียบร้อย งานถูกย้ายไปประวัติแล้ว`);
+      closeModal("completeModal", false, false);
+      updateDashboardRoute("", "replace");
+      toast(`ปิดงาน ${job.id} เรียบร้อย`);
     });
     $("#historySearchForm")?.addEventListener("submit", (event) => {
       event.preventDefault();
@@ -4708,7 +4822,7 @@ export function useStaffDashboard() {
       const invitation = {sent: "ส่งสำเร็จ", failed: "ส่งไม่สำเร็จ", pending: "รอส่ง"}[staff.invitationDeliveryStatus] || "ไม่มีข้อมูล";
       $("#staffAccountDetailInfo").innerHTML = [
         ["ชื่อ", staff.name], ["อีเมล", staff.email], ["บทบาท", staff.role],
-        ["สถานะคำเชิญ", invitation],
+        ["สถานะบัญชี", staff.status], ["สถานะคำเชิญ", invitation],
       ].map(([label, value]) => `<div><small>${label}</small><strong>${escapeHtml(value || "–")}</strong></div>`).join("");
       const work = $("#staffAccountDetailWork");
       const isWorker = ["แม่บ้าน", "ช่าง"].includes(staff.role);
@@ -4753,6 +4867,7 @@ export function useStaffDashboard() {
       if (!button) return;
       const index = Number(button.dataset.staffIndex);
       if (button.dataset.staffAction === "edit") openEditStaff(index, button);
+      if (button.dataset.staffAction === "toggle") toggleStaff(index);
       if (button.dataset.staffAction === "remove") removeStaff(index);
       if (button.dataset.staffAction === "resend-invitation")
         resendInvitation(index, button);
@@ -4845,8 +4960,51 @@ export function useStaffDashboard() {
     // 19) Event binding: Notification, Staff, Lost & Found, QR และประกาศ
     // -------------------------------------------------------------------------
 
-    // จัดการรายการภายในหน้าศูนย์การแจ้งเตือน
-    $("#notificationList")?.addEventListener("click", async (event) => {
+    // Phones and tablets show notifications as a bottom navigation page.
+    function openMobileNotifications(button) {
+      const panel = $("#notificationPanel");
+      if (!panel) return;
+      panel.classList.add("open", "mobile-notification-page");
+      $("#notificationButton")?.setAttribute("aria-expanded", "false");
+      $$(".bottom-nav button").forEach((item) => item.classList.remove("active"));
+      button.classList.add("active");
+      button.setAttribute("aria-current", "page");
+      closeSidebar();
+      panel.scrollTop = 0;
+      window.scrollTo(0, 0);
+    }
+    function toggleNotificationPanel() {
+      const panel = $("#notificationPanel");
+      if (!panel) return;
+      const open = !panel.classList.contains("open");
+      panel.classList.toggle("open", open);
+      $("#notificationButton")?.setAttribute("aria-expanded", String(open));
+      if (open) panel.querySelector("button")?.focus();
+    }
+    $("#notificationButton")?.addEventListener("click", (event) => {
+      event.stopPropagation();
+      toggleNotificationPanel();
+    });
+    $(".bottom-nav")?.addEventListener("click", (event) => {
+      const button = event.target.closest("[data-mobile-notification]");
+      if (!button) return;
+      event.stopPropagation();
+      if (window.matchMedia("(max-width: 1024px)").matches)
+        openMobileNotifications(button);
+      else toggleNotificationPanel();
+    });
+    $("#notificationPanel")?.addEventListener("click", async (event) => {
+      event.stopPropagation();
+      if (event.target.closest("[data-close-notifications]")) {
+        event.currentTarget.classList.remove("open");
+        $("#notificationButton")?.setAttribute("aria-expanded", "false");
+        return;
+      }
+      if (event.target === event.currentTarget) {
+        event.currentTarget.classList.remove("open");
+        $("#notificationButton")?.setAttribute("aria-expanded", "false");
+        return;
+      }
       const clerkTarget = event.target.closest("[data-clerk-notification-target]");
       if (clerkTarget) {
         if (clerkTarget.dataset.clerkNotificationTarget === "claim")
@@ -4914,6 +5072,11 @@ export function useStaffDashboard() {
       if (match) openJobDetail(match[0], itemButton);
       else if (currentRole === "clerk") navigate("clerk-center");
       else toast(item.title);
+    });
+    document.addEventListener("click", () => {
+      if ($("#notificationPanel")?.classList.contains("mobile-notification-page")) return;
+      $("#notificationPanel")?.classList.remove("open");
+      $("#notificationButton")?.setAttribute("aria-expanded", "false");
     });
     $("#markAllRead")?.addEventListener("click", markNotificationsRead);
     $("#openStaffModal")?.addEventListener("click", (event) => {
@@ -5025,7 +5188,7 @@ export function useStaffDashboard() {
         if (!value) message = "กรุณากรอกอีเมล";
         else if (field.validity.typeMismatch) message = "กรุณากรอกอีเมลให้ถูกต้อง";
       } else if (field.id === "newRole" && !value) {
-        message = "กรุณาเลือกบทบาท";
+        message = "กรุณาเลือก Role";
       }
 
       return setStaffFieldError(field, message);
@@ -5122,7 +5285,7 @@ export function useStaffDashboard() {
         "สร้างบัญชี",
         record.id,
         record.name,
-        `สร้างบัญชีบทบาท ${record.role}`,
+        `สร้างบัญชี Role ${record.role}`,
       );
       await loadStaffAccounts();
       closeModal("staffModal", false);
@@ -5267,7 +5430,7 @@ export function useStaffDashboard() {
       const id = $("#returnJobId").value,
         reason = $("#returnReason").value,
         note = $("#returnNote").value.trim();
-      closeModal("returnJobModal", false);
+      closeModal("returnJobModal", false, false);
       requestConfirmation(
         "ยืนยันคืนงานเข้าคิวกลาง",
         `ยืนยันคืนงาน ${id} เพราะ “${reason}” หรือไม่?`,
@@ -5336,9 +5499,11 @@ export function useStaffDashboard() {
           renderMetrics();
           renderQueue();
           renderStaffOverview();
+          updateDashboardRoute("", "replace");
           toast("คืนงานเข้าคิวกลางเรียบร้อย");
         },
         "ยืนยันคืนงาน",
+        "replace",
       );
     });
     $("#appointmentForm")?.addEventListener("submit", async (event) => {

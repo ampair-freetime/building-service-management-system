@@ -33,8 +33,11 @@
 
         <div>
           <div class="job-meta" id="jobDetailBadges"></div>
-          <p id="jobDetailDescription"></p>
           <div class="detail-meta">
+            <div class="detail-description" style="grid-column: 1 / -1">
+              <small>รายละเอียดสิ่งของ</small>
+              <strong id="jobDetailDescription">–</strong>
+            </div>
             <div>
               <small id="jobDetailRoomLabel">สถานที่พบ</small>
               <strong id="jobDetailRoom">–</strong>

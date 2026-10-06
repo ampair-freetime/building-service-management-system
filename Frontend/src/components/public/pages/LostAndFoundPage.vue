@@ -337,7 +337,7 @@
                 aria-live="polite"
               ></p>
             </div>
-            <!-- <div class="field">
+            <div class="field">
               <label for="publicFoundCustody">นำของไปฝากไว้ที่ใด</label
               ><input
                 id="publicFoundCustody"
@@ -354,7 +354,7 @@
                 class="field-error"
                 aria-live="polite"
               ></p>
-            </div> -->
+            </div>
             <div class="field">
               <label for="publicFoundDescription">รายละเอียดทั่วไป</label
               ><textarea

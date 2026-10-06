@@ -6,10 +6,11 @@ from unittest.mock import Mock
 
 import pytest
 
-from app.api.dependencies import provide_object_storage
+from app.api.dependencies import provide_object_storage, provide_optional_object_storage
 from conftest import seed_staff
 from sqlalchemy import select
 from app.models.enums import ClaimStatus, LostStatus, LostType, ReturnStatus
+from app.models.image import Image
 from app.models.lost_found import (
     LostClaim,
     LostClaimReturnStatusHistory,
@@ -1309,6 +1310,13 @@ def test_clerk_can_update_return_status_to_returned(test_context):
     assert claim.status == ClaimStatus.COMPLETED
     assert claim.return_status == ReturnStatus.RETURNED
 
+    async def get_item_status():
+        async with session_factory() as session:
+            return (await session.get(LostItem, claim.found_item_id)).status
+
+    # คืนของแล้วต้องเอาประกาศออกจากหน้า guest ด้วย
+    assert asyncio.run(get_item_status()) == LostStatus.CLAIMED
+
 
 def test_invalid_return_status_returns_422(test_context):
     client, session_factory = test_context
@@ -1983,3 +1991,242 @@ def test_view_scheduled_pickup_details(test_context):
 
     assert data["status"] == "scheduled"
     assert data["pickup_datetime"] == "2026-09-20T13:30:00"
+
+
+def _clerk_headers(client, session_factory):
+    seed_staff(
+        session_factory,
+        email="clerk@example.com",
+        password="admin-password",
+        role="clerk",
+    )
+    login = client.post(
+        "/api/v1/auth/login",
+        json={"identifier": "clerk@example.com", "password": "admin-password"},
+    )
+    return {"Authorization": f"Bearer {login.json()['access_token']}"}
+
+
+def _seed_item(session_factory, *, report_type, status, claim_status=None):
+    async def seed():
+        async with session_factory() as session:
+            item = LostItem(
+                item_code=f"{report_type.value.upper()}-{uuid4().hex[:8]}",
+                report_type=report_type,
+                item_category="Accessories",
+                item_name="Wallet",
+                description="Brown wallet",
+                event_datetime=datetime.now(timezone.utc),
+                location_id=None,
+                location_detail="Building B",
+                custody_location="Clerk Office" if report_type == LostType.FOUND else None,
+                reporter_email="reporter@example.com",
+                status=status,
+            )
+            session.add(item)
+            await session.flush()
+            if claim_status is not None:
+                session.add(
+                    LostClaim(
+                        found_item_id=item.id,
+                        claimant_name="Owner User",
+                        claimant_email="owner@example.com",
+                        proof_detail="มีบัตรนักศึกษาอยู่ด้านใน",
+                        status=claim_status,
+                    )
+                )
+            await session.commit()
+            return item.id
+
+    return asyncio.run(seed())
+
+
+def _item_status(session_factory, item_id):
+    async def read():
+        async with session_factory() as session:
+            return (await session.get(LostItem, item_id)).status
+
+    return asyncio.run(read())
+
+
+@pytest.mark.parametrize(
+    ("report_type", "collection"),
+    [(LostType.FOUND, "found-items"), (LostType.LOST, "lost-items")],
+)
+def test_clerk_close_removes_item_from_public_list(
+    test_context, public_list_storage, report_type, collection
+):
+    client, session_factory = test_context
+    headers = _clerk_headers(client, session_factory)
+    item_id = _seed_item(session_factory, report_type=report_type, status=LostStatus.APPROVED)
+
+    response = client.post(f"/api/v1/lost-found/{collection}/{item_id}/close", headers=headers)
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "closed"
+    assert _item_status(session_factory, item_id) == LostStatus.CLOSED
+    public_items = client.get(f"/api/v1/guest/{collection}").json()["items"]
+    assert all(item["id"] != str(item_id) for item in public_items)
+
+
+def test_clerk_cannot_close_pending_item(test_context):
+    client, session_factory = test_context
+    headers = _clerk_headers(client, session_factory)
+    item_id = _seed_item(session_factory, report_type=LostType.FOUND, status=LostStatus.PENDING)
+
+    response = client.post(f"/api/v1/lost-found/found-items/{item_id}/close", headers=headers)
+
+    assert response.status_code == 404
+    assert _item_status(session_factory, item_id) == LostStatus.PENDING
+
+
+def test_close_found_item_with_wrong_report_type_returns_404(test_context):
+    client, session_factory = test_context
+    headers = _clerk_headers(client, session_factory)
+    item_id = _seed_item(session_factory, report_type=LostType.LOST, status=LostStatus.APPROVED)
+
+    response = client.post(f"/api/v1/lost-found/found-items/{item_id}/close", headers=headers)
+
+    assert response.status_code == 404
+    assert _item_status(session_factory, item_id) == LostStatus.APPROVED
+
+
+@pytest.mark.parametrize(
+    "claim_status",
+    [ClaimStatus.PENDING, ClaimStatus.ADDITIONAL_INFO_REQUIRED, ClaimStatus.APPROVED, ClaimStatus.SCHEDULED],
+)
+def test_clerk_cannot_close_found_item_with_active_claim(test_context, claim_status):
+    client, session_factory = test_context
+    headers = _clerk_headers(client, session_factory)
+    item_id = _seed_item(
+        session_factory,
+        report_type=LostType.FOUND,
+        status=LostStatus.APPROVED,
+        claim_status=claim_status,
+    )
+
+    response = client.post(f"/api/v1/lost-found/found-items/{item_id}/close", headers=headers)
+
+    assert response.status_code == 409
+    assert _item_status(session_factory, item_id) == LostStatus.APPROVED
+
+
+def test_clerk_can_close_found_item_after_claim_was_rejected(test_context):
+    client, session_factory = test_context
+    headers = _clerk_headers(client, session_factory)
+    item_id = _seed_item(
+        session_factory,
+        report_type=LostType.FOUND,
+        status=LostStatus.APPROVED,
+        claim_status=ClaimStatus.REJECTED,
+    )
+
+    response = client.post(f"/api/v1/lost-found/found-items/{item_id}/close", headers=headers)
+
+    assert response.status_code == 200
+    assert _item_status(session_factory, item_id) == LostStatus.CLOSED
+
+
+def test_close_requires_clerk_login(test_context):
+    client, session_factory = test_context
+    item_id = _seed_item(session_factory, report_type=LostType.LOST, status=LostStatus.APPROVED)
+
+    response = client.post(f"/api/v1/lost-found/lost-items/{item_id}/close")
+
+    assert response.status_code == 401
+    assert _item_status(session_factory, item_id) == LostStatus.APPROVED
+
+
+@pytest.fixture
+def staff_image_storage(test_context):
+    """R2 ตัวปลอมสำหรับ endpoint staff ที่สร้าง signed URL ของรูป"""
+    client, _ = test_context
+    client.app.dependency_overrides[provide_optional_object_storage] = lambda: Mock(
+        create_download_url=lambda key: f"https://signed.example/{key}",
+    )
+    yield
+    client.app.dependency_overrides.pop(provide_optional_object_storage, None)
+
+
+def _seed_image(session_factory, item_id, *, sort_order=0):
+    async def seed():
+        async with session_factory() as session:
+            image = Image(
+                lost_item_id=item_id,
+                object_key=f"lost-found/{item_id}/{sort_order}.webp",
+                content_type="image/webp",
+                width=32,
+                height=24,
+                sort_order=sort_order,
+            )
+            session.add(image)
+            await session.commit()
+            return image.object_key
+
+    return asyncio.run(seed())
+
+
+@pytest.mark.parametrize(
+    ("report_type", "collection"),
+    [(LostType.FOUND, "found-items"), (LostType.LOST, "lost-items")],
+)
+def test_clerk_sees_images_of_pending_item_before_approval(
+    test_context, staff_image_storage, report_type, collection
+):
+    client, session_factory = test_context
+    headers = _clerk_headers(client, session_factory)
+    item_id = _seed_item(session_factory, report_type=report_type, status=LostStatus.PENDING)
+    second_key = _seed_image(session_factory, item_id, sort_order=1)
+    first_key = _seed_image(session_factory, item_id, sort_order=0)
+
+    detail = client.get(f"/api/v1/lost-found/{collection}/{item_id}", headers=headers)
+    pending = client.get(f"/api/v1/lost-found/pending-{collection}", headers=headers)
+
+    assert detail.status_code == 200
+    assert [image["url"] for image in detail.json()["images"]] == [
+        f"https://signed.example/{first_key}",
+        f"https://signed.example/{second_key}",
+    ]
+    assert pending.status_code == 200
+    pending_item = next(item for item in pending.json() if item["id"] == str(item_id))
+    assert pending_item["images"][0]["url"] == f"https://signed.example/{first_key}"
+
+
+def test_item_without_images_returns_empty_list(test_context, staff_image_storage):
+    client, session_factory = test_context
+    headers = _clerk_headers(client, session_factory)
+    item_id = _seed_item(session_factory, report_type=LostType.FOUND, status=LostStatus.PENDING)
+
+    response = client.get(f"/api/v1/lost-found/found-items/{item_id}", headers=headers)
+
+    assert response.status_code == 200
+    assert response.json()["images"] == []
+
+
+def test_detail_still_works_when_image_storage_is_not_configured(test_context):
+    client, session_factory = test_context
+    client.app.dependency_overrides[provide_optional_object_storage] = lambda: None
+    try:
+        headers = _clerk_headers(client, session_factory)
+        item_id = _seed_item(session_factory, report_type=LostType.FOUND, status=LostStatus.PENDING)
+        _seed_image(session_factory, item_id)
+
+        response = client.get(f"/api/v1/lost-found/found-items/{item_id}", headers=headers)
+    finally:
+        client.app.dependency_overrides.pop(provide_optional_object_storage, None)
+
+    assert response.status_code == 200
+    assert response.json()["images"] == []
+
+
+def test_approve_response_does_not_lazy_load_item_images(test_context):
+    """approve คืน schema เดียวกับ detail ต้องไม่ไปแตะ relationship LostItem.images"""
+    client, session_factory = test_context
+    headers = _clerk_headers(client, session_factory)
+    item_id = _seed_item(session_factory, report_type=LostType.FOUND, status=LostStatus.PENDING)
+    _seed_image(session_factory, item_id)
+
+    response = client.post(f"/api/v1/lost-found/found-items/{item_id}/approve", headers=headers)
+
+    assert response.status_code == 200
+    assert response.json()["images"] == []

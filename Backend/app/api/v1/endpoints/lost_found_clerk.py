@@ -2,7 +2,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, HTTPException
 
-from app.api.dependencies import ClerkStaff, DbSession
+from app.api.dependencies import ClerkStaff, DbSession, OptionalObjectStorageClient
 from app.schemas.lost_found_clerk import (
     FoundItemDetailResponse,
     LostItemDetailResponse,
@@ -15,15 +15,19 @@ from app.schemas.lost_found_clerk import (
     UpdateReturnStatusRequest,
     SchedulePickupRequest,
 )
+from app.models.enums import LostType
 from app.services.lost_found_clerk import (
+    ActiveClaimExistsError,
     approve_found_item,
     approve_lost_item,
+    close_lost_found_item,
     get_found_item_detail,
     get_lost_item_detail,
     get_ownership_request_detail,
     list_pending_found_items,
     list_pending_lost_items,
     list_pending_ownership_requests,
+    load_staff_image_urls,
     reject_found_item,
     reject_lost_item,
     approve_ownership_request,
@@ -40,10 +44,18 @@ router = APIRouter()
 )
 async def get_pending_found_items(
     session: DbSession,
+    storage: OptionalObjectStorageClient,
     _: ClerkStaff,
 ) -> list[PendingFoundItemResponse]:
     """คืนรายการของที่พบซึ่งกำลังรอเจ้าหน้าที่ธุรการตรวจสอบ"""
-    return await list_pending_found_items(session)
+    items = await list_pending_found_items(session)
+    image_urls = await load_staff_image_urls(session, [item.id for item in items], storage)
+    return [
+        PendingFoundItemResponse.model_validate(item).model_copy(
+            update={"images": image_urls.get(item.id, [])}
+        )
+        for item in items
+    ]
 
 
 @router.get(
@@ -52,10 +64,18 @@ async def get_pending_found_items(
 )
 async def get_pending_lost_items(
     session: DbSession,
+    storage: OptionalObjectStorageClient,
     _: ClerkStaff,
 ) -> list[PendingLostItemResponse]:
     """คืนรายการประกาศของหายซึ่งกำลังรอเจ้าหน้าที่ธุรการตรวจสอบ"""
-    return await list_pending_lost_items(session)
+    items = await list_pending_lost_items(session)
+    image_urls = await load_staff_image_urls(session, [item.id for item in items], storage)
+    return [
+        PendingLostItemResponse.model_validate(item).model_copy(
+            update={"images": image_urls.get(item.id, [])}
+        )
+        for item in items
+    ]
 
 
 @router.get(
@@ -65,9 +85,10 @@ async def get_pending_lost_items(
 async def get_found_item(
     item_id: UUID,
     session: DbSession,
+    storage: OptionalObjectStorageClient,
     _: ClerkStaff,
 ) -> FoundItemDetailResponse:
-    """คืนรายละเอียดของที่พบตาม ID"""
+    """คืนรายละเอียดของที่พบตาม ID พร้อมรูปสำหรับตรวจสอบ"""
     item = await get_found_item_detail(session, item_id)
 
     if item is None:
@@ -76,7 +97,10 @@ async def get_found_item(
             detail="Found item not found",
         )
 
-    return item
+    image_urls = await load_staff_image_urls(session, [item.id], storage)
+    return FoundItemDetailResponse.model_validate(item).model_copy(
+        update={"images": image_urls.get(item.id, [])}
+    )
 
 
 @router.get(
@@ -86,9 +110,10 @@ async def get_found_item(
 async def get_lost_item(
     item_id: UUID,
     session: DbSession,
+    storage: OptionalObjectStorageClient,
     _: ClerkStaff,
 ) -> LostItemDetailResponse:
-    """คืนรายละเอียดประกาศของหายตาม ID"""
+    """คืนรายละเอียดประกาศของหายตาม ID พร้อมรูปสำหรับตรวจสอบ"""
 
     item = await get_lost_item_detail(session, item_id)
 
@@ -98,7 +123,10 @@ async def get_lost_item(
             detail="Lost item not found",
         )
 
-    return item
+    image_urls = await load_staff_image_urls(session, [item.id], storage)
+    return LostItemDetailResponse.model_validate(item).model_copy(
+        update={"images": image_urls.get(item.id, [])}
+    )
 
 
 @router.post(
@@ -204,6 +232,63 @@ async def reject_found_item_report(
         raise HTTPException(
             status_code=404,
             detail="Pending found item not found",
+        )
+
+    return item
+
+
+@router.post(
+    "/found-items/{item_id}/close",
+    response_model=FoundItemDetailResponse,
+)
+async def close_found_item_report(
+    item_id: UUID,
+    session: DbSession,
+    current_staff: ClerkStaff,
+) -> FoundItemDetailResponse:
+    """ปิดรายการของที่พบซึ่งเผยแพร่แล้ว เพื่อเอาออกจากหน้า guest"""
+
+    try:
+        item = await close_lost_found_item(
+            session,
+            item_id,
+            LostType.FOUND,
+            current_staff.id,
+        )
+    except ActiveClaimExistsError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+    if item is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Approved found item not found",
+        )
+
+    return item
+
+
+@router.post(
+    "/lost-items/{item_id}/close",
+    response_model=LostItemDetailResponse,
+)
+async def close_lost_item_report(
+    item_id: UUID,
+    session: DbSession,
+    current_staff: ClerkStaff,
+) -> LostItemDetailResponse:
+    """ปิดประกาศของหายที่เผยแพร่แล้ว เช่น เจ้าของได้ของคืนแล้ว"""
+
+    item = await close_lost_found_item(
+        session,
+        item_id,
+        LostType.LOST,
+        current_staff.id,
+    )
+
+    if item is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Approved lost item not found",
         )
 
     return item

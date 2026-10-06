@@ -1,8 +1,15 @@
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from app.models.enums import ClaimStatus, LostStatus, LostType, ReturnStatus
+from app.schemas.lost_found_item import GuestImageResponse
+
+
+# รูปให้ staff ตรวจก่อนอนุมัติ ส่งเป็น signed URL อายุสั้น โดย endpoint เติมค่าเองภายหลัง
+# validation_alias ชี้ไปชื่อที่ LostItem ไม่มี เพื่อกัน from_attributes ไปอ่าน relationship
+# LostItem.images ซึ่ง lazy load ไม่ได้ใน async session (MissingGreenlet)
+STAFF_IMAGES_FIELD = Field(default_factory=list, validation_alias="staff_images")
 
 
 class PendingFoundItemResponse(BaseModel):
@@ -17,6 +24,7 @@ class PendingFoundItemResponse(BaseModel):
     location_detail: str | None
     status: LostStatus
     created_at: datetime
+    images: list[GuestImageResponse] = STAFF_IMAGES_FIELD
 
 
 class PendingLostItemResponse(BaseModel):
@@ -31,6 +39,7 @@ class PendingLostItemResponse(BaseModel):
     location_detail: str | None
     status: LostStatus
     created_at: datetime
+    images: list[GuestImageResponse] = STAFF_IMAGES_FIELD
 
 
 class FoundItemDetailResponse(BaseModel):
@@ -48,6 +57,7 @@ class FoundItemDetailResponse(BaseModel):
     reporter_email: str
     status: LostStatus
     created_at: datetime
+    images: list[GuestImageResponse] = STAFF_IMAGES_FIELD
 
 
 class LostItemDetailResponse(BaseModel):
@@ -64,6 +74,7 @@ class LostItemDetailResponse(BaseModel):
     reporter_email: str
     status: LostStatus
     created_at: datetime
+    images: list[GuestImageResponse] = STAFF_IMAGES_FIELD
 
 
 class RejectFoundItemRequest(BaseModel):

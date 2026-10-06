@@ -75,6 +75,9 @@ class Settings(BaseSettings):
     max_image_pixels: int = Field(default=8_000_000, gt=0)
     max_image_processing_concurrency: int = Field(default=1, ge=1, le=16)
 
+    # guest ไม่ได้เลือกจุดฝากเอง ทุกรายการพบของต้องนำไปฝากที่จุดเดียวกันตามที่หน้าเว็บแจ้งไว้
+    default_custody_location: str = Field(default="ห้องธุรการ ชั้น 1", min_length=1, max_length=255)
+
     @model_validator(mode="after")
     def validate_deployment_settings(self) -> "Settings":
         if not self.staff_activation_url:

@@ -12,6 +12,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.api.dependencies import provide_object_storage
+from app.core.config import settings
 from app.models.enums import ClaimStatus, LostStatus, LostType, ReturnStatus
 from app.models.image import Image
 from app.models.lost_found import LostClaim, LostItem
@@ -107,7 +108,6 @@ def found_form() -> dict[str, str]:
         "description": "พบหน้าห้องสมุด",
         "event_datetime": "2025-01-15T11:00:00",
         "location_detail": "อาคารหอสมุด ชั้น 1",
-        "custody_location": "ห้องประชาสัมพันธ์",
         "private_verification_detail": "มีลูกกุญแจสามดอกและหมายเลขด้านหลัง",
         "reporter_email": "finder@example.com",
     }
@@ -278,6 +278,30 @@ def test_found_item_keeps_verification_detail_private_in_database(
     item = asyncio.run(read_item())
     assert item.report_type == LostType.FOUND
     assert item.private_verification_detail == "มีลูกกุญแจสามดอกและหมายเลขด้านหลัง"
+    # guest ไม่ได้ส่งจุดฝากมา backend ต้องใส่จุดฝากกลางให้เอง
+    assert item.custody_location == settings.default_custody_location
+
+
+def test_found_item_ignores_client_supplied_custody_location(
+    test_context: tuple[TestClient, async_sessionmaker[AsyncSession]],
+    fake_storage: FakeObjectStorage,
+) -> None:
+    client, session_factory = test_context
+    response = client.post(
+        "/api/v1/guest/found-items",
+        data={**found_form(), "custody_location": "บ้านผู้แจ้ง"},
+    )
+
+    assert response.status_code == 201
+    item_code = response.json()["item_code"]
+
+    async def read_custody() -> str | None:
+        async with session_factory() as session:
+            return await session.scalar(
+                select(LostItem.custody_location).where(LostItem.item_code == item_code)
+            )
+
+    assert asyncio.run(read_custody()) == settings.default_custody_location
 
 
 @pytest.mark.parametrize(
@@ -909,7 +933,7 @@ def test_custody_location_appears_only_after_claim_is_approved(
 
     approved = client.get(status_url, params=params)
     assert approved.status_code == 200
-    assert approved.json()["custody_location"] == "ห้องประชาสัมพันธ์"
+    assert approved.json()["custody_location"] == settings.default_custody_location
 
 
 def test_cancellation_after_upload_still_removes_orphaned_r2_object(

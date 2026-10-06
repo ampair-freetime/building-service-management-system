@@ -13,6 +13,8 @@ export function taskHistoryRows(job, entries, { staff, role, statusLabels }) {
     const status = statusLabels[entry.new_status] || entry.new_status || job.status;
     return {
       uid: `backend-${entry.id}`, staff, role, itemId: job.id,
+      sourceAction: entry.action,
+      timestamp: timestamp.getTime(),
       title: job.title, category: job.category,
       action: entry.new_status === "completed" && entry.action === "status_changed"
         ? "ปิดงาน" : actions[entry.action],

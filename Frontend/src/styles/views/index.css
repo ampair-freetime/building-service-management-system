@@ -23,7 +23,7 @@
   --shadow-sm: 0 6px 20px rgba(35, 72, 105, 0.07);
   --radius: 24px;
   --radius-sm: 18px;
-  --font: "Sarabun", "Open Sans", system-ui, sans-serif;
+  --font: "Sarabun", sans-serif;
 }
 
 * {
@@ -1729,7 +1729,7 @@ h4,
 .eyebrow,
 .brand,
 .brand * {
-  font-family: "Sarabun", "Open Sans", system-ui, sans-serif !important;
+  font-family: "Sarabun", sans-serif !important;
 }
 
 /* enhancements.css */
@@ -3001,7 +3001,7 @@ textarea:focus-visible {
 .user-page .brand strong,
 .staff-dashboard-page .brand strong,
 .staff-login-page .brand {
-  font-family: "Prompt", "Sarabun", sans-serif !important;
+  font-family: "Sarabun", sans-serif !important;
 }
 .user-page .greeting-name,
 .user-page .page-header h2,

@@ -1,3 +1,4 @@
+import logging
 from uuid import UUID
 
 from sqlalchemy import select
@@ -9,7 +10,58 @@ from app.models.lost_found import (
     LostClaim,
     LostClaimReturnStatusHistory,
     LostItem,
+    LostItemHistory,
 )
+from app.schemas.lost_found_item import GuestImageResponse
+from app.services.lost_found import load_image_map
+from app.services.object_storage import ObjectStorage, StorageOperationError
+
+logger = logging.getLogger(__name__)
+
+# คำขอรับของที่ยังไม่จบ ถ้าปิดรายการทั้งที่ยังมีคำขอพวกนี้ ผู้ยื่นจะค้างโดยไม่มีใครดูแล
+ACTIVE_CLAIM_STATUSES = (
+    ClaimStatus.PENDING,
+    ClaimStatus.ADDITIONAL_INFO_REQUIRED,
+    ClaimStatus.APPROVED,
+    ClaimStatus.SCHEDULED,
+)
+
+
+class ActiveClaimExistsError(Exception):
+    """ปิดรายการพบของไม่ได้เพราะยังมีคำขอรับของคืนที่ยังไม่จบ"""
+
+
+async def load_staff_image_urls(
+    session: AsyncSession,
+    item_ids: list[UUID],
+    storage: ObjectStorage | None,
+) -> dict[UUID, list[GuestImageResponse]]:
+    """สร้าง signed URL ของรูปทุกสถานะ เพื่อให้ staff เห็นรูปก่อนกดอนุมัติ
+
+    ถ้า R2 ยังไม่ตั้งค่าหรือสร้าง URL ไม่ได้ จะคืน dict ว่าง ให้ staff ยังอ่านข้อมูลอื่นได้
+    """
+    if storage is None or not item_ids:
+        return {}
+
+    image_map = await load_image_map(session, item_ids)
+    try:
+        return {
+            item_id: [
+                GuestImageResponse(
+                    id=image.id,
+                    url=storage.create_download_url(image.object_key),
+                    content_type=image.content_type,
+                    width=image.width,
+                    height=image.height,
+                )
+                for image in images
+            ]
+            for item_id, images in image_map.items()
+        }
+    except StorageOperationError:
+        logger.warning("Creating staff lost-found image URLs failed", exc_info=True)
+        return {}
+
 
 async def list_pending_found_items(session: AsyncSession) -> list[LostItem]:
     """คืนรายการของที่พบซึ่งกำลังรอเจ้าหน้าที่ธุรการตรวจสอบ"""
@@ -366,6 +418,19 @@ async def update_ownership_return_status(
 
     if new_status == ReturnStatus.RETURNED:
         claim.status = ClaimStatus.COMPLETED
+        # คืนของให้เจ้าของแล้ว จึงต้องเอาประกาศออกจากหน้า guest ใน commit เดียวกับ claim
+        item = await session.get(LostItem, claim.found_item_id)
+        if item is not None and item.status == LostStatus.APPROVED:
+            item.status = LostStatus.CLAIMED
+            session.add(
+                LostItemHistory(
+                    lost_item_id=item.id,
+                    staff_id=staff_id,
+                    old_status=LostStatus.APPROVED,
+                    new_status=LostStatus.CLAIMED,
+                    note="คืนของให้ผู้ยื่นคำขอแล้ว",
+                )
+            )
 
     await session.commit()
     await session.refresh(claim)
@@ -400,3 +465,57 @@ async def schedule_pickup(
     await session.refresh(claim)
 
     return claim
+
+
+async def close_lost_found_item(
+    session: AsyncSession,
+    item_id: UUID,
+    report_type: LostType,
+    staff_id: UUID,
+) -> LostItem | None:
+    """ปิดรายการที่เผยแพร่แล้ว เพื่อให้หายจากหน้า guest ที่แสดงเฉพาะสถานะ APPROVED"""
+
+    statement = (
+        select(LostItem)
+        .where(
+            LostItem.id == item_id,
+            LostItem.report_type == report_type,
+            LostItem.status == LostStatus.APPROVED,
+        )
+        .with_for_update()
+    )
+
+    item = await session.scalar(statement)
+
+    if item is None:
+        return None
+
+    if report_type == LostType.FOUND:
+        active_claim_id = await session.scalar(
+            select(LostClaim.id)
+            .where(
+                LostClaim.found_item_id == item.id,
+                LostClaim.status.in_(ACTIVE_CLAIM_STATUSES),
+            )
+            .limit(1)
+        )
+        if active_claim_id is not None:
+            raise ActiveClaimExistsError(
+                "มีคำขอรับของคืนที่ยังดำเนินการอยู่ กรุณาจัดการคำขอก่อนปิดรายการ"
+            )
+
+    item.status = LostStatus.CLOSED
+    session.add(
+        LostItemHistory(
+            lost_item_id=item.id,
+            staff_id=staff_id,
+            old_status=LostStatus.APPROVED,
+            new_status=LostStatus.CLOSED,
+            note="เจ้าหน้าที่ปิดรายการ",
+        )
+    )
+
+    await session.commit()
+    await session.refresh(item)
+
+    return item
