@@ -15,10 +15,9 @@ import {
 } from "../../../services/cleaningRequests.js";
 import LocationCombobox from "../LocationCombobox.vue";
 
-const priorityValues = {
-  ทำความสะอาดทั่วไป: "normal",
-  เหตุเร่งด่วน: "urgent",
-};
+import { cleaningCategories } from "../../../services/cleaningCategories.js";
+const priorityValues = { ปกติ: "normal", เร่งด่วน: "urgent" };
+const selectedPriority = ref("ปกติ");
 
 const { isSubmitting, status, message, submit, markChanged } =
   useCleaningSubmission(uploadCleaningRequest);
@@ -32,8 +31,9 @@ async function submitCleaning(event) {
     return;
   }
   const payload = new FormData(form);
+  payload.set("cleaning_category", selectedWorkType.value);
   payload.set("location_id", String(selectedLocation.value.id));
-  payload.set("priority", priorityValues[selectedWorkType.value] || "");
+  payload.set("priority", priorityValues[selectedPriority.value] || "");
   // Explicitly include only accepted photos; omit the empty file input entry.
   payload.delete("image");
   photos.value.forEach(({ file }) => payload.append("image", file));
@@ -80,7 +80,7 @@ const locationLoadError = ref("");
 const locationError = ref("");
 
 const selectedWorkType = ref("");
-const workTypeSuggestions = Object.keys(priorityValues);
+const workTypeSuggestions = cleaningCategories;
 
 const photoInput = ref(null);
 const photos = ref([]);
@@ -261,7 +261,7 @@ onBeforeUnmount(clearPhotos);
         data-service-validation
         :aria-busy="isSubmitting"
         @submit.prevent="submitCleaning"
-        @reset="clearPhotos"
+        @reset="clearPhotos(); selectedWorkType = ''; selectedPriority = 'ปกติ'"
         @input="markChanged"
         @change="markChanged"
       >
@@ -326,15 +326,21 @@ onBeforeUnmount(clearPhotos);
             :searchable="false"
             required
           />
-          <input
-            type="hidden"
-            name="priority"
-            :value="priorityValues[selectedWorkType] || ''"
+          <LocationCombobox
+            v-model="selectedPriority"
+            id="cleanPriority"
+            label="ความเร่งด่วน"
+            :options="Object.keys(priorityValues)"
+            :allow-custom="false"
+            :searchable="false"
+            required
           />
+          <input type="hidden" name="priority" :value="priorityValues[selectedPriority]" />
           <div class="field">
-            <label for="cleanDetails">รายละเอียด (ถ้ามี)</label>
+            <label for="cleanDetails">{{ selectedPriority === "เร่งด่วน" ? "รายละเอียดและเหตุผลที่เร่งด่วน" : "รายละเอียด (ถ้ามี)" }}</label>
             <textarea
               id="cleanDetails"
+              :required="selectedPriority === 'เร่งด่วน'"
               name="description"
               maxlength="255"
               aria-describedby="cleanDetailsError"

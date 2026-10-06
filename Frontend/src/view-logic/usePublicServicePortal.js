@@ -55,11 +55,15 @@ export function usePublicServicePortal() {
     // เก็บเฉพาะคำร้องที่ผู้ใช้ส่งจริงในรอบการเปิดหน้านี้ ไม่มีข้อมูลตัวอย่างปะปน
     const trackedRequests = new Map();
 
-    function syncBottomNavigation(modalId = "") {
+    function syncBottomNavigation(modalId = "", activeButton = null) {
       bottomButtons.forEach((button) => {
-        const matchesPage = button.dataset.bottomPage === currentPage;
+        const matchesPage =
+          button === activeButton || button.dataset.bottomPage === currentPage;
         const matchesModal = modalId && button.dataset.openModal === modalId;
-        button.classList.toggle("active", Boolean(matchesPage || matchesModal));
+        const isActive = Boolean(matchesPage || matchesModal);
+        button.classList.toggle("active", isActive);
+        if (isActive) button.setAttribute("aria-current", "page");
+        else button.removeAttribute("aria-current");
       });
     }
 
@@ -109,6 +113,15 @@ export function usePublicServicePortal() {
     navItems.forEach((item) =>
       item.addEventListener("click", () => navigate(item.dataset.page)),
     );
+    syncBottomNavigation();
+    // ลิงก์จาก QR ระบุบริการไว้ใน query string ต้องเลือกหน้าตั้งแต่เปิดหน้า
+    // เพื่อให้ทั้งเนื้อหาและเมนูด้านล่างอยู่ในสถานะเดียวกัน
+    const initialService = new URLSearchParams(window.location.search).get(
+      "service",
+    );
+    if (["repair", "clean"].includes(initialService)) {
+      navigate(initialService);
+    }
     document.querySelectorAll("[data-go]").forEach((button) =>
       button.addEventListener("click", (event) => {
         event.stopPropagation();
@@ -545,6 +558,7 @@ export function usePublicServicePortal() {
       return new Intl.DateTimeFormat("th-TH", {
         dateStyle: "medium",
         timeStyle: "short",
+        timeZone: "Asia/Bangkok",
       }).format(date);
     }
 
@@ -1285,7 +1299,9 @@ export function usePublicServicePortal() {
           requestTitleForTracking(item);
 
         document.getElementById(ids.updatedAt).textContent =
-          item.updatedAt || formatItemDate(item.updated_at);
+          item.updated_at
+            ? formatItemDate(item.updated_at)
+            : item.updatedAt || "–";
       }
 
       renderTrackingProgress(item, code, ids);
@@ -1419,9 +1435,7 @@ export function usePublicServicePortal() {
     document.querySelectorAll("[data-scroll-track]").forEach((button) =>
       button.addEventListener("click", () => {
         navigate("dashboard");
-        bottomButtons.forEach((item) =>
-          item.classList.toggle("active", item === button),
-        );
+        syncBottomNavigation("", button);
         window.setTimeout(
           () => {
             document.getElementById("trackingSection").scrollIntoView({
@@ -1545,17 +1559,16 @@ export function usePublicServicePortal() {
         submitButton.disabled = false;
         submitButton.textContent = "ส่งคำขอรับคืน";
       }
-      const urlParams = new URLSearchParams(window.location.search);
-
-      if (urlParams.get("service") === "clean") {
-        navigate("clean");
-      }
     });
 
     const viewStatusButton = document.getElementById("viewStatusButton");
     viewStatusButton?.addEventListener("click", () => {
       closeUiModal("successModal", false);
       navigate("dashboard");
+      syncBottomNavigation(
+        "",
+        document.querySelector(".bottom-nav [data-scroll-track]"),
+      );
 
       window.setTimeout(() => {
         document.getElementById("trackingSection").scrollIntoView({

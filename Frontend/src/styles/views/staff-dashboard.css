@@ -993,6 +993,9 @@ body {
 .metric:nth-child(3):before {
   background: var(--clean);
 }
+.staff-dashboard-page .metric.urgent:before {
+  background: #e55b3c;
+}
 .metric:nth-child(4):before,
 .metric.warn:before {
   background: var(--lost);
@@ -1283,6 +1286,23 @@ body {
   background: var(--clean);
   margin-right: 4px;
 }
+.staff-dashboard-page .assignee.is-unassigned {
+  color: #9a3412;
+  background: #fff0df;
+  border-radius: 8px;
+  padding: 4px 8px;
+  font-weight: 700;
+}
+.staff-dashboard-page #jobDetailAssignee.is-unassigned {
+  color: #9a3412;
+}
+.staff-dashboard-page .job-meta .badge.normal {
+  color: #276640;
+  background: #e0f2e7;
+}
+.staff-dashboard-page .assignee.is-unassigned .assignee-dot {
+  background: #ea580c;
+}
 .work-history-card {
   display: grid;
   grid-template-columns: 100px 1fr auto;
@@ -1461,6 +1481,39 @@ body {
   flex: 1;
   min-width: 0;
   overflow-wrap: anywhere;
+}
+.staff-overview-modal-card #staffOverviewDetail + .overview-work-heading {
+  margin-top: 24px;
+}
+.staff-overview-modal-card #staffOverviewReturned {
+  display: grid;
+  gap: 14px;
+}
+.staff-overview-modal-card #staffOverviewReturned .overview-detail-item {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: #fafbfd;
+  line-height: 1.65;
+}
+.staff-overview-modal-card #staffOverviewReturned .overview-detail-item > div {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.staff-overview-modal-card #staffOverviewReturned p {
+  margin: 8px 0 0;
+  line-height: 1.65;
+}
+.staff-overview-modal-card #staffOverviewReturned .badge {
+  align-self: flex-start;
+  flex: none;
+  max-width: 100%;
+  white-space: normal;
+  line-height: 1.6;
 }
 .overview-number {
   font-size: 24px;
@@ -2228,12 +2281,65 @@ textarea:focus-visible,
 }
 .detail-photo img {
   width: 100%;
-  height: 210px;
-  object-fit: cover;
+  height: auto;
+  object-fit: contain;
   display: block;
 }
-.detail-photo img[hidden] {
+.detail-photo img[hidden],
+.detail-photo .icon[hidden] {
   display: none;
+}
+.staff-dashboard-page .field[hidden] {
+  display: none;
+}
+.grouped-history-card {
+  padding: 24px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  min-width: 0;
+  line-height: 1.65;
+}
+.history-group {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  background: #fafbfd;
+}
+.history-group > h3 { margin: 0; line-height: 1.65; }
+.staff-dashboard-page #myHistoryTabs .tab {
+  box-shadow: none;
+}
+.staff-dashboard-page #myHistoryTabs .tab.active {
+  background: var(--role);
+  box-shadow: none;
+}
+.grouped-history-card header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+.grouped-history-card h3 { margin: 10px 0; line-height: 1.65; overflow-wrap: anywhere; }
+.grouped-history-card .history-note { padding: 14px; background: #fafbfd; border-radius: 14px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.grouped-history-card details { margin-top: 16px; border-top: 1px solid var(--line); padding-top: 16px; }
+.grouped-history-card summary { cursor: pointer; color: var(--primary); font-weight: 700; }
+.grouped-history-card .timeline p { margin: 8px 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.history-photos { display: flex; flex-wrap: wrap; gap: 12px; }
+.history-photos img { width: 180px; max-width: 100%; height: 140px; object-fit: contain; border-radius: 14px; background: #fafbfd; }
+#page-my-history .history-filter-panel label { display: grid; gap: 8px; min-width: 0; }
+.staff-dashboard-page #page-my-history .history-filter-panel {
+  align-items: end;
+}
+.staff-dashboard-page #page-my-history .history-filter-panel :is(input.field-compact, .filter-select-trigger, #resetMyHistoryFilters) {
+  height: 58px;
+  min-height: 58px;
+  box-sizing: border-box;
 }
 .job-detail-modal.lost-post-detail .detail-photo {
   min-height: 320px;
@@ -2247,6 +2353,16 @@ textarea:focus-visible,
 #confirmModalText {
   white-space: pre-line;
 }
+#returnJobForm .return-btn,
+#confirmModal #confirmActionButton.confirm-accept {
+  background: var(--role, #276640);
+  border-color: var(--role, #276640);
+  color: #fff;
+}
+#returnJobForm .return-btn:hover,
+#confirmModal #confirmActionButton.confirm-accept:hover {
+  filter: brightness(0.9);
+}
 #successModalText {
   white-space: pre-line;
 }
@@ -2259,6 +2375,14 @@ textarea:focus-visible,
 .detail-photo .icon {
   width: 72px;
   height: 72px;
+}
+.staff-dashboard-page #jobQuickActions [data-detail-action="accept"] {
+  background: var(--role, #276640);
+  border-color: var(--role, #276640);
+  color: #fff;
+}
+.staff-dashboard-page #jobQuickActions [data-detail-action="accept"]:hover {
+  filter: brightness(0.9);
 }
 .detail-meta {
   display: grid;
@@ -3635,7 +3759,10 @@ body {
 .job-card > div {
   min-width: 0;
 }
-.job-card h3 {
+.staff-dashboard-page .job-card h3 {
+  margin: 10px 0 12px;
+  font-size: 17px;
+  line-height: 1.65;
   overflow-wrap: anywhere;
 }
 .job-photo {
@@ -5497,6 +5624,10 @@ body:has(.staff-dashboard-page) {
   background: linear-gradient(135deg, #9a4708, #b45309 52%, #d97706);
   color: #fff;
   box-shadow: 0 9px 20px rgba(180, 83, 9, 0.24);
+}
+.staff-dashboard-page.is-technician .job-meta .badge.normal {
+  background: var(--role-soft);
+  color: var(--role);
 }
 
 .staff-dashboard-page.is-technician .sidebar .brand-mark {

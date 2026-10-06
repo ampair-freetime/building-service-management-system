@@ -187,7 +187,6 @@
             <label for="statusNote">หมายเหตุ</label
             ><textarea
               id="statusNote"
-              required
               placeholder="คืบหน้า"
             ></textarea>
           </div>
@@ -331,15 +330,14 @@
           <input type="hidden" id="completeJobId" />
           <div class="field">
             <label for="completeResult">ผลการดำเนินงาน</label
-            ><textarea id="completeResult" required></textarea>
+            ><textarea id="completeResult"></textarea>
           </div>
           <div class="field">
             <label for="completeNote">หมายเหตุปิดงาน</label>
             <textarea
-              id="completeNote"
+              id="completeNote" required
               maxlength="2000"
               placeholder="ระบุรายละเอียดเพิ่มเติม เช่น จุดที่ทำความสะอาดหรือสิ่งที่ควรติดตาม"
-              required
             ></textarea>
             <small>สูงสุด 2,000 ตัวอักษร</small>
           </div>
@@ -351,10 +349,9 @@
               for="completeImage"
             >
               <input
-                id="completeImage"
+                id="completeImage" required
                 type="file"
                 accept="image/jpeg,image/png,image/webp"
-                required
               />
               <span>
                 <svg class="icon" style="margin: auto">

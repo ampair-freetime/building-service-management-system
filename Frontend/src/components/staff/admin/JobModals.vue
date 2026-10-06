@@ -190,7 +190,6 @@
             <label for="statusNote">หมายเหตุ</label
             ><textarea
               id="statusNote"
-              required
               placeholder="สรุปความคืบหน้า"
             ></textarea>
           </div>
@@ -334,11 +333,11 @@
           <input type="hidden" id="completeJobId" />
           <div class="field">
             <label for="completeResult">ผลการดำเนินงาน</label
-            ><textarea id="completeResult" required></textarea>
+            ><textarea id="completeResult"></textarea>
           </div>
           <div class="field">
             <label for="completeNote">หมายเหตุปิดงาน</label
-            ><textarea id="completeNote" required></textarea>
+            ><textarea id="completeNote"></textarea>
           </div>
           <div class="field">
             <label for="completeImage">รูปหลังดำเนินการ</label

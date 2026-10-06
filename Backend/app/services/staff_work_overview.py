@@ -11,6 +11,7 @@ from app.models.service_request import RequestHistory, ServiceRequest
 from app.models.staff import Staff
 from app.schemas.staff_work_overview import (
     CurrentWorkItem,
+    ReturnedWorkItem,
     StaffCurrentWorkResponse,
     StaffWorkCounts,
     StaffWorkOverviewItem,
@@ -165,9 +166,23 @@ async def get_staff_current_work(
             .order_by(ServiceRequest.created_at.desc(), ServiceRequest.id.desc())
         )
     )
+    returned = (await session.execute(
+        select(RequestHistory, ServiceRequest)
+        .join(ServiceRequest, ServiceRequest.id == RequestHistory.request_id)
+        .where(RequestHistory.performed_by == staff.id,
+               RequestHistory.action == RequestAction.RETURNED,
+               ServiceRequest.request_type.in_((RequestType.CLEANING, RequestType.REPAIR)))
+        .order_by(RequestHistory.created_at.desc(), RequestHistory.id.desc())
+    )).all()
     return StaffCurrentWorkResponse(
         staff_id=staff.id,
         full_name=staff.full_name,
         current_work_count=len(work),
         current_work=[CurrentWorkItem.model_validate(request) for request in work],
+        returned_work=[ReturnedWorkItem(
+            id=request.id, request_code=request.request_code,
+            request_type=request.request_type, title=request.title, status=request.status,
+            history_id=history.id, reason=history.note, returned_at=history.created_at,
+            returned_by=staff.full_name,
+        ) for history, request in returned],
     )

@@ -184,6 +184,9 @@
             ><select id="newJobStatus" required></select>
           </div>
           <div class="field">
+            <label for="statusNote">หมายเหตุ</label><textarea id="statusNote" placeholder="ระบุเหตุผล"></textarea>
+          </div>
+          <div class="field">
             <label for="statusImage">รูปความคืบหน้า (ถ้ามี)</label
             ><input
               id="statusImage"
@@ -323,22 +326,21 @@
           <input type="hidden" id="completeJobId" />
           <div class="field">
             <label for="completeResult">ผลการดำเนินงาน</label
-            ><textarea id="completeResult" required></textarea>
+            ><textarea id="completeResult"></textarea>
           </div>
           <div class="field">
             <label for="completeNote">หมายเหตุปิดงาน</label>
             <textarea
-              id="completeNote"
+              id="completeNote" required
               maxlength="2000"
               placeholder="สรุปการซ่อมและสิ่งที่ควรติดตาม"
-              required
             ></textarea>
             <small>สูงสุด 2,000 ตัวอักษร</small>
           </div>
           <div class="field">
-            <label for="completeImage">รูปหลังดำเนินการ (ไม่บังคับ)</label>
+            <label for="completeImage">รูปหลังดำเนินการ</label>
             <label class="drop-zone" id="completionDropZone" for="completeImage">
-              <input id="completeImage" type="file" accept="image/jpeg,image/png,image/webp" />
+              <input id="completeImage" required type="file" accept="image/jpeg,image/png,image/webp" />
               <span>
                 <svg class="icon" style="margin: auto"><use href="#i-upload" /></svg>
                 <strong>ลากรูปหลังดำเนินการมาวาง หรือเลือกจากเครื่อง</strong>

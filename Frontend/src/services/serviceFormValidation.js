@@ -58,6 +58,15 @@ export function installServiceFormValidation(form) {
     if (!valid || !form.checkValidity()) {
       event.preventDefault();
       event.stopImmediatePropagation();
+      const invalid = fields.find(field => errors.get(field).textContent || field.validity?.valid === false);
+      const status = form.querySelector(".submission-status");
+      if (status) {
+        status.textContent = invalid
+          ? errors.get(invalid).textContent || invalid.validationMessage
+          : "กรุณาตรวจสอบข้อมูลในแบบฟอร์มก่อนส่ง";
+      }
+      invalid?.scrollIntoView?.({ block: "center", behavior: "smooth" });
+      invalid?.focus?.({ preventScroll: true });
     }
   }, true);
 

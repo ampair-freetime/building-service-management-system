@@ -44,6 +44,7 @@ class ServiceRequest(Base):
     )
     location_id: Mapped[int] = mapped_column(ForeignKey("locations.id"), nullable=False)
     title: Mapped[str] = mapped_column(String(200))
+    cleaning_category: Mapped[str | None] = mapped_column(String(100), nullable=True)
     description: Mapped[str] = mapped_column(Text)
     priority: Mapped[PriorityLevel] = mapped_column(
         SqlEnum(

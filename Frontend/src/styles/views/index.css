@@ -3278,7 +3278,9 @@ textarea:focus-visible {
   }
 
   .user-page .mobile-hero {
-    padding: 12px 0 10px;
+    min-height: 308px;
+    padding: 190px 4px 16px;
+    overflow: hidden;
   }
 
   .user-page .mobile-hero .greeting-name {
@@ -3298,8 +3300,11 @@ textarea:focus-visible {
   }
 
   .user-page .mobile-hero .building-illustration {
-    top: 8px;
-    width: min(180px, 48cqi);
+    top: -12px;
+    right: 50%;
+    width: calc(100% + 56px);
+    max-width: none;
+    transform: translateX(50%);
   }
 
   .user-page .location-card {
