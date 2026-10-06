@@ -468,7 +468,6 @@ export function useStaffDashboard() {
       });
       renderActivities();
       renderMyHistory();
-      renderActivities();
       renderStaffOverview();
     }
     function roleAllows(element, role) {
