@@ -15,9 +15,12 @@ from app.schemas.lost_found_clerk import (
     UpdateReturnStatusRequest,
     SchedulePickupRequest,
 )
+from app.models.enums import LostType
 from app.services.lost_found_clerk import (
+    ActiveClaimExistsError,
     approve_found_item,
     approve_lost_item,
+    close_lost_found_item,
     get_found_item_detail,
     get_lost_item_detail,
     get_ownership_request_detail,
@@ -204,6 +207,63 @@ async def reject_found_item_report(
         raise HTTPException(
             status_code=404,
             detail="Pending found item not found",
+        )
+
+    return item
+
+
+@router.post(
+    "/found-items/{item_id}/close",
+    response_model=FoundItemDetailResponse,
+)
+async def close_found_item_report(
+    item_id: UUID,
+    session: DbSession,
+    current_staff: ClerkStaff,
+) -> FoundItemDetailResponse:
+    """ปิดรายการของที่พบซึ่งเผยแพร่แล้ว เพื่อเอาออกจากหน้า guest"""
+
+    try:
+        item = await close_lost_found_item(
+            session,
+            item_id,
+            LostType.FOUND,
+            current_staff.id,
+        )
+    except ActiveClaimExistsError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+    if item is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Approved found item not found",
+        )
+
+    return item
+
+
+@router.post(
+    "/lost-items/{item_id}/close",
+    response_model=LostItemDetailResponse,
+)
+async def close_lost_item_report(
+    item_id: UUID,
+    session: DbSession,
+    current_staff: ClerkStaff,
+) -> LostItemDetailResponse:
+    """ปิดประกาศของหายที่เผยแพร่แล้ว เช่น เจ้าของได้ของคืนแล้ว"""
+
+    item = await close_lost_found_item(
+        session,
+        item_id,
+        LostType.LOST,
+        current_staff.id,
+    )
+
+    if item is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Approved lost item not found",
         )
 
     return item

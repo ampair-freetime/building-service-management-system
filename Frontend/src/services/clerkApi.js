@@ -301,6 +301,38 @@ export async function approveLostItemAnnouncement(itemId) {
   return await parseResponse(response, "ไม่สามารถอนุมัติประกาศของหายได้");
 }
 
+export async function closeFoundItem(itemId) {
+  const response = await fetch(
+    `${API_BASE_URL}/lost-found/found-items/${encodeURIComponent(itemId)}/close`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${
+          localStorage.getItem("buildingCareAccessToken") || ""
+        }`,
+      },
+    },
+  );
+
+  return await parseResponse(response, "ไม่สามารถปิดรายการได้");
+}
+
+export async function closeLostItemAnnouncement(itemId) {
+  const response = await fetch(
+    `${API_BASE_URL}/lost-found/lost-items/${encodeURIComponent(itemId)}/close`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${
+          localStorage.getItem("buildingCareAccessToken") || ""
+        }`,
+      },
+    },
+  );
+
+  return await parseResponse(response, "ไม่สามารถปิดประกาศของหายได้");
+}
+
 export async function rejectFoundItem(itemId, reason) {
   const response = await fetch(
     `${API_BASE_URL}/lost-found/found-items/${encodeURIComponent(itemId)}/reject`,

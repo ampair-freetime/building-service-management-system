@@ -69,10 +69,9 @@ class GuestLostItemCreate(GuestItemCreateBase):
 class GuestFoundItemCreate(GuestItemCreateBase):
     """ข้อมูลสร้างประกาศพบของ โดยข้อมูลยืนยันจะไม่ถูกส่งออก public API."""
 
-    custody_location: str = Field(min_length=1, max_length=255)
     private_verification_detail: str = Field(min_length=1, max_length=2_000)
 
-    @field_validator("custody_location", "private_verification_detail")
+    @field_validator("private_verification_detail")
     @classmethod
     def normalize_found_item_text(cls, value: str) -> str:
         return value.strip()

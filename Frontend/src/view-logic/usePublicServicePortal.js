@@ -943,8 +943,6 @@ export function usePublicServicePortal() {
       },
       location_detail: (value) =>
         validateRequiredText(value, "สถานที่พบสิ่งของ"),
-      custody_location: (value) =>
-        validateRequiredText(value, "จุดรับฝากสิ่งของ"),
       description: (value) =>
         validateRequiredText(value, "รายละเอียดสิ่งของ", 10),
       private_detail: (value) =>

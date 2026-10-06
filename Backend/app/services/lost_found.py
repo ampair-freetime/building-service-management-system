@@ -10,6 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.models.enums import LostStatus, LostType
 from app.models.image import Image
 from app.models.location import Location
@@ -77,7 +78,7 @@ async def create_guest_item(
     custody_location = None
     if isinstance(payload, GuestFoundItemCreate):
         private_verification_detail = payload.private_verification_detail
-        custody_location = payload.custody_location
+        custody_location = settings.default_custody_location
 
     item = LostItem(
         id=item_id,

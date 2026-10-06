@@ -1309,6 +1309,13 @@ def test_clerk_can_update_return_status_to_returned(test_context):
     assert claim.status == ClaimStatus.COMPLETED
     assert claim.return_status == ReturnStatus.RETURNED
 
+    async def get_item_status():
+        async with session_factory() as session:
+            return (await session.get(LostItem, claim.found_item_id)).status
+
+    # คืนของแล้วต้องเอาประกาศออกจากหน้า guest ด้วย
+    assert asyncio.run(get_item_status()) == LostStatus.CLAIMED
+
 
 def test_invalid_return_status_returns_422(test_context):
     client, session_factory = test_context
@@ -1983,3 +1990,147 @@ def test_view_scheduled_pickup_details(test_context):
 
     assert data["status"] == "scheduled"
     assert data["pickup_datetime"] == "2026-09-20T13:30:00"
+
+
+def _clerk_headers(client, session_factory):
+    seed_staff(
+        session_factory,
+        email="clerk@example.com",
+        password="admin-password",
+        role="clerk",
+    )
+    login = client.post(
+        "/api/v1/auth/login",
+        json={"identifier": "clerk@example.com", "password": "admin-password"},
+    )
+    return {"Authorization": f"Bearer {login.json()['access_token']}"}
+
+
+def _seed_item(session_factory, *, report_type, status, claim_status=None):
+    async def seed():
+        async with session_factory() as session:
+            item = LostItem(
+                item_code=f"{report_type.value.upper()}-{uuid4().hex[:8]}",
+                report_type=report_type,
+                item_category="Accessories",
+                item_name="Wallet",
+                description="Brown wallet",
+                event_datetime=datetime.now(timezone.utc),
+                location_id=None,
+                location_detail="Building B",
+                custody_location="Clerk Office" if report_type == LostType.FOUND else None,
+                reporter_email="reporter@example.com",
+                status=status,
+            )
+            session.add(item)
+            await session.flush()
+            if claim_status is not None:
+                session.add(
+                    LostClaim(
+                        found_item_id=item.id,
+                        claimant_name="Owner User",
+                        claimant_email="owner@example.com",
+                        proof_detail="มีบัตรนักศึกษาอยู่ด้านใน",
+                        status=claim_status,
+                    )
+                )
+            await session.commit()
+            return item.id
+
+    return asyncio.run(seed())
+
+
+def _item_status(session_factory, item_id):
+    async def read():
+        async with session_factory() as session:
+            return (await session.get(LostItem, item_id)).status
+
+    return asyncio.run(read())
+
+
+@pytest.mark.parametrize(
+    ("report_type", "collection"),
+    [(LostType.FOUND, "found-items"), (LostType.LOST, "lost-items")],
+)
+def test_clerk_close_removes_item_from_public_list(
+    test_context, public_list_storage, report_type, collection
+):
+    client, session_factory = test_context
+    headers = _clerk_headers(client, session_factory)
+    item_id = _seed_item(session_factory, report_type=report_type, status=LostStatus.APPROVED)
+
+    response = client.post(f"/api/v1/lost-found/{collection}/{item_id}/close", headers=headers)
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "closed"
+    assert _item_status(session_factory, item_id) == LostStatus.CLOSED
+    public_items = client.get(f"/api/v1/guest/{collection}").json()["items"]
+    assert all(item["id"] != str(item_id) for item in public_items)
+
+
+def test_clerk_cannot_close_pending_item(test_context):
+    client, session_factory = test_context
+    headers = _clerk_headers(client, session_factory)
+    item_id = _seed_item(session_factory, report_type=LostType.FOUND, status=LostStatus.PENDING)
+
+    response = client.post(f"/api/v1/lost-found/found-items/{item_id}/close", headers=headers)
+
+    assert response.status_code == 404
+    assert _item_status(session_factory, item_id) == LostStatus.PENDING
+
+
+def test_close_found_item_with_wrong_report_type_returns_404(test_context):
+    client, session_factory = test_context
+    headers = _clerk_headers(client, session_factory)
+    item_id = _seed_item(session_factory, report_type=LostType.LOST, status=LostStatus.APPROVED)
+
+    response = client.post(f"/api/v1/lost-found/found-items/{item_id}/close", headers=headers)
+
+    assert response.status_code == 404
+    assert _item_status(session_factory, item_id) == LostStatus.APPROVED
+
+
+@pytest.mark.parametrize(
+    "claim_status",
+    [ClaimStatus.PENDING, ClaimStatus.ADDITIONAL_INFO_REQUIRED, ClaimStatus.APPROVED, ClaimStatus.SCHEDULED],
+)
+def test_clerk_cannot_close_found_item_with_active_claim(test_context, claim_status):
+    client, session_factory = test_context
+    headers = _clerk_headers(client, session_factory)
+    item_id = _seed_item(
+        session_factory,
+        report_type=LostType.FOUND,
+        status=LostStatus.APPROVED,
+        claim_status=claim_status,
+    )
+
+    response = client.post(f"/api/v1/lost-found/found-items/{item_id}/close", headers=headers)
+
+    assert response.status_code == 409
+    assert _item_status(session_factory, item_id) == LostStatus.APPROVED
+
+
+def test_clerk_can_close_found_item_after_claim_was_rejected(test_context):
+    client, session_factory = test_context
+    headers = _clerk_headers(client, session_factory)
+    item_id = _seed_item(
+        session_factory,
+        report_type=LostType.FOUND,
+        status=LostStatus.APPROVED,
+        claim_status=ClaimStatus.REJECTED,
+    )
+
+    response = client.post(f"/api/v1/lost-found/found-items/{item_id}/close", headers=headers)
+
+    assert response.status_code == 200
+    assert _item_status(session_factory, item_id) == LostStatus.CLOSED
+
+
+def test_close_requires_clerk_login(test_context):
+    client, session_factory = test_context
+    item_id = _seed_item(session_factory, report_type=LostType.LOST, status=LostStatus.APPROVED)
+
+    response = client.post(f"/api/v1/lost-found/lost-items/{item_id}/close")
+
+    assert response.status_code == 401
+    assert _item_status(session_factory, item_id) == LostStatus.APPROVED

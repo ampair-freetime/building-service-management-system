@@ -22,6 +22,8 @@ import {
   rejectLostItemAnnouncement,
   approveFoundItem,
   approveLostItemAnnouncement,
+  closeFoundItem,
+  closeLostItemAnnouncement,
   getPendingOwnershipRequests,
   getOwnershipRequestDetail,
   approveOwnershipRequest,
@@ -257,21 +259,6 @@ export function useStaffDashboard() {
       }
     }
 
-    const completedLostFoundStorageKey = "buildingCareCompletedLostFoundItems";
-
-    // อ่านรหัสรายการที่ปิดงานแล้ว เพื่อไม่ดึงกลับมาแสดงซ้ำ
-    function completedLostFoundIds() {
-      try {
-        return new Set(
-          JSON.parse(
-            localStorage.getItem(completedLostFoundStorageKey) || "[]",
-          ),
-        );
-      } catch {
-        return new Set();
-      }
-    }
-
     let approvedLoadVersion = 0;
     // โหลดของพบและประกาศของหายที่ผ่านการอนุมัติแล้ว
     async function loadApprovedLostFoundItems() {
@@ -280,7 +267,6 @@ export function useStaffDashboard() {
       try {
         const { foundItems, lostItems } = await getApprovedLostFoundItems();
         if (version !== approvedLoadVersion) return;
-        const completedIds = completedLostFoundIds();
         const deletedIds = new Set(deletedRecords
           .filter((entry) => entry.source === "lost")
           .map((entry) => entry.itemId));
@@ -304,7 +290,7 @@ export function useStaffDashboard() {
         const mergeApproved = (tab, items) => {
           const previous = new Map(lostSets[tab].map((item) => [item.backendId, item]));
           const approved = items
-            .filter((item) => !completedIds.has(item.item_code) && !deletedIds.has(item.item_code))
+            .filter((item) => !deletedIds.has(item.item_code))
             .map((item) => ({ ...previous.get(item.id), ...mapApprovedItem(item, tab) }));
           const approvedIds = new Set(approved.map((item) => item.backendId));
           lostSets[tab] = [
@@ -1309,13 +1295,20 @@ export function useStaffDashboard() {
       requestConfirmation(
         "ยืนยันปิดรายการ",
         `${id} · ยืนยันว่าดำเนินการ “${item.title}” สำเร็จแล้วใช่หรือไม่?`,
-        () => {
-          const completedIds = completedLostFoundIds();
-          completedIds.add(item.id);
-          localStorage.setItem(
-            completedLostFoundStorageKey,
-            JSON.stringify([...completedIds]),
-          );
+        async () => {
+          // ปิดที่ backend ก่อน หน้า guest จะได้เลิกแสดงรายการนี้ด้วย ไม่ใช่แค่ซ่อนในเครื่อง staff
+          if (item.backendId) {
+            try {
+              if (tab === "inventory") await closeFoundItem(item.backendId);
+              else if (tab === "lostposts")
+                await closeLostItemAnnouncement(item.backendId);
+            } catch (error) {
+              if (await handleUnauthorizedResponse(error.status)) return;
+              console.error(`Close ${tab} item failed:`, error);
+              toast(error.message || "ไม่สามารถปิดรายการได้");
+              return;
+            }
+          }
           lostSets[tab] = lostSets[tab].filter((record) => record.id !== id);
           recordWorkHistory({
             itemId: id,
