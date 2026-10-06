@@ -846,6 +846,7 @@ export function useStaffDashboard() {
         toast("ไม่พบหน้าที่เลือก");
         return;
       }
+      currentPage = page;
       if (["housekeeper", "technician"].includes(currentRole) && destinationPage === "jobs") {
         currentBoardView = page === "my-jobs" ? "mine" : "unassigned";
       }
@@ -1023,7 +1024,7 @@ export function useStaffDashboard() {
             ]
           : [
               [
-                "คิวงานเป็นคิวร่วมของ Role",
+                "คิวงานเป็นคิวร่วมของบทบาท",
                 "งานใหม่ยังไม่ใช่ของบุคคลใดจนกว่าจะกดรับ",
               ],
               [
@@ -1032,7 +1033,7 @@ export function useStaffDashboard() {
               ],
               [
                 "กรองตามประเภทที่ผู้ใช้เลือก",
-                "Dropdown แสดงหมวดงานที่ตรงกับ Role ปัจจุบัน",
+                "Dropdown แสดงหมวดงานที่ตรงกับบทบาทปัจจุบัน",
               ],
             ];
       $("#activityList").innerHTML = content
@@ -2573,29 +2574,19 @@ export function useStaffDashboard() {
           };
           return `<article class="staff-account-card">
             <header class="staff-account-card-head">
-              <div class="person">${staffRoleAvatar(s.role)}<div><strong>${escapeHtml(s.name)}</strong><small>${
-                s.status === "ใช้งาน" ? escapeHtml(s.email || "-") : "บัญชีระงับ"
-              }</small></div></div>
-              <span class="badge ${s.status === "ใช้งาน" ? "done" : "wait"}">${
-                s.status
-              }</span>
+              <div class="person">${staffRoleAvatar(s.role)}<div><strong>${escapeHtml(s.name)}</strong><small>${escapeHtml(s.email || "-")}</small></div></div>
             </header>
             <div class="staff-account-meta">
-              <div><span>Role</span><strong>${escapeHtml(s.role)}</strong></div>
+              <div><span>บทบาท</span><strong>${escapeHtml(s.role)}</strong></div>
               <div><span>สถานะการส่งคำเชิญ</span><strong class="invitation-delivery-status ${invitationDelivery.className}">${invitationDelivery.label}</strong></div>
             </div>
             <button class="small-btn resend-invitation-button" type="button" data-staff-action="resend-invitation" data-staff-index="${i}" ${s.status === "ใช้งาน" ? "" : "disabled"}>ส่งคำเชิญซ้ำ</button>
-            <footer class="staff-account-actions"><button class="small-btn" type="button" data-staff-action="detail" data-staff-index="${i}">ดูรายละเอียด</button><button class="small-btn" type="button" data-staff-action="edit" data-staff-index="${i}">แก้ไขข้อมูล</button><button class="small-btn" type="button" data-staff-action="toggle" data-staff-index="${i}">${
-              s.status === "ใช้งาน" ? "ปิดบัญชี" : "เปิดใช้"
-            }</button><button class="small-btn delete" type="button" data-staff-action="remove" data-staff-index="${i}">ลบ</button></footer>
+            <footer class="staff-account-actions"><button class="small-btn" type="button" data-staff-action="detail" data-staff-index="${i}">ดูรายละเอียด</button><button class="small-btn" type="button" data-staff-action="edit" data-staff-index="${i}">แก้ไขข้อมูล</button><button class="small-btn delete" type="button" data-staff-action="remove" data-staff-index="${i}">ลบ</button></footer>
           </article>`;
             })
             .join("")
         : '<div class="history-empty staff-account-empty">ไม่พบบัญชี Staff ที่ตรงกับตัวกรอง</div>';
       $("#staffTotal").textContent = staffData.length;
-      $("#staffActiveTotal").textContent = `ใช้งาน ${
-        staffData.filter((staff) => staff.status === "ใช้งาน").length
-      } บัญชี`;
       $("#housekeeperTotal").textContent = staffData.filter(
         (staff) => staff.role === "แม่บ้าน",
       ).length;
@@ -2615,7 +2606,6 @@ export function useStaffDashboard() {
       $("#editStaffIndex").value = staff.id;
       $("#editStaffName").value = staff.name;
       $("#editStaffEmail").value = staff.email;
-      $("#editStaffRole").textContent = staff.role;
       $("#editStaffError").hidden = true;
       $("#editStaffButton").disabled = false;
       openModal("editStaffModal", trigger);
@@ -2679,27 +2669,6 @@ export function useStaffDashboard() {
         button.disabled = false;
         button.textContent = "บันทึกข้อมูล";
       }
-    }
-    function toggleStaff(i) {
-      const staff = staffData[i];
-      requestConfirmation(
-        staff.status === "ใช้งาน" ? "ยืนยันปิดบัญชี" : "ยืนยันเปิดบัญชี",
-        `${staff.status === "ใช้งาน" ? "ปิด" : "เปิด"}การใช้งานบัญชี ${
-          staff.name
-        } หรือไม่?`,
-        () => {
-          staff.status = staff.status === "ใช้งาน" ? "พักงาน" : "ใช้งาน";
-          addAudit(
-            "staff",
-            "อัปเดตสถานะ",
-            staff.id,
-            staff.name,
-            `เปลี่ยนสถานะบัญชีเป็น ${staff.status}`,
-          );
-          renderStaff();
-          toast("อัปเดตสถานะบัญชีแล้ว");
-        },
-      );
     }
     async function performResendStaffInvitation(index, button) {
       const staff = staffData[index];
@@ -3049,7 +3018,7 @@ export function useStaffDashboard() {
         !restoringNavigation &&
         readDashboardRoute().dialog === modalSlug(id)
       ) {
-        router.back();
+        updateDashboardRoute("", "replace");
       }
     }
     function syncDashboardFromRoute() {
@@ -4217,12 +4186,6 @@ export function useStaffDashboard() {
     $("#mobileProfile")?.addEventListener("click", (event) =>
       openModal("profileModal", event.currentTarget),
     );
-    $("#changePassword")?.addEventListener("click", () =>
-      toast("ส่งลิงก์เปลี่ยนรหัสผ่านไปยังอีเมลเจ้าหน้าที่แล้ว"),
-    );
-    $("#notificationSettings")?.addEventListener("click", () =>
-      toast("บันทึกการตั้งค่าการแจ้งเตือนแล้ว")
-    );
     $(".bottom-nav")?.addEventListener("click", (event) => {
       const button = event.target.closest("[data-mobile-page]");
       if (!button) return;
@@ -4745,7 +4708,7 @@ export function useStaffDashboard() {
       const invitation = {sent: "ส่งสำเร็จ", failed: "ส่งไม่สำเร็จ", pending: "รอส่ง"}[staff.invitationDeliveryStatus] || "ไม่มีข้อมูล";
       $("#staffAccountDetailInfo").innerHTML = [
         ["ชื่อ", staff.name], ["อีเมล", staff.email], ["บทบาท", staff.role],
-        ["สถานะบัญชี", staff.status], ["สถานะคำเชิญ", invitation],
+        ["สถานะคำเชิญ", invitation],
       ].map(([label, value]) => `<div><small>${label}</small><strong>${escapeHtml(value || "–")}</strong></div>`).join("");
       const work = $("#staffAccountDetailWork");
       const isWorker = ["แม่บ้าน", "ช่าง"].includes(staff.role);
@@ -4790,7 +4753,6 @@ export function useStaffDashboard() {
       if (!button) return;
       const index = Number(button.dataset.staffIndex);
       if (button.dataset.staffAction === "edit") openEditStaff(index, button);
-      if (button.dataset.staffAction === "toggle") toggleStaff(index);
       if (button.dataset.staffAction === "remove") removeStaff(index);
       if (button.dataset.staffAction === "resend-invitation")
         resendInvitation(index, button);
@@ -5063,7 +5025,7 @@ export function useStaffDashboard() {
         if (!value) message = "กรุณากรอกอีเมล";
         else if (field.validity.typeMismatch) message = "กรุณากรอกอีเมลให้ถูกต้อง";
       } else if (field.id === "newRole" && !value) {
-        message = "กรุณาเลือก Role";
+        message = "กรุณาเลือกบทบาท";
       }
 
       return setStaffFieldError(field, message);
@@ -5160,7 +5122,7 @@ export function useStaffDashboard() {
         "สร้างบัญชี",
         record.id,
         record.name,
-        `สร้างบัญชี Role ${record.role}`,
+        `สร้างบัญชีบทบาท ${record.role}`,
       );
       await loadStaffAccounts();
       closeModal("staffModal", false);

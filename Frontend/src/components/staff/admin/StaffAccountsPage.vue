@@ -13,7 +13,7 @@
           <div class="metrics">
             <article class="metric">
               <span>บัญชีทั้งหมด</span><strong id="staffTotal">0</strong
-              ><small id="staffActiveTotal">ใช้งาน 0 บัญชี</small>
+              ><small>บัญชีเจ้าหน้าที่</small>
             </article>
             <article class="metric">
               <span>แม่บ้าน</span><strong id="housekeeperTotal">0</strong
@@ -33,8 +33,8 @@
             </article>
           </div>
           <div class="staff-account-filters">
-            <select class="field-compact" id="staffRoleFilter" aria-label="กรองตาม Role">
-              <option value="all">ทุก Role</option>
+            <select class="field-compact" id="staffRoleFilter" aria-label="กรองตามบทบาท">
+              <option value="all">ทุกบทบาท</option>
               <option value="admin">แอดมิน</option>
               <option value="clerk">ธุรการ</option>
               <option value="housekeeper">แม่บ้าน</option>
@@ -44,7 +44,7 @@
               class="field-compact search"
               id="staffAccountSearch"
               type="search"
-              placeholder="ค้นหาชื่อหรือ Role"
+              placeholder="ค้นหาชื่อหรือบทบาท"
               aria-label="ค้นหาบัญชีเจ้าหน้าที่"
             />
             <button class="secondary" id="resetStaffAccountFilters" type="button">

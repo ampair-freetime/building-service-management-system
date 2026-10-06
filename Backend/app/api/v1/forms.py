@@ -152,7 +152,7 @@ def parse_guest_found_item_form(
     location_detail: Annotated[str, Form(min_length=1, max_length=255)],
     reporter_email: Annotated[EmailStr, Form()],
     custody_location: Annotated[str, Form(min_length=1, max_length=255)],
-    private_verification_detail: Annotated[str, Form(min_length=1, max_length=2_000)],
+    private_verification_detail: Annotated[str | None, Form(max_length=2_000)] = None,
     description: Annotated[str | None, Form(max_length=2_000)] = None,
     location_id: Annotated[int | None, Form(ge=1)] = None,
 ) -> GuestFoundItemCreate:

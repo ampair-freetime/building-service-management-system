@@ -35,7 +35,7 @@
         <div class="panel-head">
           <div>
             <h3>กิจกรรมล่าสุด</h3>
-            <p>การเปลี่ยนแปลงใน Role ของคุณ</p>
+            <p>การเปลี่ยนแปลงในบทบาทของคุณ</p>
           </div>
         </div>
         <div class="panel-body">

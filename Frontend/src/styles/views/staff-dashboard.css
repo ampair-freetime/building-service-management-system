@@ -2317,6 +2317,11 @@ textarea:focus-visible,
   background: var(--role);
   box-shadow: none;
 }
+.staff-dashboard-page:is(.is-technician, .is-housekeeper) #myHistoryTabs .tab:hover {
+  border-color: #367a4d;
+  background: #e1f2e6;
+  color: #1f5132;
+}
 .grouped-history-card header {
   display: flex;
   flex-wrap: wrap;
@@ -2586,6 +2591,7 @@ textarea:focus-visible,
 }
 .profile-data .profile-name-field {
   width: 100%;
+  border: 1px solid var(--line);
 }
 .profile-data .profile-name-field strong {
   margin-top: 3px;
@@ -2611,7 +2617,7 @@ textarea:focus-visible,
   margin-top: 3px;
   overflow-wrap: anywhere;
 }
-@media (max-width: 480px) {
+@media (max-width: 720px) {
   .profile-data .profile-meta-row {
     grid-template-columns: 1fr;
     gap: 9px;
@@ -4040,9 +4046,12 @@ body {
   .profile-grid {
     grid-template-columns: 1fr;
   }
-  .detail-meta,
-  .profile-data {
+  .detail-meta {
     grid-template-columns: 1fr 1fr;
+  }
+  .profile-data,
+  .profile-data .profile-meta-row {
+    grid-template-columns: 1fr;
   }
   .quick-action-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -6217,7 +6226,7 @@ body:has(.staff-dashboard-page) {
 
 .staff-dashboard-page .staff-account-actions {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 7px;
   padding: 16px 18px 18px;
 }
@@ -6274,7 +6283,7 @@ body:has(.staff-dashboard-page) {
   }
 
   .staff-dashboard-page .staff-account-actions {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: 1fr;
     padding: 14px 15px 15px;
   }
 }

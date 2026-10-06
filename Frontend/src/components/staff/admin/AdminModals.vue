@@ -61,15 +61,15 @@
           <p id="newEmailError" class="field-error" aria-live="polite"></p>
         </div>
         <div class="field">
-          <label for="newRole">Role</label
+          <label for="newRole">บทบาท</label
           ><select
             class="field-compact"
             id="newRole"
-            aria-label="เลือก Role"
+            aria-label="เลือกบทบาท"
             aria-describedby="newRoleError"
             required
           >
-            <option value="" disabled selected>เลือก Role</option>
+            <option value="" disabled selected>เลือกบทบาท</option>
             <option value="housekeeper">แม่บ้าน</option>
             <option value="technician">ช่าง</option>
             <option value="clerk">ธุรการ</option>
@@ -112,11 +112,6 @@
         <div class="field">
           <label for="editStaffEmail">อีเมล</label
           ><input id="editStaffEmail" type="email" required maxlength="255" />
-        </div>
-        <div class="field">
-          <span>Role</span>
-          <strong id="editStaffRole"></strong>
-          <small>ยังไม่รองรับการเปลี่ยน Role</small>
         </div>
         <p id="editStaffError" class="field-error" role="alert" hidden></p>
         <button id="editStaffButton" type="submit" class="primary" style="width: 100%">

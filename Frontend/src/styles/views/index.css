@@ -3758,3 +3758,15 @@ textarea:focus-visible {
   font-size: clamp(26px, 3vw, 38px);
   line-height: 1.25;
 }
+.detail-contact-notice {
+  margin: 16px 0 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--primary);
+  border-radius: 13px;
+  background: var(--primary-soft);
+  color: var(--primary);
+  font-size: clamp(14px, 2vw, 16px);
+  font-weight: 800;
+  line-height: 1.55;
+  text-align: center;
+}

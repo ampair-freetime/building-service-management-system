@@ -134,7 +134,7 @@
               ><input id="assignSearch" placeholder="ค้นหาชื่อหรือพื้นที่" />
             </div>
             <div class="field">
-              <label for="assignRole">Role</label
+              <label for="assignRole">บทบาท</label
               ><select id="assignRole">
                 <option>ช่าง</option>
                 <option>แม่บ้าน</option>

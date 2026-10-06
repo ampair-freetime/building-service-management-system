@@ -62,16 +62,12 @@
             </div>
             <div class="profile-meta-row">
               <span><small>อีเมล</small><strong id="profileEmail">-</strong></span>
-              <span><small>Role</small><strong id="profileRole">-</strong></span>
+              <span><small>บทบาท</small><strong id="profileRole">-</strong></span>
             </div>
           </div>
         </div>
         <div class="modal-actions">
-          <button type="button" class="secondary" id="notificationSettings">
-            ตั้งค่าการแจ้งเตือน</button
-          ><button type="button" class="secondary" id="changePassword">
-            เปลี่ยนรหัสผ่าน</button
-          ><button type="button" class="danger" id="profileLogout">
+          <button type="button" class="danger" id="profileLogout">
             ออกจากระบบ
           </button>
         </div>

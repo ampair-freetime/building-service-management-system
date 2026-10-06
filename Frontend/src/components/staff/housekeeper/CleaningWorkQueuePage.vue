@@ -5,7 +5,7 @@
               <div class="eyebrow">Shared work queue</div>
               <h2 id="jobsTitle">ศูนย์รับงานรวม</h2>
               <p id="jobsSubtitle">
-                Staff ทุกคนใน Role เห็นงานใหม่ร่วมกัน และกดรับงานก่อนอัปเดตสถานะ
+                Staff ทุกคนในบทบาทเห็นงานใหม่ร่วมกัน และกดรับงานก่อนอัปเดตสถานะ
               </p>
             </div>
             <div class="toolbar">

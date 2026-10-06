@@ -43,6 +43,9 @@
                 <small>สถานที่</small><strong id="detailLocation">–</strong>
               </div>
             </div>
+            <p id="detailContactNotice" class="detail-contact-notice" hidden>
+              “หากพบให้นำของไปฝากไว้ที่ห้องธุรการ”
+            </p>
             <div class="modal-actions">
               <button
                 type="button"

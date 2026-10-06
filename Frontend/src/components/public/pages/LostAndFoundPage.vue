@@ -410,7 +410,6 @@
               ><textarea
                 id="publicFoundPrivateDetail"
                 name="private_detail"
-                required
                 minlength="10"
                 maxlength="600"
                 aria-describedby="publicFoundPrivateDetailError"

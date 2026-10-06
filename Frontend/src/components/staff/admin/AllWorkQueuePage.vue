@@ -4,9 +4,9 @@
             <div>
               <div class="eyebrow">Shared work queue</div>
               <h2 id="jobsTitle">ศูนย์รับงานรวม</h2>
-              <p id="jobsSubtitle">
-                Staff ทุกคนใน Role เห็นงานใหม่ร่วมกัน และกดรับงานก่อนอัปเดตสถานะ
-              </p>
+              <!-- <p id="jobsSubtitle">
+                Staff ทุกคนในบทบาทเห็นงานใหม่ร่วมกัน และกดรับงานก่อนอัปเดตสถานะ
+              </p> -->
             </div>
             <div class="toolbar">
               <input
@@ -35,10 +35,10 @@
             <div class="queue-explainer-icon">↳</div>
             <div>
               <strong id="queueExplainerTitle"
-                >คิวนี้เป็นคิวร่วมของ Role</strong
+                >คิวนี้เป็นคิวร่วมของบทบาท</strong
               >
               <p>
-                งานใหม่ยังไม่มีเจ้าของ ทุกคนใน Role สามารถเห็นและกดรับได้
+                งานใหม่ยังไม่มีเจ้าของ ทุกคนในบทบาทสามารถเห็นและกดรับได้
                 คนที่รับสำเร็จจะเป็นผู้แก้ไขสถานะงานนั้น
               </p>
             </div>

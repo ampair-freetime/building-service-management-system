@@ -518,13 +518,14 @@ export function usePublicServicePortal() {
         showImagePlaceholder();
       }
       const continueButton = document.getElementById("detailContinueButton");
+      const contactNotice = document.getElementById("detailContactNotice");
       detailAction = action;
+      continueButton.hidden = action === "contact";
+      contactNotice.hidden = action !== "contact";
       continueButton.textContent =
         action === "claim"
           ? "นี่อาจเป็นของฉัน"
-          : action === "contact"
-            ? "ติดต่อเจ้าหน้าที่"
-            : "รับทราบ";
+          : "รับทราบ";
     }
 
     function setItemDetailState(state, message = "") {
@@ -961,8 +962,12 @@ export function usePublicServicePortal() {
         validateRequiredText(value, "จุดรับฝากสิ่งของ"),
       description: (value) =>
         validateRequiredText(value, "รายละเอียดสิ่งของ", 10),
-      private_detail: (value) =>
-        validateRequiredText(value, "รายละเอียดลับ", 10),
+      private_detail: (value) => {
+        const trimmed = value.trim();
+        return trimmed && trimmed.length < 10
+          ? "รายละเอียดลับต้องมีอย่างน้อย 10 ตัวอักษร"
+          : "";
+      },
       recipient_email: (value, field) => {
         if (!value.trim()) return "กรุณาระบุอีเมลสำหรับติดตามสถานะ";
         if (field.validity.typeMismatch) return "กรุณาระบุอีเมลให้ถูกต้อง";
@@ -1043,10 +1048,12 @@ export function usePublicServicePortal() {
           new Date(formData.get("event_datetime")).toISOString(),
         );
         formData.set("reporter_email", reporterEmail);
-        formData.set(
-          "private_verification_detail",
-          formData.get("private_detail"),
-        );
+        const privateDetail = String(formData.get("private_detail") || "").trim();
+        if (privateDetail) {
+          formData.set("private_verification_detail", privateDetail);
+        } else {
+          formData.delete("private_verification_detail");
+        }
         formData.delete("recipient_email");
         formData.delete("private_detail");
         const image = formData.get("image");
