@@ -6935,3 +6935,52 @@ body:has(.staff-dashboard-page) {
 #claimDetailModal #claimActions .quick-action { flex: 1; min-width: 160px; }
 #claimDetailModal #claimActions .primary-action { background: var(--role); color: #fff; border-color: var(--role); }
 #claimDetailModal #claimActions .claim-reject-action { background: #fff0f0; color: #c03939; border-color: #f2cdcd; }
+
+.lost-record-code, #claimDetailCode {
+  display: block;
+  color: #747987;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+  margin-top: 6px;
+}
+.staff-dashboard-page .lost-content > p { margin: 12px 0 16px; }
+.staff-dashboard-page .lost-content .claim-controls { margin-top: 16px; }
+#claimDetailModal .claim-general-section { margin: 24px 0; }
+#claimDetailModal .claim-general-section p {
+  margin: 12px 0 0;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+#claimDetailModal .claim-next-step { margin: 18px 0; }
+#claimDetailModal .claim-evidence-section h4 { margin-bottom: 14px; }
+
+.staff-dashboard-page .loading-mask {
+  animation: none;
+  pointer-events: auto;
+}
+
+.staff-dashboard-page .lost-content .approval-note {
+  margin: 16px 0;
+  line-height: 1.7;
+}
+.staff-dashboard-page .lost-content .lost-foot {
+  gap: 12px;
+  margin-top: 16px;
+  margin-bottom: 16px;
+}
+.staff-dashboard-page .lost-content .approval-actions { margin-top: 16px; }
+
+.staff-dashboard-page .lost-content h3 { margin-top: 14px; margin-bottom: 8px; line-height: 1.5; }
+.staff-dashboard-page .lost-card-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid #eee5d1;
+}
+.staff-dashboard-page .lost-card-actions .decision-strip { display: contents; }
+.staff-dashboard-page .lost-card-actions button { width: 100%; min-width: 0; min-height: 46px; white-space: normal; }

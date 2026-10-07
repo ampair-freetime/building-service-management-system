@@ -1782,6 +1782,8 @@ def test_rejected_lost_item_is_not_published_and_removed_from_pending_list(
 def test_clerk_can_schedule_pickup(test_context, monkeypatch):
     async def fake_email(**kwargs):
         assert "CSB office" in kwargs["body"] or "CSB lobby" in kwargs["body"]
+        if "CSB office" in kwargs["body"]:
+            assert "13:30–16:00" in kwargs["body"]
     monkeypatch.setattr("app.api.v1.endpoints.lost_found_clerk.send_email", fake_email)
     client, session_factory = test_context
 
@@ -1845,6 +1847,7 @@ def test_clerk_can_schedule_pickup(test_context, monkeypatch):
         headers=headers,
         json={
             "pickup_datetime": "2030-09-20T13:30:00",
+            "pickup_end_datetime": "2030-09-20T16:00:00",
             "pickup_location": "CSB office",
             "note": "Bring identification",
         },
@@ -1859,6 +1862,10 @@ def test_clerk_can_schedule_pickup(test_context, monkeypatch):
     detail = client.get(f"/api/v1/lost-found/ownership-requests/{claim_id}", headers=headers)
     assert detail.json()["pickup_location"] == "CSB office"
     assert detail.json()["pickup_note"] == "Bring identification"
+    assert detail.json()["pickup_end_datetime"] == "2030-09-20T16:00:00"
+    for end in ["2030-09-20T13:00:00", "2030-09-20T17:00:00", "2030-09-21T14:00:00", "2030-09-20T14:15:00"]:
+        invalid = client.post(f"/api/v1/lost-found/ownership-requests/{claim_id}/schedule-pickup", headers=headers, json={"pickup_datetime": "2030-09-20T13:30:00", "pickup_end_datetime": end})
+        assert invalid.status_code == 422
     changed = client.post(
         f"/api/v1/lost-found/ownership-requests/{claim_id}/schedule-pickup", headers=headers,
         json={"pickup_datetime": "2030-09-23T14:30:00", "pickup_location": "CSB lobby"},

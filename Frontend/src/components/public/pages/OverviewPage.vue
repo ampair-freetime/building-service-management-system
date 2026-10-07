@@ -28,6 +28,7 @@ onMounted(async () => {
 <template>
 <section class="page active" id="dashboard">
           <header class="mobile-hero">
+            <div class="hero-copy">
             <div class="eyebrow">CS Building Care</div>
 
             <h1 class="greeting-name">แจ้งปัญหาได้ทันที!</h1>
@@ -35,6 +36,7 @@ onMounted(async () => {
               ระบบบริหารจัดการงานบริการอาคารเรียน<br />
               ภาควิชาวิทยาการคอมพิวเตอร์
             </p>
+            </div>
             <img
               class="building-illustration"
               src="/images/cs-building-line-art.svg"

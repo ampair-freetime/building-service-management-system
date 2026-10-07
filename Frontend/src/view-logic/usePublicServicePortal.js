@@ -21,6 +21,8 @@ export function usePublicServicePortal() {
   const validationCleanups = [];
   let portalMounted = true;
   onUnmounted(() => { portalMounted = false; });
+  const pageLoading = ref(true);
+  let loadingTimer;
   const sidebarOpen = ref(false);
   const closeSidebar = () => {
     sidebarOpen.value = false;
@@ -1597,16 +1599,14 @@ export function usePublicServicePortal() {
     document
       .querySelectorAll(".ui-modal")
       .forEach((modal) => modal.setAttribute("aria-hidden", "true"));
-    window.setTimeout(
-      () => document.querySelector(".loading-mask")?.remove(),
-      320,
-    );
+    loadingTimer = window.setTimeout(() => { pageLoading.value = false; }, 1000);
 
   });
 
   onUnmounted(() => {
+    window.clearTimeout(loadingTimer);
     validationCleanups.forEach((cleanup) => cleanup());
     document.body.classList.remove("modal-open", "offline");
   });
-  return { sidebarOpen, closeSidebar, toggleSidebar };
+  return { sidebarOpen, closeSidebar, toggleSidebar, pageLoading };
 }

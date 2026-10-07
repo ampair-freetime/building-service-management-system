@@ -4,6 +4,7 @@ import asyncio
 import smtplib
 import ssl
 from email.message import EmailMessage
+from email.utils import formataddr, formatdate, make_msgid
 
 from app.core.config import settings
 
@@ -19,7 +20,15 @@ async def send_email(*, recipient: str, subject: str, body: str) -> None:
 
     message = EmailMessage()
     message["Subject"] = subject
-    message["From"] = settings.mail_from
+    sender = settings.mail_from.strip()
+    # Accept legacy "Display Name address@example.com" configuration.
+    if "<" not in sender and " " in sender:
+        name, address = sender.rsplit(" ", 1)
+        if "@" in address:
+            sender = formataddr((name, address))
+    message["From"] = sender
+    message["Date"] = formatdate(localtime=False)
+    message["Message-ID"] = make_msgid()
     message["To"] = recipient
     message.set_content(body)
 
@@ -54,12 +63,16 @@ async def send_invitation_email(
     """Send an invitation containing an identifier and activation link, never a password."""
     await send_email(
         recipient=recipient,
-        subject="Set up your Building Service Management account",
+        subject="ตั้งรหัสผ่านบัญชีเจ้าหน้าที่ · CS Building Care",
         body=(
-            "Your staff identifier is: "
-            f"{staff_identifier}\n\nSet your password using this one-time link:\n"
+            "คุณได้รับเชิญให้ใช้งานระบบ CS Building Care ในฐานะเจ้าหน้าที่\n\n"
+            f"อีเมลสำหรับเข้าสู่ระบบ: {staff_identifier}\n"
+            "กรุณาเปิดลิงก์ด้านล่างเพื่อตั้งรหัสผ่านและเปิดใช้งานบัญชี:\n"
             f"{activation_link}\n\n"
-            "This link expires soon. If you did not expect this email, contact an administrator."
+            "ลิงก์นี้ใช้ได้ครั้งเดียว โปรดตั้งรหัสผ่านก่อนลิงก์หมดอายุ\n"
+            "หากลิงก์หมดอายุ กรุณาติดต่อผู้ดูแลระบบเพื่อส่งคำเชิญใหม่\n"
+            "หากไม่ทราบที่มาของคำเชิญนี้ กรุณาติดต่อผู้ดูแลระบบ\n\n"
+
         ),
     )
 

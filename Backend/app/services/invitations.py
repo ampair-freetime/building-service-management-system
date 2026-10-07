@@ -20,7 +20,7 @@ from app.models.staff import Staff
 from app.schemas.staff import StaffCreate
 from app.services.invitation_email import EmailDeliveryError, send_invitation_email
 from app.services.password_reset import invalidate_pending_resets
-from app.services.staff import DuplicateStaffError, get_staff_for_update
+from app.services.staff import DuplicateStaffError, get_staff_for_update, release_deleted_staff_email
 
 logger = logging.getLogger(__name__)
 
@@ -137,8 +137,9 @@ async def create_staff_and_invite(
         role=payload.role,
         status=AccountStatus.ACTIVE,
     )
-    session.add(account)
     try:
+        await release_deleted_staff_email(session, account.email)
+        session.add(account)
         await session.flush()
         invitation, token = await _create_pending_invitation(session, account)
         await session.commit()

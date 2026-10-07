@@ -443,6 +443,7 @@ async def schedule_ownership_pickup(
         request.pickup_datetime,
         request.pickup_location,
         request.note,
+        request.pickup_end_datetime,
     )
 
     if claim is None:
@@ -462,15 +463,18 @@ async def schedule_ownership_pickup(
     local = request.pickup_datetime
     zone = ZoneInfo("Asia/Bangkok")
     local = local.replace(tzinfo=zone) if local.tzinfo is None else local.astimezone(zone)
+    end = request.pickup_end_datetime
+    end = (end.replace(tzinfo=zone) if end.tzinfo is None else end.astimezone(zone)) if end else None
+    time_label = local.strftime("%H:%M") + (f"–{end.strftime('%H:%M')}" if end else "")
     try:
         await send_email(
             recipient=detail["claimant_email"],
             subject="นัดหมายรับคืนสิ่งของ · CS Building Care",
             body=(f"เรียน {detail['claimant_name']}\n\n"
                   f"นัดรับคืน: {detail['item_name']} ({detail['item_code']})\n"
-                  f"วันที่ {local.strftime('%d/%m/%Y')} เวลา {local.strftime('%H:%M')} น. (เวลาไทย)\n"
+                  f"วันที่ {local.strftime('%d/%m/%Y')} เวลา {time_label} น. (เวลาไทย)\n"
                   f"จุดรับของ: {request.pickup_location or detail['custody_location'] or 'ติดต่อห้องธุรการ CSB'}\n"
-                  f"สิ่งที่ต้องเตรียม / หมายเหตุ: {request.note or 'ไม่มี'}\n\n"
+                  f"สิ่งที่ต้องนำมาเพื่อยืนยันการรับคืน: {request.note or 'ไม่ได้ระบุ กรุณาติดต่อธุรการก่อนเข้ารับของ'}\n\n"
                   "หากไม่สะดวกตามนัด กรุณาติดต่อธุรการอาคาร CSB"),
         )
         detail["email_sent"] = True

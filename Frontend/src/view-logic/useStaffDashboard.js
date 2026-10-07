@@ -89,6 +89,7 @@ export function useStaffDashboard() {
   const router = useRouter();
   const allowedRoles = ["housekeeper", "technician", "clerk", "admin"];
   const savedRole = localStorage.getItem("buildingCareRole");
+  const dashboardLoading = ref(true);
   const activeRole = ref(
     allowedRoles.includes(savedRole) ? savedRole : "clerk",
   );
@@ -96,6 +97,7 @@ export function useStaffDashboard() {
   let cleanupDashboardEvents = () => {};
 
   async function initializeDashboard() {
+    const loadingStartedAt = performance.now();
     // โหลด dependency ภายนอกก่อนสร้างหน้าจอ หากโหลดไม่ได้จะใช้ QR fallback แทน
     try {
       await loadQrCodeLibrary();
@@ -375,7 +377,9 @@ export function useStaffDashboard() {
             claim.created_at,
           ).toLocaleString("th-TH"),
           createdAt: claim.created_at,
+          pickupEndTime: claim.pickup_end_datetime ? new Intl.DateTimeFormat("en-GB", {timeZone: "Asia/Bangkok", hour: "2-digit", minute: "2-digit"}).format(new Date(claim.pickup_end_datetime)) : "",
           evidence: claim.proof_detail,
+          generalDescription: claim.description,
           secret: claim.private_verification_detail,
           custodyLocation: claim.custody_location,
           pickupDate: claim.pickup_date || (claim.pickup_datetime ? new Intl.DateTimeFormat("en-CA", {timeZone: "Asia/Bangkok", year: "numeric", month: "2-digit", day: "2-digit"}).format(new Date(claim.pickup_datetime)) : ""),
@@ -1725,10 +1729,14 @@ export function useStaffDashboard() {
                       : "บันทึกการอนุมัติ"
                   }:</strong> ${i.decisionReason}</div>`
                 : "";
+              const inlineClose = tab === "lostposts" && approvalGroup(i.status) === "approved";
+              const detailsButton = `<button class="small-btn" type="button" data-lost-action="detail" data-tab="${tab}" data-item-id="${i.id}">ดูรายละเอียด</button>`;
               const controls =
                 tab === "claims"
                   ? `<div class="claim-controls"><button type="button" class="primary" data-lost-action="claim-detail" data-tab="claims" data-item-id="${i.id}">ดูรายละเอียดคำขอ</button></div>`
-                  : `${note}<div class="lost-foot"><span class="custody">${i.custody}</span>${tab === "inventory" ? `<span class="badge progress">สถานะการคืน: ${escapeHtml(returnStatusForFoundItem(i))}</span>` : ""}<button class="small-btn" type="button" data-lost-action="detail" data-tab="${tab}" data-item-id="${i.id}">ดูรายละเอียด</button></div>`;
+                  : inlineClose
+                    ? `${note}<div class="lost-card-actions">${detailsButton}${decisionButtons(tab, i)}</div>`
+                    : `${note}<div class="lost-foot">${tab === "inventory" ? `<span class="custody">${i.custody}</span><span class="badge progress">สถานะการคืน: ${escapeHtml(returnStatusForFoundItem(i))}</span>` : ""}${detailsButton}</div>`;
               const claimHint =
                 tab === "claims"
                   ? '<div class="approval-note"><strong>รับคำขออัตโนมัติ:</strong> ธุรการไม่ต้องกดอนุมัติ สามารถตรวจรายละเอียด นัดหมาย และยืนยันการส่งคืนได้</div>'
@@ -1745,9 +1753,9 @@ export function useStaffDashboard() {
                 i.id
               }">${image}<div class="lost-content">${sourceBadge}<span class="badge ${badgeClass(
                 i.status,
-              )}">${i.status}</span><h3>${i.id} · ${i.title}</h3><p>${
+              )}">${i.status}</span><h3>${escapeHtml(i.title)}</h3><small class="lost-record-code">${escapeHtml(i.id)}</small><p>${
                 i.place
-              }</p>${claimHint}${controls}${decisionButtons(tab, i)}</div></article>`;
+              }</p>${claimHint}${controls}${inlineClose ? "" : decisionButtons(tab, i)}</div></article>`;
             })
             .join("")
         : `<div class="empty" style="grid-column:1/-1">${emptyLabel}</div>`;
@@ -2120,10 +2128,10 @@ export function useStaffDashboard() {
           ["อนุมัติ", "ไม่อนุมัติ"].includes(x.action),
         ).length;
       summary.innerHTML = [
-        [own.length, "กิจกรรมทั้งหมด", "รวมทุกวันที่บันทึก"],
-        [closed, "งาน/คำขอที่ปิด", "ดำเนินการถึงสถานะสุดท้าย"],
-        [returned, "คืนเข้ากองกลาง", "มีเหตุผลบันทึกไว้"],
-        [decisions, "การตัดสินใจ", "อนุมัติหรือไม่อนุมัติ"],
+        [own.length, "รายการดำเนินการทั้งหมด", "นับทุกครั้งที่บันทึก รวมงานเดิมที่ทำหลายครั้ง"],
+        [closed, "รายการที่ปิดแล้ว", "นับแต่ละงานหรือคำขอเพียงครั้งเดียว"],
+        [returned, "ครั้งที่คืนงานเข้าคิว", "ส่งงานกลับให้เจ้าหน้าที่คนอื่นรับต่อ"],
+        [decisions, "ครั้งที่ตรวจอนุมัติ", "รวมทั้งอนุมัติและไม่อนุมัติ"],
       ]
         .map(
           (v, i) =>
@@ -3993,7 +4001,7 @@ export function useStaffDashboard() {
     function openClaimDetail(id, trigger = document.activeElement) {
       const item = lostSets.claims.find((record) => record.id === id);
       if (!item) return;
-      $("#claimDetailCode").textContent = `${id} · ${item.status}`;
+      $("#claimDetailCode").textContent = id;
       $("#claimDetailTitle").textContent = item.title;
       $("#claimRequester").textContent = item.requester || "ไม่ระบุชื่อผู้ขอ";
       $("#claimContact").textContent = item.contact || "ไม่ระบุช่องทางติดต่อ";
@@ -4004,13 +4012,14 @@ export function useStaffDashboard() {
           })
         : "ยังไม่มีนัดหมาย";
       $("#claimPickupDate").textContent = pickupDateText;
-      $("#claimPickupTime").textContent = item.pickupTime || "–";
+      $("#claimPickupTime").textContent = (item.pickupTime ? `${item.pickupTime}${item.pickupEndTime ? "–" + item.pickupEndTime : ""}` : "–");
       $("#claimPickupLocation").textContent =
         item.pickupLocation || "ยังไม่ระบุจุดรับของ";
       $("#claimPickupNote").textContent = item.pickupNote || "ไม่มีหมายเหตุ";
       $("#claimReturnStatus").textContent =
         item.returnStatus ||
         foundItemReturnStatus(item.returnStatusCode, item.backendStatus);
+      $("#claimGeneralDescription").textContent = item.generalDescription || "ไม่ได้ระบุรายละเอียดทั่วไป";
       $("#claimEvidence").textContent =
         item.evidence || item.place || "ยังไม่มีรายละเอียดหลักฐาน";
       $("#claimSecret").textContent =
@@ -4186,7 +4195,9 @@ export function useStaffDashboard() {
         return;
       }
       $("#appointmentItemId").value = id;
-      $("#appointmentTitle").textContent = `นัดหมายรับของ · ${id}`;
+      $("#appointmentTitle").textContent = item.title;
+      $("#appointmentCode").textContent = id;
+      $("#appointmentEndTime").value = item.pickupEndTime || "";
       $("#appointmentDate").min = todayISO();
       $("#appointmentDate").value = item.pickupDate || todayISO();
       $("#appointmentTime").value = item.pickupTime || "";
@@ -5648,6 +5659,11 @@ export function useStaffDashboard() {
       if (!item) return;
       const appointmentDate = $("#appointmentDate").value;
       const appointmentTime = $("#appointmentTime").value;
+      const endTime = $("#appointmentEndTime").value;
+      if (endTime <= appointmentTime) {
+        toast("เวลาสิ้นสุดต้องหลังเวลาเริ่ม");
+        return;
+      }
       const appointmentPlace = $("#appointmentPlace").value.trim();
       const note = $("#appointmentNote").value.trim();
       const pickupAt = new Date(`${appointmentDate}T${appointmentTime}`);
@@ -5672,6 +5688,7 @@ export function useStaffDashboard() {
         const result = await scheduleOwnershipPickup(item.backendId, {
           date: appointmentDate,
           time: appointmentTime,
+          endTime,
           location: appointmentPlace,
           note,
         });
@@ -5697,7 +5714,8 @@ export function useStaffDashboard() {
           result.pickup_note || result.appointment?.note || note;
         item.status = "นัดหมายแล้ว";
         item.assignee = activeStaffName();
-        item.appointment = `${appointmentDate} เวลา ${appointmentTime} · ${appointmentPlace}`;
+        item.pickupEndTime = endTime;
+        item.appointment = `${appointmentDate} เวลา ${appointmentTime}–${endTime} · ${appointmentPlace}`;
         item.custody = `นัด ${item.appointment}`;
         if (note) {
           item.appointment += ` · ${note}`;
@@ -5912,8 +5930,8 @@ export function useStaffDashboard() {
     // DOM พร้อมใช้งานแล้ว จึงแสดงรายการสถานที่และปิด loading mask
     setTimeout(() => {
       renderQrLocations();
-      $(".loading-mask")?.remove();
-    }, 320);
+      dashboardLoading.value = false;
+    }, Math.max(0, 1000 - (performance.now() - loadingStartedAt)));
   }
 
   onMounted(initializeDashboard);
@@ -5922,5 +5940,5 @@ export function useStaffDashboard() {
     cleanupDashboardEvents();
   });
 
-  return { activeRole };
+  return { activeRole, dashboardLoading };
 }

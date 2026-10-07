@@ -3773,3 +3773,61 @@ textarea:focus-visible {
   display: block;
   margin-bottom: 8px;
 }
+
+/* Keep the illustration in flow so it cannot overlap the welcome text. */
+.user-page .mobile-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr);
+  align-items: center;
+  gap: 24px;
+  padding: 24px 0;
+  min-height: 0;
+}
+.user-page .mobile-hero .hero-copy {
+  min-width: 0;
+  position: relative;
+  z-index: 1;
+}
+.user-page .mobile-hero .hero-copy .eyebrow {
+  color: #4c76a8;
+  font-weight: 700;
+}
+.user-page .mobile-hero .greeting-name {
+  font-size: clamp(28px, 3vw, 48px);
+  white-space: normal;
+  line-height: 1.4;
+}
+.user-page .mobile-hero .building-illustration {
+  position: static;
+  width: 100%;
+  max-width: 620px;
+  height: auto;
+  transform: none;
+  justify-self: center;
+}
+.user-page .mobile-hero::after {
+  display: none;
+}
+@media (max-width: 1100px) {
+  .user-page .mobile-hero {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+  }
+  .user-page .mobile-hero .building-illustration {
+    max-width: 520px;
+  }
+}
+@media (max-width: 680px) {
+  .user-page .mobile-hero {
+    padding: 12px 4px 16px;
+  }
+  .user-page .mobile-hero .building-illustration {
+    max-width: 360px;
+  }
+}
+
+.user-page .loading-mask {
+  animation: none;
+  pointer-events: auto;
+  z-index: 1000;
+}

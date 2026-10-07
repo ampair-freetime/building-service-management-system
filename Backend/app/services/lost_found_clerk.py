@@ -326,6 +326,7 @@ async def get_ownership_request_detail(
         "proof_detail": claim.proof_detail,
         "status": claim.status,
         "pickup_datetime": claim.pickup_datetime,
+        "pickup_end_datetime": claim.pickup_end_datetime,
         "pickup_location": claim.pickup_location,
         "pickup_note": claim.pickup_note,
         "private_verification_detail": item.private_verification_detail,
@@ -513,6 +514,7 @@ async def schedule_pickup(
     pickup_datetime: datetime,
     pickup_location: str | None = None,
     note: str | None = None,
+    pickup_end_datetime: datetime | None = None,
 ) -> LostClaim | None:
     """นัดวันและเวลารับของสำหรับ ownership request ที่ยืนยันแล้ว"""
 
@@ -529,6 +531,7 @@ async def schedule_pickup(
     if claim is None:
         return None
 
+    claim.pickup_end_datetime = pickup_end_datetime
     claim.pickup_datetime = pickup_datetime
     claim.pickup_location = pickup_location
     claim.pickup_note = note

@@ -117,8 +117,8 @@
       <section class="modal-card">
         <header class="modal-head">
           <div>
-            <span class="eyebrow" id="claimDetailCode">CLM-000</span>
             <h3 id="claimDetailTitle">รายละเอียดคำขอรับคืน</h3>
+            <small id="claimDetailCode">CLM-000</small>
           </div>
           <button
             type="button"
@@ -139,6 +139,10 @@
           </div>
           <div><small>สถานะการคืนของ</small><strong id="claimReturnStatus">รอตรวจสอบคำขอ</strong></div>
         </div>
+        <section class="claim-general-section">
+          <h4>รายละเอียดทั่วไปของสิ่งของ</h4>
+          <p id="claimGeneralDescription"></p>
+        </section>
         <section class="claim-evidence-section">
           <h4>ตรวจสอบความเป็นเจ้าของ</h4>
           <div class="claim-evidence-columns">
@@ -152,7 +156,7 @@
             <div><small>วันที่นัดรับ</small><strong id="claimPickupDate">–</strong></div>
             <div><small>เวลานัดรับ</small><strong id="claimPickupTime">–</strong></div>
             <div><small>จุดรับของ</small><strong id="claimPickupLocation">–</strong></div>
-            <div><small>สิ่งที่ต้องเตรียม / หมายเหตุ</small><strong id="claimPickupNote">–</strong></div>
+            <div><small>สิ่งที่ต้องนำมาเพื่อยืนยันการรับคืน</small><strong id="claimPickupNote">–</strong></div>
           </div>
         </section>
         <p id="claimNextStep" class="claim-next-step"></p>
@@ -170,7 +174,7 @@
     >
       <section class="modal-card">
         <header class="modal-head">
-          <h3 id="appointmentTitle">นัดหมายรับของ</h3>
+          <div><h3 id="appointmentTitle">นัดหมายรับของ</h3><small id="appointmentCode" class="lost-record-code"></small></div>
           <button
             type="button"
             class="close"
@@ -181,7 +185,7 @@
           </button>
         </header>
         <form id="appointmentForm">
-          <p class="form-intro">บันทึกนัดหมายแล้วระบบจะส่งวัน เวลา จุดรับของ และหมายเหตุไปยังอีเมลของผู้ขอ</p>
+          <p class="form-intro">บันทึกนัดหมายแล้วระบบจะส่งวัน เวลา จุดรับของ และสิ่งที่ต้องนำมาเพื่อยืนยันการรับคืนไปยังอีเมลของผู้ขอ</p>
           <input type="hidden" id="appointmentItemId" />
           <div class="form-row">
             <div class="field">
@@ -189,10 +193,17 @@
               ><input id="appointmentDate" type="date" required />
             </div>
             <div class="field">
-              <label for="appointmentTime">เวลา</label
+              <label for="appointmentTime">ตั้งแต่เวลา</label
               > <select id="appointmentTime" required aria-describedby="appointmentDateTimeHint">
                 <option value="">เลือกเวลา (24 ชั่วโมง)</option>
-                <option v-for="minutes in 33" :key="minutes" :value="`${String(Math.floor((510 + (minutes - 1) * 15) / 60)).padStart(2, '0')}:${String((510 + (minutes - 1) * 15) % 60).padStart(2, '0')}`">{{ `${String(Math.floor((510 + (minutes - 1) * 15) / 60)).padStart(2, '0')}:${String((510 + (minutes - 1) * 15) % 60).padStart(2, '0')}` }} น.</option>
+                <option v-for="minutes in 17" :key="minutes" :value="`${String(Math.floor((510 + (minutes - 1) * 30) / 60)).padStart(2, '0')}:${String((510 + (minutes - 1) * 30) % 60).padStart(2, '0')}`">{{ `${String(Math.floor((510 + (minutes - 1) * 30) / 60)).padStart(2, '0')}:${String((510 + (minutes - 1) * 30) % 60).padStart(2, '0')}` }} น.</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="appointmentEndTime">ถึงเวลา</label>
+              <select id="appointmentEndTime" required>
+                <option value="">เลือกเวลาสิ้นสุด</option>
+                <option v-for="minutes in 17" :key="minutes" :value="`${String(Math.floor((510 + (minutes - 1) * 30) / 60)).padStart(2, '0')}:${String((510 + (minutes - 1) * 30) % 60).padStart(2, '0')}`">{{ `${String(Math.floor((510 + (minutes - 1) * 30) / 60)).padStart(2, '0')}:${String((510 + (minutes - 1) * 30) % 60).padStart(2, '0')}` }} น.</option>
               </select>
             </div>
           </div>
@@ -208,10 +219,10 @@
             />
           </div>
           <div class="field">
-            <label for="appointmentNote">หมายเหตุ</label
+            <label for="appointmentNote">สิ่งที่ต้องนำมาเพื่อยืนยันการรับคืน</label
             ><textarea
               id="appointmentNote"
-              placeholder="เอกสารที่ต้องนำมาแสดง"
+              placeholder="เช่น รูปถ่ายสิ่งของหรือหลักฐานการเป็นเจ้าของ"
             ></textarea>
           </div>
           <button type="submit" class="primary" style="width: 100%">

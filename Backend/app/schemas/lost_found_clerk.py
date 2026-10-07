@@ -2,7 +2,7 @@ from datetime import datetime, time
 from zoneinfo import ZoneInfo
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from app.models.enums import ClaimStatus, LostStatus, LostType, ReturnStatus
 from app.schemas.lost_found_item import GuestImageResponse
 
@@ -126,6 +126,7 @@ class OwnershipRequestDetailResponse(BaseModel):
     email_sent: bool | None = None
     pickup_note: str | None = None
     private_verification_detail: str | None = None
+    pickup_end_datetime: datetime | None = None
     pickup_datetime: datetime | None
     return_status: ReturnStatus | None
     review_note: str | None
@@ -161,6 +162,7 @@ class UpdateReturnStatusRequest(BaseModel):
 
 class SchedulePickupRequest(BaseModel):
     pickup_datetime: datetime
+    pickup_end_datetime: datetime | None = None
     pickup_location: str | None = Field(default=None, max_length=255)
     note: str | None = Field(default=None, max_length=2000)
 
@@ -174,6 +176,20 @@ class SchedulePickupRequest(BaseModel):
         if local <= datetime.now(zone):
             raise ValueError("กรุณาเลือกวันและเวลานัดหมายที่ยังมาไม่ถึง")
         return value
+
+    @model_validator(mode="after")
+    def validate_range(self):
+        if self.pickup_end_datetime is None:
+            return self
+        zone = ZoneInfo("Asia/Bangkok")
+        def local(value):
+            return value.replace(tzinfo=zone) if value.tzinfo is None else value.astimezone(zone)
+        start, end = local(self.pickup_datetime), local(self.pickup_end_datetime)
+        if start.date() != end.date() or end <= start or end.time() > time(16, 30):
+            raise ValueError("เวลาสิ้นสุดต้องหลังเวลาเริ่มในวันเดียวกันและไม่เกิน 16:30")
+        if any(value.minute not in (0, 30) or value.second or value.microsecond for value in (start, end)):
+            raise ValueError("เลือกนาทีได้เฉพาะ 00 และ 30")
+        return self
 
 
 class PersonalLostFoundHistoryResponse(BaseModel):

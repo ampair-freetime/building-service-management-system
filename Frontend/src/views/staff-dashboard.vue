@@ -1,4 +1,5 @@
 <script setup>
+import LoadingAnimation from "../components/shared/LoadingAnimation.vue";
 import AdminPages from "../components/staff/admin/AdminPages.vue";
 import ClerkPages from "../components/staff/clerk/ClerkPages.vue";
 import HousekeeperPages from "../components/staff/housekeeper/HousekeeperPages.vue";
@@ -6,7 +7,7 @@ import TechnicianPages from "../components/staff/technician/TechnicianPages.vue"
 import NotificationCenterPage from "../components/staff/NotificationCenterPage.vue";
 import { useStaffDashboard } from "../view-logic/useStaffDashboard.js";
 
-const { activeRole } = useStaffDashboard();
+const { activeRole, dashboardLoading } = useStaffDashboard();
 </script>
 
 <template>
@@ -103,11 +104,8 @@ const { activeRole } = useStaffDashboard();
         />
       </symbol>
     </svg>
-    <div class="loading-mask" aria-label="กำลังโหลด">
-      <div class="loading-card">
-        <span class="skeleton"></span><span class="skeleton"></span
-        ><span class="skeleton"></span>
-      </div>
+    <div v-if="dashboardLoading" class="loading-mask" aria-label="กำลังโหลด">
+      <LoadingAnimation />
     </div>
     <div class="app">
       <aside class="sidebar" id="sidebar">

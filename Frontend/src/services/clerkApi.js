@@ -257,6 +257,7 @@ export async function scheduleOwnershipPickup(claimId, appointment) {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
+        pickup_end_datetime: new Date(`${appointment.date}T${appointment.endTime}:00+07:00`).toISOString(),
         pickup_datetime: new Date(`${appointment.date}T${appointment.time}:00+07:00`).toISOString(),
         pickup_location: appointment.location,
         note: appointment.note || null,

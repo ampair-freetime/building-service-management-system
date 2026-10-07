@@ -15,13 +15,21 @@ docker compose up --build
 | Frontend | http://localhost:5173 |
 | API | http://localhost:8000 |
 | API docs (ดู endpoint ทั้งหมด) | http://localhost:8000/docs |
-| Mailpit (อีเมลทดสอบ) | http://localhost:8025 |
 
 Backend รัน `alembic upgrade head` ให้เองทุกครั้งที่ container เริ่ม ถ้าเพิ่ม migration ใหม่ให้ restart backend:
 
 ```bash
 docker compose restart backend
 ```
+
+## การส่งอีเมล
+
+ตั้งค่า SMTP ใน `.env` ตามผู้ให้บริการที่ใช้งาน: `SMTP_HOST`, `SMTP_PORT`,
+`SMTP_USERNAME`, `SMTP_PASSWORD` และ `MAIL_FROM` โดยค่าเริ่มต้นใช้ port 587
+พร้อม `SMTP_USE_STARTTLS=true` หากใช้ port 465 ให้ตั้ง `SMTP_USE_SSL=true`
+และ `SMTP_USE_STARTTLS=false` ระบบจะส่งอีเมลไปยังผู้รับโดยตรง
+หากไม่ตั้ง `SMTP_HOST` ระบบจะตอบ `email_sent=false`
+หลังแก้ค่าให้สร้าง backend container ใหม่ด้วย `docker compose up -d backend`
 
 ## บัญชีสำหรับ login (development เท่านั้น)
 
@@ -39,7 +47,7 @@ Login ที่ `POST /api/v1/auth/login` ใช้ **อีเมล**
 | `technician` (ช่าง) | อีเมลที่ใช้ได้ | Staff ตั้งเองผ่าน invitation link | Admin สร้างผ่าน API |
 
 Admin สร้างบัญชีผ่าน `POST /api/v1/staff` โดยส่ง `email`, `full_name` และ `role`
-(ทำใน http://localhost:8000/docs ได้) จากนั้นเปิดอีเมลใน Mailpit แล้วกด invitation link
+(ทำใน http://localhost:8000/docs ได้) จากนั้นเปิดอีเมลในกล่องจดหมายของผู้รับ แล้วกด invitation link
 เพื่อตั้งรหัสผ่านก่อน login; response มี `email_sent` แต่ไม่คืนรหัสผ่านหรือ token
 ลิงก์หมดอายุใน 24 ชั่วโมงตามค่าเริ่มต้น และใช้ได้ครั้งเดียว
 หากส่งอีเมลไม่สำเร็จหรือลิงก์หมดอายุ ให้ Admin เรียก

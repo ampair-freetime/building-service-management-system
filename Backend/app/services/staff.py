@@ -74,6 +74,28 @@ def _is_duplicate_staff_email(exc: IntegrityError) -> bool:
     return "UNIQUE constraint failed: staff.email" in str(original)
 
 
+async def release_deleted_staff_email(session: AsyncSession, email: str) -> None:
+    """Free a deleted identity's email; retain the old address in deletion audit."""
+    account = await session.scalar(select(Staff).where(
+        Staff.email == email, Staff.status == AccountStatus.DELETED
+    ).with_for_update())
+    if account is None:
+        return
+    audit = await session.scalar(select(StaffDeletionAudit.id).where(
+        StaffDeletionAudit.deleted_staff_id == account.id
+    ))
+    if audit is None:
+        # Legacy deleted rows may predate deletion auditing.
+        session.add(StaffDeletionAudit(
+            deleted_staff_id=account.id, deleted_email=account.email,
+            deleted_full_name=account.full_name, deleted_role=account.role.value,
+            deleted_by_staff_id=UUID(int=0),  # Unknown actor for legacy deletions.
+        ))
+    account.email = f"deleted-{account.id}@deleted.invalid"
+    await _invalidate_pending_links(session, account.id)
+    await session.flush()
+
+
 async def update_staff_profile(
     session: AsyncSession, *, staff_id: UUID, payload: StaffUpdate, actor: Staff
 ) -> Staff:
@@ -89,6 +111,7 @@ async def update_staff_profile(
         return account
 
     if "email" in changes:
+        await release_deleted_staff_email(session, changes["email"])
         duplicate = await session.scalar(
             select(Staff.id).where(Staff.email == changes["email"], Staff.id != staff_id)
         )
