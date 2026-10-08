@@ -128,6 +128,8 @@ class OwnershipRequestDetailResponse(BaseModel):
     private_verification_detail: str | None = None
     pickup_end_datetime: datetime | None = None
     pickup_datetime: datetime | None
+    pickup_location: str | None
+    pickup_note: str | None
     return_status: ReturnStatus | None
     review_note: str | None
     created_at: datetime
@@ -190,6 +192,22 @@ class SchedulePickupRequest(BaseModel):
         if any(value.minute not in (0, 30) or value.second or value.microsecond for value in (start, end)):
             raise ValueError("เลือกนาทีได้เฉพาะ 00 และ 30")
         return self
+
+    @field_validator("pickup_location")
+    @classmethod
+    def normalize_pickup_location(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        value = " ".join(value.split())
+        return value or None
+
+    @field_validator("note")
+    @classmethod
+    def normalize_note(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        value = value.strip()
+        return value or None
 
 
 class PersonalLostFoundHistoryResponse(BaseModel):

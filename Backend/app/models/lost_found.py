@@ -168,6 +168,8 @@ class LostClaim(Base):
         DateTime(timezone=True),
         nullable=True,
     )
+    pickup_location: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    pickup_note: Mapped[str | None] = mapped_column(Text, nullable=True)
     reviewed_by: Mapped[UUID | None] = mapped_column(ForeignKey("staff.id"), nullable=True)
     review_note: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

@@ -131,9 +131,9 @@
         </header>
         <div class="inline-summary">
           <div>
-            <small>ผู้ขอรับ</small><strong id="claimRequester">–</strong>
+            <small>ชื่อผู้ขอรับ</small><strong id="claimRequester">–</strong>
           </div>
-          <div><small>ติดต่อ</small><strong id="claimContact">–</strong></div>
+          <div><small>อีเมลติดต่อ</small><strong id="claimContact">–</strong></div>
           <div>
             <small>วันที่ส่งคำขอ</small><strong id="claimDate">–</strong>
           </div>
@@ -149,6 +149,7 @@
             <div><strong>หลักฐานจากผู้ขอรับคืน</strong><p id="claimEvidence"></p></div>
             <div class="claim-secret"><strong>ข้อมูลลับของสิ่งของ · เฉพาะเจ้าหน้าที่</strong><p id="claimSecret"></p></div>
           </div>
+          <div class="claim-evidence-images" id="claimImages" hidden></div>
         </section>
         <section id="claimAppointmentGroup" hidden>
           <h4>นัดหมายรับของ</h4>
@@ -212,11 +213,10 @@
           </small>
           <div class="field">
             <label for="appointmentPlace">จุดรับของ</label
-            ><input
+            ><textarea
               id="appointmentPlace"
-              value="ประชาสัมพันธ์ ชั้น 1"
-              required
-            />
+              placeholder="CSB"
+            ></textarea>
           </div>
           <div class="field">
             <label for="appointmentNote">สิ่งที่ต้องนำมาเพื่อยืนยันการรับคืน</label

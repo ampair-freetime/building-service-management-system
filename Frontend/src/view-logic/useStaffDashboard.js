@@ -357,7 +357,24 @@ export function useStaffDashboard() {
           }),
         );
 
-        lostSets.claims = data.map((claim) => ({
+        lostSets.claims = data.map((claim) => {
+          const pickupDateTime = claim.pickup_datetime
+            ? new Date(claim.pickup_datetime)
+            : null;
+          const pickupParts = pickupDateTime && !Number.isNaN(pickupDateTime.getTime())
+            ? Object.fromEntries(
+                new Intl.DateTimeFormat("en-GB", {
+                  timeZone: "Asia/Bangkok",
+                  year: "numeric",
+                  month: "2-digit",
+                  day: "2-digit",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                  hourCycle: "h23",
+                }).formatToParts(pickupDateTime).map((part) => [part.type, part.value]),
+              )
+            : null;
+          return ({
           backendId: claim.id,
           foundItemBackendId: claim.found_item_id,
           id: claim.claim_code || claim.id,
@@ -382,16 +399,20 @@ export function useStaffDashboard() {
           generalDescription: claim.description,
           secret: claim.private_verification_detail,
           custodyLocation: claim.custody_location,
-          pickupDate: claim.pickup_date || (claim.pickup_datetime ? new Intl.DateTimeFormat("en-CA", {timeZone: "Asia/Bangkok", year: "numeric", month: "2-digit", day: "2-digit"}).format(new Date(claim.pickup_datetime)) : ""),
-          pickupTime: claim.pickup_time || (claim.pickup_datetime ? new Intl.DateTimeFormat("en-GB", {timeZone: "Asia/Bangkok", hour: "2-digit", minute: "2-digit"}).format(new Date(claim.pickup_datetime)) : ""),
+          pickupDate: claim.pickup_date || (pickupParts ? `${pickupParts.year}-${pickupParts.month}-${pickupParts.day}` : ""),
+          pickupTime: claim.pickup_time || (pickupParts ? `${pickupParts.hour}:${pickupParts.minute}` : ""),
           pickupLocation:
             claim.pickup_location || claim.appointment?.pickup_location || "",
           pickupNote: claim.pickup_note || claim.appointment?.note || "",
-          appointment: claim.pickup_date
-            ? `${claim.pickup_date} เวลา ${claim.pickup_time || "–"}`
+          images: claim.images || [],
+          imageUrl: claim.images?.[0]?.url || "",
+          itemCustodyLocation: claim.custody_location || "",
+          appointment: pickupParts
+            ? `${pickupParts.day}/${pickupParts.month}/${pickupParts.year} เวลา ${pickupParts.hour}:${pickupParts.minute}`
             : "ยังไม่มีนัดหมาย",
           assignee: null,
-        }));
+          });
+        });
 
         clerkApprovalLoadState.claims = "ready";
         renderClerkCenter();
@@ -448,11 +469,21 @@ export function useStaffDashboard() {
       date = todayISO(),
       time = currentTimeHM(),
     }) {
-      workHistory.unshift({
+      const actorId = signedInStaffId();
+      const timestamp = Date.now();
+      const duplicate = workHistory.find(
+        (entry) =>
+          entry.staff === staff &&
+          entry.actorId === actorId &&
+          entry.itemId === itemId &&
+          entry.action === action &&
+          timestamp - (entry.timestamp || 0) < 2000,
+      );
+      const record = {
         uid: `WH-${Date.now()}-${Math.random().toString(16).slice(2)}`,
         staff,
         role,
-        actorId: signedInStaffId(),
+        actorId,
         itemId,
         title,
         category,
@@ -461,8 +492,13 @@ export function useStaffDashboard() {
         detail,
         date,
         time,
-        timestamp: Date.now(),
-      });
+        timestamp,
+      };
+      if (duplicate) {
+        Object.assign(duplicate, record, { uid: duplicate.uid });
+      } else {
+        workHistory.unshift(record);
+      }
       renderActivities();
       renderMyHistory();
       renderStaffOverview();
@@ -878,9 +914,11 @@ export function useStaffDashboard() {
       }
       $("#notificationPanel")?.classList.remove("open", "mobile-notification-page");
       $("#notificationButton")?.setAttribute("aria-expanded", "false");
-      $$("#mobileNotification, #mobileNotificationAdmin").forEach((button) => {
-        button.classList.remove("active");
-        button.removeAttribute("aria-current");
+      $$('[data-mobile-notification]').forEach((button) => {
+        const active = page === "notifications";
+        button.classList.toggle("active", active);
+        if (active) button.setAttribute("aria-current", "page");
+        else button.removeAttribute("aria-current");
       });
       $$(".page").forEach((p) => p.classList.remove("active"));
       destination.classList.add("active");
@@ -1332,6 +1370,24 @@ export function useStaffDashboard() {
         detail,
         time: nowThai(),
       });
+      recordWorkHistory({
+        staff: actor,
+        itemId,
+        title,
+        category:
+          source === "lost"
+            ? "ของหายและรับฝาก"
+            : source === "jobs"
+              ? "งานบริการ"
+              : source === "staff"
+                ? "บัญชี Staff"
+                : source === "qr"
+                  ? "สถานที่และ QR"
+                  : "งานทั่วไป",
+        action,
+        status: action,
+        detail,
+      });
       renderHistory();
     }
     function storeDeletedRecord(source, record, collectionKey, title) {
@@ -1518,9 +1574,13 @@ export function useStaffDashboard() {
           })),
       );
     }
+    function claimNeedsClerkReview(item) {
+      return ["pending", "additional_info_required"].includes(item.backendStatus) ||
+        ["รอตรวจสอบ", "ขอข้อมูลเพิ่มเติม"].includes(item.status);
+    }
     function activeClaimNotifications() {
       return lostSets.claims
-        .filter((item) => !["คืนของแล้ว", "ไม่ผ่านการตรวจสอบ"].includes(item.status))
+        .filter(claimNeedsClerkReview)
         .map((item) => ({
           ...item,
           unread: !readClaimNotifications.has(item.id),
@@ -1576,7 +1636,7 @@ export function useStaffDashboard() {
       }
       const found = lostSets.inventory.filter((item) => approvalGroup(item.status) === "pending");
       const lost = lostSets.lostposts.filter((item) => approvalGroup(item.status) === "pending");
-      const claims = lostSets.claims.filter((item) => !["คืนของแล้ว", "ไม่ผ่านการตรวจสอบ"].includes(item.status));
+      const claims = lostSets.claims.filter(claimNeedsClerkReview);
       metrics.innerHTML = [
         [found.length + lost.length, "รออนุมัติทั้งหมด", "ของที่พบและประกาศของหาย"],
         [found.length, "ของที่พบ", "รออนุมัติรับฝาก"],
@@ -1628,7 +1688,7 @@ export function useStaffDashboard() {
       );
       const claims = lostSets.claims.filter(
         (item) =>
-          !["คืนของแล้ว", "ไม่ผ่านการตรวจสอบ"].includes(item.status) &&
+          claimNeedsClerkReview(item) &&
           matchesClerkCenterSearch(
             item.id,
             item.title,
@@ -1691,7 +1751,12 @@ export function useStaffDashboard() {
         }
         const data =
           view === "claims"
-            ? lostSets.claims.filter((item) => !["คืนของแล้ว", "ไม่ผ่านการตรวจสอบ"].includes(item.status))
+            ? lostSets.claims.filter(
+                (item) =>
+                  currentRole !== "clerk" ||
+                  ["approved", "scheduled"].includes(item.backendStatus) ||
+                  ["ผ่านการตรวจสอบ", "นัดหมายแล้ว"].includes(item.status),
+              )
             : lostSets[view].filter(
                 (item) => approvalGroup(item.status) === "approved",
               );
@@ -3998,10 +4063,15 @@ export function useStaffDashboard() {
       );
     }
 
-    function openClaimDetail(id, trigger = document.activeElement) {
+    function openClaimDetail(
+      id,
+      trigger = document.activeElement,
+      context = "center",
+    ) {
       const item = lostSets.claims.find((record) => record.id === id);
       if (!item) return;
-      $("#claimDetailCode").textContent = id;
+      const detailContext = currentRole === "clerk" ? context : "center";
+      $("#claimDetailCode").textContent = `${id} · ${item.status}`;
       $("#claimDetailTitle").textContent = item.title;
       $("#claimRequester").textContent = item.requester || "ไม่ระบุชื่อผู้ขอ";
       $("#claimContact").textContent = item.contact || "ไม่ระบุช่องทางติดต่อ";
@@ -4022,6 +4092,14 @@ export function useStaffDashboard() {
       $("#claimGeneralDescription").textContent = item.generalDescription || "ไม่ได้ระบุรายละเอียดทั่วไป";
       $("#claimEvidence").textContent =
         item.evidence || item.place || "ยังไม่มีรายละเอียดหลักฐาน";
+      const claimImages = $("#claimImages");
+      if (claimImages) {
+        const images = item.images?.length ? item.images : item.imageUrl ? [{ url: item.imageUrl }] : [];
+        claimImages.hidden = images.length === 0;
+        claimImages.innerHTML = images.map((image, index) =>
+          `<img src="${escapeHtml(image.url)}" alt="หลักฐานรูปที่ ${index + 1} ของ ${escapeHtml(item.title)}" loading="lazy" />`,
+        ).join("");
+      }
       $("#claimSecret").textContent =
         item.secret || "ยังไม่มีข้อมูลลับสำหรับตรวจสอบ";
       $("#claimTimeline").innerHTML = [
@@ -4037,17 +4115,23 @@ export function useStaffDashboard() {
       const verified = ["approved", "scheduled"].includes(item.backendStatus);
       const returned = item.returnStatusCode === "returned";
       const appointmentGroup = $("#claimAppointmentGroup");
-      if (appointmentGroup) appointmentGroup.hidden = !item.pickupDate;
+      if (appointmentGroup) appointmentGroup.hidden = detailContext !== "lost" || !item.pickupDate;
       const nextStep = $("#claimNextStep");
       if (nextStep) nextStep.textContent = returned ? "ส่งคืนเจ้าของแล้ว" : verified
         ? "ยืนยันเจ้าของแล้ว นัดวัน เวลา และจุดรับของกับผู้ขอ ก่อนบันทึกนัดหมาย"
         : "เทียบหลักฐานที่ผู้ขอระบุกับข้อมูลลับของสิ่งของ แล้วจึงยืนยันความเป็นเจ้าของ";
-      const claimActions = verified || returned || item.backendStatus === "rejected" ? [] : [
-        ["reject", "ปฏิเสธคำขอ", "claim-reject-action"],
-        ["more", "ขอข้อมูลเพิ่มเติม", ""],
-        ["verify", "ยืนยันความเป็นเจ้าของ", "primary-action"],
-      ];
-      if (verified && !returned) {
+      const claimActions =
+        detailContext === "center" && !verified && !returned && item.backendStatus !== "rejected"
+          ? [
+              ["reject", "ปฏิเสธคำขอ", "claim-reject-action"],
+              ["more", "ขอข้อมูลเพิ่มเติม", ""],
+              ["verify", "ยืนยันความเป็นเจ้าของ", "primary-action"],
+            ]
+          : [];
+      if (
+        detailContext === "lost" &&
+        verified && !returned
+      ) {
         claimActions.push([
           "appointment",
           item.status === "นัดหมายแล้ว"
@@ -4156,6 +4240,9 @@ export function useStaffDashboard() {
             detail: `ดำเนินการโดย ${activeStaffName()}`,
           });
           renderLost();
+          renderClerkCenter();
+          renderClerkApprovalsOverview();
+          renderMetrics();
           renderNotifications();
           if (action === "verify") {
             openAppointment(id, trigger);
@@ -4169,14 +4256,10 @@ export function useStaffDashboard() {
             return;
           }
           showSuccess(
-            action === "verify"
-              ? `${id} · ยืนยันความเป็นเจ้าของสำหรับ ${item.requester || "ผู้ยื่นคำขอ"} แล้ว สถานะเปลี่ยนเป็น “${status}”`
-              : action === "returned"
+            action === "returned"
                 ? `${id} · บันทึกว่าส่ง ${item.title} คืนเจ้าของแล้ว`
                 : `อัปเดตคำขอ ${id} เป็น “${status}” แล้ว`,
-            action === "verify"
-              ? "ยืนยันความเป็นเจ้าของแล้ว"
-              : action === "returned"
+            action === "returned"
                 ? "บันทึกการส่งคืนแล้ว"
                 : "อัปเดตคำขอแล้ว",
           );
@@ -4362,7 +4445,7 @@ export function useStaffDashboard() {
           if (index === 4 && firstClaim) {
             openAppointment(firstClaim.id, button);
           } else if (index === 5 && firstClaim) {
-            openClaimDetail(firstClaim.id, button);
+            openClaimDetail(firstClaim.id, button, "center");
           }
         } else {
           currentLostTab = index === 2 ? "inventory" : "lostposts";
@@ -5064,7 +5147,7 @@ export function useStaffDashboard() {
     $("#activeClaimList")?.addEventListener("click", (event) => {
       const button = event.target.closest("[data-center-action]");
       if (button?.dataset.centerAction === "claim-detail")
-        openClaimDetail(button.dataset.itemId, button);
+        openClaimDetail(button.dataset.itemId, button, "center");
     });
     // ฟังคลิกที่ container เพื่อรองรับปุ่มในการ์ดที่ถูกสร้างใหม่หลัง render โดยไม่ต้องผูก event ซ้ำ
     $("#lostGrid")?.addEventListener("click", (event) => {
@@ -5081,44 +5164,18 @@ export function useStaffDashboard() {
       if (action === "delete") deleteLostRecord(tab, id);
       if (action === "appointment") openAppointment(id, button);
       if (action === "detail") openLostDetail(tab, id, button);
-      if (action === "claim-detail") openClaimDetail(id, button);
+      if (action === "claim-detail") openClaimDetail(id, button, "lost");
     });
     // -------------------------------------------------------------------------
     // 19) Event binding: Notification, Staff, Lost & Found, QR และประกาศ
     // -------------------------------------------------------------------------
 
-    // Phones and tablets show notifications as a bottom navigation page.
-    function openMobileNotifications(button) {
-      const panel = $("#notificationPanel");
-      if (!panel) return;
-      panel.classList.add("open", "mobile-notification-page");
-      $("#notificationButton")?.setAttribute("aria-expanded", "false");
-      $$(".bottom-nav button").forEach((item) => item.classList.remove("active"));
-      button.classList.add("active");
-      button.setAttribute("aria-current", "page");
-      closeSidebar();
-      panel.scrollTop = 0;
-      window.scrollTo(0, 0);
-    }
-    function toggleNotificationPanel() {
-      const panel = $("#notificationPanel");
-      if (!panel) return;
-      const open = !panel.classList.contains("open");
-      panel.classList.toggle("open", open);
-      $("#notificationButton")?.setAttribute("aria-expanded", String(open));
-      if (open) panel.querySelector("button")?.focus();
-    }
-    $("#notificationButton")?.addEventListener("click", (event) => {
-      event.stopPropagation();
-      toggleNotificationPanel();
-    });
+    // Notification center is a regular dashboard page on every viewport.
     $(".bottom-nav")?.addEventListener("click", (event) => {
       const button = event.target.closest("[data-mobile-notification]");
       if (!button) return;
       event.stopPropagation();
-      if (window.matchMedia("(max-width: 1024px)").matches)
-        openMobileNotifications(button);
-      else toggleNotificationPanel();
+      navigate("notifications");
     });
     $("#notificationList")?.addEventListener("click", async (event) => {
       event.stopPropagation();
@@ -5198,11 +5255,6 @@ export function useStaffDashboard() {
       if (match) openJobDetail(match[0], itemButton);
       else if (currentRole === "clerk") navigate("clerk-center");
       else toast(item.title);
-    });
-    document.addEventListener("click", () => {
-      if ($("#notificationPanel")?.classList.contains("mobile-notification-page")) return;
-      $("#notificationPanel")?.classList.remove("open");
-      $("#notificationButton")?.setAttribute("aria-expanded", "false");
     });
     $("#markAllRead")?.addEventListener("click", markNotificationsRead);
     $("#openStaffModal")?.addEventListener("click", (event) => {
@@ -5698,20 +5750,10 @@ export function useStaffDashboard() {
           item.returnStatusCode,
           item.backendStatus,
         );
-        item.pickupDate =
-          result.pickup_date ||
-          result.appointment?.pickup_date ||
-          appointmentDate;
-        item.pickupTime =
-          result.pickup_time ||
-          result.appointment?.pickup_time ||
-          appointmentTime;
-        item.pickupLocation =
-          result.pickup_location ||
-          result.appointment?.pickup_location ||
-          appointmentPlace;
-        item.pickupNote =
-          result.pickup_note || result.appointment?.note || note;
+        item.pickupDate = appointmentDate;
+        item.pickupTime = appointmentTime;
+        item.pickupLocation = result.pickup_location || appointmentPlace;
+        item.pickupNote = result.pickup_note || note;
         item.status = "นัดหมายแล้ว";
         item.assignee = activeStaffName();
         item.pickupEndTime = endTime;

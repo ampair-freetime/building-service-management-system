@@ -1894,6 +1894,7 @@ def test_clerk_can_schedule_pickup(test_context, monkeypatch):
 
     assert claim.status == ClaimStatus.SCHEDULED
     assert claim.pickup_datetime is not None
+    assert claim.pickup_location == "CSB lobby"
 
 
 def test_schedule_pickup_requires_datetime(test_context):
@@ -2021,6 +2022,8 @@ def test_view_scheduled_pickup_details(test_context):
                 status=ClaimStatus.SCHEDULED,
                 return_status=ReturnStatus.PENDING,
                 pickup_datetime=datetime(2026, 9, 20, 13, 30),
+                pickup_location="Clerk Office",
+                pickup_note="Bring an ID card",
             )
 
             session.add(claim)
@@ -2042,6 +2045,8 @@ def test_view_scheduled_pickup_details(test_context):
 
     assert data["status"] == "scheduled"
     assert data["pickup_datetime"] == "2026-09-20T13:30:00"
+    assert data["pickup_location"] == "Clerk Office"
+    assert data["pickup_note"] == "Bring an ID card"
 
 
 def _clerk_headers(client, session_factory):
