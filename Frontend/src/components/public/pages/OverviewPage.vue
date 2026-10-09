@@ -31,7 +31,7 @@ onMounted(async () => {
             <div class="hero-copy">
             <div class="eyebrow">CS Building Care</div>
 
-            <h1 class="greeting-name">แจ้งปัญหาได้ทันที!</h1>
+            <h1 class="greeting-name">แจ้งปัญหาได้ทันที !</h1>
             <p class="hero-subtitle">
               ระบบบริหารจัดการงานบริการอาคารเรียน<br />
               ภาควิชาวิทยาการคอมพิวเตอร์

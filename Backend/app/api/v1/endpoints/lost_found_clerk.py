@@ -314,7 +314,7 @@ async def get_pending_ownership_requests(
     session: DbSession,
     _: ClerkStaff,
 ) -> list[OwnershipRequestListResponse]:
-    """คืนรายการคำขอรับของคืนที่กำลังรอตรวจสอบ"""
+    """คืนรายการคำขอรับของคืนที่ยังอยู่ระหว่างดำเนินการ"""
 
     return await list_pending_ownership_requests(session)
 

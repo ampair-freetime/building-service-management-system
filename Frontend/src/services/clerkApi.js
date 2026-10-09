@@ -144,7 +144,7 @@ export async function getLostItemDetail(itemId) {
   }
 }
 
-// โหลดคำร้องขอรับของคืนทั้งหมดที่รอให้เจ้าหน้าที่ตรวจสอบ
+// โหลดคำร้องขอรับของคืนที่ยังอยู่ระหว่างตรวจสอบ ยืนยัน หรือนัดหมาย
 export async function getPendingOwnershipRequests() {
   const controller = new AbortController();
 
@@ -254,7 +254,7 @@ export async function scheduleOwnershipPickup(claimId, appointment) {
       method: "POST",
       headers: {
         Authorization: `Bearer ${localStorage.getItem("buildingCareAccessToken") || ""}`,
-        "Content-Type": "application/json",
+      "Content-Type": "application/json",
       },
       body: JSON.stringify({
         pickup_end_datetime: new Date(`${appointment.date}T${appointment.endTime}:00+07:00`).toISOString(),
