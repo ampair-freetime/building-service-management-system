@@ -70,9 +70,13 @@ class Settings(BaseSettings):
     r2_total_max_attempts: int = Field(default=2, ge=1, le=5)
 
     # จำกัดทั้งขนาดไฟล์และจำนวน pixel เพื่อลดความเสี่ยงจากไฟล์ภาพผิดปกติ
-    max_image_upload_bytes: int = Field(default=5 * 1024 * 1024, gt=0)
+    max_image_upload_bytes: int = Field(default=25 * 1024 * 1024, gt=0)
     max_guest_images: int = Field(default=5, ge=1, le=5)
-    max_image_pixels: int = Field(default=8_000_000, gt=0)
+    max_image_pixels: int = Field(default=50_000_000, gt=0)
+    # รูปที่เก็บจริงใน R2: ย่อด้านยาวและบีบอัดให้เล็ก แยกจากขีดจำกัดของไฟล์ที่อัปโหลด
+    image_max_dimension: int = Field(default=2048, ge=256, le=16383)
+    image_webp_quality: int = Field(default=78, ge=1, le=100)
+    max_image_output_bytes: int = Field(default=1 * 1024 * 1024, gt=0)
     max_image_processing_concurrency: int = Field(default=1, ge=1, le=16)
 
     # guest ไม่ได้เลือกจุดฝากเอง ทุกรายการพบของต้องนำไปฝากที่จุดเดียวกันตามที่หน้าเว็บแจ้งไว้
