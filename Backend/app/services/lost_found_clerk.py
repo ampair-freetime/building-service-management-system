@@ -320,6 +320,7 @@ async def get_ownership_request_detail(
 
     return {
         "id": claim.id,
+        "claim_code": claim.claim_code,
         "found_item_id": claim.found_item_id,
         "claimant_name": claim.claimant_name,
         "claimant_email": claim.claimant_email,
@@ -408,6 +409,7 @@ async def approve_ownership_request(
         other_claim.status = ClaimStatus.REJECTED
         other_claim.reviewed_by = staff_id
         other_claim.review_note = AUTO_REJECT_NOTE
+        other_claim.staff_message = AUTO_REJECT_NOTE
 
     await session.commit()
     await session.refresh(claim)
@@ -428,7 +430,7 @@ async def request_additional_ownership_information(
         .where(
             LostClaim.id == claim_id,
             LostClaim.status.in_([ClaimStatus.PENDING, ClaimStatus.ADDITIONAL_INFO_REQUIRED]),
-        )
+        ).with_for_update()
     )
 
     claim = await session.scalar(statement)
@@ -439,6 +441,7 @@ async def request_additional_ownership_information(
     claim.status = ClaimStatus.ADDITIONAL_INFO_REQUIRED
     claim.reviewed_by = staff_id
     claim.review_note = message
+    claim.staff_message = message
 
     await session.commit()
     await session.refresh(claim)
@@ -634,6 +637,7 @@ async def reject_ownership_request(session: AsyncSession, claim_id: UUID, staff_
     claim.status = ClaimStatus.REJECTED
     claim.reviewed_by = staff_id
     claim.review_note = reason
+    claim.staff_message = reason
     await session.commit()
     await session.refresh(claim)
     return claim

@@ -13,6 +13,8 @@ import {
   getLostFoundItem,
   fetchPublicLostFoundItems,
   trackLostFoundItem,
+  trackClaim,
+  submitClaimAdditionalInfo,
   trackServiceRequest,
 } from "../services/api";
 import { createLostFoundStore, filterLostFoundItems } from "../services/lostFoundSearch.js";
@@ -54,6 +56,8 @@ export function usePublicServicePortal() {
     let detailRequestId = 0;
     let selectedClaimItem = "";
     let selectedClaimItemCode = "";
+    let selectedLostItem = null;
+    let trackedClaim = null;
     // เก็บเฉพาะคำร้องที่ผู้ใช้ส่งจริงในรอบการเปิดหน้านี้ ไม่มีข้อมูลตัวอย่างปะปน
     const trackedRequests = new Map();
 
@@ -525,7 +529,7 @@ export function usePublicServicePortal() {
         action === "claim"
           ? "นี่อาจเป็นของฉัน"
           : action === "contact"
-            ? "ติดต่อเจ้าหน้าที่"
+            ? "ฉันพบของชิ้นนี้"
             : "รับทราบ";
     }
 
@@ -593,6 +597,7 @@ export function usePublicServicePortal() {
     async function openLostFoundDetail(card, trigger = card) {
       const requestId = ++detailRequestId;
       selectedClaimItemCode = "";
+      selectedLostItem = null;
       selectedClaimItem =
         card.querySelector("h4")?.textContent.trim() || "รายการ";
       const isFound = card.dataset.kind === "found";
@@ -615,6 +620,7 @@ export function usePublicServicePortal() {
         }
 
         selectedClaimItem = item.item_name;
+        selectedLostItem = item.report_type === "lost" ? item : null;
         selectedClaimItemCode =
           item.report_type === "found" ? item.item_code : "";
         setDetailContent(
@@ -693,7 +699,18 @@ export function usePublicServicePortal() {
           );
         else if (detailAction === "contact") {
           closeUiModal("detailModal", false);
-          showToast("ส่งข้อมูลติดต่อให้เจ้าหน้าที่แล้ว");
+          navigate("lost");
+          openLostView("report-found");
+          const form = document.getElementById("publicFoundForm");
+          if (selectedLostItem && form) {
+            form.elements.item_name.value = selectedLostItem.item_name;
+            form.elements.item_category.value = selectedLostItem.item_category;
+            form.elements.description.value = `เกี่ยวข้องกับประกาศ ${selectedLostItem.item_code}`;
+            for (const name of ["item_name", "item_category", "description"]) {
+              form.elements[name].dispatchEvent(new Event(name === "item_category" ? "change" : "input", {bubbles: true}));
+            }
+          }
+          showToast("กรุณาแจ้งสถานที่และเวลาที่พบ พร้อมนำของไปฝากห้องธุรการ");
         } else closeUiModal("detailModal");
       });
 
@@ -933,6 +950,7 @@ export function usePublicServicePortal() {
         // ช่องไฟล์ที่ไม่ได้เลือกอาจอยู่ใน FormData เป็น File ชื่อว่าง ต้องลบเพื่อไม่ให้ Backend รับเป็นรูปว่าง
         const image = formData.get("image");
         if (!image || !image.name) formData.delete("image");
+        if (!formData.get("location_id")) formData.delete("location_id");
         const item = await createLostItem(formData);
 
         clearImagePreviews(form);
@@ -1053,6 +1071,7 @@ export function usePublicServicePortal() {
         const image = formData.get("image");
         if (!image || !image.name) formData.delete("image");
 
+        if (!formData.get("location_id")) formData.delete("location_id");
         const item = await createFoundItem(formData);
         clearImagePreviews(form);
         form.reset();
@@ -1242,6 +1261,20 @@ export function usePublicServicePortal() {
     }
 
     function renderTrackingResult(item, code, ids, { refreshed = false } = {}) {
+      trackedClaim = item?.claim_code ? {code: item.claim_code,
+        email: document.getElementById("trackingEmail").value.trim().toLowerCase()} : null;
+      document.getElementById("claimTrackingDetails").hidden = !trackedClaim;
+      document.getElementById("claimAdditionalInfoForm").hidden = item?.status !== "additional_info_required";
+      document.getElementById("claimStaffMessage").textContent = item?.staff_message || "";
+      const dateLabel = value => value ? new Intl.DateTimeFormat("th-TH", {
+        timeZone: "Asia/Bangkok", dateStyle: "long", timeStyle: "short",
+      }).format(new Date(value)) : "";
+      document.getElementById("claimPickupDetails").textContent = trackedClaim ? [
+        item.pickup_datetime ? `นัดรับ: ${dateLabel(item.pickup_datetime)}` : "",
+        item.pickup_end_datetime ? `ถึง: ${dateLabel(item.pickup_end_datetime)}` : "",
+        item.pickup_location || item.custody_location ? `จุดรับของ: ${item.pickup_location || item.custody_location}` : "",
+        item.pickup_note ? `หมายเหตุ: ${item.pickup_note}` : "",
+      ].filter(Boolean).join("\n") : "";
       const result = document.getElementById(ids.result);
       const statusBadge = document.getElementById(ids.status);
       const photosNotice = document.getElementById("trackingPhotosNotice");
@@ -1287,6 +1320,7 @@ export function usePublicServicePortal() {
         document.getElementById(ids.details).hidden = false;
 
         document.getElementById(ids.requestType).textContent =
+          (item.claim_code ? "คำขอรับของคืน" : "") ||
           item.requestType ||
           (item.request_type === "cleaning"
             ? "แจ้งทำความสะอาด"
@@ -1415,7 +1449,9 @@ export function usePublicServicePortal() {
           await new Promise((resolve) => window.setTimeout(resolve, 0));
         }
         let item;
-        if (isLostFoundCode) {
+        if (code.startsWith("CLM-")) {
+          item = await trackClaim(code, email);
+        } else if (isLostFoundCode) {
           item = await trackLostFoundItem(code, email);
         } else if (isServiceCode) {
           const remoteItem = await trackServiceRequest(code, email);
@@ -1445,6 +1481,8 @@ export function usePublicServicePortal() {
             second: "2-digit",
           }).format(new Date())}`;
       } catch (error) {
+        trackedClaim = null;
+        document.getElementById("claimTrackingDetails").hidden = true;
         // แสดงกรอบผลลัพธ์แม้เกิดปัญหาการเชื่อมต่อ และให้ผู้ใช้กดรีเฟรชซ้ำได้
         document.getElementById("trackingPhotosNotice").hidden = true;
         document.getElementById(trackingIds.code).textContent = code;
@@ -1468,6 +1506,30 @@ export function usePublicServicePortal() {
         refreshTrackingButton.textContent = "รีเฟรชสถานะ";
       }
     }
+
+    document.getElementById("claimAdditionalInfoForm").addEventListener("submit", async event => {
+      event.preventDefault();
+      if (!trackedClaim) return;
+      const form = event.currentTarget;
+      const button = form.querySelector('button[type="submit"]');
+      if (button.disabled || !form.reportValidity()) return;
+      const proof = document.getElementById("claimAdditionalProof").value.trim();
+      if (!proof) return;
+      const {code, email} = trackedClaim;
+      button.disabled = true;
+      button.textContent = "กำลังส่ง…";
+      try {
+        await submitClaimAdditionalInfo(code, email, proof);
+        form.reset();
+        await loadTrackingStatus({refreshed: true});
+        showToast("ส่งหลักฐานเพิ่มเติมแล้ว");
+      } catch (error) {
+        showToast(error.message || "ส่งหลักฐานไม่สำเร็จ");
+      } finally {
+        button.disabled = false;
+        button.textContent = "ส่งหลักฐานเพิ่มเติม";
+      }
+    });
 
     trackingForm.addEventListener("submit", (event) => {
       event.preventDefault();
@@ -1583,19 +1645,22 @@ export function usePublicServicePortal() {
         claimForm.reset();
         closeUiModal("claimModal", false);
 
-        // Backend ใช้ UUID เป็นรหัส claim จึงต้องแสดงค่าที่ตอบกลับแทนการสุ่มรหัสใน frontend
+        // ใช้รหัสคำขอเดียวกันทั้งใบรับเรื่องและหน้าติดตาม
         document.getElementById("successType").textContent =
           `ส่งคำขอรับคืน ${selectedClaimItem} แล้ว`;
         document.getElementById("successInstruction").textContent =
           claim.message;
-        document.getElementById("successCode").textContent = claim.id;
+        document.getElementById("successCode").textContent = claim.claim_code;
         document.getElementById("successCode").hidden = false;
         document.getElementById("successEmail").textContent =
-          `รหัสประกาศ ${claim.found_item_code} · สถานะ ${claim.status}`;
+          `ติดตามด้วย ${claim.claim_code} + ${payload.claimant_email}`;
         document.getElementById("successEmail").hidden = false;
 
-        // ฟอร์มติดตามรวมรับรหัสคำร้องหลัก แต่ยังไม่รับ UUID ของคำขอรับคืน
-        document.getElementById("viewStatusButton").hidden = true;
+        document.getElementById("trackingCode").value = claim.claim_code;
+        document.getElementById("trackingEmail").value = payload.claimant_email;
+        trackingFields.forEach(validateTrackingField);
+        document.getElementById("successRequestDetails").hidden = true;
+        document.getElementById("viewStatusButton").hidden = false;
         document.getElementById("backHomeButton").textContent = "รับทราบ";
         openUiModal("successModal", document.activeElement);
       } catch (error) {

@@ -473,7 +473,7 @@ async def schedule_ownership_pickup(
             body=(f"เรียน {detail['claimant_name']}\n\n"
                   "เจ้าหน้าที่ได้กำหนดนัดหมายรับคืนทรัพย์สินของท่าน โดยมีรายละเอียดดังนี้\n\n"
                   f"ทรัพย์สิน: {detail['item_name']}\n"
-                  f"รหัสอ้างอิง: {detail['item_code']}\n"
+                  f"รหัสคำขอรับคืน: {detail['claim_code']}\n"
                   f"วันที่นัดรับคืน: {local.strftime('%d/%m/%Y')}\n"
                   f"เวลารับคืน: {time_label} น.\n"
                   f"สถานที่รับคืน: {request.pickup_location or detail['custody_location'] or 'ติดต่อห้องธุรการ CSB'}\n"
@@ -483,6 +483,7 @@ async def schedule_ownership_pickup(
                   "โทรศัพท์: 053-943433 หรือ 063-0807969\n"
                   "อีเมล: Compsci@cmu.ac.th\n"
                   "เวลาทำการ: วันจันทร์–ศุกร์ เวลา 08:30–16:30 น. (ยกเว้นวันหยุดนักขัตฤกษ์)"),
+
         )
         detail["email_sent"] = True
     except EmailDeliveryError:
@@ -503,7 +504,7 @@ async def reject_ownership_request_endpoint(
             recipient=claim.claimant_email,
             subject="ผลการตรวจสอบคำขอรับคืนสิ่งของ · อาคาร CSB",
             body=(f"เรียน {claim.claimant_name}\n\n"
-                  f"คำขอรับคืน {detail['item_name']} ({detail['item_code']}) ไม่ผ่านการตรวจสอบ\n"
+                  f"คำขอรับคืน {detail['item_name']} ไม่ผ่านการตรวจสอบ\n"
                   f"เหตุผล: {request.reason}\n\n"
                   "หากต้องการสอบถามเพิ่มเติม กรุณาติดต่อธุรการอาคาร CSB"),
         )

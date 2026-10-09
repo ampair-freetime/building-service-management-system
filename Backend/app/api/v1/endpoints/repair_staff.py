@@ -1,8 +1,9 @@
 """Endpoints สำหรับ Repair Staff."""
 
+from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, Form, File, HTTPException, UploadFile, status
 
 from app.api.dependencies import (
     DbSession,
@@ -33,10 +34,8 @@ from app.services.repair_staff import (
     RepairRequestNotFoundError,
     RepairTaskAlreadyAssignedError,
     RepairTaskNotCompletedError,
-    RepairTaskNotInProgressError,
     accept_repair_task,
     add_repair_completion_note,
-    complete_repair_task,
     get_repair_request_detail,
     get_repair_work_history,
     list_repair_requests,
@@ -53,6 +52,12 @@ from app.services.task_return import (
     return_task_to_pool,
 )
 
+from app.api.v1.forms import parse_guest_image_uploads
+from app.services.task_completion import (
+    complete_task_with_report, completion_report_ids, CompletionNotFoundError,
+    CompletionNotOwnedError, CompletionConflictError,
+)
+
 router = APIRouter()
 
 
@@ -66,6 +71,7 @@ async def read_repair_requests(
 ) -> RepairRequestListResponse:
     requests = await list_repair_requests(session)
 
+    reported_ids = await completion_report_ids(session, [item.id for item in requests])
     return RepairRequestListResponse(
         requests=[
             RepairRequestListItem(
@@ -82,6 +88,7 @@ async def read_repair_requests(
                 ),
                 assigned_staff_id=request.assigned_staff_id,
                 created_at=request.created_at,
+                has_completion_report=request.id in reported_ids,
             )
             for request in requests
         ]
@@ -221,49 +228,6 @@ async def update_task_status(
             detail=str(exc),
         ) from exc
     except InvalidRepairStatusTransitionError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=str(exc),
-        ) from exc
-
-    return RepairTaskResponse(
-        id=task.id,
-        request_code=task.request_code,
-        title=task.title,
-        status=task.status.value,
-        assigned_staff=AssignedTechnicianResponse(
-            id=technician.id,
-            full_name=technician.full_name,
-        ),
-    )
-
-
-@router.patch(
-    "/{request_id}/complete",
-    response_model=RepairTaskResponse,
-)
-async def complete_task(
-    request_id: UUID,
-    session: DbSession,
-    technician: TechnicianStaff,
-) -> RepairTaskResponse:
-    try:
-        task = await complete_repair_task(
-            session,
-            request_id=request_id,
-            staff_id=technician.id,
-        )
-    except RepairRequestNotFoundError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(exc),
-        ) from exc
-    except RepairTaskAlreadyAssignedError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=str(exc),
-        ) from exc
-    except RepairTaskNotInProgressError as exc:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=str(exc),
@@ -452,4 +416,36 @@ async def return_task(
         request_code=task.request_code,
         title=task.title,
         status=task.status.value,
+    )
+
+
+@router.post("/{request_id}/complete", response_model=RepairTaskResponse)
+@router.patch("/{request_id}/complete", response_model=RepairTaskResponse)
+async def complete_task(
+    request_id: UUID,
+    session: DbSession,
+    staff: TechnicianStaff,
+    storage: OptionalObjectStorageClient,
+    note: Annotated[str, Form(min_length=1, max_length=2000)],
+    images: Annotated[list[UploadFile], Depends(parse_guest_image_uploads)],
+):
+    try:
+        task = await complete_task_with_report(
+            session, request_id=request_id, request_type=RequestType.REPAIR,
+            staff_id=staff.id, note=note, uploads=images, storage=storage,
+        )
+    except CompletionNotFoundError as exc:
+        raise HTTPException(404, detail=str(exc)) from exc
+    except CompletionNotOwnedError as exc:
+        raise HTTPException(403, detail=str(exc)) from exc
+    except CompletionConflictError as exc:
+        raise HTTPException(409, detail=str(exc)) from exc
+    except (InvalidImageError, ValueError) as exc:
+        raise HTTPException(422, detail=str(exc)) from exc
+    except StorageOperationError as exc:
+        raise HTTPException(502, detail="ไม่สามารถอัปโหลดรูปภาพได้") from exc
+    return RepairTaskResponse(
+        id=task.id, request_code=task.request_code, title=task.title,
+        status=task.status.value,
+        assigned_staff=AssignedTechnicianResponse(id=staff.id, full_name=staff.full_name),
     )

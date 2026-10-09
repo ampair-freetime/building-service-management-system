@@ -6,9 +6,7 @@
               <h2>ของหาย จุดรับฝาก และคำขอรับคืน</h2>
               <p>ตรวจสอบรายการและบันทึกเหตุผลทุกการตัดสินใจ</p>
             </div>
-            <button class="primary" id="addFoundBtn" type="button">
-              + รับฝากของใหม่
-            </button>
+
           </div>
           <button class="small-btn" id="staffLostRefreshButton" type="button">รีเฟรชประกาศ</button>
           <div class="tabs" id="lostTabs">

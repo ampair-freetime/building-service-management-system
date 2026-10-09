@@ -1,3 +1,17 @@
+<script setup>
+import {onMounted, ref} from "vue";
+import {getFoundItemConfig} from "../../../services/api.js";
+import {listCleaningLocations} from "../../../services/cleaningRequests.js";
+
+const custodyLocation = ref("");
+const locations = ref([]);
+onMounted(async () => {
+  const results = await Promise.allSettled([getFoundItemConfig(), listCleaningLocations()]);
+  if (results[0].status === "fulfilled") custodyLocation.value = results[0].value.custody_location;
+  if (results[1].status === "fulfilled") locations.value = results[1].value;
+});
+</script>
+
 <template>
   <section class="page" id="lost" data-theme="lost">
     <header class="page-header lost-page-header">
@@ -166,6 +180,15 @@
               ></p>
             </div>
             <div class="field">
+              <label for="lostItemLocationId">เลือกสถานที่ในอาคาร (ไม่บังคับ)</label>
+              <select id="lostItemLocationId" name="location_id">
+                <option value="">ไม่ระบุ / สถานที่อื่น</option>
+                <option v-for="location in locations" :key="location.id" :value="location.id">
+                  ชั้น {{ location.floor }} · {{ location.area }}
+                </option>
+              </select>
+            </div>
+            <div class="field">
               <label for="lostItemLocation">สถานที่คาดว่าทำหาย</label
               ><input
                 id="lostItemLocation"
@@ -320,6 +343,15 @@
               ></p>
             </div>
             <div class="field">
+              <label for="publicFoundLocationId">เลือกสถานที่ในอาคาร (ไม่บังคับ)</label>
+              <select id="publicFoundLocationId" name="location_id">
+                <option value="">ไม่ระบุ / สถานที่อื่น</option>
+                <option v-for="location in locations" :key="location.id" :value="location.id">
+                  ชั้น {{ location.floor }} · {{ location.area }}
+                </option>
+              </select>
+            </div>
+            <div class="field">
               <label for="publicFoundLocation">สถานที่พบ</label
               ><input
                 id="publicFoundLocation"
@@ -337,24 +369,7 @@
                 aria-live="polite"
               ></p>
             </div>
-            <div class="field">
-              <label for="publicFoundCustody">นำของไปฝากไว้ที่ใด</label
-              ><input
-                id="publicFoundCustody"
-                name="custody_location"
-                type="text"
-                required
-                minlength="2"
-                maxlength="160"
-                aria-describedby="publicFoundCustodyError"
-                placeholder="เช่น ห้องประชาสัมพันธ์ชั้น 1"
-              />
-              <p
-                id="publicFoundCustodyError"
-                class="field-error"
-                aria-live="polite"
-              ></p>
-            </div>
+            <p class="form-intro">กรุณานำของไปฝากที่ {{ custodyLocation || 'ห้องธุรการ (ติดต่อเจ้าหน้าที่เพื่อยืนยันจุดรับฝาก)' }}</p>
             <div class="field">
               <label for="publicFoundDescription">รายละเอียดทั่วไป</label
               ><textarea
@@ -422,12 +437,7 @@
                 aria-live="polite"
               ></p>
             </div>
-            <!-- <div class="field">
-              <label for="publicFinderName"
-                >ชื่อผู้พบหรือผู้ส่งมอบ
-                <span class="optional-label">(ไม่บังคับ)</span></label
-              ><input id="publicFinderName" type="text" maxlength="120" />
-            </div> -->
+
             <div class="field">
               <label for="publicFoundEmail">อีเมลสำหรับติดตามสถานะ</label
               ><input
