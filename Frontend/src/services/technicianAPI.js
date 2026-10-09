@@ -98,14 +98,6 @@ export async function updateRepairRequestStatus(requestId, status) {
 }
 
 /** งานซ่อมต้องปิดผ่าน endpoint แยกหลังเข้าสู่ in_progress */
-export async function completeRepairRequest(requestId) {
-  const response = await fetch(
-    `${API_BASE_URL}/repair-requests/${encodeURIComponent(requestId)}/complete`,
-    { method: "PATCH", headers: authHeaders() },
-  );
-  return parseResponse(response, "ไม่สามารถปิดงานซ่อมได้");
-}
-
 /** บันทึกหมายเหตุสรุปหลังงานเสร็จ */
 export async function addRepairCompletionNote(requestId, note) {
   const response = await fetch(
@@ -141,4 +133,15 @@ export async function getRepairRequestHistory(requestId) {
     { method: "GET", headers: authHeaders() },
   );
   return parseResponse(response, "ไม่สามารถโหลดประวัติงานได้");
+}
+
+export async function completeRepairRequest(requestId, note, files = []) {
+  const body = new FormData();
+  body.append("note", note);
+  files.forEach(file => body.append("image", file));
+  const response = await fetch(
+    `${API_BASE_URL}/repair-requests/${encodeURIComponent(requestId)}/complete`,
+    { method: "POST", headers: authHeaders(), body },
+  );
+  return parseResponse(response, "ไม่สามารถปิดงานพร้อมรายงานได้");
 }

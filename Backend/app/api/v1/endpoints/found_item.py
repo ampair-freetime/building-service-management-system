@@ -38,7 +38,15 @@ from app.services.lost_found_claim import (
 )
 from app.services.object_storage import StorageOperationError
 
+from app.core.config import settings
+
 router = APIRouter()
+
+
+@router.get("/config")
+async def found_item_config():
+    return {"custody_location": settings.default_custody_location}
+
 
 
 @router.post(

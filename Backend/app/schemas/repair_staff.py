@@ -25,6 +25,8 @@ class RepairRequestListItem(BaseModel):
     assigned_staff_id: UUID | None
     created_at: datetime
 
+    has_completion_report: bool = False
+
 
 class RepairRequestListResponse(BaseModel):
     requests: list[RepairRequestListItem]

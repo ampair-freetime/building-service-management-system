@@ -1,6 +1,7 @@
 """Models สำหรับของหาย ของที่พบ ประวัติ และคำขอรับคืน."""
 
 from datetime import datetime
+from zoneinfo import ZoneInfo
 from typing import TYPE_CHECKING
 from uuid import UUID, uuid4
 
@@ -121,6 +122,12 @@ class LostItemHistory(Base):
     )
 
 
+def make_claim_code(context):
+    claim_id = context.get_current_parameters().get("id") or uuid4()
+    day = datetime.now(ZoneInfo("Asia/Bangkok")).strftime("%Y%m%d")
+    return f"CLM-{day}-{claim_id.hex[:8].upper()}"
+
+
 class LostClaim(Base):
     __tablename__ = "lost_claims"
     __table_args__ = (
@@ -139,6 +146,8 @@ class LostClaim(Base):
     )
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    claim_code: Mapped[str] = mapped_column(String(30), unique=True, default=make_claim_code)
+    staff_message: Mapped[str | None] = mapped_column(Text, nullable=True)
     found_item_id: Mapped[UUID] = mapped_column(ForeignKey("lost_items.id"), index=True)
     claimant_name: Mapped[str] = mapped_column(String(150))
     claimant_email: Mapped[str] = mapped_column(String(255), index=True)

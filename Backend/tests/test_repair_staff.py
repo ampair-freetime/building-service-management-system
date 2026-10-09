@@ -73,7 +73,7 @@ def complete_repair_task(
             == 200
         )
     assert (
-        client.patch(f"/api/v1/repair-requests/{request_id}/complete", headers=headers).status_code
+        client.patch(f"/api/v1/repair-requests/{request_id}/complete", headers=headers, data={"note": "Initial completion report"}).status_code
         == 200
     )
 
@@ -1012,7 +1012,7 @@ def test_technician_can_complete_repair_task(
     # IN_PROGRESS → COMPLETED
     response = client.patch(
         f"/api/v1/repair-requests/{request_id}/complete",
-        headers=headers,
+        headers=headers, data={"note": "Initial completion report"},
     )
 
     assert response.status_code == 200
@@ -1088,11 +1088,11 @@ def test_technician_cannot_complete_repair_before_in_progress(
     # พยายาม Complete ทั้งที่ยัง ASSIGNED
     response = client.patch(
         f"/api/v1/repair-requests/{request_id}/complete",
-        headers=headers,
+        headers=headers, data={"note": "Initial completion report"},
     )
 
     assert response.status_code == 409
-    assert response.json()["detail"] == ("Repair task must be in progress before completion")
+    assert response.json()["detail"] == ("ต้องเริ่มดำเนินการก่อนปิดงาน")
 
     async def verify_database() -> None:
         async with session_factory() as session:
@@ -1181,11 +1181,11 @@ def test_other_technician_cannot_complete_repair_task(
     # TECH002 พยายาม Complete งานของ TECH001
     response = client.patch(
         f"/api/v1/repair-requests/{request_id}/complete",
-        headers=tech2_headers,
+        headers=tech2_headers, data={"note": "Initial completion report"},
     )
 
     assert response.status_code == 403
-    assert response.json()["detail"] == ("Repair task is assigned to another technician")
+    assert response.json()["detail"] == ("เฉพาะผู้รับผิดชอบงานเท่านั้นที่ปิดงานได้")
 
     async def verify_database() -> None:
         async with session_factory() as session:
@@ -1266,7 +1266,7 @@ def test_technician_can_add_repair_completion_note(
     assert (
         client.patch(
             f"/api/v1/repair-requests/{request_id}/complete",
-            headers=headers,
+            headers=headers, data={"note": "Initial completion report"},
         ).status_code
         == 200
     )
@@ -1288,6 +1288,7 @@ def test_technician_can_add_repair_completion_note(
                 select(RequestHistory).where(
                     RequestHistory.request_id == request_id,
                     RequestHistory.action == RequestAction.COMPLETION_NOTE_ADDED,
+                    RequestHistory.note != "Initial completion report",
                 )
             )
 
@@ -1362,6 +1363,7 @@ def test_technician_cannot_add_repair_note_before_completed(
                 select(RequestHistory).where(
                     RequestHistory.request_id == request_id,
                     RequestHistory.action == RequestAction.COMPLETION_NOTE_ADDED,
+                    RequestHistory.note != "Initial completion report",
                 )
             )
 
@@ -1438,7 +1440,7 @@ def test_repair_completion_note_appears_in_work_history(
     assert (
         client.patch(
             f"/api/v1/repair-requests/{request_id}/complete",
-            headers=headers,
+            headers=headers, data={"note": "Initial completion report"},
         ).status_code
         == 200
     )
@@ -1469,7 +1471,8 @@ def test_repair_completion_note_appears_in_work_history(
         item for item in data["history"] if item["action"] == "completion_note_added"
     ]
 
-    assert len(completion_notes) == 1
+    assert len(completion_notes) == 2
+    completion_notes = [entry for entry in completion_notes if entry["note"] != "Initial completion report"]
     assert completion_notes[0]["note"] == "Replaced damaged component"
     assert completion_notes[0]["old_status"] == "completed"
     assert completion_notes[0]["new_status"] == "completed"

@@ -471,7 +471,8 @@ async def schedule_ownership_pickup(
             recipient=detail["claimant_email"],
             subject="นัดหมายรับคืนสิ่งของ · CS Building Care",
             body=(f"เรียน {detail['claimant_name']}\n\n"
-                  f"นัดรับคืน: {detail['item_name']} ({detail['item_code']})\n"
+                  f"นัดรับคืน: {detail['item_name']}\n"
+                  f"รหัสคำขอรับคืน: {detail['claim_code']}\n"
                   f"วันที่ {local.strftime('%d/%m/%Y')} เวลา {time_label} น. (เวลาไทย)\n"
                   f"จุดรับของ: {request.pickup_location or detail['custody_location'] or 'ติดต่อห้องธุรการ CSB'}\n"
                   f"สิ่งที่ต้องนำมาเพื่อยืนยันการรับคืน: {request.note or 'ไม่ได้ระบุ กรุณาติดต่อธุรการก่อนเข้ารับของ'}\n\n"
@@ -496,7 +497,7 @@ async def reject_ownership_request_endpoint(
             recipient=claim.claimant_email,
             subject="ผลการตรวจสอบคำขอรับคืนสิ่งของ · อาคาร CSB",
             body=(f"เรียน {claim.claimant_name}\n\n"
-                  f"คำขอรับคืน {detail['item_name']} ({detail['item_code']}) ไม่ผ่านการตรวจสอบ\n"
+                  f"คำขอรับคืน {detail['item_name']} ไม่ผ่านการตรวจสอบ\n"
                   f"เหตุผล: {request.reason}\n\n"
                   "หากต้องการสอบถามเพิ่มเติม กรุณาติดต่อธุรการอาคาร CSB"),
         )

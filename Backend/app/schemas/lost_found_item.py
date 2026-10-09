@@ -158,6 +158,7 @@ class GuestClaimCreatedResponse(BaseModel):
     ไม่มี custody_location / private_verification_detail / reporter_email เพราะ endpoint นี้เปิด public
     """
 
+    claim_code: str
     id: UUID
     found_item_code: str
     status: ClaimStatus
@@ -168,6 +169,7 @@ class GuestClaimCreatedResponse(BaseModel):
 class GuestClaimStatusResponse(BaseModel):
     """สถานะ claim ที่เจ้าของเรื่องติดตามได้ โดยไม่เผย review_note ซึ่งเป็นโน้ตภายใน."""
 
+    claim_code: str
     id: UUID
     found_item_code: str
     item_name: str
@@ -177,3 +179,15 @@ class GuestClaimStatusResponse(BaseModel):
     updated_at: datetime
     # บอกที่รับของเฉพาะคนที่ผ่านการตรวจหลักฐานแล้วเท่านั้น สถานะอื่นเป็น None เสมอ
     custody_location: str | None = None
+
+    staff_message: str | None = None
+    pickup_datetime: datetime | None = None
+    pickup_end_datetime: datetime | None = None
+    pickup_location: str | None = None
+    pickup_note: str | None = None
+
+
+class GuestClaimAdditionalInfo(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+    claimant_email: EmailStr
+    proof_detail: str = Field(min_length=1, max_length=2000)

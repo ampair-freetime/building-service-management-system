@@ -20,6 +20,10 @@ class PendingFoundItemResponse(BaseModel):
     id: UUID
     item_code: str
     report_type: LostType
+    item_category: str
+    event_datetime: datetime
+    reporter_email: str
+    custody_location: str | None = None
     item_name: str
     description: str | None
     location_detail: str | None
@@ -35,6 +39,10 @@ class PendingLostItemResponse(BaseModel):
     id: UUID
     item_code: str
     report_type: LostType
+    item_category: str
+    event_datetime: datetime
+    reporter_email: str
+    custody_location: str | None = None
     item_name: str
     description: str | None
     location_detail: str | None
@@ -81,7 +89,7 @@ class LostItemDetailResponse(BaseModel):
 
 
 class RejectFoundItemRequest(BaseModel):
-    reason: str
+    reason: str = Field(min_length=1, max_length=2000)
 
     @field_validator("reason")
     @classmethod
@@ -99,6 +107,7 @@ class OwnershipRequestListResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
+    claim_code: str
     found_item_id: UUID
     claimant_name: str
     claimant_email: str
@@ -111,6 +120,7 @@ class OwnershipRequestDetailResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
+    claim_code: str
     found_item_id: UUID
 
     # Claimant information
@@ -143,7 +153,7 @@ class OwnershipRequestDetailResponse(BaseModel):
     
 
 class RequestAdditionalInfoRequest(BaseModel):
-    message: str
+    message: str = Field(min_length=1, max_length=2000)
 
     @field_validator("message")
     @classmethod
