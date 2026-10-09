@@ -2375,7 +2375,11 @@ def test_approving_ownership_hides_found_item_from_guest_list(test_context, publ
     assert all(item["id"] != str(item_id) for item in public_items)
 
 
-def test_approving_ownership_rejects_other_open_claims(test_context):
+def test_approving_ownership_rejects_other_open_claims(test_context, monkeypatch):
+    emails = []
+    async def fake_email(**kwargs):
+        emails.append(kwargs)
+    monkeypatch.setattr("app.services.lost_found_clerk.send_email", fake_email)
     client, session_factory = test_context
     headers = _clerk_headers(client, session_factory)
     item_id = _seed_item(session_factory, report_type=LostType.FOUND, status=LostStatus.APPROVED)
@@ -2400,6 +2404,10 @@ def test_approving_ownership_rejects_other_open_claims(test_context):
         assert claim.status == ClaimStatus.REJECTED
         assert claim.review_note == "รายการนี้ยืนยันเจ้าของแล้ว"
     assert _claim(session_factory, unrelated_id).status == ClaimStatus.PENDING
+    assert {email["recipient"] for email in emails} == {"other@example.com", "info@example.com"}
+    assert len(emails) == 2
+    assert all("รายการนี้ยืนยันเจ้าของแล้ว" in email["body"] for email in emails)
+    assert all("รหัสคำขอรับคืน:" in email["body"] for email in emails)
 
 
 def test_second_ownership_approval_for_same_item_returns_409(test_context):

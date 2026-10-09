@@ -92,6 +92,7 @@ export function useStaffDashboard() {
   const allowedRoles = ["housekeeper", "technician", "clerk", "admin"];
   const savedRole = localStorage.getItem("buildingCareRole");
   const dashboardLoading = ref(true);
+  const emailSending = ref(false);
   const activeRole = ref(
     allowedRoles.includes(savedRole) ? savedRole : "clerk",
   );
@@ -1487,8 +1488,9 @@ export function useStaffDashboard() {
       );
     }
     function claimNeedsClerkReview(item) {
-      return ["pending", "additional_info_required"].includes(item.backendStatus) ||
-        ["รอตรวจสอบ", "ขอข้อมูลเพิ่มเติม"].includes(item.status);
+      if (item.returnStatusCode === "returned" || ["completed", "rejected"].includes(item.backendStatus)) return false;
+      return ["pending", "additional_info_required", "approved", "scheduled"].includes(item.backendStatus) ||
+        ["รอตรวจสอบ", "ขอข้อมูลเพิ่มเติม", "นัดหมายแล้ว", "ผ่านการตรวจสอบ"].includes(item.status);
     }
     function activeClaimNotifications() {
       return lostSets.claims
@@ -1654,7 +1656,8 @@ export function useStaffDashboard() {
     function renderLost() {
       if (!$("#lostGrid")) return;
       const entriesForView = (view) => {
-        if (view === "all") return ["inventory", "lostposts", "claims"].flatMap(entriesForView);
+        if (view === "claims" && currentRole === "clerk") return [];
+        if (view === "all") return (currentRole === "clerk" ? ["inventory", "lostposts"] : ["inventory", "lostposts", "claims"]).flatMap(entriesForView);
         if (["approved", "rejected"].includes(view)) {
           return ["inventory", "lostposts", "claims"].flatMap((tab) =>
             lostSets[tab]
@@ -1707,13 +1710,16 @@ export function useStaffDashboard() {
                       : "บันทึกการอนุมัติ"
                   }:</strong> ${i.decisionReason}</div>`
                 : "";
-              const inlineClose = tab === "lostposts" && approvalGroup(i.status) === "approved";
+              const inlineClose = ["lostposts", "inventory"].includes(tab) && approvalGroup(i.status) === "approved";
+              const inventoryMeta = tab === "inventory"
+                ? `<div class="lost-foot"><span class="custody">${escapeHtml(i.custodyLocation || i.activityLabel || "")}</span><span class="badge progress">สถานะการคืน: ${escapeHtml(returnStatusForFoundItem(i))}</span></div>`
+                : "";
               const detailsButton = `<button class="small-btn" type="button" data-lost-action="detail" data-tab="${tab}" data-item-id="${i.id}">ดูรายละเอียด</button>`;
               const controls =
                 tab === "claims"
                   ? `<div class="claim-controls"><button type="button" class="primary" data-lost-action="claim-detail" data-tab="claims" data-item-id="${i.id}">ดูรายละเอียดคำขอ</button></div>`
                   : inlineClose
-                    ? `${note}<div class="lost-card-actions">${detailsButton}${decisionButtons(tab, i)}</div>`
+                    ? `${note}${inventoryMeta}<div class="lost-card-actions">${detailsButton}${decisionButtons(tab, i)}</div>`
                     : `${note}<div class="lost-foot">${tab === "inventory" ? `<span class="custody">${escapeHtml(i.custodyLocation || i.activityLabel || "")}</span><span class="badge progress">สถานะการคืน: ${escapeHtml(returnStatusForFoundItem(i))}</span>` : ""}${detailsButton}</div>`;
               const claimHint =
                 tab === "claims"
@@ -2672,6 +2678,8 @@ export function useStaffDashboard() {
     function openEditStaff(index, trigger = document.activeElement) {
       const staff = staffData[index];
       if (!staff || currentRole !== "admin") return;
+      if (emailSending.value) return;
+      emailSending.value = true;
       $("#editStaffIndex").value = staff.id;
       $("#editStaffName").value = staff.name;
       $("#editStaffEmail").value = staff.email;
@@ -2803,6 +2811,8 @@ export function useStaffDashboard() {
           button.disabled = false;
           button.textContent = "ส่งคำเชิญซ้ำ";
         }
+      } finally {
+        emailSending.value = false;
       }
     }
     function resendInvitation(index, button) {
@@ -4043,10 +4053,10 @@ export function useStaffDashboard() {
       const verified = ["approved", "scheduled"].includes(item.backendStatus);
       const returned = item.returnStatusCode === "returned";
       const appointmentGroup = $("#claimAppointmentGroup");
-      if (appointmentGroup) appointmentGroup.hidden = detailContext !== "lost" || !item.pickupDate;
+      if (appointmentGroup) appointmentGroup.hidden = !item.pickupDate;
       const nextStep = $("#claimNextStep");
       if (nextStep) nextStep.textContent = returned ? "ส่งคืนเจ้าของแล้ว" : verified
-        ? "ยืนยันเจ้าของแล้ว นัดวัน เวลา และจุดรับของกับผู้ขอ ก่อนบันทึกนัดหมาย"
+        ? item.pickupDate ? "นัดรับของแล้ว เมื่อส่งมอบของให้ผู้ขอให้กด ยืนยันส่งคืนแล้ว" : "ยืนยันเจ้าของแล้ว กรุณาบันทึกนัดหมายรับของ"
         : "เทียบหลักฐานที่ผู้ขอระบุกับข้อมูลลับของสิ่งของ แล้วจึงยืนยันความเป็นเจ้าของ";
       const claimActions =
         detailContext === "center" && !verified && !returned && item.backendStatus !== "rejected"
@@ -4057,7 +4067,6 @@ export function useStaffDashboard() {
             ]
           : [];
       if (
-        detailContext === "lost" &&
         verified && !returned
       ) {
         claimActions.push([
@@ -4460,9 +4469,15 @@ export function useStaffDashboard() {
         currentLostTab = "inventory";
         renderLost();
       } else if (action === "claims" || action === "appointments") {
-        navigate(currentRole === "admin" ? "history" : "lost");
-        currentLostTab = "claims";
-        renderLost();
+        if (currentRole === "clerk") {
+          navigate("clerk-center");
+          setClerkCenterView("claims");
+          renderClerkCenter();
+        } else {
+          navigate(currentRole === "admin" ? "history" : "lost");
+          currentLostTab = "claims";
+          renderLost();
+        }
         if (action === "appointments" && lostSets.claims[0])
           openAppointment(lostSets.claims[0].id, button);
       } else if (action === "add-staff") openModal("staffModal", button);
@@ -4569,9 +4584,15 @@ export function useStaffDashboard() {
           lostAction.dataset.itemId,
         );
       else {
-        currentLostTab = "claims";
-        renderLost();
-        navigate(currentRole === "admin" ? "history" : "lost");
+        if (currentRole === "clerk") {
+          navigate("clerk-center");
+          setClerkCenterView("claims");
+          renderClerkCenter();
+        } else {
+          currentLostTab = "claims";
+          renderLost();
+          navigate(currentRole === "admin" ? "history" : "lost");
+        }
       }
     });
     $("#assignForm")?.addEventListener("submit", (event) => {
@@ -5355,6 +5376,7 @@ export function useStaffDashboard() {
       const fullName = `${firstName} ${lastName}`.trim();
 
       if (!validateStaffForm(form)) return;
+      if (emailSending.value) return;
       const submitButton = $("#createStaffButton");
       submitButton.disabled = true;
       const payload = {
@@ -5363,6 +5385,7 @@ export function useStaffDashboard() {
         role: $("#newRole").value,
       };
       let account;
+      emailSending.value = true;
       try {
         account = await createStaffAccount(payload);
       } catch (error) {
@@ -5377,6 +5400,8 @@ export function useStaffDashboard() {
         }
         submitButton.disabled = false;
         return;
+      } finally {
+        emailSending.value = false;
       }
       const record = toDashboardStaff(account);
       rememberInvitationDelivery(record, record.invitationDeliveryStatus);
@@ -5857,5 +5882,5 @@ export function useStaffDashboard() {
     cleanupDashboardEvents();
   });
 
-  return { activeRole, dashboardLoading };
+  return { activeRole, dashboardLoading, emailSending };
 }

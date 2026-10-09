@@ -7061,3 +7061,40 @@ body:has(.staff-dashboard-page) {
 .appointment-spinner { width: 20px; height: 20px; flex-shrink: 0; border: 3px solid #eadfbd; border-top-color: var(--role); border-radius: 50%; animation: appointment-spin 0.8s linear infinite; }
 @keyframes appointment-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .appointment-spinner { animation: none; } }
+
+.staff-dashboard-page .loading-mask.email-sending-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+}
+
+/* Technician details: bounded photo and clearly separated information. */
+.staff-dashboard-page.is-technician #jobDetailModal .modal-card {
+  width: min(1000px, calc(100vw - 32px));
+  max-height: calc(100dvh - 48px);
+  overflow-y: auto;
+}
+.staff-dashboard-page.is-technician #jobDetailModal .modal-head > div { display: grid; gap: 8px; min-width: 0; }
+.staff-dashboard-page.is-technician #jobDetailModal .modal-head h3 { margin: 0; line-height: 1.5; }
+.staff-dashboard-page.is-technician #jobDetailModal .modal-head .eyebrow { margin: 0; font-size: 12px; overflow-wrap: anywhere; }
+.staff-dashboard-page.is-technician #jobDetailModal .detail-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: start;
+  gap: 24px;
+  padding: 24px;
+}
+.staff-dashboard-page.is-technician #jobDetailModal .detail-layout > div { min-width: 0; }
+.staff-dashboard-page.is-technician #jobDetailModal .detail-photo { height: 340px; min-height: 0; background: #f8f7fb; border-radius: 16px; overflow: hidden; }
+.staff-dashboard-page.is-technician #jobDetailModal .detail-photo img { width: 100%; height: 100%; object-fit: contain; }
+.staff-dashboard-page.is-technician #jobDetailModal .job-meta { margin: 0 0 20px; display: flex; flex-wrap: wrap; gap: 8px; }
+.staff-dashboard-page.is-technician #jobDetailModal .detail-meta { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0; margin: 20px 0; }
+.staff-dashboard-page.is-technician #jobDetailModal .detail-meta > div { background: transparent; padding: 12px 0; border-radius: 0; border-bottom: 1px solid var(--line); }
+.staff-dashboard-page.is-technician #jobDetailModal .detail-meta strong { display: block; margin-top: 6px; overflow-wrap: anywhere; line-height: 1.6; }
+.staff-dashboard-page.is-technician #jobDetailModal .detail-notes { padding: 16px; margin: 16px 0; line-height: 1.7; }
+.staff-dashboard-page.is-technician #jobDetailModal .detail-notes small { display: block; margin-top: 8px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.staff-dashboard-page.is-technician #jobDetailModal .timeline { margin-top: 24px; }
+@media (max-width: 720px) {
+  .staff-dashboard-page.is-technician #jobDetailModal .detail-layout { grid-template-columns: 1fr; padding: 18px; gap: 20px; }
+  .staff-dashboard-page.is-technician #jobDetailModal .detail-photo { height: 260px; }
+}

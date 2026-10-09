@@ -2715,7 +2715,7 @@ textarea:focus-visible {
 }
 .tracking-progress-steps {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(var(--tracking-step-count, 3), minmax(0, 1fr));
   margin: 0;
   padding: 0;
   list-style: none;

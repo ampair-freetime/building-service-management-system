@@ -504,9 +504,13 @@ async def reject_ownership_request_endpoint(
             recipient=claim.claimant_email,
             subject="ผลการตรวจสอบคำขอรับคืนสิ่งของ · อาคาร CSB",
             body=(f"เรียน {claim.claimant_name}\n\n"
-                  f"คำขอรับคืน {detail['item_name']} ไม่ผ่านการตรวจสอบ\n"
+                  f"คำขอรับคืน: {detail['item_name']}\n"
+                  f"รหัสคำขอรับคืน: {detail['claim_code']}\n"
+                  "ผลการตรวจสอบ: ไม่อนุมัติคำขอ\n"
                   f"เหตุผล: {request.reason}\n\n"
-                  "หากต้องการสอบถามเพิ่มเติม กรุณาติดต่อธุรการอาคาร CSB"),
+                  "หากมีข้อสงสัยหรือต้องการสอบถามเพิ่มเติม กรุณาติดต่อเจ้าหน้าที่ที่ห้องธุรการหรือห้องประชาสัมพันธ์ ชั้น 1 อาคาร CSB\n"
+                  "โทรศัพท์: 053-943433 หรือ 063-0807969\n"
+                  "อีเมล: Compsci@cmu.ac.th"),
         )
         email_sent = True
     except EmailDeliveryError:
