@@ -77,19 +77,28 @@ async def _prepare_limited_image(upload: UploadFile) -> ProcessedImage:
                 return await anyio.to_thread.run_sync(
                     _normalize_to_webp,
                     data,
-                    settings.max_image_upload_bytes,
+                    settings.max_image_output_bytes,
                     settings.max_image_pixels,
+                    settings.image_max_dimension,
+                    settings.image_webp_quality,
                 )
     finally:
         await upload.close()
+
+
+def _quality_ladder(quality: int) -> list[int]:
+    """quality ที่ตั้งไว้ก่อน แล้วค่อยลดลง โดยไม่ต่ำกว่า 50 เพื่อให้ยังอ่านรายละเอียดได้."""
+    return [quality, *(step for step in (70, 60, 50) if step < quality)]
 
 
 def _normalize_to_webp(
     data: bytes,
     max_output_bytes: int,
     max_pixels: int,
+    max_dimension: int = 2048,
+    quality: int = 78,
 ) -> ProcessedImage:
-    """ตรวจเนื้อหาไฟล์จริง หมุนตาม EXIF แล้ว encode ใหม่เพื่อตัด metadata."""
+    """ตรวจเนื้อหาไฟล์จริง หมุนตาม EXIF ย่อด้านยาว แล้ว encode ใหม่เพื่อตัด metadata."""
     try:
         with warnings.catch_warnings():
             warnings.simplefilter("error", PillowImage.DecompressionBombWarning)
@@ -102,25 +111,39 @@ def _normalize_to_webp(
                 width, height = source.size
                 if width <= 0 or height <= 0 or width * height > max_pixels:
                     raise InvalidImageError("รูปภาพมีความละเอียดสูงเกินกำหนด")
-                if width > MAX_WEBP_DIMENSION or height > MAX_WEBP_DIMENSION:
-                    raise InvalidImageError(f"รูปภาพแต่ละด้านต้องไม่เกิน {MAX_WEBP_DIMENSION:,} พิกเซล")
-
+                # JPEG ให้ libjpeg decode แบบย่อ 1/2–1/8 ตั้งแต่ตอนแตกไฟล์ (ต้องเรียกก่อน load)
+                # รูป 50MP จะใช้ RAM ไม่กี่ MB แทนที่จะเป็น ~150MB เมื่อ decode เต็มขนาด
+                # ขนาดที่ได้จะไม่เล็กกว่า max_dimension จึงยังย่อละเอียดต่อด้วย thumbnail ได้
+                if source.format == "JPEG":
+                    source.draft("RGB", (max_dimension, max_dimension))
                 source.load()
                 normalized = ImageOps.exif_transpose(source)
                 target_mode = "RGBA" if "A" in normalized.getbands() else "RGB"
                 normalized = normalized.convert(target_mode)
-                # ต้องอ่านขนาดใหม่หลัง exif_transpose เพราะภาพที่ถูกหมุน 90/270 องศา
-                # จะสลับด้านกว้าง-สูง ถ้าใช้ width/height จาก source เดิม ค่าที่บันทึกลง DB
-                # จะไม่ตรงกับไฟล์ WebP จริงที่ถูกเก็บใน R2
-                width, height = normalized.size
-
-                output = BytesIO()
-                normalized.save(
-                    output,
-                    format="WEBP",
-                    quality=82,
-                    method=4,
+                # thumbnail คงสัดส่วนและไม่ขยายรูปที่เล็กกว่าอยู่แล้ว (แก้ภาพในที่ ไม่คืนค่า)
+                normalized.thumbnail(
+                    (max_dimension, max_dimension),
+                    PillowImage.Resampling.LANCZOS,
+                    reducing_gap=3.0,
                 )
+                # ต้องอ่านขนาดใหม่หลัง exif_transpose และ thumbnail เพราะภาพที่ถูกหมุน
+                # 90/270 องศาจะสลับด้านกว้าง-สูง ถ้าใช้ width/height จาก source เดิม
+                # ค่าที่บันทึกลง DB จะไม่ตรงกับไฟล์ WebP จริงที่ถูกเก็บใน R2
+                width, height = normalized.size
+                if width > MAX_WEBP_DIMENSION or height > MAX_WEBP_DIMENSION:
+                    raise InvalidImageError(f"รูปภาพแต่ละด้านต้องไม่เกิน {MAX_WEBP_DIMENSION:,} พิกเซล")
+
+                # รูปที่บีบอัดยาก (เช่น noise เยอะ) ลด quality ทีละขั้นจนกว่าจะไม่เกินขนาดที่กำหนด
+                for attempt_quality in _quality_ladder(quality):
+                    output = BytesIO()
+                    normalized.save(
+                        output,
+                        format="WEBP",
+                        quality=attempt_quality,
+                        method=6,
+                    )
+                    if output.tell() <= max_output_bytes:
+                        break
     except InvalidImageError:
         raise
     except (
