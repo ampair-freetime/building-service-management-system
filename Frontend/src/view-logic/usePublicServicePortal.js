@@ -715,6 +715,7 @@ export function usePublicServicePortal() {
     ) {
       showConfirmationDetails(details);
       const trackingCode = requestId;
+      rememberTracking(trackingCode, recipientEmail);
       const serviceType = serviceTypeForRequest(
         { requestType: type },
         trackingCode,
@@ -1331,6 +1332,48 @@ export function usePublicServicePortal() {
       progressSteps: "trackingProgressSteps",
     };
     let isTrackingRequestPending = false;
+    const savedTrackingKey = "building-care-tracking-v1";
+    let savedTracking = [];
+    try {
+      const stored = JSON.parse(localStorage.getItem(savedTrackingKey) || "[]");
+      if (Array.isArray(stored)) savedTracking = stored.filter((entry) =>
+        entry && typeof entry.code === "string" && typeof entry.email === "string"
+      ).slice(0, 20);
+    } catch { /* Storage may be unavailable; tracking still works. */ }
+    const savedTrackingSelect = document.getElementById("savedTrackingRequests");
+    function renderSavedTracking() {
+      savedTrackingSelect.replaceChildren();
+      savedTracking.forEach((entry, index) => {
+        const option = document.createElement("option");
+        option.value = String(index);
+        option.textContent = `${entry.code} · ${entry.email}`;
+        savedTrackingSelect.append(option);
+      });
+      document.getElementById("savedTrackingGroup").hidden = !savedTracking.length;
+    }
+    function rememberTracking(code, email) {
+      code = code.trim().toUpperCase();
+      email = email.trim().toLowerCase();
+      if (!code || !email) return;
+      savedTracking = [{ code, email }, ...savedTracking.filter((entry) =>
+        entry.code !== code || entry.email !== email
+      )].slice(0, 20);
+      try { localStorage.setItem(savedTrackingKey, JSON.stringify(savedTracking)); } catch { }
+      renderSavedTracking();
+    }
+    function restoreTracking(entry) {
+      if (!entry) return;
+      document.getElementById("trackingCode").value = entry.code;
+      document.getElementById("trackingEmail").value = entry.email;
+      void loadTrackingStatus();
+    }
+    renderSavedTracking();
+    savedTrackingSelect.addEventListener("change", () => restoreTracking(savedTracking[Number(savedTrackingSelect.value)]));
+    document.getElementById("clearSavedTracking").addEventListener("click", () => {
+      savedTracking = [];
+      try { localStorage.removeItem(savedTrackingKey); } catch { }
+      renderSavedTracking();
+    });
 
     async function loadTrackingStatus({ refreshed = false } = {}) {
       if (isTrackingRequestPending) return;
@@ -1394,6 +1437,7 @@ export function usePublicServicePortal() {
               : null;
         }
         renderTrackingResult(item, code, trackingIds, { refreshed });
+        if (item) rememberTracking(code, email);
         document.getElementById("trackingRefreshTime").textContent =
           `ตรวจสอบล่าสุด ${new Intl.DateTimeFormat("th-TH", {
             hour: "2-digit",
@@ -1432,6 +1476,7 @@ export function usePublicServicePortal() {
     refreshTrackingButton.addEventListener("click", () => {
       void loadTrackingStatus({ refreshed: true });
     });
+    restoreTracking(savedTracking[0]);
     document.querySelectorAll("[data-scroll-track]").forEach((button) =>
       button.addEventListener("click", () => {
         navigate("dashboard");

@@ -225,6 +225,10 @@
               placeholder="เช่น รูปถ่ายสิ่งของหรือหลักฐานการเป็นเจ้าของ"
             ></textarea>
           </div>
+          <p id="appointmentSendingStatus" class="appointment-sending-status" role="status" aria-live="polite" hidden>
+            <span class="appointment-spinner" aria-hidden="true"></span>
+            กำลังบันทึกนัดหมายและส่งอีเมล… กรุณารอสักครู่
+          </p>
           <button type="submit" class="primary" style="width: 100%">
             ยืนยันนัดหมาย
           </button>

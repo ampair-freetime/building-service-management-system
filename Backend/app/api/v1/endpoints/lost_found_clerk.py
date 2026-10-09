@@ -469,13 +469,20 @@ async def schedule_ownership_pickup(
     try:
         await send_email(
             recipient=detail["claimant_email"],
-            subject="นัดหมายรับคืนสิ่งของ · CS Building Care",
+            subject=f"นัดรับคืน {detail['item_name']} · {local.strftime('%d/%m/%Y')}",
             body=(f"เรียน {detail['claimant_name']}\n\n"
-                  f"นัดรับคืน: {detail['item_name']} ({detail['item_code']})\n"
-                  f"วันที่ {local.strftime('%d/%m/%Y')} เวลา {time_label} น. (เวลาไทย)\n"
-                  f"จุดรับของ: {request.pickup_location or detail['custody_location'] or 'ติดต่อห้องธุรการ CSB'}\n"
-                  f"สิ่งที่ต้องนำมาเพื่อยืนยันการรับคืน: {request.note or 'ไม่ได้ระบุ กรุณาติดต่อธุรการก่อนเข้ารับของ'}\n\n"
-                  "หากไม่สะดวกตามนัด กรุณาติดต่อธุรการอาคาร CSB"),
+                  "เจ้าหน้าที่ได้กำหนดนัดหมายรับคืนทรัพย์สินของท่าน โดยมีรายละเอียดดังนี้\n\n"
+                  f"ทรัพย์สิน: {detail['item_name']}\n"
+                  f"รหัสอ้างอิง: {detail['item_code']}\n"
+                  f"วันที่นัดรับคืน: {local.strftime('%d/%m/%Y')}\n"
+                  f"เวลารับคืน: {time_label} น.\n"
+                  f"สถานที่รับคืน: {request.pickup_location or detail['custody_location'] or 'ติดต่อห้องธุรการ CSB'}\n"
+                  f"หลักฐานที่ต้องนำมาเพื่อยืนยันการรับคืน: {request.note or 'ไม่ได้ระบุ กรุณาติดต่อธุรการก่อนเข้ารับของ'}\n\n"
+                  "หากไม่สะดวกมารับคืนตามวันและเวลาที่กำหนด กรุณาติดต่อเจ้าหน้าที่ธุรการเพื่อประสานงานนัดหมายใหม่\n\n"
+                  "ช่องทางติดต่อ\n"
+                  "โทรศัพท์: 053-943433 หรือ 063-0807969\n"
+                  "อีเมล: Compsci@cmu.ac.th\n"
+                  "เวลาทำการ: วันจันทร์–ศุกร์ เวลา 08:30–16:30 น. (ยกเว้นวันหยุดนักขัตฤกษ์)"),
         )
         detail["email_sent"] = True
     except EmailDeliveryError:

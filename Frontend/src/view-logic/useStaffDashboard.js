@@ -1479,7 +1479,7 @@ export function useStaffDashboard() {
       if (!item) return;
       requestConfirmation(
         "ยืนยันปิดรายการ",
-        `${id} · ยืนยันว่าดำเนินการ “${item.title}” สำเร็จแล้วใช่หรือไม่?`,
+        `ยืนยันว่าดำเนินการ “${item.title}” สำเร็จแล้วใช่หรือไม่?`,
         async () => {
           // ปิดที่ backend ก่อน หน้า guest จะได้เลิกแสดงรายการนี้ด้วย ไม่ใช่แค่ซ่อนในเครื่อง staff
           if (item.backendId) {
@@ -1506,7 +1506,7 @@ export function useStaffDashboard() {
           renderLost();
           renderMetrics();
           showSuccess(
-            `${id} · ${item.title} ถูกปิดเป็นรายการสำเร็จแล้ว`,
+            `${item.title} ถูกปิดเป็นรายการสำเร็จแล้ว`,
             "ปิดรายการแล้ว",
           );
         },
@@ -1731,7 +1731,7 @@ export function useStaffDashboard() {
         ? claims
             .map(
               (item) =>
-                `<article class="clerk-request-card"><div class="clerk-request-top"><div><span class="approval-type claims">คำขอแสดงความเป็นเจ้าของ</span><h4>${item.id} · ${escapeHtml(item.title)}</h4></div><span class="badge ${badgeClass(item.status)}">${escapeHtml(item.status)}</span></div><p>${escapeHtml(item.place)}</p><div class="clerk-request-meta"><span>ผู้ขอ: ${escapeHtml(item.requester || "ไม่ระบุชื่อ")}</span><span>ส่งคำขอ: ${escapeHtml(item.requestDate || "ไม่ระบุเวลา")}</span><span>สถานะการคืน: ${escapeHtml(item.returnStatus || "ไม่ทราบสถานะ")}</span><span>${escapeHtml(item.custody || "คำขอใหม่")}</span></div><div class="clerk-request-actions"><button class="small-btn" type="button" data-center-action="claim-detail" data-item-id="${item.id}">ดูรายละเอียดคำขอ</button></div></article>`,
+                `<article class="clerk-request-card"><div class="clerk-request-top"><div><span class="approval-type claims">คำขอแสดงความเป็นเจ้าของ</span><h4>${escapeHtml(item.title)}</h4></div><span class="badge ${badgeClass(item.status)}">${escapeHtml(item.status)}</span></div><p>${escapeHtml(item.place)}</p><div class="clerk-request-meta"><span>ผู้ขอ: ${escapeHtml(item.requester || "ไม่ระบุชื่อ")}</span><span>ส่งคำขอ: ${escapeHtml(item.requestDate || "ไม่ระบุเวลา")}</span><span>สถานะการคืน: ${escapeHtml(item.returnStatus || "ไม่ทราบสถานะ")}</span><span>${escapeHtml(item.custody || "คำขอใหม่")}</span></div><div class="clerk-request-actions"><button class="small-btn" type="button" data-center-action="claim-detail" data-item-id="${item.id}">ดูรายละเอียดคำขอ</button></div></article>`,
             )
             .join("")
         : '<div class="empty">ไม่มีคำขอที่รออนุมัติ</div>';
@@ -1832,8 +1832,8 @@ export function useStaffDashboard() {
       requestConfirmation(
         isLostAnnouncement ? "ยืนยันเผยแพร่ประกาศของหาย" : "ยืนยันการอนุมัติ",
         isLostAnnouncement
-          ? `${item.id} · ${item.title} จะถูกเปลี่ยนเป็นประกาศที่อนุมัติเผยแพร่`
-          : `ตรวจสอบข้อมูลของ ${item.id} · ${item.title} แล้วใช่หรือไม่?`,
+          ? `${item.title} จะถูกเปลี่ยนเป็นประกาศที่อนุมัติเผยแพร่`
+          : `ตรวจสอบข้อมูลของ ${item.title} แล้วใช่หรือไม่?`,
         () => confirmApproveLostItem(tab, id),
         isLostAnnouncement ? "อนุมัติเผยแพร่" : "อนุมัติ",
       );
@@ -1912,12 +1912,12 @@ export function useStaffDashboard() {
       renderLost();
       if (tab === "lostposts") {
         showSuccess(
-          `${id} · ${item.title} ถูกเปลี่ยนสถานะเป็น “${nextStatus}” แล้ว`,
+          `${item.title} ถูกเปลี่ยนสถานะเป็น “${nextStatus}” แล้ว`,
           "เผยแพร่ประกาศของหายแล้ว",
         );
       } else {
         showSuccess(
-          `${id} · ${item.title} ถูกเปลี่ยนสถานะเป็น “${nextStatus}” แล้ว`,
+          `${item.title} ถูกเปลี่ยนสถานะเป็น “${nextStatus}” แล้ว`,
           "อนุมัติรายการของที่พบแล้ว",
         );
       }
@@ -1932,7 +1932,7 @@ export function useStaffDashboard() {
       if (reasonDetail) reasonDetail.value = "";
       const rejectNote = $("#rejectNote");
       if (rejectNote) rejectNote.value = "";
-      $("#rejectModalTitle").textContent = `ไม่อนุมัติ ${id} · ${item.title}`;
+      $("#rejectModalTitle").textContent = `ไม่อนุมัติ ${item.title}`;
       openModal("rejectModal");
     }
     async function confirmRejectLostItem(tab, id, decisionReason) {
@@ -2590,7 +2590,7 @@ export function useStaffDashboard() {
           claims
             .map(
               (item) =>
-                `<button type="button" class="notification-item ${item.unread ? "unread" : ""}" data-clerk-notification-target="claim" data-item-id="${item.id}"><div class="notification-symbol"><svg class="icon"><use href="#i-user"/></svg></div><div><span class="approval-type claims">คำขอรับของ</span><strong>${item.id} · ${escapeHtml(item.title)}</strong><p>${escapeHtml(item.place)}</p><small>กดเพื่อไปที่ศูนย์รับงาน</small></div></button>`,
+                `<button type="button" class="notification-item ${item.unread ? "unread" : ""}" data-clerk-notification-target="claim" data-item-id="${item.id}"><div class="notification-symbol"><svg class="icon"><use href="#i-user"/></svg></div><div><span class="approval-type claims">คำขอรับของ</span><strong>${escapeHtml(item.title)}</strong><p>${escapeHtml(item.place)}</p><small>กดเพื่อไปที่ศูนย์รับงาน</small></div></button>`,
             )
             .join("");
       const groups = [
@@ -4009,7 +4009,7 @@ export function useStaffDashboard() {
       }
       requestConfirmation(
         "ยืนยันการส่งคืนของ",
-        `${id} · ยืนยันว่าได้ส่ง ${item.title} คืนให้ ${claim.requester || "เจ้าของ"} แล้วใช่หรือไม่?`,
+        `ยืนยันว่าได้ส่ง ${item.title} คืนให้ ${claim.requester || "เจ้าของ"} แล้วใช่หรือไม่?`,
         async () => {
           try {
             const previousReturnStatus = returnStatusForFoundItem(item);
@@ -4049,7 +4049,7 @@ export function useStaffDashboard() {
             renderMetrics();
             renderNotifications();
             showSuccess(
-              `${id} · ${item.title} เปลี่ยนสถานะจาก “${previousReturnStatus}” เป็น “${claim.returnStatus}” แล้ว`,
+              `${item.title} เปลี่ยนสถานะจาก “${previousReturnStatus}” เป็น “${claim.returnStatus}” แล้ว`,
               "ส่งคืนเจ้าของสำเร็จ",
             );
             await loadApprovedLostFoundItems();
@@ -4071,7 +4071,7 @@ export function useStaffDashboard() {
       const item = lostSets.claims.find((record) => record.id === id);
       if (!item) return;
       const detailContext = currentRole === "clerk" ? context : "center";
-      $("#claimDetailCode").textContent = `${id} · ${item.status}`;
+      $("#claimDetailCode").textContent = "";
       $("#claimDetailTitle").textContent = item.title;
       $("#claimRequester").textContent = item.requester || "ไม่ระบุชื่อผู้ขอ";
       $("#claimContact").textContent = item.contact || "ไม่ระบุช่องทางติดต่อ";
@@ -4179,10 +4179,10 @@ export function useStaffDashboard() {
       closeModal("claimDetailModal", false);
       const confirmationText =
         action === "verify"
-          ? `${id} · ${item.requester || "ผู้ยื่นคำขอ"} ให้หลักฐานตรงกับรายการ ${item.title} แล้วใช่หรือไม่?`
+          ? `${item.requester || "ผู้ยื่นคำขอ"} ให้หลักฐานตรงกับรายการ ${item.title} แล้วใช่หรือไม่?`
           : action === "returned"
-            ? `${id} · ยืนยันว่าได้ส่ง ${item.title} คืนให้ ${item.requester || "ผู้ยื่นคำขอ"} แล้วใช่หรือไม่?`
-            : `ยืนยันการดำเนินการกับคำขอ ${id} หรือไม่?`;
+            ? `ยืนยันว่าได้ส่ง ${item.title} คืนให้ ${item.requester || "ผู้ยื่นคำขอ"} แล้วใช่หรือไม่?`
+            : `ยืนยันการดำเนินการกับ ${item.title} ของ ${item.requester || "ผู้ยื่นคำขอ"} หรือไม่?`;
       requestConfirmation(title, confirmationText, async () => {
         try {
           const result =
@@ -4257,8 +4257,8 @@ export function useStaffDashboard() {
           }
           showSuccess(
             action === "returned"
-                ? `${id} · บันทึกว่าส่ง ${item.title} คืนเจ้าของแล้ว`
-                : `อัปเดตคำขอ ${id} เป็น “${status}” แล้ว`,
+                ? `บันทึกว่าส่ง ${item.title} คืนเจ้าของแล้ว`
+                : `อัปเดต ${item.title} เป็น “${status}” แล้ว`,
             action === "returned"
                 ? "บันทึกการส่งคืนแล้ว"
                 : "อัปเดตคำขอแล้ว",
@@ -4279,7 +4279,7 @@ export function useStaffDashboard() {
       }
       $("#appointmentItemId").value = id;
       $("#appointmentTitle").textContent = item.title;
-      $("#appointmentCode").textContent = id;
+      $("#appointmentCode").textContent = "";
       $("#appointmentEndTime").value = item.pickupEndTime || "";
       $("#appointmentDate").min = todayISO();
       $("#appointmentDate").value = item.pickupDate || todayISO();
@@ -5591,7 +5591,7 @@ export function useStaffDashboard() {
         isLostAnnouncement
           ? "ยืนยันปฏิเสธประกาศของหาย"
           : "ยืนยันไม่อนุมัติรายการรับฝาก",
-        `${id} · ${item.title}\nเหตุผล: ${decisionReason}\n\n${
+        `${item.title}\nเหตุผล: ${decisionReason}\n\n${
           isLostAnnouncement
             ? "ประกาศนี้จะไม่ถูกเผยแพร่ให้ผู้ใช้งานเห็น"
             : "รายการนี้จะไม่ได้รับการอนุมัติเข้าสู่ระบบรับฝาก"
@@ -5699,6 +5699,7 @@ export function useStaffDashboard() {
     $("#appointmentForm")?.addEventListener("submit", async (event) => {
       event.preventDefault();
       const form = event.currentTarget;
+      if (form.getAttribute("aria-busy") === "true") return;
       const appointmentTimeInput = $("#appointmentTime");
       appointmentTimeInput.setCustomValidity("");
       if (!form.checkValidity()) {
@@ -5735,7 +5736,13 @@ export function useStaffDashboard() {
         return;
       }
       const submitButton = form.querySelector('button[type="submit"]');
-      if (submitButton) submitButton.disabled = true;
+      const originalLabel = submitButton?.textContent;
+      form.setAttribute("aria-busy", "true");
+      $("#appointmentSendingStatus").hidden = false;
+      if (submitButton) {
+        submitButton.disabled = true;
+        submitButton.textContent = "กำลังส่งอีเมล…";
+      }
       try {
         const result = await scheduleOwnershipPickup(item.backendId, {
           date: appointmentDate,
@@ -5777,7 +5784,7 @@ export function useStaffDashboard() {
         renderClerkCenter();
         renderMetrics();
         showSuccess(
-          `${item.id} · นัดรับ ${item.title}\n${item.appointment}\n${result.email_sent ? "ส่งอีเมลนัดหมายให้ผู้ขอแล้ว" : "บันทึกนัดหมายแล้ว แต่ส่งอีเมลไม่สำเร็จ กรุณาติดต่อผู้ขอหรือบันทึกนัดหมายอีกครั้งเพื่อส่งใหม่"}`,
+          `นัดรับ ${item.title}\n${item.appointment}\n${result.email_sent ? "ส่งอีเมลนัดหมายให้ผู้ขอแล้ว" : "บันทึกนัดหมายแล้ว แต่ส่งอีเมลไม่สำเร็จ กรุณาติดต่อผู้ขอหรือบันทึกนัดหมายอีกครั้งเพื่อส่งใหม่"}`,
           "สร้างนัดหมายรับของแล้ว",
         );
       } catch (error) {
@@ -5785,7 +5792,12 @@ export function useStaffDashboard() {
         console.error("Scheduling ownership pickup failed:", error);
         toast(error.message || "ไม่สามารถสร้างนัดหมายรับของได้");
       } finally {
-        if (submitButton) submitButton.disabled = false;
+        form.removeAttribute("aria-busy");
+        $("#appointmentSendingStatus").hidden = true;
+        if (submitButton) {
+          submitButton.disabled = false;
+          submitButton.textContent = originalLabel;
+        }
       }
     });
     $("#openQrModal")?.addEventListener("click", (event) =>

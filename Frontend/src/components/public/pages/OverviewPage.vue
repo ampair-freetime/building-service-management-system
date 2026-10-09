@@ -100,6 +100,11 @@ onMounted(async () => {
                 </p>
               </div>
             </div>
+            <div id="savedTrackingGroup" class="field" hidden style="margin: 16px 0">
+              <label for="savedTrackingRequests">คำร้องที่บันทึกไว้ในเครื่องนี้</label>
+              <select id="savedTrackingRequests"></select>
+              <button id="clearSavedTracking" type="button" class="small-btn" style="margin-top: 8px">ล้างรายการที่บันทึกไว้</button>
+            </div>
             <form class="tracking-box" id="trackingForm" novalidate>
               <div class="field">
                 <label for="trackingCode">รหัสคำร้อง</label

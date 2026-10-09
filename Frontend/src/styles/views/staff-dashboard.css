@@ -7055,3 +7055,9 @@ body:has(.staff-dashboard-page) {
 }
 .staff-dashboard-page .lost-card-actions .decision-strip { display: contents; }
 .staff-dashboard-page .lost-card-actions button { width: 100%; min-width: 0; min-height: 46px; white-space: normal; }
+
+.appointment-sending-status { display: flex; align-items: center; gap: 10px; padding: 14px; background: #fff7dd; border-radius: 12px; line-height: 1.6; }
+.appointment-sending-status[hidden] { display: none; }
+.appointment-spinner { width: 20px; height: 20px; flex-shrink: 0; border: 3px solid #eadfbd; border-top-color: var(--role); border-radius: 50%; animation: appointment-spin 0.8s linear infinite; }
+@keyframes appointment-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .appointment-spinner { animation: none; } }
