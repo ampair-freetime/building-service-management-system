@@ -14,6 +14,7 @@ from app.models.lost_found import (
 )
 from app.schemas.lost_found_item import GuestImageResponse
 from app.services.lost_found import load_image_map
+from app.services.invitation_email import EmailDeliveryError, send_email
 from app.services.object_storage import ObjectStorage, StorageOperationError
 
 logger = logging.getLogger(__name__)
@@ -405,7 +406,8 @@ async def approve_ownership_request(
             ),
         )
     )
-    for other_claim in other_claims:
+    rejected_claims = list(other_claims)
+    for other_claim in rejected_claims:
         other_claim.status = ClaimStatus.REJECTED
         other_claim.reviewed_by = staff_id
         other_claim.review_note = AUTO_REJECT_NOTE
@@ -413,6 +415,23 @@ async def approve_ownership_request(
 
     await session.commit()
     await session.refresh(claim)
+
+    for other_claim in rejected_claims:
+        try:
+            await send_email(
+                recipient=other_claim.claimant_email,
+                subject=f"ผลคำขอรับคืน {item.item_name} · ไม่อนุมัติ",
+                body=(f"เรียน {other_claim.claimant_name}\n\n"
+                      f"คำขอรับคืน: {item.item_name}\n"
+                      f"รหัสคำขอรับคืน: {other_claim.claim_code}\n"
+                      "ผลการตรวจสอบ: ไม่อนุมัติคำขอ\n"
+                      f"เหตุผล: {AUTO_REJECT_NOTE} จึงไม่สามารถอนุมัติคำขอรับคืนของท่านได้\n\n"
+                      "หากมีข้อสงสัยหรือต้องการสอบถามเพิ่มเติม กรุณาติดต่อเจ้าหน้าที่ที่ห้องธุรการหรือห้องประชาสัมพันธ์ ชั้น 1 อาคาร CSB\n"
+                      "โทรศัพท์: 053-943433 หรือ 063-0807969\n"
+                      "อีเมล: Compsci@cmu.ac.th"),
+            )
+        except EmailDeliveryError:
+            logger.warning("Failed to notify automatically rejected claim %s", other_claim.id)
 
     return claim
 

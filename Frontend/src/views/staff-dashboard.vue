@@ -7,7 +7,7 @@ import TechnicianPages from "../components/staff/technician/TechnicianPages.vue"
 import NotificationCenterPage from "../components/staff/NotificationCenterPage.vue";
 import { useStaffDashboard } from "../view-logic/useStaffDashboard.js";
 
-const { activeRole, dashboardLoading } = useStaffDashboard();
+const { activeRole, dashboardLoading, emailSending } = useStaffDashboard();
 </script>
 
 <template>
@@ -104,8 +104,8 @@ const { activeRole, dashboardLoading } = useStaffDashboard();
         />
       </symbol>
     </svg>
-    <div v-if="dashboardLoading" class="loading-mask" aria-label="กำลังโหลด">
-      <LoadingAnimation />
+    <div v-if="dashboardLoading || emailSending" class="loading-mask" :class="{ 'email-sending-mask': emailSending }" aria-label="กำลังโหลด">
+      <LoadingAnimation :label="emailSending ? 'กำลังส่งอีเมลตั้งรหัสผ่าน… กรุณารอสักครู่' : 'กำลังโหลดข้อมูล…'" />
     </div>
     <div class="app">
       <aside class="sidebar" id="sidebar">

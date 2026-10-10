@@ -1229,6 +1229,7 @@ export function usePublicServicePortal() {
         return;
       }
 
+      list.style.setProperty("--tracking-step-count", progress.steps.length);
       progress.steps.forEach((step, index) => {
         const itemElement = document.createElement("li");
         itemElement.className =
@@ -1266,15 +1267,8 @@ export function usePublicServicePortal() {
       document.getElementById("claimTrackingDetails").hidden = !trackedClaim;
       document.getElementById("claimAdditionalInfoForm").hidden = item?.status !== "additional_info_required";
       document.getElementById("claimStaffMessage").textContent = item?.staff_message || "";
-      const dateLabel = value => value ? new Intl.DateTimeFormat("th-TH", {
-        timeZone: "Asia/Bangkok", dateStyle: "long", timeStyle: "short",
-      }).format(new Date(value)) : "";
-      document.getElementById("claimPickupDetails").textContent = trackedClaim ? [
-        item.pickup_datetime ? `นัดรับ: ${dateLabel(item.pickup_datetime)}` : "",
-        item.pickup_end_datetime ? `ถึง: ${dateLabel(item.pickup_end_datetime)}` : "",
-        item.pickup_location || item.custody_location ? `จุดรับของ: ${item.pickup_location || item.custody_location}` : "",
-        item.pickup_note ? `หมายเหตุ: ${item.pickup_note}` : "",
-      ].filter(Boolean).join("\n") : "";
+      document.getElementById("claimPickupDetails").hidden = true;
+      document.getElementById("claimPickupDetails").textContent = "";
       const result = document.getElementById(ids.result);
       const statusBadge = document.getElementById(ids.status);
       const photosNotice = document.getElementById("trackingPhotosNotice");
