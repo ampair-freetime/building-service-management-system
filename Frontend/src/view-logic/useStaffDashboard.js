@@ -1466,6 +1466,15 @@ export function useStaffDashboard() {
       if (item.status === "คืนของแล้ว") return "ส่งคืนเจ้าของแล้ว";
       return "ยังไม่มีคำขอรับคืน";
     }
+    function approvalReviewerName(item) {
+      return (
+        item.reviewerName ||
+        staffData.find((staff) => staff.id === item.reviewerId)?.name ||
+        item.decidedBy ||
+        item.assignee ||
+        "ธุรการ"
+      );
+    }
     function approvalTypeLabel(tab) {
       return tab === "inventory"
         ? "ของที่รับฝาก"
@@ -1726,24 +1735,21 @@ export function useStaffDashboard() {
       $("#lostGrid").innerHTML = visibleEntries.length
         ? visibleEntries
             .map(({ item: i, tab }) => {
-              const note = i.decisionReason
-                ? `<div class="approval-note"><strong>${
-                    i.status.includes("ไม่อนุมัติ")
-                      ? "เหตุผลที่ไม่อนุมัติ"
-                      : "บันทึกการอนุมัติ"
-                  }:</strong> ${i.decisionReason}</div>`
-                : "";
+              const note =
+                i.decisionReason && i.status.includes("ไม่อนุมัติ")
+                  ? `<div class="approval-note"><strong>เหตุผลที่ไม่อนุมัติ:</strong> ${i.decisionReason}</div>`
+                  : "";
               const inlineClose = ["lostposts", "inventory"].includes(tab) && approvalGroup(i.status) === "approved";
-              const inventoryMeta = tab === "inventory"
-                ? `<div class="lost-foot"><span class="custody">${escapeHtml(i.custodyLocation || i.activityLabel || "")}</span><span class="badge progress">สถานะการคืน: ${escapeHtml(returnStatusForFoundItem(i))}</span></div>`
+              const approvalMeta = ["inventory", "lostposts"].includes(tab)
+                ? `<div class="lost-foot"><span class="custody">${escapeHtml(i.custodyLocation || i.activityLabel || "")}</span><span class="badge progress">ยืนยันโดย: ${escapeHtml(approvalReviewerName(i))}</span></div>`
                 : "";
               const detailsButton = `<button class="small-btn" type="button" data-lost-action="detail" data-tab="${tab}" data-item-id="${i.id}">ดูรายละเอียด</button>`;
               const controls =
                 tab === "claims"
                   ? `<div class="claim-controls"><button type="button" class="primary" data-lost-action="claim-detail" data-tab="claims" data-item-id="${i.id}">ดูรายละเอียดคำขอ</button></div>`
                   : inlineClose
-                    ? `${note}${inventoryMeta}<div class="lost-card-actions">${detailsButton}${decisionButtons(tab, i)}</div>`
-                    : `${note}<div class="lost-foot">${tab === "inventory" ? `<span class="custody">${escapeHtml(i.custodyLocation || i.activityLabel || "")}</span><span class="badge progress">สถานะการคืน: ${escapeHtml(returnStatusForFoundItem(i))}</span>` : ""}${detailsButton}</div>`;
+                    ? `${note}${approvalMeta}<div class="lost-card-actions">${detailsButton}${decisionButtons(tab, i)}</div>`
+                    : `${note}<div class="lost-foot">${tab === "inventory" ? `<span class="custody">${escapeHtml(i.custodyLocation || i.activityLabel || "")}</span><span class="badge progress">ยืนยันโดย: ${escapeHtml(approvalReviewerName(i))}</span>` : ""}${detailsButton}</div>`;
               const claimHint =
                 tab === "claims"
                   ? '<div class="approval-note"><strong>รับคำขออัตโนมัติ:</strong> ธุรการไม่ต้องกดอนุมัติ สามารถตรวจรายละเอียด นัดหมาย และยืนยันการส่งคืนได้</div>'
@@ -3843,7 +3849,9 @@ export function useStaffDashboard() {
       const privateText = $("#jobDetailPrivate");
       if (privateText) privateText.textContent = item.privateVerificationDetail || "";
       const notesGroup = $("#jobDetailNotesGroup");
-      if (notesGroup) notesGroup.hidden = !item.decisionReason;
+      if (notesGroup)
+        notesGroup.hidden =
+          !item.decisionReason || !item.status.includes("ไม่อนุมัติ");
       const isLostAnnouncement = tab === "lostposts";
       selectedJobId = "";
       $("#jobDetailModal")?.classList.add("lost-post-detail");

@@ -9,6 +9,7 @@ from fastapi import UploadFile
 from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.core.config import settings
 from app.models.enums import LostStatus, LostType
@@ -179,6 +180,7 @@ async def list_public_items(
     ]
     result = await session.scalars(
         select(LostItem)
+        .options(selectinload(LostItem.reviewer))
         .where(*filters)
         .order_by(LostItem.created_at.desc(), LostItem.id.desc())
     )
@@ -216,7 +218,9 @@ async def get_public_item(
         # อีเมลถูก normalize เป็นตัวพิมพ์เล็กตั้งแต่ตอนสร้าง จึงต้องเทียบด้วยรูปแบบเดียวกัน
         filters.append(LostItem.reporter_email == reporter_email.strip().lower())
 
-    item = await session.scalar(select(LostItem).where(*filters))
+    item = await session.scalar(
+        select(LostItem).options(selectinload(LostItem.reviewer)).where(*filters)
+    )
     if item is None:
         # ใช้ข้อความเดียวกันทั้งกรณีไม่มีรหัสนี้และกรณีอีเมลไม่ตรง เพื่อกันการไล่เดาอีเมลผู้แจ้ง
         raise PublicItemNotFoundError("ไม่พบประกาศนี้")
@@ -270,6 +274,7 @@ def _to_public_response(
         status=item.status,
         created_at=item.created_at,
         updated_at=item.updated_at,
+        reviewer_name=item.reviewer.full_name if item.reviewer else None,
         images=[
             GuestImageResponse(
                 id=image.id,

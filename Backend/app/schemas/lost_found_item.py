@@ -117,6 +117,7 @@ class GuestItemPublicResponse(BaseModel):
     status: LostStatus
     created_at: datetime
     updated_at: datetime
+    reviewer_name: str | None = None
     images: list[GuestImageResponse]
 
 
