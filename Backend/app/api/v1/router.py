@@ -10,6 +10,7 @@ from app.api.v1.endpoints import (
     clerk_work_overview,
     found_item,
     guest_claim,
+    images,
     lost_found_clerk,
     lost_item,
     notification,
@@ -87,3 +88,4 @@ api_router.include_router(
 )
 
 api_router.include_router(guest_claim.router, prefix="/guest/claims", tags=["guest claims"])
+api_router.include_router(images.router, prefix="/images", tags=["images"])

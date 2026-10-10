@@ -1,4 +1,5 @@
 import asyncio
+from uuid import UUID
 from io import BytesIO
 
 import pytest
@@ -14,6 +15,7 @@ from app.models.enums import ImageType, RequestAction, RequestStatus
 from app.models.image import Image
 from app.models.location import Location
 from app.models.service_request import RequestHistory, ServiceRequest
+from app.services.image_urls import build_image_url
 from app.services.object_storage import StoredObject
 
 class FakeStorage:
@@ -984,7 +986,7 @@ def test_guest_can_view_completion_photos(
         assert photo["content_type"] == "image/webp"
         assert photo["width"] == 32
         assert photo["height"] == 24
-        assert photo["url"].startswith("https://example.test/")
+        assert photo["url"] == build_image_url(UUID(photo["id"]))
 
 
 def test_housekeeper_can_add_completion_note(

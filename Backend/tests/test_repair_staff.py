@@ -1,4 +1,5 @@
 import asyncio
+from uuid import UUID
 from io import BytesIO
 
 import pytest
@@ -13,6 +14,7 @@ from app.models.enums import ImageType, RequestAction, RequestStatus, RequestTyp
 from app.models.image import Image
 from app.models.location import Location
 from app.models.service_request import RequestHistory, ServiceRequest
+from app.services.image_urls import build_image_url
 from app.services.object_storage import StoredObject
 
 
@@ -485,14 +487,14 @@ def test_repair_detail_includes_attached_images(
 
     assert images[0]["image_type"] == "before"
     assert images[0]["sort_order"] == 0
-    assert images[0]["url"] == ("https://example.test/repair/test/first.webp")
+    assert images[0]["url"] == build_image_url(UUID(images[0]["id"]))
     assert images[0]["content_type"] == "image/webp"
     assert images[0]["size_bytes"] == 100
     assert images[0]["width"] == 640
     assert images[0]["height"] == 480
 
     assert images[1]["sort_order"] == 1
-    assert images[1]["url"] == ("https://example.test/repair/test/second.webp")
+    assert images[1]["url"] == build_image_url(UUID(images[1]["id"]))
 
 
 def test_technician_can_accept_repair_task(

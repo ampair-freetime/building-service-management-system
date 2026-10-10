@@ -25,6 +25,7 @@ from app.schemas.lost_found_item import (
     GuestItemListResponse,
     GuestItemPublicResponse,
 )
+from app.services.image_urls import build_image_url
 from app.services.images import ProcessedImage, prepare_guest_image
 from app.services.object_storage import (
     ObjectStorage,
@@ -278,7 +279,7 @@ def _to_public_response(
         images=[
             GuestImageResponse(
                 id=image.id,
-                url=storage.create_download_url(image.object_key),
+                url=build_image_url(image.id),
                 content_type=image.content_type,
                 width=image.width,
                 height=image.height,

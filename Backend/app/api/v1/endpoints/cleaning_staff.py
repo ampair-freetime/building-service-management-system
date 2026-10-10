@@ -40,6 +40,7 @@ from app.services.cleaning_staff import (
     upload_completion_photos,
     get_cleaning_work_history,
 )
+from app.services.image_urls import build_image_url
 from app.services.images import InvalidImageError
 from app.services.object_storage import StorageOperationError
 
@@ -121,7 +122,7 @@ async def read_cleaning_task_detail(
                 width=image.width,
                 height=image.height,
                 sort_order=image.sort_order,
-                url=storage.create_download_url(image.object_key),
+                url=build_image_url(image.id),
                 created_at=image.created_at,
             )
             for image in sorted(

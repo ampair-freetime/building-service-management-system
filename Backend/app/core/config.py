@@ -65,6 +65,12 @@ class Settings(BaseSettings):
     r2_secret_access_key: str | None = None
     r2_bucket_name: str | None = None
     r2_presigned_url_expire_seconds: int = Field(default=28800, ge=1, le=604800)
+    # Stable image links (/api/v1/images/{id}?sig=...) are signed with this key, kept
+    # separate from jwt_secret_key so rotating one never logs everyone out or breaks images.
+    image_url_secret: str = "development-only-change-this-image-secret"
+    # Each redirect creates a fresh R2 link that only needs to survive until the browser
+    # starts downloading, so it can be short.
+    image_redirect_url_expire_seconds: int = Field(default=300, ge=60, le=3600)
     r2_connect_timeout_seconds: float = Field(default=5, gt=0, le=120)
     r2_read_timeout_seconds: float = Field(default=15, gt=0, le=120)
     r2_total_max_attempts: int = Field(default=2, ge=1, le=5)
@@ -100,6 +106,11 @@ class Settings(BaseSettings):
                 or len(self.jwt_secret_key) < 32
             ):
                 raise ValueError("Production requires a JWT_SECRET_KEY of at least 32 characters")
+            if (
+                self.image_url_secret == "development-only-change-this-image-secret"
+                or len(self.image_url_secret) < 32
+            ):
+                raise ValueError("Production requires an IMAGE_URL_SECRET of at least 32 characters")
             for value in (
                 self.public_base_url,
                 self.staff_activation_url,

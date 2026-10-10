@@ -2705,8 +2705,6 @@ export function useStaffDashboard() {
     function openEditStaff(index, trigger = document.activeElement) {
       const staff = staffData[index];
       if (!staff || currentRole !== "admin") return;
-      if (emailSending.value) return;
-      emailSending.value = true;
       $("#editStaffIndex").value = staff.id;
       $("#editStaffName").value = staff.name;
       $("#editStaffEmail").value = staff.email;
@@ -2799,6 +2797,8 @@ export function useStaffDashboard() {
     async function performResendStaffInvitation(index, button) {
       const staff = staffData[index];
       if (!staff || currentRole !== "admin") return;
+      if (emailSending.value) return;
+      emailSending.value = true;
       button.disabled = true;
       button.textContent = "กำลังส่ง…";
       try {

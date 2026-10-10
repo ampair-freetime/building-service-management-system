@@ -23,6 +23,7 @@ from app.schemas.cleaning_guest import (
     GuestLocationResponse,
     GuestTrackingResponse,
 )
+from app.services.image_urls import build_image_url
 from app.services.images import ProcessedImage, prepare_guest_image
 from app.services.notification import create_cleaning_request_notifications
 from app.services.object_storage import (
@@ -272,7 +273,7 @@ async def get_guest_request_status(
                 completion_photos = [
                     GuestCompletionPhotoResponse(
                         id=image.id,
-                        url=storage.create_download_url(image.object_key),
+                        url=build_image_url(image.id),
                         content_type=image.content_type,
                         width=image.width,
                         height=image.height,

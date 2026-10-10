@@ -27,6 +27,7 @@ from app.services.lost_found_clerk import (
     reject_ownership_request,
     ActiveClaimExistsError,
     ItemAlreadyClaimedError,
+    LostFoundStateConflictError,
     approve_found_item,
     approve_lost_item,
     close_lost_found_item,
@@ -171,11 +172,15 @@ async def approve_found_item_report(
 ) -> FoundItemDetailResponse:
     """ อนุมัติรายการของที่พบโดยเจ้าหน้าที่ธุรการ"""
 
-    item = await approve_found_item(
-        session,
-        item_id,
-        current_staff.id,
-    )
+    try:
+        item = await approve_found_item(
+            session,
+            item_id,
+            current_staff.id,
+        )
+    except LostFoundStateConflictError as exc:
+        # เจ้าหน้าที่อีกคนดำเนินการไปก่อนแล้ว
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     
     if item is None:
         raise HTTPException(
@@ -197,11 +202,15 @@ async def approve_lost_item_report(
 ) -> LostItemDetailResponse:
     """อนุมัติประกาศของหายโดยเจ้าหน้าที่ธุรการ"""
 
-    item = await approve_lost_item(
-        session,
-        item_id,
-        current_staff.id,
-    )
+    try:
+        item = await approve_lost_item(
+            session,
+            item_id,
+            current_staff.id,
+        )
+    except LostFoundStateConflictError as exc:
+        # เจ้าหน้าที่อีกคนดำเนินการไปก่อนแล้ว
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
 
     if item is None:
         raise HTTPException(
@@ -224,12 +233,16 @@ async def reject_lost_item_report(
 ) -> LostItemDetailResponse:
     """ปฏิเสธประกาศของหายโดยเจ้าหน้าที่ธุรการ"""
 
-    item = await reject_lost_item(
-        session,
-        item_id,
-        current_staff.id,
-        request.reason,
-    )
+    try:
+        item = await reject_lost_item(
+            session,
+            item_id,
+            current_staff.id,
+            request.reason,
+        )
+    except LostFoundStateConflictError as exc:
+        # เจ้าหน้าที่อีกคนดำเนินการไปก่อนแล้ว
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
 
     if item is None:
         raise HTTPException(
@@ -252,12 +265,16 @@ async def reject_found_item_report(
 ) -> FoundItemDetailResponse:
     """ปฏิเสธรายการของที่พบโดยเจ้าหน้าที่ธุรการ"""
 
-    item = await reject_found_item(
-        session,
-        item_id,
-        current_staff.id,
-        request.reason,
-    )
+    try:
+        item = await reject_found_item(
+            session,
+            item_id,
+            current_staff.id,
+            request.reason,
+        )
+    except LostFoundStateConflictError as exc:
+        # เจ้าหน้าที่อีกคนดำเนินการไปก่อนแล้ว
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
 
     if item is None:
         raise HTTPException(
@@ -430,12 +447,16 @@ async def update_return_status(
     session: DbSession,
     current_staff: ClerkStaff,
 ) -> OwnershipRequestListResponse:
-    claim = await update_ownership_return_status(
-        session,
-        claim_id,
-        request.return_status,
-        current_staff.id,
-    )
+    try:
+        claim = await update_ownership_return_status(
+            session,
+            claim_id,
+            request.return_status,
+            current_staff.id,
+        )
+    except LostFoundStateConflictError as exc:
+        # เจ้าหน้าที่อีกคนดำเนินการไปก่อนแล้ว
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
 
     if claim is None:
         raise HTTPException(
@@ -456,14 +477,18 @@ async def schedule_ownership_pickup(
     session: DbSession,
     _: ClerkStaff,
 ) -> OwnershipRequestDetailResponse:
-    claim = await schedule_pickup(
-        session,
-        claim_id,
-        request.pickup_datetime,
-        request.pickup_location,
-        request.note,
-        request.pickup_end_datetime,
-    )
+    try:
+        claim = await schedule_pickup(
+            session,
+            claim_id,
+            request.pickup_datetime,
+            request.pickup_location,
+            request.note,
+            request.pickup_end_datetime,
+        )
+    except LostFoundStateConflictError as exc:
+        # เจ้าหน้าที่อีกคนดำเนินการไปก่อนแล้ว
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
 
     if claim is None:
         raise HTTPException(

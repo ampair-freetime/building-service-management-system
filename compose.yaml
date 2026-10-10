@@ -43,6 +43,8 @@ services:
       R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY:-}
       R2_BUCKET_NAME: ${R2_BUCKET_NAME:-building-service-images}
       R2_PRESIGNED_URL_EXPIRE_SECONDS: ${R2_PRESIGNED_URL_EXPIRE_SECONDS:-28800}
+      IMAGE_URL_SECRET: ${IMAGE_URL_SECRET:-development-only-change-this-image-secret}
+      IMAGE_REDIRECT_URL_EXPIRE_SECONDS: ${IMAGE_REDIRECT_URL_EXPIRE_SECONDS:-300}
       R2_CONNECT_TIMEOUT_SECONDS: ${R2_CONNECT_TIMEOUT_SECONDS:-5}
       R2_READ_TIMEOUT_SECONDS: ${R2_READ_TIMEOUT_SECONDS:-15}
       R2_TOTAL_MAX_ATTEMPTS: ${R2_TOTAL_MAX_ATTEMPTS:-2}
@@ -68,6 +70,8 @@ services:
     command: npm run dev -- --host 0.0.0.0
     environment:
       VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8000/api/v1}
+      # Vite forwards /api (image links) to the backend container.
+      DEV_API_PROXY_TARGET: http://backend:8000
     ports:
       - "5173:5173"
     volumes:

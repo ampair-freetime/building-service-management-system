@@ -144,7 +144,7 @@ def test_qr_flow_create_and_track(test_context, fake_storage) -> None:
     assert client.get(f"/api/v1/guest/cleaning-requests/{body['request_code']}").status_code == 422
 
 
-@pytest.mark.parametrize("storage_state", ["missing", "signing_failure", "available"])
+@pytest.mark.parametrize("storage_state", ["missing", "available"])
 def test_tracking_keeps_request_details_when_completion_photos_are_unavailable(
     test_context,
     fake_storage,
@@ -176,12 +176,6 @@ def test_tracking_keeps_request_details_when_completion_photos_are_unavailable(
 
     asyncio.run(add_completion_photo())
 
-    def sign(key):
-        if storage_state == "signing_failure":
-            raise StorageOperationError("Simulated signing failure")
-        return f"https://signed.example/{key}"
-
-    monkeypatch.setattr(fake_storage, "create_download_url", sign, raising=False)
     if storage_state == "missing":
         client.app.dependency_overrides[provide_optional_object_storage] = lambda: None
 

@@ -50,6 +50,8 @@ def test_explicit_dotenv_works_from_another_working_directory(tmp_path):
     "overrides",
     [
         {"jwt_secret_key": "development-only-change-this-secret"},
+        {"image_url_secret": "development-only-change-this-image-secret"},
+        {"image_url_secret": "too-short"},
         {"public_base_url": "http://localhost:5173"},
         {"staff_activation_url": "http://127.0.0.1:5173/staff/setup-password"},
         {"backend_cors_origins": ["*"]},
@@ -59,6 +61,7 @@ def test_production_rejects_development_configuration(overrides):
     values = {
         "environment": "production",
         "jwt_secret_key": "test-key-" * 8,
+        "image_url_secret": "test-image-key-" * 4,
         "public_base_url": "https://care.example.org",
         "backend_cors_origins": ["https://care.example.org"],
         **overrides,

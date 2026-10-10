@@ -14,7 +14,7 @@ Backend อ่านค่าโดยเรียงลำดับความ
 
 ## Docker
 
-1. คัดลอก `.env.production.example` เป็น `.env.production` แล้วตั้ง `POSTGRES_PASSWORD`, `JWT_SECRET_KEY`, `PUBLIC_BASE_URL`, `BACKEND_CORS_ORIGINS` และ SMTP/R2 ตามสิทธิ์ที่มี ควรใช้รหัสผ่านฐานข้อมูลที่เป็นตัวอักษร/ตัวเลขเพื่อหลีกเลี่ยงปัญหา URL encoding ใน Compose หรือแก้การสร้าง DATABASE_URL ให้ encode รหัสผ่านตามต้องการ
+1. คัดลอก `.env.production.example` เป็น `.env.production` แล้วตั้ง `POSTGRES_PASSWORD`, `JWT_SECRET_KEY`, `IMAGE_URL_SECRET` (สุ่ม ≥32 ตัว คนละค่ากับ JWT; เปลี่ยนค่านี้แล้วลิงก์รูปทั้งหมดจะใช้ไม่ได้), `PUBLIC_BASE_URL`, `BACKEND_CORS_ORIGINS` และ SMTP/R2 ตามสิทธิ์ที่มี ควรใช้รหัสผ่านฐานข้อมูลที่เป็นตัวอักษร/ตัวเลขเพื่อหลีกเลี่ยงปัญหา URL encoding ใน Compose หรือแก้การสร้าง DATABASE_URL ให้ encode รหัสผ่านตามต้องการ
 2. ตรวจ configuration แบบไม่พิมพ์ secrets: `docker compose --env-file .env.production -f compose.production.yaml config --quiet`
 3. Build ก่อนเปิดบริการ: `docker compose --env-file .env.production -f compose.production.yaml build`
 4. เริ่ม database/backend: `docker compose --env-file .env.production -f compose.production.yaml up -d database backend` คำสั่งเริ่ม backend จะ validate settings → รัน Alembic migration → เริ่ม Uvicorn หนึ่ง worker ไม่ใช้ reload
