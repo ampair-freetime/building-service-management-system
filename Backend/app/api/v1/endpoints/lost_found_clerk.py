@@ -3,9 +3,11 @@ from zoneinfo import ZoneInfo
 from app.services.invitation_email import send_email, EmailDeliveryError
 
 from fastapi import APIRouter, HTTPException
+from sqlalchemy import select
+from app.models.lost_found import LostItem
 
 from app.core.config import settings
-from app.api.dependencies import ClerkStaff, DbSession, OptionalObjectStorageClient
+from app.api.dependencies import ClerkStaff, CurrentStaff, DbSession, OptionalObjectStorageClient
 from app.schemas.lost_found_clerk import (
     PersonalLostFoundHistoryResponse,
     FoundItemDetailResponse,
@@ -19,7 +21,7 @@ from app.schemas.lost_found_clerk import (
     UpdateReturnStatusRequest,
     SchedulePickupRequest,
 )
-from app.models.enums import LostType
+from app.models.enums import LostType, LostStatus
 from app.services.lost_found_clerk import (
     list_personal_lost_found_history,
     reject_ownership_request,
@@ -44,6 +46,22 @@ from app.services.lost_found_clerk import (
 )
 
 router = APIRouter()
+
+
+@router.get("/items", response_model=list[FoundItemDetailResponse])
+async def read_processed_items(
+    session: DbSession, storage: OptionalObjectStorageClient, staff: CurrentStaff,
+):
+    if staff.role.value not in ("clerk", "admin"):
+        raise HTTPException(status_code=403, detail="Clerk or admin access required")
+    items = list(await session.scalars(select(LostItem).where(
+        LostItem.status.in_([LostStatus.APPROVED, LostStatus.CLAIMED]),
+        LostItem.deleted_at.is_(None),
+    ).order_by(LostItem.created_at.desc())))
+    image_urls = await load_staff_image_urls(session, [item.id for item in items], storage)
+    return [FoundItemDetailResponse.model_validate(item).model_copy(
+        update={"images": image_urls.get(item.id, [])}
+    ) for item in items]
 
 
 @router.get("/my-history", response_model=list[PersonalLostFoundHistoryResponse])

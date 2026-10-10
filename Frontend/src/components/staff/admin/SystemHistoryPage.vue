@@ -33,6 +33,7 @@ import ClerkApprovalsOverviewPage from "./ClerkApprovalsOverviewPage.vue";
       </div>
       <div class="approval-flow-note"><span>✓</span><div><strong>แสดงรายการที่ผ่านการตรวจสอบแล้ว</strong><br />“ของที่รับฝาก” และ “ประกาศตามหา” แสดงรายการที่ธุรการอนุมัติแล้ว ส่วน “คำขอรับของ” แสดงคำขอที่เกี่ยวข้องกับรายการรับฝาก</div></div>
       <div class="lost-grid" id="lostGrid"></div>
+      <div id="adminClaimTabContent"></div>
     </section>
   </section>
 </template> 

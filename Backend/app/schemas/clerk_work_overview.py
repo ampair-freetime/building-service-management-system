@@ -6,7 +6,7 @@ from uuid import UUID
 
 from pydantic import BaseModel
 
-from app.models.enums import LostStatus, LostType
+from app.models.enums import ClaimStatus, LostStatus, LostType, ReturnStatus
 
 
 class AnnouncementStatistics(BaseModel):
@@ -18,6 +18,20 @@ class AnnouncementStatistics(BaseModel):
     average_pending_review_age_hours: float | None
 
 
+class ClerkClaimOverviewItem(BaseModel):
+    id: UUID
+    claim_code: str
+    item_name: str
+    claimant_name: str
+    claimant_email: str
+    status: ClaimStatus
+    return_status: ReturnStatus | None
+    proof_detail: str
+    staff_message: str | None
+    submission_date: datetime
+    updated_at: datetime
+
+
 class ClerkWorkOverviewResponse(BaseModel):
     """Aggregate approval counts across every clerk."""
 
@@ -26,6 +40,7 @@ class ClerkWorkOverviewResponse(BaseModel):
     date_from: date | None
     date_to: date | None
     announcement_type: LostType | None
+    claims: list[ClerkClaimOverviewItem]
 
 
 class ClerkAnnouncementListItem(BaseModel):

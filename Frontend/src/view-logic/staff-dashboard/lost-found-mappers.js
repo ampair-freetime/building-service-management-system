@@ -44,6 +44,7 @@ export function mapPendingLostItem(item) {
 export function mapApprovedItem(item, tab) {
   return {
     publicListItem: true,
+    backendStatus: item.status,
     backendId: item.id,
     id: item.item_code,
     displayCode: item.item_code,
@@ -53,7 +54,10 @@ export function mapApprovedItem(item, tab) {
     place: item.location_detail || "ไม่ระบุสถานที่",
     description: item.description || "ไม่มีรายละเอียดเพิ่มเติม",
     activityLabel: tab === "inventory" ? "รับฝากโดยธุรการ" : "เผยแพร่แล้ว",
-    status: tab === "inventory" ? "อนุมัติรับฝาก" : "อนุมัติเผยแพร่",
+    status: item.status === "claimed" ? "ยืนยันเจ้าของแล้ว · รอคืนของ"
+      : item.status === "closed" ? "ปิดรายการแล้ว"
+      : item.status === "rejected" ? "ไม่อนุมัติ"
+      : tab === "inventory" ? "อนุมัติรับฝาก" : "อนุมัติเผยแพร่",
     eventDatetime: item.event_datetime,
     imageUrl: item.images?.[0]?.url || "",
     reporterEmail: item.reporter_email || null,

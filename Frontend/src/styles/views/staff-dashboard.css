@@ -6650,6 +6650,12 @@ body:has(.staff-dashboard-page) {
   display: grid;
   gap: 8px;
 }
+.clerk-admin-claims { margin-top: 28px; }
+#lostGrid[hidden] { display: none; }
+.clerk-admin-claims h3 { margin-bottom: 16px; }
+.clerk-admin-claims h3 small { color: var(--muted); font-size: 14px; font-weight: normal; margin-left: 8px; }
+.clerk-admin-claims article > div { min-width: 0; overflow-wrap: anywhere; }
+.clerk-admin-claims .clerk-admin-request-details strong { white-space: pre-wrap; }
 .clerk-admin-item-list article {
   display: flex;
   justify-content: space-between;
@@ -7097,4 +7103,86 @@ body:has(.staff-dashboard-page) {
 @media (max-width: 720px) {
   .staff-dashboard-page.is-technician #jobDetailModal .detail-layout { grid-template-columns: 1fr; padding: 18px; gap: 20px; }
   .staff-dashboard-page.is-technician #jobDetailModal .detail-photo { height: 260px; }
+}
+
+/* Active custody list: compact header and practical search controls. */
+.staff-dashboard-page .clerk-custody-page .custody-heading {
+  align-items: center;
+  gap: 20px;
+  margin-bottom: 22px;
+}
+.staff-dashboard-page .clerk-custody-page .custody-heading h2 { margin-bottom: 8px; }
+.staff-dashboard-page .custody-toolbar {
+  display: flex;
+  align-items: end;
+  gap: 16px;
+  padding: 20px;
+  margin-bottom: 22px;
+  background: #fff;
+  border: 1px solid #eee2c9;
+  border-radius: 18px;
+}
+.staff-dashboard-page .custody-toolbar label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  color: #655940;
+  font-size: 13px;
+  font-weight: 600;
+  min-width: 230px;
+}
+.staff-dashboard-page .custody-toolbar .custody-search { flex: 1; }
+.staff-dashboard-page .custody-toolbar input,
+.staff-dashboard-page .custody-toolbar select {
+  width: 100%;
+  min-height: 46px;
+  padding: 10px 14px;
+  border: 1px solid #e5dfd3;
+  border-radius: 10px;
+  background: #f3f4f6;
+  color: #292633;
+  font: inherit;
+}
+.staff-dashboard-page .custody-toolbar :is(input, select):focus-visible {
+  outline: 2px solid #a87413;
+  outline-offset: 2px;
+}
+.staff-dashboard-page .custody-list-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.staff-dashboard-page .custody-list-heading .tabs { margin: 0; }
+.staff-dashboard-page .custody-list-heading p { margin: 0; color: #827a6a; font-size: 13px; }
+.staff-dashboard-page [data-custody-count] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  padding: 1px 6px;
+  margin-left: 6px;
+  border-radius: 20px;
+  background: #f4ecd9;
+  color: #89600e;
+  font-size: 12px;
+}
+.staff-dashboard-page .tab.active [data-custody-count] { background: #ffffff30; color: #fff; }
+.staff-dashboard-page .clerk-custody-page .lost-image.has-image {
+  height: 160px;
+  background: #faf8f3;
+  border-radius: 12px;
+}
+.staff-dashboard-page .clerk-custody-page .lost-image img { object-fit: contain; }
+@media (max-width: 900px) {
+  .staff-dashboard-page .custody-toolbar { flex-wrap: wrap; }
+  .staff-dashboard-page .custody-toolbar label { flex: 1; min-width: 200px; }
+}
+@media (max-width: 600px) {
+  .staff-dashboard-page .clerk-custody-page .custody-heading { align-items: start; flex-direction: column; }
+  .staff-dashboard-page .custody-toolbar { padding: 16px; }
+  .staff-dashboard-page .custody-toolbar label { min-width: 100%; }
+  .staff-dashboard-page .custody-list-heading .tabs { display: flex; flex-wrap: wrap; }
 }

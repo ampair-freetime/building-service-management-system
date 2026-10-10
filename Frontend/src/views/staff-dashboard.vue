@@ -155,13 +155,6 @@ const { activeRole, dashboardLoading, emailSending } = useStaffDashboard();
           >
             <span class="nav-icon">03</span>งานของฉัน
           </button>
-          <button
-            class="nav-item"
-            data-page="my-history"
-            data-roles="housekeeper,technician,clerk"
-          >
-            <span class="nav-icon">H</span>ประวัติงานของฉัน
-          </button>
           <button class="nav-item" data-page="staff-overview" data-roles="admin">
             <span class="nav-icon">WO</span>ภาพรวมงานของเจ้าหน้าที่
           </button>
@@ -192,6 +185,13 @@ const { activeRole, dashboardLoading, emailSending } = useStaffDashboard();
               aria-live="polite"
               hidden
             ></span>
+          </button>
+          <button
+            class="nav-item"
+            data-page="my-history"
+            data-roles="housekeeper,technician,clerk"
+          >
+            <span class="nav-icon">H</span>ประวัติงานของฉัน
           </button>
         </nav>
         <div class="sidebar-foot">
