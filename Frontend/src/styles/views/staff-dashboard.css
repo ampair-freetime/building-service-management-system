@@ -1924,6 +1924,33 @@ h4,
 .brand * {
   font-family: "Sarabun", sans-serif !important;
 }
+button.is-loading {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  cursor: wait;
+}
+button.is-loading::before {
+  content: "";
+  width: 17px;
+  height: 17px;
+  flex: 0 0 17px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: buttonLoadingSpin 0.7s linear infinite;
+}
+@keyframes buttonLoadingSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  button.is-loading::before {
+    animation-duration: 1.4s;
+  }
+}
 .loading-mask {
   position: fixed;
   inset: 0;
@@ -6281,7 +6308,7 @@ body:has(.staff-dashboard-page) {
 
 .staff-dashboard-page .staff-account-actions {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 7px;
   padding: 16px 18px 18px;
 }
@@ -6338,7 +6365,7 @@ body:has(.staff-dashboard-page) {
   }
 
   .staff-dashboard-page .staff-account-actions {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: 1fr;
     padding: 14px 15px 15px;
   }
 }
@@ -6730,16 +6757,7 @@ body:has(.staff-dashboard-page) {
 
 @media (min-width: 721px) and (max-width: 1024px) {
   .staff-dashboard-page .bottom-nav {
-    position: fixed;
-    z-index: 35;
-    inset: auto 0 0;
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    height: 78px;
-    padding: 7px 4px max(7px, env(safe-area-inset-bottom));
-    border-top: 1px solid var(--line);
-    background: rgba(255, 255, 255, 0.96);
-    box-shadow: 0 -8px 28px rgba(35, 28, 66, 0.08);
+    display: none;
   }
   .staff-dashboard-page .bottom-nav button {
     position: relative;
@@ -6859,4 +6877,25 @@ body:has(.staff-dashboard-page) {
 .staff-dashboard-page .notification-center-hero h2 {
   font-size: clamp(26px, 3vw, 38px);
   line-height: 1.25;
+}
+
+/* Keep every role's profile fields visually consistent. */
+.staff-dashboard-page #profileModal .profile-name-field,
+.staff-dashboard-page #profileModal .profile-meta-row > span {
+  min-width: 0;
+  padding: 11px;
+  border: 1px solid color-mix(in srgb, var(--role) 34%, #fff);
+  border-radius: 13px;
+  background: color-mix(in srgb, var(--role-soft) 58%, #fff);
+}
+
+@media (max-width: 720px) {
+  .staff-dashboard-page #profileModal .profile-data,
+  .staff-dashboard-page #profileModal .profile-meta-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .staff-dashboard-page #profileModal .profile-meta-row {
+    gap: 9px;
+  }
 }

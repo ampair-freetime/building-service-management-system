@@ -75,9 +75,6 @@
               <h3>ประกาศล่าสุด</h3>
               <p id="resultSummary">แสดงรายการที่กำลังตามหาและของที่พบแล้ว</p>
             </div>
-            <button id="lostRefreshButton" type="button" class="filter-chip">
-              รีเฟรชประกาศ
-            </button>
           </div>
           <div class="filter-row">
             <button type="button" class="filter-chip active" data-filter="all">
@@ -410,7 +407,6 @@
               ><textarea
                 id="publicFoundPrivateDetail"
                 name="private_detail"
-                minlength="10"
                 maxlength="600"
                 aria-describedby="publicFoundPrivateDetailError"
                 placeholder="เช่น ของภายใน ตำหนิ หรือข้อมูลที่ไม่ควรแสดงสาธารณะ"

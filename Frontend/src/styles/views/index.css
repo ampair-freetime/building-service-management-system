@@ -65,19 +65,19 @@ a {
 .submit-btn {
   border: 0;
   border-radius: 16px;
-  background: linear-gradient(135deg, var(--primary), #4c76a8);
+  background: linear-gradient(135deg, var(--primary), var(--primary-2));
   color: #fff;
   font-weight: 800;
   min-height: 50px;
   padding: 0 22px;
-  box-shadow: 0 10px 24px rgba(51, 94, 138, 0.24);
+  box-shadow: 0 10px 24px color-mix(in srgb, var(--primary) 24%, transparent);
   transition: 0.2s ease;
 }
 .primary-btn:hover,
 .primary:hover,
 .submit-btn:hover {
   transform: translateY(-2px);
-  box-shadow: 0 14px 30px rgba(51, 94, 138, 0.28);
+  box-shadow: 0 14px 30px color-mix(in srgb, var(--primary) 28%, transparent);
 }
 .ghost-btn,
 .secondary,
@@ -1185,6 +1185,13 @@ main {
 .form-panel {
   display: grid;
   gap: 18px;
+}
+.form-panel > fieldset {
+  display: grid;
+  gap: 18px;
+}
+.form-panel > fieldset > h3 + .form-row {
+  margin-top: -14px;
 }
 .form-panel > h3 {
   font-size: 22px;
@@ -2630,7 +2637,9 @@ textarea:focus-visible {
 .work-layout.single-form-layout,
 .two-form-layout.single-form-layout {
   grid-template-columns: minmax(0, 1fr);
-  max-width: 820px;
+  width: 100%;
+  max-width: 1020px;
+  margin-inline: auto;
 }
 @media (prefers-reduced-motion: reduce) {
   .ui-modal,
@@ -3440,9 +3449,9 @@ textarea:focus-visible {
 
   .user-page .lost-tab,
   .user-page .filter-chip {
-    min-height: 34px;
-    padding-inline: 11px;
-    font-size: 11px;
+    min-height: 42px;
+    padding-inline: 16px;
+    font-size: 13px;
   }
 
   .user-page .form-panel > .field {

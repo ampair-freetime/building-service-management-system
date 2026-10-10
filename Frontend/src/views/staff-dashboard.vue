@@ -182,7 +182,7 @@ const { activeRole } = useStaffDashboard();
           <button
             class="nav-item notification-nav-item"
             data-page="notifications"
-            data-roles="housekeeper,technician,clerk,admin"
+            data-roles="housekeeper,technician,clerk"
           >
             <span class="nav-icon">
               <svg class="icon" aria-hidden="true"><use href="#i-bell" /></svg>
@@ -241,7 +241,7 @@ const { activeRole } = useStaffDashboard();
         aria-label="ปิดเมนู"
       ></button>
 
-      <div class="mobile-notification-launcher">
+      <div v-if="activeRole !== 'admin'" class="mobile-notification-launcher">
         <button
           class="icon-btn"
           id="mobileNotificationButton"
@@ -293,9 +293,8 @@ const { activeRole } = useStaffDashboard();
         <button type="button" data-mobile-page="qr">
           <svg class="icon"><use href="#i-qr" /></svg><span>QR ห้อง</span>
         </button>
-        <button type="button" id="mobileNotificationAdmin" data-mobile-notification>
-          <svg class="icon"><use href="#i-bell" /></svg><span>แจ้งเตือน</span>
-          <span class="notification-count" id="mobileAdminNotificationCount" aria-live="polite" hidden></span>
+        <button type="button" id="mobileProfile">
+          <svg class="icon"><use href="#i-user" /></svg><span>โปรไฟล์</span>
         </button>
       </template>
       <template v-else-if="['technician', 'housekeeper'].includes(activeRole)">
@@ -315,9 +314,8 @@ const { activeRole } = useStaffDashboard();
         <button type="button" data-mobile-page="my-history">
           <svg class="icon"><use href="#i-history" /></svg><span>ประวัติงาน</span>
         </button>
-        <button type="button" id="mobileNotification" data-mobile-notification>
-          <svg class="icon"><use href="#i-bell" /></svg><span>แจ้งเตือน</span>
-          <span class="notification-count" id="mobileNotificationCount" aria-live="polite" hidden></span>
+        <button type="button" id="mobileProfile">
+          <svg class="icon"><use href="#i-user" /></svg><span>โปรไฟล์</span>
         </button>
       </template>
       <template v-else-if="activeRole === 'clerk'">
@@ -337,9 +335,8 @@ const { activeRole } = useStaffDashboard();
         <button type="button" data-mobile-page="my-history">
           <svg class="icon"><use href="#i-history" /></svg><span>ประวัติงาน</span>
         </button>
-        <button type="button" id="mobileNotification" data-mobile-notification>
-          <svg class="icon"><use href="#i-bell" /></svg><span>แจ้งเตือน</span>
-          <span class="notification-count" id="mobileNotificationCount" aria-live="polite" hidden></span>
+        <button type="button" id="mobileProfile">
+          <svg class="icon"><use href="#i-user" /></svg><span>โปรไฟล์</span>
         </button>
       </template>
       <template v-else>

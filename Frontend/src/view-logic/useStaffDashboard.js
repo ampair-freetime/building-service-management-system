@@ -864,6 +864,7 @@ export function useStaffDashboard() {
         toast("ไม่พบหน้าที่เลือก");
         return;
       }
+      currentPage = page;
       $("#notificationPanel")?.classList.remove("open", "mobile-notification-page");
       $("#notificationButton")?.setAttribute("aria-expanded", "false");
       $$("#mobileNotification, #mobileNotificationAdmin").forEach((button) => {
@@ -2595,38 +2596,19 @@ export function useStaffDashboard() {
           };
           return `<article class="staff-account-card">
             <header class="staff-account-card-head">
-              <div class="person"><div class="person-avatar" style="background:${
-            staffRoleColor(s.role)
-          }18;color:${staffRoleColor(s.role)}">${s.name.slice(
-            0,
-            2
-          ) ? escapeHtml(s.name.slice(0, 2)) : "-"}</div><div><strong>${escapeHtml(s.name)}</strong><small>${
-            escapeHtml(s.email)
-            
-          }</small></div></div>
-          
-              <span class="badge ${
-            s.status === "ใช้งาน" ? "done" : "wait"
-          }">${
-            s.status
-          }</span>
+              <div class="person">${staffRoleAvatar(s.role)}<div><strong>${escapeHtml(s.name)}</strong><small>${escapeHtml(s.email || "-")}</small></div></div>
             </header>
             <div class="staff-account-meta">
-              <div><span>Role</span><strong>${escapeHtml(s.role)}</strong></div>
+              <div><span>บทบาท</span><strong>${escapeHtml(s.role)}</strong></div>
               <div><span>สถานะการส่งคำเชิญ</span><strong class="invitation-delivery-status ${invitationDelivery.className}">${invitationDelivery.label}</strong></div>
             </div>
             <button class="small-btn resend-invitation-button" type="button" data-staff-action="resend-invitation" data-staff-index="${i}" ${s.status === "ใช้งาน" ? "" : "disabled"}>ส่งคำเชิญซ้ำ</button>
-            <footer class="staff-account-actions"><button class="small-btn" type="button" data-staff-action="detail" data-staff-index="${i}">ดูรายละเอียด</button><button class="small-btn" type="button" data-staff-action="edit" data-staff-index="${i}">แก้ไขข้อมูล</button><button class="small-btn" type="button" data-staff-action="toggle" data-staff-index="${i}">${
-              s.status === "ใช้งาน" ? "ปิดบัญชี" : "เปิดใช้"
-            }</button><button class="small-btn delete" type="button" data-staff-action="remove" data-staff-index="${i}">ลบ</button></footer>
+            <footer class="staff-account-actions"><button class="small-btn" type="button" data-staff-action="detail" data-staff-index="${i}">ดูรายละเอียด</button><button class="small-btn" type="button" data-staff-action="edit" data-staff-index="${i}">แก้ไขข้อมูล</button><button class="small-btn delete" type="button" data-staff-action="remove" data-staff-index="${i}">ปิดบัญชี</button></footer>
           </article>`;
             })
             .join("")
         : '<div class="history-empty staff-account-empty">ไม่พบบัญชี Staff ที่ตรงกับตัวกรอง</div>';
       $("#staffTotal").textContent = staffData.length;
-      $("#staffActiveTotal").textContent = `ใช้งาน ${
-        staffData.filter((staff) => staff.status === "ใช้งาน").length
-      } บัญชี`;
       $("#housekeeperTotal").textContent = staffData.filter(
         (staff) => staff.role === "แม่บ้าน",
       ).length;
@@ -2646,7 +2628,6 @@ export function useStaffDashboard() {
       $("#editStaffIndex").value = staff.id;
       $("#editStaffName").value = staff.name;
       $("#editStaffEmail").value = staff.email;
-      $("#editStaffRole").textContent = staff.role;
       $("#editStaffError").hidden = true;
       $("#editStaffButton").disabled = false;
       openModal("editStaffModal", trigger);
@@ -2659,6 +2640,8 @@ export function useStaffDashboard() {
       const errorMessage = $("#editStaffError");
       errorMessage.hidden = true;
       button.disabled = true;
+      button.classList.add("is-loading");
+      button.setAttribute("aria-busy", "true");
       button.textContent = "กำลังบันทึก…";
       try {
         const account = await updateStaffProfile(staff.id, changes);
@@ -2708,34 +2691,17 @@ export function useStaffDashboard() {
         errorMessage.hidden = false;
       } finally {
         button.disabled = false;
+        button.classList.remove("is-loading");
+        button.removeAttribute("aria-busy");
         button.textContent = "บันทึกข้อมูล";
       }
-    }
-    function toggleStaff(i) {
-      const staff = staffData[i];
-      requestConfirmation(
-        staff.status === "ใช้งาน" ? "ยืนยันปิดบัญชี" : "ยืนยันเปิดบัญชี",
-        `${staff.status === "ใช้งาน" ? "ปิด" : "เปิด"}การใช้งานบัญชี ${
-          staff.name
-        } หรือไม่?`,
-        () => {
-          staff.status = staff.status === "ใช้งาน" ? "พักงาน" : "ใช้งาน";
-          addAudit(
-            "staff",
-            "อัปเดตสถานะ",
-            staff.id,
-            staff.name,
-            `เปลี่ยนสถานะบัญชีเป็น ${staff.status}`,
-          );
-          renderStaff();
-          toast("อัปเดตสถานะบัญชีแล้ว");
-        },
-      );
     }
     async function performResendStaffInvitation(index, button) {
       const staff = staffData[index];
       if (!staff || currentRole !== "admin") return;
       button.disabled = true;
+      button.classList.add("is-loading");
+      button.setAttribute("aria-busy", "true");
       button.textContent = "กำลังส่ง…";
       try {
         const result = await resendStaffInvitation(staff.id);
@@ -2770,6 +2736,8 @@ export function useStaffDashboard() {
         );
         if (document.contains(button)) {
           button.disabled = false;
+          button.classList.remove("is-loading");
+          button.removeAttribute("aria-busy");
           button.textContent = "ส่งคำเชิญซ้ำ";
         }
       }
@@ -2790,8 +2758,8 @@ export function useStaffDashboard() {
       const staff = staffData[i];
       if (!staff || deletingStaffIds.has(staff.id)) return;
       requestConfirmation(
-        "ยืนยันการลบบัญชีพนักงาน",
-        `คุณต้องการลบบัญชี ${staff.name} (${staff.email}) หรือไม่? บัญชีนี้จะเข้าสู่ระบบไม่ได้อีก และจะหายไปจากรายการพนักงาน`,
+        "ยืนยันการปิดบัญชีพนักงาน",
+        `คุณต้องการปิดบัญชี ${staff.name} (${staff.email}) หรือไม่? บัญชีนี้จะเข้าสู่ระบบไม่ได้อีก และจะหายไปจากรายการพนักงาน`,
         async () => {
           if (deletingStaffIds.has(staff.id)) return;
           deletingStaffIds.add(staff.id);
@@ -2800,39 +2768,39 @@ export function useStaffDashboard() {
             const index = staffData.findIndex((item) => item.id === staff.id);
             if (index !== -1) staffData.splice(index, 1);
             forgetInvitationDelivery(staff.id);
-            addAudit("staff", "ลบ", staff.id, staff.name, "ปิดบัญชี Staff แล้ว");
+            addAudit("staff", "ปิดบัญชี", staff.id, staff.name, "ปิดบัญชี Staff แล้ว");
             renderStaff();
             renderHistory();
             loadStaffWorkOverview();
             showSuccess(
-              `ลบบัญชี ${staff.name} (${staff.email}) เรียบร้อยแล้ว`,
-              "ลบบัญชีสำเร็จ",
+              `ปิดบัญชี ${staff.name} (${staff.email}) เรียบร้อยแล้ว`,
+              "ปิดบัญชีสำเร็จ",
             );
           } catch (error) {
             if (await handleUnauthorizedResponse(error.status)) return;
             const assignments = error.unfinishedAssignments || [];
             const codes = assignments.map((item) => item.request_code).filter(Boolean);
             const message = codes.length
-              ? `กรุณาโอนงานที่ยังไม่เสร็จก่อนลบบัญชี: ${codes.join(", ")}`
+              ? `กรุณาโอนงานที่ยังไม่เสร็จก่อนปิดบัญชี: ${codes.join(", ")}`
               : error.status === 404
                 ? "ไม่พบบัญชีนี้ในระบบ กรุณาโหลดรายการพนักงานใหม่"
                 : error.message === "You cannot delete your own account"
-                ? "ไม่สามารถลบบัญชีของตัวเองได้"
+                ? "ไม่สามารถปิดบัญชีของตัวเองได้"
                 : error.message === "You cannot delete the last active administrator"
-                  ? "ไม่สามารถลบบัญชีแอดมินที่ใช้งานอยู่คนสุดท้ายได้"
+                  ? "ไม่สามารถปิดบัญชีแอดมินที่ใช้งานอยู่คนสุดท้ายได้"
                   : error instanceof TypeError
                     ? "เชื่อมต่อระบบไม่ได้ กรุณาลองใหม่อีกครั้ง"
-                    : error.message || "ไม่สามารถลบบัญชีเจ้าหน้าที่ได้";
+                    : error.message || "ไม่สามารถปิดบัญชีเจ้าหน้าที่ได้";
             showSuccess(
               message,
-              "ลบบัญชีไม่สำเร็จ",
+              "ปิดบัญชีไม่สำเร็จ",
               "error",
             );
           } finally {
             deletingStaffIds.delete(staff.id);
           }
         },
-        "ลบบัญชี",
+        "ปิดบัญชี",
       );
     }
 
@@ -3080,7 +3048,7 @@ export function useStaffDashboard() {
         !restoringNavigation &&
         readDashboardRoute().dialog === modalSlug(id)
       ) {
-        router.back();
+        updateDashboardRoute("", "replace");
       }
     }
     function syncDashboardFromRoute() {
@@ -4822,7 +4790,7 @@ export function useStaffDashboard() {
       const invitation = {sent: "ส่งสำเร็จ", failed: "ส่งไม่สำเร็จ", pending: "รอส่ง"}[staff.invitationDeliveryStatus] || "ไม่มีข้อมูล";
       $("#staffAccountDetailInfo").innerHTML = [
         ["ชื่อ", staff.name], ["อีเมล", staff.email], ["บทบาท", staff.role],
-        ["สถานะบัญชี", staff.status], ["สถานะคำเชิญ", invitation],
+        ["สถานะคำเชิญ", invitation],
       ].map(([label, value]) => `<div><small>${label}</small><strong>${escapeHtml(value || "–")}</strong></div>`).join("");
       const work = $("#staffAccountDetailWork");
       const isWorker = ["แม่บ้าน", "ช่าง"].includes(staff.role);
@@ -4867,7 +4835,6 @@ export function useStaffDashboard() {
       if (!button) return;
       const index = Number(button.dataset.staffIndex);
       if (button.dataset.staffAction === "edit") openEditStaff(index, button);
-      if (button.dataset.staffAction === "toggle") toggleStaff(index);
       if (button.dataset.staffAction === "remove") removeStaff(index);
       if (button.dataset.staffAction === "resend-invitation")
         resendInvitation(index, button);
@@ -5253,15 +5220,41 @@ export function useStaffDashboard() {
 
       if (!validateStaffForm(form)) return;
       const submitButton = $("#createStaffButton");
+      if (submitButton.disabled) return;
       submitButton.disabled = true;
+      submitButton.classList.add("is-loading");
+      submitButton.setAttribute("aria-busy", "true");
+      submitButton.textContent = "กำลังสร้างบัญชีและส่งคำเชิญ…";
+      form.setAttribute("aria-busy", "true");
       const payload = {
         full_name: fullName,
         email: $("#newEmail").value.trim(),
         role: $("#newRole").value,
       };
-      let account;
       try {
-        account = await createStaffAccount(payload);
+        const account = await createStaffAccount(payload);
+        const record = toDashboardStaff(account);
+        rememberInvitationDelivery(record, record.invitationDeliveryStatus);
+        record.invitationStatusSource = "browser";
+        staffData.push(record);
+        loadStaffWorkOverview();
+        addAudit(
+          "staff",
+          "สร้างบัญชี",
+          record.id,
+          record.name,
+          `สร้างบัญชี Role ${record.role}`,
+        );
+        await loadStaffAccounts();
+        closeModal("staffModal", false);
+        form.reset();
+        showSuccess(
+          account.email_sent
+            ? `สร้างบัญชี Staff และส่งคำเชิญไปยัง ${record.email} แล้ว`
+            : `สร้างบัญชี Staff แล้ว แต่ส่งคำเชิญไปยัง ${record.email} ไม่สำเร็จ กรุณาตรวจสอบระบบอีเมล`,
+          account.email_sent ? "ส่งคำเชิญสำเร็จ" : "ส่งคำเชิญไม่สำเร็จ",
+          account.email_sent ? "success" : "error",
+        );
       } catch (error) {
         if (await handleUnauthorizedResponse(error.status)) return;
         console.error("Creating staff account failed:", error);
@@ -5272,32 +5265,13 @@ export function useStaffDashboard() {
         } else {
           toast(error.message || "ไม่สามารถสร้างบัญชีได้");
         }
+      } finally {
         submitButton.disabled = false;
-        return;
+        submitButton.classList.remove("is-loading");
+        submitButton.removeAttribute("aria-busy");
+        submitButton.textContent = "สร้างบัญชี";
+        form.removeAttribute("aria-busy");
       }
-      const record = toDashboardStaff(account);
-      rememberInvitationDelivery(record, record.invitationDeliveryStatus);
-      record.invitationStatusSource = "browser";
-      staffData.push(record);
-      loadStaffWorkOverview();
-      addAudit(
-        "staff",
-        "สร้างบัญชี",
-        record.id,
-        record.name,
-        `สร้างบัญชี Role ${record.role}`,
-      );
-      await loadStaffAccounts();
-      closeModal("staffModal", false);
-      form.reset();
-      submitButton.disabled = false;
-      showSuccess(
-        account.email_sent
-          ? `สร้างบัญชี Staff และส่งคำเชิญไปยัง ${record.email} แล้ว`
-          : `สร้างบัญชี Staff แล้ว แต่ส่งคำเชิญไปยัง ${record.email} ไม่สำเร็จ กรุณาตรวจสอบระบบอีเมล`,
-        account.email_sent ? "ส่งคำเชิญสำเร็จ" : "ส่งคำเชิญไม่สำเร็จ",
-        account.email_sent ? "success" : "error",
-      );
     });
     $("#editStaffForm")?.addEventListener("submit", (event) => {
       event.preventDefault();

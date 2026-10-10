@@ -323,7 +323,7 @@ export function usePublicServicePortal() {
         : "ยังไม่มีประกาศที่เผยแพร่";
       empty.querySelector("p").textContent = postsStore.items.length
         ? "ลองเปลี่ยนคำค้น หรือเลือกประเภท “ทั้งหมด” แล้วค้นหาอีกครั้ง"
-        : "กดรีเฟรชเพื่อตรวจสอบประกาศใหม่อีกครั้ง";
+        : "ประกาศใหม่จะแสดงในหน้านี้เมื่อได้รับการเผยแพร่";
     }
 
     async function filterPosts({ force = false } = {}) {
@@ -468,9 +468,6 @@ export function usePublicServicePortal() {
         }, 120);
       });
 
-    document.getElementById("lostRefreshButton")?.addEventListener("click", () => {
-      void filterPosts({ force: true });
-    });
     document.getElementById("lostPreviousPage")?.addEventListener("click", () => {
       if (postPage === 0) return;
       postPage--;
@@ -960,12 +957,7 @@ export function usePublicServicePortal() {
         validateRequiredText(value, "สถานที่พบสิ่งของ"),
       description: (value) =>
         validateRequiredText(value, "รายละเอียดสิ่งของ", 10),
-      private_detail: (value) => {
-        const trimmed = value.trim();
-        return trimmed && trimmed.length < 10
-          ? "รายละเอียดลับต้องมีอย่างน้อย 10 ตัวอักษร"
-          : "";
-      },
+      private_detail: () => "",
       recipient_email: (value, field) => {
         if (!value.trim()) return "กรุณาระบุอีเมลสำหรับติดตามสถานะ";
         if (field.validity.typeMismatch) return "กรุณาระบุอีเมลให้ถูกต้อง";

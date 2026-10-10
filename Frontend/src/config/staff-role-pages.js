@@ -29,7 +29,6 @@ export const STAFF_ROLE_PAGES = {
     { id: "history", label: "ของหายและรับฝาก" },
     { id: "staff", label: "บัญชีเจ้าหน้าที่" },
     { id: "qr", label: "จัดการสถานที่" },
-    { id: "notifications", label: "ศูนย์การแจ้งเตือน" },
   ],
 };
 
