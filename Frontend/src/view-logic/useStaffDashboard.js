@@ -4212,7 +4212,7 @@ export function useStaffDashboard() {
       $("#appointmentDate").min = todayISO();
       $("#appointmentDate").value = item.pickupDate || todayISO();
       $("#appointmentTime").value = item.pickupTime || "";
-      $("#appointmentPlace").value = item.pickupLocation || item.custodyLocation || "ประชาสัมพันธ์ ชั้น 1";
+      $("#appointmentPlace").value = item.pickupLocation || item.custodyLocation || "ห้องธุรการ ชั้น 1";
       $("#appointmentNote").value = item.pickupNote || "";
       openModal("appointmentModal", trigger);
     }

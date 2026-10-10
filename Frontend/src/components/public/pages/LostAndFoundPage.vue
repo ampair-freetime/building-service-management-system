@@ -369,7 +369,7 @@ onMounted(async () => {
                 aria-live="polite"
               ></p>
             </div>
-            <p class="form-intro">กรุณานำของไปฝากที่ {{ custodyLocation || 'ห้องธุรการ (ติดต่อเจ้าหน้าที่เพื่อยืนยันจุดรับฝาก)' }}</p>
+            <p class="form-intro">กรุณานำของไปฝากที่ {{ custodyLocation || 'ห้องธุรการ ชั้น 1' }}</p>
             <div class="field">
               <label for="publicFoundDescription">รายละเอียดทั่วไป</label
               ><textarea

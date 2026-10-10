@@ -4,6 +4,7 @@ from app.services.invitation_email import send_email, EmailDeliveryError
 
 from fastapi import APIRouter, HTTPException
 
+from app.core.config import settings
 from app.api.dependencies import ClerkStaff, DbSession, OptionalObjectStorageClient
 from app.schemas.lost_found_clerk import (
     PersonalLostFoundHistoryResponse,
@@ -476,7 +477,7 @@ async def schedule_ownership_pickup(
                   f"รหัสคำขอรับคืน: {detail['claim_code']}\n"
                   f"วันที่นัดรับคืน: {local.strftime('%d/%m/%Y')}\n"
                   f"เวลารับคืน: {time_label} น.\n"
-                  f"สถานที่รับคืน: {request.pickup_location or detail['custody_location'] or 'ติดต่อห้องธุรการ CSB'}\n"
+                  f"สถานที่รับคืน: {request.pickup_location or detail['custody_location'] or settings.default_custody_location}\n"
                   f"หลักฐานที่ต้องนำมาเพื่อยืนยันการรับคืน: {request.note or 'ไม่ได้ระบุ กรุณาติดต่อธุรการก่อนเข้ารับของ'}\n\n"
                   "หากไม่สะดวกมารับคืนตามวันและเวลาที่กำหนด กรุณาติดต่อเจ้าหน้าที่ธุรการเพื่อประสานงานนัดหมายใหม่\n\n"
                   "ช่องทางติดต่อ\n"
