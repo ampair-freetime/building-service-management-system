@@ -13,6 +13,7 @@ from app.services.invitations import (
 )
 from app.services.staff import (
     DuplicateStaffError,
+    StaffActorNotAuthorizedError,
     StaffDeletionBlockedError,
     delete_staff_account,
     list_staff,
@@ -83,6 +84,8 @@ async def delete_staff(staff_id: UUID, session: DbSession, admin: AdminStaff) ->
         await delete_staff_account(session, staff_id=staff_id, deleted_by=admin)
     except LookupError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except StaffActorNotAuthorizedError as exc:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
     except StaffDeletionBlockedError as exc:
         detail: str | dict[str, object] = str(exc)
         if exc.assignments:

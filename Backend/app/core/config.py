@@ -64,7 +64,7 @@ class Settings(BaseSettings):
     r2_access_key_id: str | None = None
     r2_secret_access_key: str | None = None
     r2_bucket_name: str | None = None
-    r2_presigned_url_expire_seconds: int = Field(default=900, ge=1, le=604800)
+    r2_presigned_url_expire_seconds: int = Field(default=28800, ge=1, le=604800)
     r2_connect_timeout_seconds: float = Field(default=5, gt=0, le=120)
     r2_read_timeout_seconds: float = Field(default=15, gt=0, le=120)
     r2_total_max_attempts: int = Field(default=2, ge=1, le=5)

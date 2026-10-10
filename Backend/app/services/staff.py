@@ -4,7 +4,7 @@ import logging
 from datetime import UTC, datetime
 from uuid import UUID
 
-from sqlalchemy import func, select, update
+from sqlalchemy import select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -31,6 +31,10 @@ class StaffDeletionBlockedError(Exception):
         self.assignments = assignments or []
 
 
+class StaffActorNotAuthorizedError(Exception):
+    """The acting admin lost access while waiting for another admin change to finish."""
+
+
 async def get_staff_by_id(session: AsyncSession, staff_id: UUID) -> Staff | None:
     """ค้นหาพนักงานด้วย UUID ซึ่งใช้เป็น subject ภายใน JWT."""
     return await session.get(Staff, staff_id)
@@ -48,6 +52,24 @@ async def get_staff_for_update(session: AsyncSession, staff_id: UUID) -> Staff |
         .where(Staff.id == staff_id)
         .with_for_update()
         .execution_options(populate_existing=True)
+    )
+
+
+async def lock_active_admins(session: AsyncSession) -> list[Staff]:
+    """Lock every active admin row, always in id order.
+
+    The "at least one active admin" rule depends on the whole group, so locking only the
+    target row lets two admins delete each other at the same time. Any future flow that can
+    remove an admin (role change, suspension) must call this before checking the count.
+    """
+    return list(
+        await session.scalars(
+            select(Staff)
+            .where(Staff.role == StaffRole.ADMIN, Staff.status == AccountStatus.ACTIVE)
+            .order_by(Staff.id)
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        )
     )
 
 
@@ -152,20 +174,25 @@ async def delete_staff_account(
     session: AsyncSession, *, staff_id: UUID, deleted_by: Staff
 ) -> None:
     """Soft-delete a staff account after checking work and administrator safeguards."""
+    if staff_id == deleted_by.id:
+        raise StaffDeletionBlockedError("You cannot delete your own account")
+
+    # Unlocked peek: only decides whether the admin group must be locked first.
+    target = await get_staff_by_id(session, staff_id)
+    if target is None or target.status == AccountStatus.DELETED:
+        raise LookupError("Staff account not found")
+
+    if target.role == StaffRole.ADMIN and target.status == AccountStatus.ACTIVE:
+        # Lock the group before the target row so every admin deletion locks in the same order.
+        active_admin_ids = {admin.id for admin in await lock_active_admins(session)}
+        if deleted_by.id not in active_admin_ids:
+            raise StaffActorNotAuthorizedError("Your administrator access is no longer active")
+        if staff_id in active_admin_ids and len(active_admin_ids) <= 1:
+            raise StaffDeletionBlockedError("You cannot delete the last active administrator")
+
     account = await get_staff_for_update(session, staff_id)
     if account is None or account.status == AccountStatus.DELETED:
         raise LookupError("Staff account not found")
-    if account.id == deleted_by.id:
-        raise StaffDeletionBlockedError("You cannot delete your own account")
-
-    if account.role == StaffRole.ADMIN and account.status == AccountStatus.ACTIVE:
-        active_admin_count = await session.scalar(
-            select(func.count())
-            .select_from(Staff)
-            .where(Staff.role == StaffRole.ADMIN, Staff.status == AccountStatus.ACTIVE)
-        )
-        if active_admin_count <= 1:
-            raise StaffDeletionBlockedError("You cannot delete the last active administrator")
 
     unfinished_statuses = (
         RequestStatus.WAITING,

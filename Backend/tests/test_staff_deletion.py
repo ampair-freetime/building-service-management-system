@@ -126,3 +126,32 @@ def test_non_admin_cannot_delete_staff(
         "/api/v1/auth/login",
         json={"identifier": "target@example.com", "password": "target-password"},
     ).status_code == 200
+
+
+def test_admin_whose_access_ended_cannot_delete_another_admin(
+    test_context: tuple[TestClient, async_sessionmaker[AsyncSession]],
+) -> None:
+    """Mirrors the losing side of a race: the deleter was removed while waiting for the lock."""
+    from app.models.enums import AccountStatus
+    from app.models.staff import Staff
+    from app.services.staff import StaffActorNotAuthorizedError, delete_staff_account
+
+    _, factory = test_context
+    former = seed_staff(factory, email="former-admin@example.com", password="pw", role="admin",
+                        status="deleted")
+    target = seed_staff(factory, email="target-admin@example.com", password="pw", role="admin")
+    seed_staff(factory, email="other-admin@example.com", password="pw", role="admin")
+
+    async def attempt() -> None:
+        async with factory() as session:
+            try:
+                await delete_staff_account(session, staff_id=target.id, deleted_by=former)
+            except StaffActorNotAuthorizedError:
+                pass
+            else:
+                raise AssertionError("A removed admin must not delete other admins")
+        async with factory() as session:
+            stored = await session.get(Staff, target.id)
+            assert stored.status == AccountStatus.ACTIVE
+
+    asyncio.run(attempt())

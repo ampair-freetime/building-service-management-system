@@ -276,3 +276,48 @@ def test_concurrent_password_reset_confirms_use_link_once(postgres_factory):
             assert stored.password_changed_at is not None
 
     asyncio.run(asyncio.wait_for(run(), timeout=20))
+
+
+def test_two_admins_deleting_each_other_keep_one_active_admin(postgres_factory, monkeypatch):
+    """Both requests pass the unlocked check first; the admin-group lock must stop one of them."""
+    from app.models.enums import AccountStatus, StaffRole
+
+    factory = postgres_factory
+    first = seed_staff(factory, email="admin1@example.com", password="password", role="admin")
+    second = seed_staff(factory, email="admin2@example.com", password="password", role="admin")
+    real_lock = staff_service.lock_active_admins
+
+    async def run():
+        barrier = asyncio.Barrier(2)
+
+        async def lock_after_both_peeked(session):
+            await barrier.wait()
+            return await real_lock(session)
+
+        monkeypatch.setattr(staff_service, "lock_active_admins", lock_after_both_peeked)
+
+        async def delete(actor, target):
+            async with factory() as session:
+                await staff_service.delete_staff_account(
+                    session, staff_id=target.id, deleted_by=actor
+                )
+                return target.id
+
+        results = await asyncio.gather(
+            delete(first, second), delete(second, first), return_exceptions=True
+        )
+        assert sum(not isinstance(r, Exception) for r in results) == 1
+        assert sum(
+            isinstance(r, staff_service.StaffActorNotAuthorizedError) for r in results
+        ) == 1
+        async with factory() as session:
+            active_admins = (
+                await session.scalars(
+                    select(Staff).where(
+                        Staff.role == StaffRole.ADMIN, Staff.status == AccountStatus.ACTIVE
+                    )
+                )
+            ).all()
+            assert len(active_admins) == 1
+
+    asyncio.run(asyncio.wait_for(run(), timeout=20))
