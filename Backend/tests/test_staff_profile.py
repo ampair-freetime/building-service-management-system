@@ -115,8 +115,8 @@ def test_role_and_invalid_fields_are_rejected_atomically(test_context, changes):
     assert _stored(factory, staff.id) == before
 
 
-@pytest.mark.parametrize("status", ["active", "suspended", "deleted"])
-def test_duplicate_email_including_deleted_accounts_is_rejected(test_context, status):
+@pytest.mark.parametrize("status", ["active", "suspended"])
+def test_duplicate_existing_email_is_rejected(test_context, status):
     client, factory = test_context
     headers = admin_headers(client, factory)
     seed_staff(factory, email="taken@example.com", password="password", role="clerk", status=status)
@@ -286,3 +286,16 @@ def test_inactive_accounts_cannot_resend_or_activate(test_context, monkeypatch, 
             assert invitation.used_at is None
 
     asyncio.run(not_consumed())
+
+
+def test_deleted_email_can_be_reused_without_restoring_old_account(test_context):
+    from app.models.enums import AccountStatus
+    client, factory = test_context
+    headers = admin_headers(client, factory)
+    old = seed_staff(factory, email="reuse@example.com", password="old-password", role="clerk", status="deleted")
+    staff = seed_staff(factory, email="tech@example.com", password="password", role="technician")
+    response = client.patch(f"/api/v1/staff/{staff.id}", headers=headers, json={"email": "reuse@example.com"})
+    assert response.status_code == 200
+    assert response.json()["email"] == "reuse@example.com"
+    assert _stored(factory, old.id)["status"] == AccountStatus.DELETED
+    assert _stored(factory, old.id)["email"].endswith("@deleted.invalid")

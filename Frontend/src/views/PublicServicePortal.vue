@@ -1,4 +1,5 @@
 <script setup>
+import LoadingAnimation from "../components/shared/LoadingAnimation.vue";
 import PublicCommonModals from "../components/public/CommonModals.vue";
 import PublicLostFoundModals from "../components/public/pages/LostAndFoundModals.vue";
 import PublicDashboardPage from "../components/public/pages/OverviewPage.vue";
@@ -7,7 +8,7 @@ import PublicRepairPage from "../components/public/pages/RepairRequestPage.vue";
 import PublicCleanPage from "../components/public/pages/CleaningRequestPage.vue";
 import { usePublicServicePortal } from "../view-logic/usePublicServicePortal.js";
 
-const { sidebarOpen, closeSidebar, toggleSidebar } = usePublicServicePortal();
+const { sidebarOpen, closeSidebar, toggleSidebar, pageLoading } = usePublicServicePortal();
 </script>
 
 <template>
@@ -110,11 +111,8 @@ const { sidebarOpen, closeSidebar, toggleSidebar } = usePublicServicePortal();
         <path d="M10 5H5v14h5M14 8l4 4-4 4M8 12h10" />
       </symbol>
     </svg>
-    <div class="loading-mask" role="status" aria-label="กำลังโหลด">
-      <div class="loading-card">
-        <span class="skeleton"></span><span class="skeleton"></span
-        ><span class="skeleton"></span>
-      </div>
+    <div v-if="pageLoading" class="loading-mask" aria-label="กำลังโหลด">
+      <LoadingAnimation />
     </div>
     <div class="app-shell">
       <aside class="sidebar" id="sidebar" :class="{ open: sidebarOpen }">

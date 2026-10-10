@@ -42,7 +42,7 @@
               <small id="jobDetailRoomLabel">สถานที่พบ</small>
               <strong id="jobDetailRoom">–</strong>
             </div>
-            <div>
+            <div hidden>
               <small id="jobDetailReporterLabel">ผู้แจ้ง</small>
               <strong id="jobDetailReporter">–</strong>
             </div>
@@ -59,8 +59,13 @@
               <strong id="jobDetailReturnStatus">ยังไม่มีคำขอรับคืน</strong>
             </div>
           </div>
-          <div class="detail-notes">
-            <strong>หมายเหตุล่าสุด</strong>
+          <div class="detail-notes private-verification" id="jobDetailPrivateGroup" hidden>
+            <strong>รายละเอียดลับสำหรับยืนยันเจ้าของ</strong>
+            <small>เฉพาะเจ้าหน้าที่ · ไม่เผยแพร่ในประกาศสาธารณะ</small>
+            <p id="jobDetailPrivate">–</p>
+          </div>
+          <div class="detail-notes" id="jobDetailNotesGroup">
+            <strong>บันทึกการตรวจสอบ</strong>
             <small id="jobDetailNotes">ยังไม่มีหมายเหตุ</small>
           </div>
           <div class="quick-action-grid" id="jobQuickActions"></div>

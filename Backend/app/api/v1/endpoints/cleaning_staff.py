@@ -1,8 +1,9 @@
 """Endpoints สำหรับ Cleaning Staff."""
 
+from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, Form, File, HTTPException, UploadFile, status
 
 from app.api.dependencies import (
     DbSession,
@@ -51,6 +52,12 @@ from app.services.task_return import (
     return_task_to_pool,
 )
 
+from app.api.v1.forms import parse_guest_image_uploads
+from app.services.task_completion import (
+    complete_task_with_report, completion_report_ids, CompletionNotFoundError,
+    CompletionNotOwnedError, CompletionConflictError,
+)
+
 router = APIRouter()
 
 
@@ -67,6 +74,7 @@ async def read_cleaning_tasks(
 ) -> CleaningTaskListResponse:
     """งานที่ยังว่างให้รับ และงานที่แม่บ้านคนนี้รับไว้ สำหรับแสดงทันทีที่เปิด dashboard."""
     tasks = await list_cleaning_tasks(session, staff_id=housekeeper.id)
+    reported_ids = await completion_report_ids(session, [item.id for item in tasks])
     return CleaningTaskListResponse(
         requests=[
             CleaningTaskListItem(
@@ -80,6 +88,7 @@ async def read_cleaning_tasks(
                 location=_location(task),
                 assigned_staff_id=task.assigned_staff_id,
                 created_at=task.created_at,
+                has_completion_report=task.id in reported_ids,
             )
             for task in tasks
         ]
@@ -413,4 +422,35 @@ async def return_task(
         request_code=task.request_code,
         title=task.title,
         status=task.status.value,
+    )
+
+
+@router.post("/{request_id}/complete", response_model=CleaningTaskResponse)
+async def complete_task(
+    request_id: UUID,
+    session: DbSession,
+    staff: HousekeeperStaff,
+    storage: OptionalObjectStorageClient,
+    note: Annotated[str, Form(min_length=1, max_length=2000)],
+    images: Annotated[list[UploadFile], Depends(parse_guest_image_uploads)],
+):
+    try:
+        task = await complete_task_with_report(
+            session, request_id=request_id, request_type=RequestType.CLEANING,
+            staff_id=staff.id, note=note, uploads=images, storage=storage,
+        )
+    except CompletionNotFoundError as exc:
+        raise HTTPException(404, detail=str(exc)) from exc
+    except CompletionNotOwnedError as exc:
+        raise HTTPException(403, detail=str(exc)) from exc
+    except CompletionConflictError as exc:
+        raise HTTPException(409, detail=str(exc)) from exc
+    except (InvalidImageError, ValueError) as exc:
+        raise HTTPException(422, detail=str(exc)) from exc
+    except StorageOperationError as exc:
+        raise HTTPException(502, detail="ไม่สามารถอัปโหลดรูปภาพได้") from exc
+    return CleaningTaskResponse(
+        id=task.id, request_code=task.request_code, title=task.title,
+        status=task.status.value,
+        assigned_staff=AssignedCleanerResponse(id=staff.id, full_name=staff.full_name),
     )

@@ -72,8 +72,8 @@ def make_png() -> bytes:
 
 
 def make_wide_png() -> bytes:
-    """20000x1000 = 20 ล้าน pixel รวม (ต่ำกว่าเพดาน 25 ล้าน) แต่ด้านกว้างเกิน
-    ขีดจำกัด 16383 px ของฟอร์แมต WebP — ตรวจแค่พื้นที่รวมอย่างเดียวจะจับไม่ได้."""
+    """20000x1000 = 20 ล้าน pixel รวม (ต่ำกว่าเพดาน) แต่ด้านกว้างเกิน
+    ขีดจำกัด 16383 px ของฟอร์แมต WebP — ต้องย่อก่อน encode."""
     output = BytesIO()
     PillowImage.new("RGB", (20_000, 1_000), color=(10, 20, 30)).save(output, format="PNG")
     return output.getvalue()
@@ -359,13 +359,12 @@ def test_r2_failure_does_not_create_database_row(
     assert asyncio.run(count_items()) == 0
 
 
-def test_extremely_wide_image_is_rejected_with_422(
+def test_extremely_wide_image_is_resized_before_webp_encode(
     test_context: tuple[TestClient, async_sessionmaker[AsyncSession]],
     fake_storage: FakeObjectStorage,
 ) -> None:
-    """รูปที่ด้านใดด้านหนึ่งเกิน 16383 px ต้องได้ 422 ที่อ่านรู้เรื่อง ไม่ใช่ 500 จาก
-    Pillow ตอน encode WebP ล้มเหลว — การตรวจแค่ width*height เทียบเพดานพื้นที่รวม
-    ปล่อยรูปยาวเรียวแบบนี้หลุดผ่านไปได้."""
+    """รูปที่ด้านใดด้านหนึ่งเกิน 16383 px (ขีดจำกัดของ WebP) ต้องถูกย่อก่อน encode
+    แล้วบันทึกได้ ไม่ใช่ 500 จาก Pillow ตอน encode WebP ล้มเหลว."""
     client, session_factory = test_context
     response = client.post(
         "/api/v1/guest/lost-items",
@@ -373,15 +372,20 @@ def test_extremely_wide_image_is_rejected_with_422(
         files={"image": ("panorama.png", make_wide_png(), "image/png")},
     )
 
-    assert response.status_code == 422
-    assert fake_storage.objects == {}
+    assert response.status_code == 201
+    assert len(fake_storage.objects) == 1
+    item_code = response.json()["item_code"]
 
-    async def count_items() -> int:
+    async def read_image() -> Image:
         async with session_factory() as session:
-            count = await session.scalar(select(func.count(LostItem.id)))
-            return int(count or 0)
+            item = await session.scalar(
+                select(LostItem).where(LostItem.item_code == item_code)
+            )
+            return await session.scalar(select(Image).where(Image.lost_item_id == item.id))
 
-    assert asyncio.run(count_items()) == 0
+    image = asyncio.run(read_image())
+    # 20000x1000 ย่อด้านยาวเหลือ 2048 โดยคงสัดส่วน
+    assert (image.width, image.height) == (2048, 102)
 
 
 def test_exif_rotated_image_reports_saved_dimensions(

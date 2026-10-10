@@ -1,3 +1,12 @@
+const claimStatus = {
+  pending: {label: "รอตรวจสอบหลักฐาน", className: "wait"},
+  additional_info_required: {label: "กรุณาส่งหลักฐานเพิ่มเติม", className: "wait"},
+  approved: {label: "ยืนยันเจ้าของแล้ว · รอนัดรับของ", className: "progress"},
+  scheduled: {label: "นัดรับของแล้ว", className: "progress"},
+  completed: {label: "รับของคืนแล้ว", className: "done"},
+  rejected: {label: "ไม่อนุมัติคำขอรับคืน", className: "not-found"},
+};
+
 const serviceStatus = {
   waiting: {
     label: "รอเจ้าหน้าที่รับเรื่อง",
@@ -29,7 +38,7 @@ const serviceStatus = {
 const lostFoundStatus = {
   pending: { label: "รอเจ้าหน้าที่ตรวจสอบ", className: "wait" },
   approved: { label: "เผยแพร่แล้ว", className: "done" },
-  claimed: { label: "มีผู้ขอรับคืน", className: "progress" },
+  claimed: { label: "ยืนยันเจ้าของแล้ว · รอคืนของ", className: "progress" },
   closed: { label: "ปิดประกาศแล้ว", className: "done" },
   rejected: { label: "ไม่อนุมัติ", className: "not-found" },
 };
@@ -90,6 +99,10 @@ export function normalizedServiceStatus(status) {
 }
 
 export function requestStatusPresentation(item = {}, code = "") {
+  if (item.claim_code || String(code).toUpperCase().startsWith("CLM-")) {
+    return {...(claimStatus[item.status] || {label: "ไม่ทราบสถานะ", className: "wait"}),
+      status: item.status, isService: false, isClaim: true};
+  }
   const serviceType = serviceTypeForRequest(item, code);
   if (serviceType) {
     const status = normalizedServiceStatus(item.status);
@@ -127,6 +140,13 @@ export function serviceProgress(item = {}, code = "") {
 }
 
 export function requestProgress(item = {}, code = "") {
+  if (item.claim_code || String(code).toUpperCase().startsWith("CLM-")) {
+    const statuses = item.status === "rejected" ? ["pending", "rejected"]
+      : item.status === "additional_info_required" ? ["pending", "additional_info_required"]
+      : ["pending", "approved", "scheduled", "completed"];
+    return {currentIndex: Math.max(0, statuses.indexOf(item.status)),
+      steps: statuses.map(status => ({status, label: claimStatus[status].label}))};
+  }
   const service = serviceProgress(item, code);
   if (service) return service;
 

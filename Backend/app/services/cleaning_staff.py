@@ -171,7 +171,7 @@ async def update_cleaning_task_status(
         select(ServiceRequest).where(
             ServiceRequest.id == request_id,
             ServiceRequest.request_type == RequestType.CLEANING,
-        )
+        ).with_for_update().execution_options(populate_existing=True)
     )
 
     if service_request is None:
@@ -186,7 +186,6 @@ async def update_cleaning_task_status(
     valid_transitions = {
         RequestStatus.ASSIGNED: RequestStatus.RECEIVED,
         RequestStatus.RECEIVED: RequestStatus.IN_PROGRESS,
-        RequestStatus.IN_PROGRESS: RequestStatus.COMPLETED,
     }
 
     expected_status = valid_transitions.get(service_request.status)

@@ -335,24 +335,6 @@
               ></p>
             </div>
             <div class="field">
-              <label for="publicFoundCustody">นำของไปฝากไว้ที่ใด</label
-              ><input
-                id="publicFoundCustody"
-                name="custody_location"
-                type="text"
-                required
-                minlength="2"
-                maxlength="160"
-                aria-describedby="publicFoundCustodyError"
-                placeholder="เช่น ห้องประชาสัมพันธ์ชั้น 1"
-              />
-              <p
-                id="publicFoundCustodyError"
-                class="field-error"
-                aria-live="polite"
-              ></p>
-            </div>
-            <div class="field">
               <label for="publicFoundDescription">รายละเอียดทั่วไป</label
               ><textarea
                 id="publicFoundDescription"
@@ -417,12 +399,7 @@
                 aria-live="polite"
               ></p>
             </div>
-            <!-- <div class="field">
-              <label for="publicFinderName"
-                >ชื่อผู้พบหรือผู้ส่งมอบ
-                <span class="optional-label">(ไม่บังคับ)</span></label
-              ><input id="publicFinderName" type="text" maxlength="120" />
-            </div> -->
+
             <div class="field">
               <label for="publicFoundEmail">อีเมลสำหรับติดตามสถานะ</label
               ><input

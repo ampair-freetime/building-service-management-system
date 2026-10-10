@@ -81,7 +81,6 @@
               <strong>ความคืบหน้าของคำร้อง</strong>
               <ol class="job-detail-progress-steps" id="jobDetailProgressSteps"></ol>
             </div>
-            <p id="jobDetailDescription"></p>
             <div class="detail-meta">
               <div>
                 <small>สถานที่</small><strong id="jobDetailRoom">–</strong>
@@ -99,7 +98,11 @@
               </div>
             </div>
             <div class="detail-notes">
-              <strong>หมายเหตุล่าสุด</strong
+              <strong>รายละเอียดจากผู้แจ้ง</strong>
+              <small id="jobDetailDescription"></small>
+            </div>
+            <div class="detail-notes">
+              <strong>หมายเหตุจากเจ้าหน้าที่</strong
               ><small id="jobDetailNotes">ยังไม่มีหมายเหตุ</small>
             </div>
             <div class="quick-action-grid" id="jobQuickActions"></div>

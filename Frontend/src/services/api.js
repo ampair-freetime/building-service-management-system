@@ -313,3 +313,40 @@ export async function createFoundItemClaim(itemCode, payload) {
     clearTimeout(timeout);
   }
 }
+
+async function claimRequest(path, options = {}) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 30000);
+  try {
+    const response = await fetch(`${API_BASE_URL}/guest/claims/${path}`, {
+      ...options, signal: controller.signal,
+    });
+    if (response.status === 404 && !options.method) return null;
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const message = typeof body.detail === "string" ? body.detail
+        : Array.isArray(body.detail) ? body.detail.map(issue => issue.msg).join("\n") : "";
+      throw new Error(message || "ไม่สามารถดำเนินการกับคำขอได้");
+    }
+    return body;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+export function trackClaim(code, email) {
+  return claimRequest(`${encodeURIComponent(code.trim().toUpperCase())}?${new URLSearchParams({claimant_email: email.trim().toLowerCase()})}`);
+}
+
+export function submitClaimAdditionalInfo(code, email, proof) {
+  return claimRequest(`${encodeURIComponent(code)}/additional-info`, {
+    method: "POST", headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({claimant_email: email, proof_detail: proof}),
+  });
+}
+
+export async function getFoundItemConfig() {
+  const response = await fetch(`${API_BASE_URL}/guest/found-items/config`);
+  if (!response.ok) throw new Error("ไม่สามารถโหลดจุดรับฝากได้");
+  return response.json();
+}

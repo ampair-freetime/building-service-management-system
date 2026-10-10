@@ -28,13 +28,15 @@ onMounted(async () => {
 <template>
 <section class="page active" id="dashboard">
           <header class="mobile-hero">
+            <div class="hero-copy">
             <div class="eyebrow">CS Building Care</div>
 
-            <h1 class="greeting-name">แจ้งปัญหาได้ทันที!</h1>
+            <h1 class="greeting-name">แจ้งปัญหาได้ทันที !</h1>
             <p class="hero-subtitle">
               ระบบบริหารจัดการงานบริการอาคารเรียน<br />
               ภาควิชาวิทยาการคอมพิวเตอร์
             </p>
+            </div>
             <img
               class="building-illustration"
               src="/images/cs-building-line-art.svg"
@@ -97,6 +99,11 @@ onMounted(async () => {
                   ตรวจสอบได้ทั้งงานบริการ ของหายและของที่พบ
                 </p>
               </div>
+            </div>
+            <div id="savedTrackingGroup" class="field" hidden style="margin: 16px 0">
+              <label for="savedTrackingRequests">คำร้องที่บันทึกไว้ในเครื่องนี้</label>
+              <select id="savedTrackingRequests"></select>
+              <button id="clearSavedTracking" type="button" class="small-btn" style="margin-top: 8px">ล้างรายการที่บันทึกไว้</button>
             </div>
             <form class="tracking-box" id="trackingForm" novalidate>
               <div class="field">
@@ -171,6 +178,17 @@ onMounted(async () => {
                 <strong id="trackingProgressTitle">ความคืบหน้าของคำร้อง</strong>
                 <ol id="trackingProgressSteps" class="tracking-progress-steps"></ol>
               </div>
+              <section id="claimTrackingDetails" hidden>
+                <p id="claimStaffMessage" style="white-space: pre-wrap"></p>
+                <p id="claimPickupDetails" style="white-space: pre-wrap"></p>
+                <form id="claimAdditionalInfoForm" hidden>
+                  <div class="field">
+                    <label for="claimAdditionalProof">หลักฐานเพิ่มเติมตามที่เจ้าหน้าที่ขอ</label>
+                    <textarea id="claimAdditionalProof" required maxlength="2000"></textarea>
+                  </div>
+                  <button type="submit" class="primary-btn">ส่งหลักฐานเพิ่มเติม</button>
+                </form>
+              </section>
               <p id="trackingPhotosNotice" role="status" hidden>
                 รูปหลังทำงานยังไม่พร้อมแสดง กรุณารีเฟรชภายหลัง
               </p>

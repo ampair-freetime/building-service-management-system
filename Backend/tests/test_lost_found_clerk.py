@@ -59,6 +59,7 @@ def test_clerk_can_view_found_item_detail(test_context):
                 item_category="Electronics",
                 item_name="Laptop",
                 description="Silver laptop",
+                private_verification_detail="Secret serial 123",
                 event_datetime=datetime.now(timezone.utc),
                 location_id=None,
                 location_detail="Building B",
@@ -79,6 +80,7 @@ def test_clerk_can_view_found_item_detail(test_context):
     )
 
     assert response.status_code == 200
+    assert response.json()["private_verification_detail"] == "Secret serial 123"
 
     data = response.json()
 
@@ -149,6 +151,19 @@ def test_administrative_can_approve_found_item(test_context):
     assert data["id"] == str(item_id)
     assert data["report_type"] == "found"
     assert data["status"] == "approved"
+
+    history = client.get("/api/v1/lost-found/my-history", headers=headers)
+    assert history.status_code == 200
+    assert len(history.json()) == 1
+    assert history.json()[0]["item_code"] == "FOUND003"
+    assert history.json()[0]["status"] == "approved"
+    assert client.get("/api/v1/lost-found/my-history").status_code == 401
+    seed_staff(session_factory, email="other.clerk@example.com",
+               password="admin-password", role="clerk")
+    other_login = client.post("/api/v1/auth/login", json={
+        "identifier": "other.clerk@example.com", "password": "admin-password"})
+    other_headers = {"Authorization": f"Bearer {other_login.json()['access_token']}"}
+    assert client.get("/api/v1/lost-found/my-history", headers=other_headers).json() == []
 
 
 def test_cannot_approve_already_approved_found_item(test_context):
@@ -1060,6 +1075,8 @@ def test_clerk_can_approve_ownership_request(test_context):
 
     assert claim.status == ClaimStatus.APPROVED
     assert claim.reviewed_by is not None
+    # ยืนยันเจ้าของแล้วต้องเอาประกาศออกจากหน้า guest ทันที ไม่ต้องรอวันคืนของ
+    assert _item_status(session_factory, claim.found_item_id) == LostStatus.CLAIMED
 
 
 def test_clerk_can_request_additional_ownership_information(test_context):
@@ -1315,7 +1332,7 @@ def test_clerk_can_update_return_status_to_returned(test_context):
             return (await session.get(LostItem, claim.found_item_id)).status
 
     # คืนของแล้วต้องเอาประกาศออกจากหน้า guest ด้วย
-    assert asyncio.run(get_item_status()) == LostStatus.CLAIMED
+    assert asyncio.run(get_item_status()) == LostStatus.CLOSED
 
 
 def test_invalid_return_status_returns_422(test_context):
@@ -1762,7 +1779,12 @@ def test_rejected_lost_item_is_not_published_and_removed_from_pending_list(
     )
 
 
-def test_clerk_can_schedule_pickup(test_context):
+def test_clerk_can_schedule_pickup(test_context, monkeypatch):
+    async def fake_email(**kwargs):
+        assert "CSB office" in kwargs["body"] or "CSB lobby" in kwargs["body"]
+        if "CSB office" in kwargs["body"]:
+            assert "13:30–16:00" in kwargs["body"]
+    monkeypatch.setattr("app.api.v1.endpoints.lost_found_clerk.send_email", fake_email)
     client, session_factory = test_context
 
     seed_staff(
@@ -1824,7 +1846,10 @@ def test_clerk_can_schedule_pickup(test_context):
         f"/api/v1/lost-found/ownership-requests/{claim_id}/schedule-pickup",
         headers=headers,
         json={
-            "pickup_datetime": "2026-09-20T13:30:00",
+            "pickup_datetime": "2030-09-20T13:30:00",
+            "pickup_end_datetime": "2030-09-20T16:00:00",
+            "pickup_location": "CSB office",
+            "note": "Bring identification",
         },
     )
 
@@ -1833,7 +1858,33 @@ def test_clerk_can_schedule_pickup(test_context):
     data = response.json()
 
     assert data["status"] == "scheduled"
-    assert data["pickup_datetime"] == "2026-09-20T13:30:00"
+    assert data["pickup_datetime"] == "2030-09-20T13:30:00"
+    detail = client.get(f"/api/v1/lost-found/ownership-requests/{claim_id}", headers=headers)
+    assert detail.json()["pickup_location"] == "CSB office"
+    assert detail.json()["pickup_note"] == "Bring identification"
+    assert detail.json()["pickup_end_datetime"] == "2030-09-20T16:00:00"
+    for end in ["2030-09-20T13:00:00", "2030-09-20T17:00:00", "2030-09-21T14:00:00", "2030-09-20T14:15:00"]:
+        invalid = client.post(f"/api/v1/lost-found/ownership-requests/{claim_id}/schedule-pickup", headers=headers, json={"pickup_datetime": "2030-09-20T13:30:00", "pickup_end_datetime": end})
+        assert invalid.status_code == 422
+    changed = client.post(
+        f"/api/v1/lost-found/ownership-requests/{claim_id}/schedule-pickup", headers=headers,
+        json={"pickup_datetime": "2030-09-23T14:30:00", "pickup_location": "CSB lobby"},
+    )
+    assert changed.status_code == 200
+    assert changed.json()["pickup_location"] == "CSB lobby"
+    assert changed.json()["email_sent"] is True
+    for invalid_time in ["2030-09-21T13:30:00+07:00", "2030-09-20T04:30:00+07:00", "2030-09-20T17:00:00+07:00"]:
+        invalid = client.post(
+            f"/api/v1/lost-found/ownership-requests/{claim_id}/schedule-pickup", headers=headers,
+            json={"pickup_datetime": invalid_time},
+        )
+        assert invalid.status_code == 422
+
+    active = client.get("/api/v1/lost-found/ownership-requests", headers=headers)
+    assert active.status_code == 200
+    assert str(claim_id) in {record["id"] for record in active.json()}
+
+
 
     async def get_claim():
         async with session_factory() as session:
@@ -1843,6 +1894,7 @@ def test_clerk_can_schedule_pickup(test_context):
 
     assert claim.status == ClaimStatus.SCHEDULED
     assert claim.pickup_datetime is not None
+    assert claim.pickup_location == "CSB lobby"
 
 
 def test_schedule_pickup_requires_datetime(test_context):
@@ -1970,6 +2022,8 @@ def test_view_scheduled_pickup_details(test_context):
                 status=ClaimStatus.SCHEDULED,
                 return_status=ReturnStatus.PENDING,
                 pickup_datetime=datetime(2026, 9, 20, 13, 30),
+                pickup_location="Clerk Office",
+                pickup_note="Bring an ID card",
             )
 
             session.add(claim)
@@ -1991,6 +2045,8 @@ def test_view_scheduled_pickup_details(test_context):
 
     assert data["status"] == "scheduled"
     assert data["pickup_datetime"] == "2026-09-20T13:30:00"
+    assert data["pickup_location"] == "Clerk Office"
+    assert data["pickup_note"] == "Bring an ID card"
 
 
 def _clerk_headers(client, session_factory):
@@ -2011,7 +2067,7 @@ def _seed_item(session_factory, *, report_type, status, claim_status=None):
     async def seed():
         async with session_factory() as session:
             item = LostItem(
-                item_code=f"{report_type.value.upper()}-{uuid4().hex[:8]}",
+                item_code=f"{report_type.value.upper()}-{uuid4().hex[:8].upper()}",
                 report_type=report_type,
                 item_category="Accessories",
                 item_name="Wallet",
@@ -2230,3 +2286,166 @@ def test_approve_response_does_not_lazy_load_item_images(test_context):
 
     assert response.status_code == 200
     assert response.json()["images"] == []
+
+
+def test_reject_ownership_requires_reason_and_preserves_found_item(test_context, monkeypatch):
+    emails = []
+    async def fake_email(**kwargs):
+        emails.append(kwargs)
+    monkeypatch.setattr("app.api.v1.endpoints.lost_found_clerk.send_email", fake_email)
+    client, session_factory = test_context
+    seed_staff(session_factory, email="reviewer@example.com", password="admin-password", role="clerk")
+    login = client.post("/api/v1/auth/login", json={"identifier": "reviewer@example.com", "password": "admin-password"})
+    headers = {"Authorization": f"Bearer {login.json()['access_token']}"}
+    async def seed():
+        async with session_factory() as session:
+            item = LostItem(item_code="REJECT-CLAIM-ITEM", report_type=LostType.FOUND,
+                            item_category="Clothing", item_name="Shirt", event_datetime=datetime.now(timezone.utc),
+                            reporter_email="finder@example.com", status=LostStatus.APPROVED)
+            session.add(item)
+            await session.flush()
+            claim = LostClaim(found_item_id=item.id, claimant_name="Claimant", claimant_email="owner@example.com",
+                              proof_detail="Wrong evidence", status=ClaimStatus.ADDITIONAL_INFO_REQUIRED)
+            session.add(claim)
+            await session.commit()
+            return claim.id, item.id
+    claim_id, item_id = asyncio.run(seed())
+    url = f"/api/v1/lost-found/ownership-requests/{claim_id}/reject"
+    assert client.post(url, headers=headers, json={"reason": " "}).status_code == 422
+    assert client.post(url, json={"reason": "Mismatch"}).status_code == 401
+    response = client.post(url, headers=headers, json={"reason": "Evidence does not match"})
+    assert response.status_code == 200
+    assert response.json()["status"] == "rejected"
+    assert response.json()["email_sent"] is True
+    assert emails[0]["recipient"] == "owner@example.com"
+    assert "Evidence does not match" in emails[0]["body"]
+    detail = client.get(f"/api/v1/lost-found/ownership-requests/{claim_id}", headers=headers).json()
+    assert detail["review_note"] == "Evidence does not match"
+    assert client.post(url, headers=headers, json={"reason": "Again"}).status_code == 409
+    async def check_item():
+        async with session_factory() as session:
+            assert (await session.get(LostItem, item_id)).status == LostStatus.APPROVED
+    asyncio.run(check_item())
+
+
+def _seed_claim(session_factory, item_id, *, email, status=ClaimStatus.PENDING):
+    async def seed():
+        async with session_factory() as session:
+            claim = LostClaim(
+                found_item_id=item_id,
+                claimant_name="Claimant",
+                claimant_email=email,
+                proof_detail="มีสติกเกอร์สีแดงด้านหลังเครื่อง",
+                status=status,
+            )
+            session.add(claim)
+            await session.commit()
+            return claim.id
+
+    return asyncio.run(seed())
+
+
+def _claim(session_factory, claim_id):
+    async def read():
+        async with session_factory() as session:
+            return await session.get(LostClaim, claim_id)
+
+    return asyncio.run(read())
+
+
+def _item_code(session_factory, item_id):
+    async def read():
+        async with session_factory() as session:
+            return (await session.get(LostItem, item_id)).item_code
+
+    return asyncio.run(read())
+
+
+def test_approving_ownership_hides_found_item_from_guest_list(test_context, public_list_storage):
+    client, session_factory = test_context
+    headers = _clerk_headers(client, session_factory)
+    item_id = _seed_item(session_factory, report_type=LostType.FOUND, status=LostStatus.APPROVED)
+    claim_id = _seed_claim(session_factory, item_id, email="owner@example.com")
+
+    response = client.post(f"/api/v1/lost-found/ownership-requests/{claim_id}/approve", headers=headers)
+
+    assert response.status_code == 200
+    assert _item_status(session_factory, item_id) == LostStatus.CLAIMED
+    public_items = client.get("/api/v1/guest/found-items").json()["items"]
+    assert all(item["id"] != str(item_id) for item in public_items)
+
+
+def test_approving_ownership_rejects_other_open_claims(test_context, monkeypatch):
+    emails = []
+    async def fake_email(**kwargs):
+        emails.append(kwargs)
+    monkeypatch.setattr("app.services.lost_found_clerk.send_email", fake_email)
+    client, session_factory = test_context
+    headers = _clerk_headers(client, session_factory)
+    item_id = _seed_item(session_factory, report_type=LostType.FOUND, status=LostStatus.APPROVED)
+    owner_claim_id = _seed_claim(session_factory, item_id, email="owner@example.com")
+    pending_id = _seed_claim(session_factory, item_id, email="other@example.com")
+    info_id = _seed_claim(
+        session_factory,
+        item_id,
+        email="info@example.com",
+        status=ClaimStatus.ADDITIONAL_INFO_REQUIRED,
+    )
+    other_item_id = _seed_item(session_factory, report_type=LostType.FOUND, status=LostStatus.APPROVED)
+    unrelated_id = _seed_claim(session_factory, other_item_id, email="other@example.com")
+
+    response = client.post(
+        f"/api/v1/lost-found/ownership-requests/{owner_claim_id}/approve", headers=headers
+    )
+
+    assert response.status_code == 200
+    for claim_id in (pending_id, info_id):
+        claim = _claim(session_factory, claim_id)
+        assert claim.status == ClaimStatus.REJECTED
+        assert claim.review_note == "รายการนี้ยืนยันเจ้าของแล้ว"
+    assert _claim(session_factory, unrelated_id).status == ClaimStatus.PENDING
+    assert {email["recipient"] for email in emails} == {"other@example.com", "info@example.com"}
+    assert len(emails) == 2
+    assert all("รายการนี้ยืนยันเจ้าของแล้ว" in email["body"] for email in emails)
+    assert all("รหัสคำขอรับคืน:" in email["body"] for email in emails)
+
+
+def test_second_ownership_approval_for_same_item_returns_409(test_context):
+    client, session_factory = test_context
+    headers = _clerk_headers(client, session_factory)
+    item_id = _seed_item(session_factory, report_type=LostType.FOUND, status=LostStatus.CLAIMED)
+    # จำลองคำขอที่ยังค้างจากข้อมูลเก่า ก่อนมีการ reject อัตโนมัติ
+    claim_id = _seed_claim(session_factory, item_id, email="late@example.com")
+
+    response = client.post(f"/api/v1/lost-found/ownership-requests/{claim_id}/approve", headers=headers)
+
+    assert response.status_code == 409
+    assert _claim(session_factory, claim_id).status == ClaimStatus.PENDING
+
+
+def test_guest_cannot_claim_but_owner_can_still_track_after_approval(test_context):
+    client, session_factory = test_context
+    headers = _clerk_headers(client, session_factory)
+    item_id = _seed_item(session_factory, report_type=LostType.FOUND, status=LostStatus.APPROVED)
+    claim_id = _seed_claim(session_factory, item_id, email="owner@example.com")
+    item_code = _item_code(session_factory, item_id)
+
+    approve = client.post(f"/api/v1/lost-found/ownership-requests/{claim_id}/approve", headers=headers)
+    new_claim = client.post(
+        f"/api/v1/guest/found-items/{item_code}/claims",
+        json={
+            "claimant_name": "คนอื่น",
+            "claimant_email": "someone@example.com",
+            "proof_detail": "พวงกุญแจมีหมายเลข 1042 สลักด้านหลัง",
+        },
+    )
+    tracking = client.get(
+        f"/api/v1/guest/found-items/{item_code}/claims/{claim_id}",
+        params={"claimant_email": "owner@example.com"},
+    )
+
+    assert approve.status_code == 200
+    assert new_claim.status_code == 409
+    assert tracking.status_code == 200
+    assert tracking.json()["status"] == "approved"
+    assert tracking.json()["custody_location"] == "Clerk Office"

@@ -10,8 +10,9 @@ from app.core.config import Settings
 from app.services import invitation_email
 
 
+@pytest.mark.parametrize("sender", ["Care <care@example.org>", "Care care@example.org"])
 @pytest.mark.parametrize("implicit_ssl", [False, True])
-def test_smtp_tls_mode_and_message(implicit_ssl, monkeypatch):
+def test_smtp_tls_mode_and_message(implicit_ssl, sender, monkeypatch):
     calls = []
     configuration = Settings(
         _env_file=None,
@@ -22,7 +23,7 @@ def test_smtp_tls_mode_and_message(implicit_ssl, monkeypatch):
         smtp_username="user",
         smtp_password="test-password",
         smtp_timeout_seconds=4,
-        mail_from="Care <care@example.org>",
+        mail_from=sender,
     )
     monkeypatch.setattr(invitation_email, "settings", configuration)
 
@@ -47,6 +48,9 @@ def test_smtp_tls_mode_and_message(implicit_ssl, monkeypatch):
 
         def send_message(self, message):
             assert message["To"] == "staff@example.org"
+            assert message["From"].addresses[0].addr_spec == "care@example.org"
+            assert message["Date"]
+            assert message["Message-ID"]
             assert (
                 "https://care.example.org/staff/setup-password?token=test" in message.get_content()
             )

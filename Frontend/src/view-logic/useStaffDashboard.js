@@ -1,3 +1,4 @@
+import {mapPendingFoundItem, mapPendingLostItem, mapApprovedItem, mapOwnershipClaim} from "./staff-dashboard/lost-found-mappers.js";
 import { onBeforeUnmount, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import { enhanceFilterSelects } from "../services/filterSelectDropdown.js";
@@ -16,6 +17,8 @@ import {
   canRoleOpenPage,
 } from "../config/staff-role-pages.js";
 import {
+  rejectOwnershipRequest,
+  getPersonalLostFoundHistory,
   getFoundItemDetail,
   getLostItemDetail,
   getPendingFoundItems,
@@ -58,6 +61,7 @@ import {
 } from "./staff-dashboard/staff-accounts.js";
 import {
   acceptCleaningTask,
+  completeCleaningTask,
   addCleaningCompletionNote,
   getCleaningTaskDetail,
   getCleaningTaskHistory,
@@ -87,6 +91,8 @@ export function useStaffDashboard() {
   const router = useRouter();
   const allowedRoles = ["housekeeper", "technician", "clerk", "admin"];
   const savedRole = localStorage.getItem("buildingCareRole");
+  const dashboardLoading = ref(true);
+  const emailSending = ref(false);
   const activeRole = ref(
     allowedRoles.includes(savedRole) ? savedRole : "clerk",
   );
@@ -94,6 +100,7 @@ export function useStaffDashboard() {
   let cleanupDashboardEvents = () => {};
 
   async function initializeDashboard() {
+    const loadingStartedAt = performance.now();
     // โหลด dependency ภายนอกก่อนสร้างหน้าจอ หากโหลดไม่ได้จะใช้ QR fallback แทน
     try {
       await loadQrCodeLibrary();
@@ -160,7 +167,7 @@ export function useStaffDashboard() {
         record.staff = currentUserName.technician;
       }
     });
-    let currentLostTab = "inventory";
+    let currentLostTab = currentRole === "clerk" ? "all" : "inventory";
     let appliedHistorySearch = "";
     let currentClerkCenterView = "approvals";
     const clerkApprovalLoadState = { found: "loading", lost: "loading", claims: "loading" };
@@ -220,19 +227,7 @@ export function useStaffDashboard() {
       if (currentRole !== "clerk") return;
       try {
         const data = await getPendingFoundItems();
-        const pendingFoundItems = data.map((item) => ({
-          backendId: item.id,
-          id: item.item_code,
-          title: item.item_name,
-          category: "ของที่พบ",
-          place: item.location_detail || "ไม่ระบุสถานที่พบ",
-          description: item.description || "ไม่มีรายละเอียดเพิ่มเติม",
-          custody: `รายงานเมื่อ ${new Date(item.created_at).toLocaleString("th-TH")}`,
-          status: "รออนุมัติรับฝาก",
-          createdAt: item.created_at,
-          imageUrl: item.images?.[0]?.url || "",
-          assignee: null,
-        }));
+        const pendingFoundItems = data.map(mapPendingFoundItem);
         const processedItems = lostSets.inventory.filter(
           (item) => approvalGroup(item.status) !== "pending",
         );
@@ -255,19 +250,7 @@ export function useStaffDashboard() {
       if (currentRole !== "clerk") return;
       try {
         const data = await getPendingLostItems();
-        const pendingLostItems = data.map((item) => ({
-          backendId: item.id,
-          id: item.item_code,
-          title: item.item_name,
-          category: "ประกาศตามหา",
-          place: item.location_detail || "ไม่ระบุสถานที่คาดว่าหาย",
-          description: item.description || "ไม่มีรายละเอียดเพิ่มเติม",
-          custody: `ส่งประกาศเมื่อ ${new Date(item.created_at).toLocaleString("th-TH")}`,
-          status: "รออนุมัติเผยแพร่",
-          createdAt: item.created_at,
-          imageUrl: item.images?.[0]?.url || "",
-          assignee: null,
-        }));
+        const pendingLostItems = data.map(mapPendingLostItem);
         const processedItems = lostSets.lostposts.filter(
           (item) => approvalGroup(item.status) !== "pending",
         );
@@ -296,23 +279,6 @@ export function useStaffDashboard() {
         const deletedIds = new Set(deletedRecords
           .filter((entry) => entry.source === "lost")
           .map((entry) => entry.itemId));
-        const mapApprovedItem = (item, tab) => ({
-          publicListItem: true,
-          backendId: item.id,
-          id: item.item_code,
-          title: item.item_name,
-          category: item.item_category,
-          place: item.location_detail || "ไม่ระบุสถานที่",
-          description: item.description || "ไม่มีรายละเอียดเพิ่มเติม",
-          custody: tab === "inventory" ? "รับฝากโดยธุรการ" : "เผยแพร่แล้ว",
-          status: tab === "inventory" ? "อนุมัติรับฝาก" : "อนุมัติเผยแพร่",
-          eventDatetime: item.event_datetime,
-          imageUrl: item.images?.[0]?.url || "",
-          reporterEmail: item.reporter_email || null,
-          reviewerId: item.reviewed_by || null,
-          reviewerName: item.reviewer_name || item.reviewer?.full_name || null,
-          assignee: null,
-        });
         const mergeApproved = (tab, items) => {
           const previous = new Map(lostSets[tab].map((item) => [item.backendId, item]));
           const approved = items
@@ -353,37 +319,7 @@ export function useStaffDashboard() {
           }),
         );
 
-        lostSets.claims = data.map((claim) => ({
-          backendId: claim.id,
-          foundItemBackendId: claim.found_item_id,
-          id: claim.claim_code || claim.id,
-          title: `คำขอรับ${claim.item_name || "ของคืน"}`,
-          place: claim.proof_detail || "ไม่มีรายละเอียดหลักฐาน",
-          custody: "คำขอใหม่",
-          backendStatus: claim.status,
-          status: ownershipStatusLabel(claim.status),
-          returnStatusCode: claim.return_status,
-          returnStatus: foundItemReturnStatus(
-            claim.return_status,
-            claim.status,
-          ),
-          requester: claim.claimant_name,
-          contact: claim.claimant_email,
-          requestDate: new Date(
-            claim.created_at,
-          ).toLocaleString("th-TH"),
-          createdAt: claim.created_at,
-          evidence: claim.proof_detail,
-          pickupDate: claim.pickup_date || claim.appointment?.pickup_date || "",
-          pickupTime: claim.pickup_time || claim.appointment?.pickup_time || "",
-          pickupLocation:
-            claim.pickup_location || claim.appointment?.pickup_location || "",
-          pickupNote: claim.pickup_note || claim.appointment?.note || "",
-          appointment: claim.pickup_date
-            ? `${claim.pickup_date} เวลา ${claim.pickup_time || "–"}`
-            : "ยังไม่มีนัดหมาย",
-          assignee: null,
-        }));
+        lostSets.claims = data.map(claim => mapOwnershipClaim(claim, ownershipStatusLabel, foundItemReturnStatus));
 
         clerkApprovalLoadState.claims = "ready";
         renderClerkCenter();
@@ -440,11 +376,21 @@ export function useStaffDashboard() {
       date = todayISO(),
       time = currentTimeHM(),
     }) {
-      workHistory.unshift({
+      const actorId = signedInStaffId();
+      const timestamp = Date.now();
+      const duplicate = workHistory.find(
+        (entry) =>
+          entry.staff === staff &&
+          entry.actorId === actorId &&
+          entry.itemId === itemId &&
+          entry.action === action &&
+          timestamp - (entry.timestamp || 0) < 2000,
+      );
+      const record = {
         uid: `WH-${Date.now()}-${Math.random().toString(16).slice(2)}`,
         staff,
         role,
-        actorId: signedInStaffId(),
+        actorId,
         itemId,
         title,
         category,
@@ -453,8 +399,13 @@ export function useStaffDashboard() {
         detail,
         date,
         time,
-        timestamp: Date.now(),
-      });
+        timestamp,
+      };
+      if (duplicate) {
+        Object.assign(duplicate, record, { uid: duplicate.uid });
+      } else {
+        workHistory.unshift(record);
+      }
       renderActivities();
       renderMyHistory();
       renderStaffOverview();
@@ -553,6 +504,7 @@ export function useStaffDashboard() {
             room: repairLocation(request.location),
             priority: request.priority === "urgent" ? "เร่งด่วน" : "ปกติ",
             backendStatus: request.status,
+            hasCompletionReport: request.has_completion_report,
             status: repairStatusLabels[request.status] || request.status,
             assigneeId: request.assigned_staff_id,
             assignee: request.assigned_staff_id
@@ -606,6 +558,7 @@ export function useStaffDashboard() {
             room: repairLocation(task.location),
             priority: task.priority === "urgent" ? "เร่งด่วน" : "ปกติ",
             backendStatus: task.status,
+            hasCompletionReport: task.has_completion_report,
             status: cleaningStatusLabels[task.status] || task.status,
             assigneeId: task.assigned_staff_id,
             assignee: task.assigned_staff_id
@@ -865,11 +818,16 @@ export function useStaffDashboard() {
         return;
       }
       currentPage = page;
+      if (["housekeeper", "technician"].includes(currentRole) && destinationPage === "jobs") {
+        currentBoardView = page === "my-jobs" ? "mine" : "unassigned";
+      }
       $("#notificationPanel")?.classList.remove("open", "mobile-notification-page");
       $("#notificationButton")?.setAttribute("aria-expanded", "false");
-      $$("#mobileNotification, #mobileNotificationAdmin").forEach((button) => {
-        button.classList.remove("active");
-        button.removeAttribute("aria-current");
+      $$('[data-mobile-notification]').forEach((button) => {
+        const active = page === "notifications";
+        button.classList.toggle("active", active);
+        if (active) button.setAttribute("aria-current", "page");
+        else button.removeAttribute("aria-current");
       });
       $$(".page").forEach((p) => p.classList.remove("active"));
       destination.classList.add("active");
@@ -999,7 +957,7 @@ export function useStaffDashboard() {
       if (currentRole === "clerk")
         items = lostSets.claims
           .slice(0, 3)
-          .map((x) => [x.id, x.title, x.custody, x.status]);
+          .map((x) => [x.id, x.title, x.activityLabel, x.status]);
       else
         items = roleJobs()
           .filter((j) => !j.assignee)
@@ -1125,6 +1083,10 @@ export function useStaffDashboard() {
                 actions = `<div class="read-only">รับโดย ${escapeHtml(
                   j.assignee,
                 )}</div>`;
+              if (isMine && j.backendId && (j.backendStatus === "in_progress" ||
+                  (j.backendStatus === "completed" && !j.hasCompletionReport))) {
+                actions += `<button class="primary" type="button" data-job-action="complete" data-job-id="${j.id}">${j.backendStatus === "completed" ? "ยังไม่ได้รายงาน · เพิ่มรายงาน" : "ปิดงานพร้อมรายงาน"}</button>`;
+              }
               const icon = j.type === "repair" ? "#i-tools" : "#i-broom";
               const photo = `<div class="job-photo"><svg class="icon"><use href="${icon}"/></svg></div>`;
               return `<article class="job-card ${
@@ -1321,6 +1283,24 @@ export function useStaffDashboard() {
         detail,
         time: nowThai(),
       });
+      recordWorkHistory({
+        staff: actor,
+        itemId,
+        title,
+        category:
+          source === "lost"
+            ? "ของหายและรับฝาก"
+            : source === "jobs"
+              ? "งานบริการ"
+              : source === "staff"
+                ? "บัญชี Staff"
+                : source === "qr"
+                  ? "สถานที่และ QR"
+                  : "งานทั่วไป",
+        action,
+        status: action,
+        detail,
+      });
       renderHistory();
     }
     function storeDeletedRecord(source, record, collectionKey, title) {
@@ -1386,7 +1366,7 @@ export function useStaffDashboard() {
       const decision = approvalGroup(item.status);
       if (decision === "rejected") return "";
       if (decision === "approved") {
-        return `<div class="decision-strip completed"><button class="approve-btn" type="button" data-lost-action="complete" data-tab="${tab}" data-item-id="${item.id}">สำเร็จแล้ว</button></div>`;
+        return `<div class="decision-strip completed"><button class="approve-btn" type="button" data-lost-action="complete" data-tab="${tab}" data-item-id="${item.id}">ปิดรายการ</button></div>`;
       }
       return `<div class="decision-strip"><button class="approve-btn" type="button" data-lost-action="approve" data-tab="${tab}" data-item-id="${item.id}">อนุมัติ</button><button class="reject-btn" type="button" data-lost-action="reject" data-tab="${tab}" data-item-id="${item.id}">ไม่อนุมัติ</button></div>`;
     }
@@ -1412,7 +1392,7 @@ export function useStaffDashboard() {
       if (!item) return;
       requestConfirmation(
         "ยืนยันปิดรายการ",
-        `${id} · ยืนยันว่าดำเนินการ “${item.title}” สำเร็จแล้วใช่หรือไม่?`,
+        `ยืนยันว่าดำเนินการ “${item.title}” สำเร็จแล้วใช่หรือไม่?`,
         async () => {
           // ปิดที่ backend ก่อน หน้า guest จะได้เลิกแสดงรายการนี้ด้วย ไม่ใช่แค่ซ่อนในเครื่อง staff
           if (item.backendId) {
@@ -1439,7 +1419,7 @@ export function useStaffDashboard() {
           renderLost();
           renderMetrics();
           showSuccess(
-            `${id} · ${item.title} ถูกปิดเป็นรายการสำเร็จแล้ว`,
+            `${item.title} ถูกปิดเป็นรายการสำเร็จแล้ว`,
             "ปิดรายการแล้ว",
           );
         },
@@ -1507,9 +1487,14 @@ export function useStaffDashboard() {
           })),
       );
     }
+    function claimNeedsClerkReview(item) {
+      if (item.returnStatusCode === "returned" || ["completed", "rejected"].includes(item.backendStatus)) return false;
+      return ["pending", "additional_info_required", "approved", "scheduled"].includes(item.backendStatus) ||
+        ["รอตรวจสอบ", "ขอข้อมูลเพิ่มเติม", "นัดหมายแล้ว", "ผ่านการตรวจสอบ"].includes(item.status);
+    }
     function activeClaimNotifications() {
       return lostSets.claims
-        .filter((item) => item.status !== "คืนของแล้ว")
+        .filter(claimNeedsClerkReview)
         .map((item) => ({
           ...item,
           unread: !readClaimNotifications.has(item.id),
@@ -1565,7 +1550,7 @@ export function useStaffDashboard() {
       }
       const found = lostSets.inventory.filter((item) => approvalGroup(item.status) === "pending");
       const lost = lostSets.lostposts.filter((item) => approvalGroup(item.status) === "pending");
-      const claims = lostSets.claims.filter((item) => item.status !== "คืนของแล้ว");
+      const claims = lostSets.claims.filter(claimNeedsClerkReview);
       metrics.innerHTML = [
         [found.length + lost.length, "รออนุมัติทั้งหมด", "ของที่พบและประกาศของหาย"],
         [found.length, "ของที่พบ", "รออนุมัติรับฝาก"],
@@ -1605,7 +1590,7 @@ export function useStaffDashboard() {
           item.text,
           record?.category,
           record?.description,
-          record?.custody,
+          record?.activityLabel,
           record?.status,
         );
       });
@@ -1617,7 +1602,7 @@ export function useStaffDashboard() {
       );
       const claims = lostSets.claims.filter(
         (item) =>
-          item.status !== "คืนของแล้ว" &&
+          claimNeedsClerkReview(item) &&
           matchesClerkCenterSearch(
             item.id,
             item.title,
@@ -1627,7 +1612,7 @@ export function useStaffDashboard() {
             item.status,
             item.returnStatus,
             item.evidence,
-            item.custody,
+            item.activityLabel,
           ),
       );
       ["#pendingApprovalCount", "#pendingApprovalTabCount"].forEach(
@@ -1644,7 +1629,7 @@ export function useStaffDashboard() {
         ? approvals
             .map((item) => {
               const record = findLostItem(item.tab, item.approvalId);
-              return `<article class="clerk-request-card"><div class="clerk-request-top"><div><span class="approval-type ${item.tab}">${approvalTypeLabel(item.tab)}</span><h4>${item.approvalId} · ${escapeHtml(item.title)}</h4></div><span class="badge wait">รออนุมัติ</span></div><p>${escapeHtml(item.text)}</p><div class="clerk-request-meta"><span>${escapeHtml(record?.custody || "รอการตรวจสอบ")}</span></div><div class="clerk-request-actions"><button class="small-btn" type="button" data-center-action="detail" data-tab="${item.tab}" data-item-id="${item.approvalId}">ดูรายละเอียด</button><button class="approve-btn" type="button" data-center-action="approve" data-tab="${item.tab}" data-item-id="${item.approvalId}">อนุมัติ</button><button class="reject-btn" type="button" data-center-action="reject" data-tab="${item.tab}" data-item-id="${item.approvalId}">ไม่อนุมัติ</button></div></article>`;
+              return `<article class="clerk-request-card"><div class="clerk-request-top"><div><span class="approval-type ${item.tab}">${approvalTypeLabel(item.tab)}</span><h4>${item.approvalId} · ${escapeHtml(item.title)}</h4></div><span class="badge wait">รออนุมัติ</span></div><p>${escapeHtml(item.text)}</p><div class="clerk-request-meta"><span>${escapeHtml(record?.activityLabel || "รอการตรวจสอบ")}</span></div><div class="clerk-request-actions"><button class="small-btn" type="button" data-center-action="detail" data-tab="${item.tab}" data-item-id="${item.approvalId}">ดูรายละเอียด</button><button class="approve-btn" type="button" data-center-action="approve" data-tab="${item.tab}" data-item-id="${item.approvalId}">อนุมัติ</button><button class="reject-btn" type="button" data-center-action="reject" data-tab="${item.tab}" data-item-id="${item.approvalId}">ไม่อนุมัติ</button></div></article>`;
             })
             .join("")
         : '<div class="empty">ไม่มีคำขอที่รออนุมัติ</div>';
@@ -1652,7 +1637,7 @@ export function useStaffDashboard() {
         ? lostAnnouncements
             .map((item) => {
               const record = findLostItem(item.tab, item.approvalId);
-              return `<article class="clerk-request-card"><div class="clerk-request-top"><div><span class="approval-type lostposts">ประกาศตามหา</span><h4>${item.approvalId} · ${escapeHtml(item.title)}</h4></div><span class="badge wait">รออนุมัติเผยแพร่</span></div><p>${escapeHtml(item.text)}</p><div class="clerk-request-meta"><span>${escapeHtml(record?.custody || "รอการตรวจสอบ")}</span></div><div class="clerk-request-actions"><button class="small-btn" type="button" data-center-action="detail" data-tab="lostposts" data-item-id="${item.approvalId}">ดูรายละเอียด</button><button class="approve-btn" type="button" data-center-action="approve" data-tab="lostposts" data-item-id="${item.approvalId}">อนุมัติเผยแพร่</button><button class="reject-btn" type="button" data-center-action="reject" data-tab="lostposts" data-item-id="${item.approvalId}">ไม่อนุมัติ</button></div></article>`;
+              return `<article class="clerk-request-card"><div class="clerk-request-top"><div><span class="approval-type lostposts">ประกาศตามหา</span><h4>${item.approvalId} · ${escapeHtml(item.title)}</h4></div><span class="badge wait">รออนุมัติเผยแพร่</span></div><p>${escapeHtml(item.text)}</p><div class="clerk-request-meta"><span>${escapeHtml(record?.activityLabel || "รอการตรวจสอบ")}</span></div><div class="clerk-request-actions"><button class="small-btn" type="button" data-center-action="detail" data-tab="lostposts" data-item-id="${item.approvalId}">ดูรายละเอียด</button><button class="approve-btn" type="button" data-center-action="approve" data-tab="lostposts" data-item-id="${item.approvalId}">อนุมัติเผยแพร่</button><button class="reject-btn" type="button" data-center-action="reject" data-tab="lostposts" data-item-id="${item.approvalId}">ไม่อนุมัติ</button></div></article>`;
             })
             .join("")
         : '<div class="empty">ไม่มีคำขอที่รออนุมัติ</div>';
@@ -1660,7 +1645,8 @@ export function useStaffDashboard() {
         ? claims
             .map(
               (item) =>
-                `<article class="clerk-request-card"><div class="clerk-request-top"><div><span class="approval-type claims">คำขอแสดงความเป็นเจ้าของ</span><h4>${item.id} · ${escapeHtml(item.title)}</h4></div><span class="badge ${badgeClass(item.status)}">${escapeHtml(item.status)}</span></div><p>${escapeHtml(item.place)}</p><div class="clerk-request-meta"><span>ผู้ขอ: ${escapeHtml(item.requester || "ไม่ระบุชื่อ")}</span><span>ส่งคำขอ: ${escapeHtml(item.requestDate || "ไม่ระบุเวลา")}</span><span>สถานะการคืน: ${escapeHtml(item.returnStatus || "ไม่ทราบสถานะ")}</span><span>${escapeHtml(item.custody || "คำขอใหม่")}</span></div><div class="clerk-request-actions"><button class="small-btn" type="button" data-center-action="claim-detail" data-item-id="${item.id}">ดูรายละเอียดคำขอ</button></div></article>`,
+                `<article class="clerk-request-card"><div class="clerk-request-top"><div><span class="approval-type claims">คำขอแสดงความเป็นเจ้าของ</span><h4>${escapeHtml(item.title)}</h4></div><span class="badge ${badgeClass(item.status)}">${escapeHtml(item.status)}</span></div><p>${escapeHtml(item.evidence || "ไม่มีรายละเอียดหลักฐาน")}</p><div class="clerk-request-meta"><span>สิ่งของ: ${escapeHtml(item.itemCode || "–")}</span><span>ผู้ขอ: ${escapeHtml(item.requester || "ไม่ระบุชื่อ")}</span><span>ส่งคำขอ: ${escapeHtml(item.requestDate || "ไม่ระบุเวลา")}</span><span>สถานะการคืน: ${escapeHtml(item.returnStatus || "ไม่ทราบสถานะ")}</span><span>${escapeHtml(item.activityLabel || "คำขอใหม่")}</span></div><div class="clerk-request-actions"><button class="small-btn" type="button" data-center-action="claim-detail" data-item-id="${item.id}">ดูรายละเอียดคำขอ</button></div></article>`,
+
             )
             .join("")
         : '<div class="empty">ไม่มีคำขอที่รออนุมัติ</div>';
@@ -1670,6 +1656,8 @@ export function useStaffDashboard() {
     function renderLost() {
       if (!$("#lostGrid")) return;
       const entriesForView = (view) => {
+        if (view === "claims" && currentRole === "clerk") return [];
+        if (view === "all") return (currentRole === "clerk" ? ["inventory", "lostposts"] : ["inventory", "lostposts", "claims"]).flatMap(entriesForView);
         if (["approved", "rejected"].includes(view)) {
           return ["inventory", "lostposts", "claims"].flatMap((tab) =>
             lostSets[tab]
@@ -1679,7 +1667,12 @@ export function useStaffDashboard() {
         }
         const data =
           view === "claims"
-            ? lostSets.claims.filter((item) => item.status !== "คืนของแล้ว")
+            ? lostSets.claims.filter(
+                (item) =>
+                  currentRole !== "clerk" ||
+                  ["approved", "scheduled"].includes(item.backendStatus) ||
+                  ["ผ่านการตรวจสอบ", "นัดหมายแล้ว"].includes(item.status),
+              )
             : lostSets[view].filter(
                 (item) => approvalGroup(item.status) === "approved",
               );
@@ -1688,7 +1681,7 @@ export function useStaffDashboard() {
       const historySearch = currentRole === "admin" ? appliedHistorySearch : "";
       const matchesSearch = ({ item }) =>
         !historySearch ||
-        `${item.id} ${item.title} ${item.place} ${item.status} ${item.custody}`
+        `${item.id} ${item.title} ${item.place} ${item.status} ${item.activityLabel}`
           .toLowerCase()
           .includes(historySearch);
       const visibleEntries =
@@ -1717,15 +1710,22 @@ export function useStaffDashboard() {
                       : "บันทึกการอนุมัติ"
                   }:</strong> ${i.decisionReason}</div>`
                 : "";
+              const inlineClose = ["lostposts", "inventory"].includes(tab) && approvalGroup(i.status) === "approved";
+              const inventoryMeta = tab === "inventory"
+                ? `<div class="lost-foot"><span class="custody">${escapeHtml(i.custodyLocation || i.activityLabel || "")}</span><span class="badge progress">สถานะการคืน: ${escapeHtml(returnStatusForFoundItem(i))}</span></div>`
+                : "";
+              const detailsButton = `<button class="small-btn" type="button" data-lost-action="detail" data-tab="${tab}" data-item-id="${i.id}">ดูรายละเอียด</button>`;
               const controls =
                 tab === "claims"
                   ? `<div class="claim-controls"><button type="button" class="primary" data-lost-action="claim-detail" data-tab="claims" data-item-id="${i.id}">ดูรายละเอียดคำขอ</button></div>`
-                  : `${note}<div class="lost-foot"><span class="custody">${i.custody}</span>${tab === "inventory" ? `<span class="badge progress">สถานะการคืน: ${escapeHtml(returnStatusForFoundItem(i))}</span>` : ""}<button class="small-btn" type="button" data-lost-action="detail" data-tab="${tab}" data-item-id="${i.id}">ดูรายละเอียด</button></div>`;
+                  : inlineClose
+                    ? `${note}${inventoryMeta}<div class="lost-card-actions">${detailsButton}${decisionButtons(tab, i)}</div>`
+                    : `${note}<div class="lost-foot">${tab === "inventory" ? `<span class="custody">${escapeHtml(i.custodyLocation || i.activityLabel || "")}</span><span class="badge progress">สถานะการคืน: ${escapeHtml(returnStatusForFoundItem(i))}</span>` : ""}${detailsButton}</div>`;
               const claimHint =
                 tab === "claims"
                   ? '<div class="approval-note"><strong>รับคำขออัตโนมัติ:</strong> ธุรการไม่ต้องกดอนุมัติ สามารถตรวจรายละเอียด นัดหมาย และยืนยันการส่งคืนได้</div>'
                   : "";
-              const sourceBadge = ["approved", "rejected"].includes(
+              const sourceBadge = ["all", "approved", "rejected"].includes(
                 currentLostTab,
               )
                 ? `<span class="badge neutral lost-source-badge">${approvalTypeLabel(tab)}</span>`
@@ -1737,9 +1737,9 @@ export function useStaffDashboard() {
                 i.id
               }">${image}<div class="lost-content">${sourceBadge}<span class="badge ${badgeClass(
                 i.status,
-              )}">${i.status}</span><h3>${i.id} · ${i.title}</h3><p>${
+              )}">${i.status}</span><h3>${escapeHtml(i.title)}</h3><small class="lost-record-code">${escapeHtml(i.id)}</small><p>${
                 i.place
-              }</p>${claimHint}${controls}${decisionButtons(tab, i)}</div></article>`;
+              }</p>${claimHint}${controls}${inlineClose ? "" : decisionButtons(tab, i)}</div></article>`;
             })
             .join("")
         : `<div class="empty" style="grid-column:1/-1">${emptyLabel}</div>`;
@@ -1751,8 +1751,8 @@ export function useStaffDashboard() {
       requestConfirmation(
         isLostAnnouncement ? "ยืนยันเผยแพร่ประกาศของหาย" : "ยืนยันการอนุมัติ",
         isLostAnnouncement
-          ? `${item.id} · ${item.title} จะถูกเปลี่ยนเป็นประกาศที่อนุมัติเผยแพร่`
-          : `ตรวจสอบข้อมูลของ ${item.id} · ${item.title} แล้วใช่หรือไม่?`,
+          ? `${item.title} จะถูกเปลี่ยนเป็นประกาศที่อนุมัติเผยแพร่`
+          : `ตรวจสอบข้อมูลของ ${item.title} แล้วใช่หรือไม่?`,
         () => confirmApproveLostItem(tab, id),
         isLostAnnouncement ? "อนุมัติเผยแพร่" : "อนุมัติ",
       );
@@ -1831,12 +1831,12 @@ export function useStaffDashboard() {
       renderLost();
       if (tab === "lostposts") {
         showSuccess(
-          `${id} · ${item.title} ถูกเปลี่ยนสถานะเป็น “${nextStatus}” แล้ว`,
+          `${item.title} ถูกเปลี่ยนสถานะเป็น “${nextStatus}” แล้ว`,
           "เผยแพร่ประกาศของหายแล้ว",
         );
       } else {
         showSuccess(
-          `${id} · ${item.title} ถูกเปลี่ยนสถานะเป็น “${nextStatus}” แล้ว`,
+          `${item.title} ถูกเปลี่ยนสถานะเป็น “${nextStatus}” แล้ว`,
           "อนุมัติรายการของที่พบแล้ว",
         );
       }
@@ -1851,7 +1851,7 @@ export function useStaffDashboard() {
       if (reasonDetail) reasonDetail.value = "";
       const rejectNote = $("#rejectNote");
       if (rejectNote) rejectNote.value = "";
-      $("#rejectModalTitle").textContent = `ไม่อนุมัติ ${id} · ${item.title}`;
+      $("#rejectModalTitle").textContent = `ไม่อนุมัติ ${item.title}`;
       openModal("rejectModal");
     }
     async function confirmRejectLostItem(tab, id, decisionReason) {
@@ -1917,7 +1917,7 @@ export function useStaffDashboard() {
     function confirmClaimStatus(item, nextStatus) {
       const previous = item.status;
       item.status = nextStatus;
-      item.custody =
+      item.activityLabel =
         item.status === "คืนของแล้ว"
           ? "ปิดกระบวนการและบันทึกผู้ส่งมอบ"
           : item.status === "นัดหมายแล้ว"
@@ -1941,7 +1941,7 @@ export function useStaffDashboard() {
         category: "คำขอรับของ",
         action: historyAction,
         status: item.status,
-        detail: `เปลี่ยนจาก “${previous}” เป็น “${item.status}” · ${item.custody}`,
+        detail: `เปลี่ยนจาก “${previous}” เป็น “${item.status}” · ${item.activityLabel}`,
       });
       toast(`เปลี่ยน ${item.id} เป็น “${item.status}” แล้ว`);
       renderLost();
@@ -2003,6 +2003,40 @@ export function useStaffDashboard() {
       return (!from || date >= from) && (!to || date <= to);
     }
     async function loadMyTaskHistory() {
+      if (currentRole === "clerk") {
+        try {
+          const records = await getPersonalLostFoundHistory();
+          const ids = new Set(records.map(record => record.item_code));
+          for (let index = workHistory.length - 1; index >= 0; index--) {
+            if (workHistory[index].source === "clerk-server" ||
+                (workHistory[index].actorId === signedInStaffId() && ids.has(workHistory[index].itemId))) {
+              workHistory.splice(index, 1);
+            }
+          }
+          workHistory.push(...records.map(record => {
+            const parts = new Intl.DateTimeFormat("en-CA", {
+              timeZone: "Asia/Bangkok", year: "numeric", month: "2-digit", day: "2-digit",
+              hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+            }).formatToParts(new Date(record.created_at));
+            const value = type => parts.find(part => part.type === type)?.value;
+            return {uid: record.uid, source: "clerk-server", actorId: signedInStaffId(),
+              staff: activeStaffName(), role: roleConfig[currentRole].label,
+              itemId: record.item_code, backendId: record.item_id,
+              tab: record.report_type === "found" ? "inventory" : "lostposts",
+              title: record.title, category: record.report_type === "found" ? "ของที่รับฝาก" : "ประกาศตามหา",
+              action: record.status === "approved" ? "อนุมัติ" : record.status === "rejected" ? "ไม่อนุมัติ" : "ปิดงาน",
+              status: record.status === "approved" ? "อนุมัติแล้ว" : record.status === "rejected" ? "ไม่อนุมัติ" : "ปิดรายการแล้ว",
+              detail: record.note || "ตรวจสอบและอนุมัติรายการแล้ว",
+              date: `${value("year")}-${value("month")}-${value("day")}`,
+              time: `${value("hour")}:${value("minute")}`, timestamp: new Date(record.created_at).getTime()};
+          }));
+          renderMyHistory();
+        } catch (error) {
+          if (await handleUnauthorizedResponse(error.status)) return;
+          toast(error.message || "โหลดประวัติงานธุรการไม่สำเร็จ");
+        }
+        return;
+      }
       if (!["housekeeper", "technician"].includes(currentRole)) return;
       const staffId = JSON.parse(localStorage.getItem("buildingCareStaff") || "null")?.id;
       if (!staffId) return;
@@ -2053,7 +2087,7 @@ export function useStaffDashboard() {
         to = $("#myHistoryTo")?.value || "",
         type = $("#myHistoryType")?.value || "all",
         q = ($("#myHistorySearch")?.value || "").trim().toLowerCase();
-      const own = workHistory.filter((x) => x.staff === staff),
+      const own = workHistory.filter((x) => x.actorId ? x.actorId === signedInStaffId() : x.staff === staff),
         rows = own
           .filter(
             (x) =>
@@ -2078,10 +2112,10 @@ export function useStaffDashboard() {
           ["อนุมัติ", "ไม่อนุมัติ"].includes(x.action),
         ).length;
       summary.innerHTML = [
-        [own.length, "กิจกรรมทั้งหมด", "รวมทุกวันที่บันทึก"],
-        [closed, "งาน/คำขอที่ปิด", "ดำเนินการถึงสถานะสุดท้าย"],
-        [returned, "คืนเข้ากองกลาง", "มีเหตุผลบันทึกไว้"],
-        [decisions, "การตัดสินใจ", "อนุมัติหรือไม่อนุมัติ"],
+        [own.length, "รายการดำเนินการทั้งหมด", "นับทุกครั้งที่บันทึก รวมงานเดิมที่ทำหลายครั้ง"],
+        [closed, "รายการที่ปิดแล้ว", "นับแต่ละงานหรือคำขอเพียงครั้งเดียว"],
+        [returned, "ครั้งที่คืนงานเข้าคิว", "ส่งงานกลับให้เจ้าหน้าที่คนอื่นรับต่อ"],
+        [decisions, "ครั้งที่ตรวจอนุมัติ", "รวมทั้งอนุมัติและไม่อนุมัติ"],
       ]
         .map(
           (v, i) =>
@@ -2175,7 +2209,7 @@ export function useStaffDashboard() {
               (i) =>
                 i.assignee === staff.name &&
                 !isTerminalStatus(i.status) &&
-                i.status !== "คืนของแล้ว",
+                !["คืนของแล้ว", "ไม่ผ่านการตรวจสอบ"].includes(i.status),
             ).length
           : 0;
       return jobs + lost;
@@ -2475,7 +2509,7 @@ export function useStaffDashboard() {
           claims
             .map(
               (item) =>
-                `<button type="button" class="notification-item ${item.unread ? "unread" : ""}" data-clerk-notification-target="claim" data-item-id="${item.id}"><div class="notification-symbol"><svg class="icon"><use href="#i-user"/></svg></div><div><span class="approval-type claims">คำขอรับของ</span><strong>${item.id} · ${escapeHtml(item.title)}</strong><p>${escapeHtml(item.place)}</p><small>กดเพื่อไปที่ศูนย์รับงาน</small></div></button>`,
+                `<button type="button" class="notification-item ${item.unread ? "unread" : ""}" data-clerk-notification-target="claim" data-item-id="${item.id}"><div class="notification-symbol"><svg class="icon"><use href="#i-user"/></svg></div><div><span class="approval-type claims">คำขอรับของ</span><strong>${escapeHtml(item.title)}</strong><p>${escapeHtml(item.place)}</p><small>กดเพื่อไปที่ศูนย์รับงาน</small></div></button>`,
             )
             .join("");
       const groups = [
@@ -2552,7 +2586,7 @@ export function useStaffDashboard() {
       }
       if (currentRole === "clerk")
         lostSets.claims
-          .filter((item) => item.status !== "คืนของแล้ว")
+          .filter((item) => !["คืนของแล้ว", "ไม่ผ่านการตรวจสอบ"].includes(item.status))
           .forEach((item) => readClaimNotifications.add(item.id));
       renderNotifications();
       toast("ทำเครื่องหมายว่าอ่านทั้งหมดแล้ว");
@@ -2585,7 +2619,7 @@ export function useStaffDashboard() {
         });
       $("#staffTable").innerHTML = visibleStaff.length
         ? visibleStaff.map(({ staff: s, index: i }) => {
-          const invitationDelivery = {
+          const invitationDelivery = s.isActivated ? { label: "เปิดใช้งานแล้ว", className: "done" } : {
             sent: { label: "ส่งสำเร็จ", className: "done" },
             failed: { label: "ส่งไม่สำเร็จ", className: "danger" },
             pending: { label: "กำลังส่ง", className: "neutral" },
@@ -2625,6 +2659,8 @@ export function useStaffDashboard() {
     function openEditStaff(index, trigger = document.activeElement) {
       const staff = staffData[index];
       if (!staff || currentRole !== "admin") return;
+      if (emailSending.value) return;
+      emailSending.value = true;
       $("#editStaffIndex").value = staff.id;
       $("#editStaffName").value = staff.name;
       $("#editStaffEmail").value = staff.email;
@@ -2675,7 +2711,7 @@ export function useStaffDashboard() {
         renderStaff();
         loadStaffWorkOverview();
         showSuccess(emailChanged
-          ? "บันทึกชื่อและอีเมลแล้ว ลิงก์คำเชิญเดิมใช้ไม่ได้ หาก Staff ยังไม่ได้ตั้งรหัสผ่าน ให้กดส่งคำเชิญซ้ำไปอีเมลใหม่"
+          ? "บันทึกอีเมลใหม่แล้ว กดส่งคำเชิญซ้ำเพื่อส่งลิงก์ตั้งรหัสผ่านไปยังอีเมลใหม่"
           : "บันทึกข้อมูล Staff แล้ว");
       } catch (error) {
         if (await handleUnauthorizedResponse(error.status)) return;
@@ -2728,7 +2764,9 @@ export function useStaffDashboard() {
         if (await handleUnauthorizedResponse(error.status)) return;
         console.error("Resending staff invitation failed:", error);
         showSuccess(
-          error.status === 404
+          error.message === "Account has already been activated"
+            ? "บัญชีนี้เปิดใช้งานแล้ว ใช้อีเมลปัจจุบันกับรหัสผ่านเดิมได้ หากลืมรหัสผ่านให้กดลืมรหัสผ่านที่หน้าเข้าสู่ระบบ"
+            : error.status === 404
             ? "Backend ยังไม่รองรับการส่งคำเชิญซ้ำ"
             : error.message || "ไม่สามารถส่งคำเชิญซ้ำได้",
           "ส่งคำเชิญไม่สำเร็จ",
@@ -2740,11 +2778,17 @@ export function useStaffDashboard() {
           button.removeAttribute("aria-busy");
           button.textContent = "ส่งคำเชิญซ้ำ";
         }
+      } finally {
+        emailSending.value = false;
       }
     }
     function resendInvitation(index, button) {
       const staff = staffData[index];
       if (!staff || currentRole !== "admin") return;
+      if (staff.isActivated) {
+        showSuccess("บัญชีเปิดใช้งานแล้ว", "บัญชีเปิดใช้งานแล้ว");
+        return;
+      }
       requestConfirmation(
         "ยืนยันส่งคำเชิญซ้ำ",
         `ส่งคำเชิญและข้อมูลเข้าสู่ระบบชุดใหม่ไปยัง ${staff.email} หรือไม่?`,
@@ -3018,7 +3062,13 @@ export function useStaffDashboard() {
       modal.classList.add("open");
       modal.removeAttribute("aria-hidden");
       document.body.classList.add("modal-open");
-      if (historyMode !== "none") updateDashboardRoute(id, historyMode);
+      if (historyMode !== "none") {
+        // Replace the previous dialog so closing success cannot reopen its form.
+        const mode = historyMode === "push" && readDashboardRoute().dialog
+          ? "replace"
+          : historyMode;
+        updateDashboardRoute(id, mode);
+      }
       requestAnimationFrame(() =>
         modal
           .querySelector(
@@ -3062,7 +3112,9 @@ export function useStaffDashboard() {
         closeModal(modal.id, false, false),
       );
       navigate(page, "none");
-      const modalId = modalIdFromSlug(routeState.dialog);
+      let modalId = modalIdFromSlug(routeState.dialog);
+      // A consumed confirmation cannot be restored from browser history.
+      if (modalId === "confirmModal" && !pendingConfirmAction) modalId = "";
       if (modalId) openModal(modalId, document.activeElement, "none");
       restoringNavigation = false;
 
@@ -3099,7 +3151,8 @@ export function useStaffDashboard() {
       $("#confirmModalTitle").textContent = title;
       $("#confirmModalText").textContent = text;
       $("#confirmActionButton").textContent = label;
-      $("#confirmActionButton").classList.toggle("confirm-accept", ["ยืนยันรับงาน", "ยืนยันคืนงาน"].includes(label));
+      $("#confirmActionButton").classList.toggle("confirm-accept", ["ยืนยันรับงาน", "ยืนยันคืนงาน"].includes(label) ||
+        (currentRole === "clerk" && !/ลบ|ไม่อนุมัติ|ปฏิเสธ/.test(`${title} ${label}`)));
       openModal("confirmModal", document.activeElement, historyMode);
     }
     function showSuccess(message, title = "บันทึกสำเร็จ", variant = "success") {
@@ -3254,6 +3307,10 @@ export function useStaffDashboard() {
         if (currentRole === "admin")
           buttons.push(["assign", "เปลี่ยนผู้รับผิดชอบ", ""]);
       }
+      if (isMine && job.backendId && (job.backendStatus === "in_progress" ||
+          (job.backendStatus === "completed" && !job.hasCompletionReport))) {
+        buttons.push(["complete", job.backendStatus === "completed" ? "เพิ่มรายงานที่ขาด" : "ปิดงานพร้อมรายงาน", "primary-action"]);
+      }
       $("#jobQuickActions").innerHTML = buttons.length
         ? buttons
             .map(
@@ -3312,7 +3369,7 @@ export function useStaffDashboard() {
       $("#jobDetailModal")?.classList.remove("lost-post-detail");
       $("#jobDetailCode").textContent = `${id} · ${job.category}`;
       $("#jobDetailTitle").textContent = job.title;
-      $("#jobDetailDescription").textContent = job.detail;
+      $("#jobDetailDescription").textContent = job.detail || "ผู้แจ้งไม่ได้ระบุรายละเอียดเพิ่มเติม";
       $("#jobDetailRoom").textContent = job.room;
       $("#jobDetailReporter").textContent = job.reporter;
       $("#jobDetailContact").textContent =
@@ -3417,6 +3474,9 @@ export function useStaffDashboard() {
               (entry) => entry.action === "completion_note_added" && entry.note,
             )
             .at(-1);
+          job.hasCompletionReport = Boolean(latestCompletionNote);
+          job.completionNoteId = latestCompletionNote?.id;
+          renderJobQuickActions(job);
           if (latestCompletionNote) {
             job.note = latestCompletionNote.note;
             $("#jobDetailNotes").textContent = latestCompletionNote.note;
@@ -3444,9 +3504,6 @@ export function useStaffDashboard() {
         toast("งานนี้ถูกรับไปแล้วหรือไม่อยู่ในรายการของคุณ");
         return true;
       }
-      navigate("jobs");
-      renderJobs();
-      renderMetrics();
       openJobDetail(job.id, trigger);
       return true;
     }
@@ -3488,6 +3545,7 @@ export function useStaffDashboard() {
       const serviceOptions = ["cleaning", "repair"].includes(job.type) && job.backendId
         ? serviceProgressStatuses
             .slice(serviceProgressStatuses.indexOf(job.backendStatus) + 1)
+            .filter(status => status !== "completed")
             .map((status) => (job.type === "repair" ? repairStatusLabels : cleaningStatusLabels)[status])
         : null;
       const options = serviceOptions || (backendNext
@@ -3540,6 +3598,11 @@ export function useStaffDashboard() {
       openModal("uploadModal", trigger);
     }
     function openCompleteModal(id, trigger = document.activeElement, historyMode = "push") {
+      const job = allJobs.find(item => item.id === id);
+      if (job?.backendId && !["in_progress", "completed"].includes(job.backendStatus)) {
+        toast("กรุณาเริ่มดำเนินการก่อนปิดงาน");
+        return;
+      }
       $("#completeJobId").value = id;
       $("#completeResult").value = "";
       $("#completeNote").value = "";
@@ -3599,6 +3662,10 @@ export function useStaffDashboard() {
       }
     }
     async function applyJobStatus(job, next, note) {
+      if (next === "เสร็จสิ้น" && job.backendId) {
+        openCompleteModal(job.id);
+        return false;
+      }
       const previous = job.status;
       const isBackendCleaning = job.type === "cleaning" && job.backendId;
       const isBackendRepair = job.type === "repair" && job.backendId;
@@ -3629,9 +3696,7 @@ export function useStaffDashboard() {
           let updatedTask;
           for (const status of serviceProgressStatuses.slice(currentServiceIndex + 1, targetServiceIndex + 1)) {
             updatedTask = isBackendRepair
-              ? status === "completed"
-                ? await completeRepairRequest(job.backendId)
-                : await updateRepairRequestStatus(job.backendId, status)
+              ? await updateRepairRequestStatus(job.backendId, status)
               : await updateCleaningTaskStatus(job.backendId, status);
             job.backendStatus = updatedTask.status;
           }
@@ -3703,10 +3768,11 @@ export function useStaffDashboard() {
             tab === "lostposts"
               ? await getLostItemDetail(item.backendId)
               : await getFoundItemDetail(item.backendId);
+          item.privateVerificationDetail = detail.private_verification_detail || "";
           item.category = detail.item_category;
           item.description = detail.description || "ไม่มีรายละเอียดเพิ่มเติม";
           item.place = detail.location_detail || "ไม่ระบุสถานที่พบ";
-          item.custody = detail.custody_location || "ไม่ระบุจุดรับฝาก";
+          item.custodyLocation = detail.custody_location || "ไม่ระบุจุดรับฝาก";
           item.reporterEmail = detail.reporter_email;
           item.eventDatetime = detail.event_datetime;
           // ขอ signed URL ใหม่ทุกครั้งที่เปิด เพราะ URL จากรายการอาจหมดอายุแล้ว
@@ -3718,6 +3784,12 @@ export function useStaffDashboard() {
           return;
         }
       }
+      const privateGroup = $("#jobDetailPrivateGroup");
+      if (privateGroup) privateGroup.hidden = !item.privateVerificationDetail;
+      const privateText = $("#jobDetailPrivate");
+      if (privateText) privateText.textContent = item.privateVerificationDetail || "";
+      const notesGroup = $("#jobDetailNotesGroup");
+      if (notesGroup) notesGroup.hidden = !item.decisionReason;
       const isLostAnnouncement = tab === "lostposts";
       selectedJobId = "";
       $("#jobDetailModal")?.classList.add("lost-post-detail");
@@ -3781,7 +3853,7 @@ export function useStaffDashboard() {
         ?.setAttribute("href", isLostAnnouncement ? "#i-search" : "#i-box");
       const detailTimeline = isLostAnnouncement
         ? [
-            ["ส่งประกาศ", item.custody || "บันทึกในระบบแล้ว"],
+            ["ส่งประกาศ", item.reportedAt ? new Date(item.reportedAt).toLocaleString("th-TH") : "บันทึกในระบบแล้ว"],
             ["ตรวจสอบข้อมูล", item.status],
             [
               "เผยแพร่ต่อผู้ใช้งาน",
@@ -3798,7 +3870,7 @@ export function useStaffDashboard() {
       $("#jobTimeline").innerHTML = detailTimeline
         .map(
           (step) =>
-            `<div class="timeline-item"><span class="timeline-dot"></span><div><strong>${step[0]}</strong><small>${step[1]}</small></div></div>`,
+            `<div class="timeline-item"><span class="timeline-dot"></span><div><strong>${escapeHtml(step[0])}</strong><small>${escapeHtml(step[1])}</small></div></div>`,
         )
         .join("");
       $("#jobDetailNotes").textContent =
@@ -3842,7 +3914,7 @@ export function useStaffDashboard() {
       }
       requestConfirmation(
         "ยืนยันการส่งคืนของ",
-        `${id} · ยืนยันว่าได้ส่ง ${item.title} คืนให้ ${claim.requester || "เจ้าของ"} แล้วใช่หรือไม่?`,
+        `ยืนยันว่าได้ส่ง ${item.title} คืนให้ ${claim.requester || "เจ้าของ"} แล้วใช่หรือไม่?`,
         async () => {
           try {
             const previousReturnStatus = returnStatusForFoundItem(item);
@@ -3857,7 +3929,7 @@ export function useStaffDashboard() {
               result.return_status,
               result.status,
             );
-            claim.custody = `ส่งคืนโดย ${activeStaffName()} · ${nowThai()}`;
+            claim.activityLabel = `ส่งคืนโดย ${activeStaffName()} · ${nowThai()}`;
             item.status = "คืนของแล้ว";
             item.publicListItem = false;
             item.returnStatus = claim.returnStatus;
@@ -3867,7 +3939,7 @@ export function useStaffDashboard() {
               "ยืนยันการส่งคืนของ",
               id,
               item.title,
-              `${item.decisionReason} · ${claim.custody}`,
+              `${item.decisionReason} · ${claim.activityLabel}`,
             );
             recordWorkHistory({
               itemId: id,
@@ -3875,14 +3947,14 @@ export function useStaffDashboard() {
               category: "ของที่รับฝาก",
               action: "ยืนยันการส่งคืนของ",
               status: "คืนของแล้ว",
-              detail: `${item.decisionReason} · ${claim.custody}`,
+              detail: `${item.decisionReason} · ${claim.activityLabel}`,
             });
             renderLost();
             renderClerkCenter();
             renderMetrics();
             renderNotifications();
             showSuccess(
-              `${id} · ${item.title} เปลี่ยนสถานะจาก “${previousReturnStatus}” เป็น “${claim.returnStatus}” แล้ว`,
+              `${item.title} เปลี่ยนสถานะจาก “${previousReturnStatus}” เป็น “${claim.returnStatus}” แล้ว`,
               "ส่งคืนเจ้าของสำเร็จ",
             );
             await loadApprovedLostFoundItems();
@@ -3896,10 +3968,15 @@ export function useStaffDashboard() {
       );
     }
 
-    function openClaimDetail(id, trigger = document.activeElement) {
+    function openClaimDetail(
+      id,
+      trigger = document.activeElement,
+      context = "center",
+    ) {
       const item = lostSets.claims.find((record) => record.id === id);
       if (!item) return;
-      $("#claimDetailCode").textContent = `${id} · ${item.status}`;
+      const detailContext = currentRole === "clerk" ? context : "center";
+      $("#claimDetailCode").textContent = "";
       $("#claimDetailTitle").textContent = item.title;
       $("#claimRequester").textContent = item.requester || "ไม่ระบุชื่อผู้ขอ";
       $("#claimContact").textContent = item.contact || "ไม่ระบุช่องทางติดต่อ";
@@ -3910,15 +3987,24 @@ export function useStaffDashboard() {
           })
         : "ยังไม่มีนัดหมาย";
       $("#claimPickupDate").textContent = pickupDateText;
-      $("#claimPickupTime").textContent = item.pickupTime || "–";
+      $("#claimPickupTime").textContent = (item.pickupTime ? `${item.pickupTime}${item.pickupEndTime ? "–" + item.pickupEndTime : ""}` : "–");
       $("#claimPickupLocation").textContent =
         item.pickupLocation || "ยังไม่ระบุจุดรับของ";
       $("#claimPickupNote").textContent = item.pickupNote || "ไม่มีหมายเหตุ";
       $("#claimReturnStatus").textContent =
         item.returnStatus ||
         foundItemReturnStatus(item.returnStatusCode, item.backendStatus);
+      $("#claimGeneralDescription").textContent = item.generalDescription || "ไม่ได้ระบุรายละเอียดทั่วไป";
       $("#claimEvidence").textContent =
         item.evidence || item.place || "ยังไม่มีรายละเอียดหลักฐาน";
+      const claimImages = $("#claimImages");
+      if (claimImages) {
+        const images = item.images?.length ? item.images : item.imageUrl ? [{ url: item.imageUrl }] : [];
+        claimImages.hidden = images.length === 0;
+        claimImages.innerHTML = images.map((image, index) =>
+          `<img src="${escapeHtml(image.url)}" alt="หลักฐานรูปที่ ${index + 1} ของ ${escapeHtml(item.title)}" loading="lazy" />`,
+        ).join("");
+      }
       $("#claimSecret").textContent =
         item.secret || "ยังไม่มีข้อมูลลับสำหรับตรวจสอบ";
       $("#claimTimeline").innerHTML = [
@@ -3928,14 +4014,28 @@ export function useStaffDashboard() {
       ]
         .map(
           (step) =>
-            `<div class="timeline-item"><span class="timeline-dot"></span><div><strong>${step[0]}</strong><small>${step[1]}</small></div></div>`,
+            `<div class="timeline-item"><span class="timeline-dot"></span><div><strong>${escapeHtml(step[0])}</strong><small>${escapeHtml(step[1])}</small></div></div>`,
         )
         .join("");
-      const claimActions = [
-        ["more", "ขอข้อมูลเพิ่มเติม", ""],
-        ["verify", "ยืนยันความเป็นเจ้าของ", "primary-action"],
-      ];
-      if (item.backendStatus === "approved" || item.status === "นัดหมายแล้ว") {
+      const verified = ["approved", "scheduled"].includes(item.backendStatus);
+      const returned = item.returnStatusCode === "returned";
+      const appointmentGroup = $("#claimAppointmentGroup");
+      if (appointmentGroup) appointmentGroup.hidden = !item.pickupDate;
+      const nextStep = $("#claimNextStep");
+      if (nextStep) nextStep.textContent = returned ? "ส่งคืนเจ้าของแล้ว" : verified
+        ? item.pickupDate ? "นัดรับของแล้ว เมื่อส่งมอบของให้ผู้ขอให้กด ยืนยันส่งคืนแล้ว" : "ยืนยันเจ้าของแล้ว กรุณาบันทึกนัดหมายรับของ"
+        : "เทียบหลักฐานที่ผู้ขอระบุกับข้อมูลลับของสิ่งของ แล้วจึงยืนยันความเป็นเจ้าของ";
+      const claimActions =
+        detailContext === "center" && !verified && !returned && item.backendStatus !== "rejected"
+          ? [
+              ["reject", "ปฏิเสธคำขอ", "claim-reject-action"],
+              ["more", "ขอข้อมูลเพิ่มเติม", ""],
+              ["verify", "ยืนยันความเป็นเจ้าของ", "primary-action"],
+            ]
+          : [];
+      if (
+        verified && !returned
+      ) {
         claimActions.push([
           "appointment",
           item.status === "นัดหมายแล้ว"
@@ -3953,15 +4053,26 @@ export function useStaffDashboard() {
         .join("");
       openModal("claimDetailModal", trigger);
     }
-    function updateClaimWithConfirmation(id, action, trigger) {
+    function updateClaimWithConfirmation(id, action, trigger, additionalInfoMessage = "") {
       const item = lostSets.claims.find((record) => record.id === id);
       if (!item) return;
+      if (["more", "reject"].includes(action) && !additionalInfoMessage.trim()) {
+        closeModal("claimDetailModal", false);
+        $("#claimMoreId").value = id;
+        $("#claimMoreAction").value = action;
+        $("#claimMoreTitle").textContent = action === "reject" ? "ปฏิเสธคำขอรับคืน" : "ขอข้อมูลเพิ่มเติม";
+        $("#claimMoreLabel").textContent = action === "reject" ? "เหตุผลที่ปฏิเสธ (จำเป็น)" : "ข้อมูลที่ต้องการให้ส่งเพิ่ม";
+        $("#claimMoreMessage").value = "";
+        openModal("claimMoreModal", trigger);
+        return;
+      }
       if (action === "appointment") {
         closeModal("claimDetailModal", false);
         openAppointment(id, trigger);
         return;
       }
       const map = {
+        reject: ["ปฏิเสธคำขอรับคืน", "ไม่ผ่านการตรวจสอบ"],
         more: ["ขอข้อมูลเพิ่มเติม", "ขอข้อมูลเพิ่มเติม"],
         verify: ["ยืนยันความเป็นเจ้าของ", "ผ่านการตรวจสอบ"],
         returned: ["ยืนยันการส่งคืนของ", "คืนของแล้ว"],
@@ -3972,19 +4083,16 @@ export function useStaffDashboard() {
       closeModal("claimDetailModal", false);
       const confirmationText =
         action === "verify"
-          ? `${id} · ${item.requester || "ผู้ยื่นคำขอ"} ให้หลักฐานตรงกับรายการ ${item.title} แล้วใช่หรือไม่?`
+          ? `${item.requester || "ผู้ยื่นคำขอ"} ให้หลักฐานตรงกับรายการ ${item.title} แล้วใช่หรือไม่?`
           : action === "returned"
-            ? `${id} · ยืนยันว่าได้ส่ง ${item.title} คืนให้ ${item.requester || "ผู้ยื่นคำขอ"} แล้วใช่หรือไม่?`
-            : `ยืนยันการดำเนินการกับคำขอ ${id} หรือไม่?`;
-      const additionalInfoMessage =
-        action === "more"
-          ? window.prompt("ระบุข้อมูลที่ต้องการให้ผู้ยื่นคำขอส่งเพิ่มเติม")
-          : null;
-      if (action === "more" && !additionalInfoMessage?.trim()) return;
+            ? `ยืนยันว่าได้ส่ง ${item.title} คืนให้ ${item.requester || "ผู้ยื่นคำขอ"} แล้วใช่หรือไม่?`
+            : `ยืนยันการดำเนินการกับ ${item.title} ของ ${item.requester || "ผู้ยื่นคำขอ"} หรือไม่?`;
       requestConfirmation(title, confirmationText, async () => {
         try {
           const result =
-            action === "returned"
+            action === "reject"
+              ? await rejectOwnershipRequest(item.backendId, additionalInfoMessage.trim())
+              : action === "returned"
               ? await updateOwnershipReturnStatus(item.backendId, "returned")
               : action === "verify"
                 ? await approveOwnershipRequest(item.backendId)
@@ -4005,7 +4113,24 @@ export function useStaffDashboard() {
             result.status,
           );
           if (action === "returned") {
-            item.custody = `ส่งคืนโดย ${activeStaffName()} · ${nowThai()}`;
+            item.activityLabel = `ส่งคืนโดย ${activeStaffName()} · ${nowThai()}`;
+            await loadApprovedLostFoundItems();
+          }
+          if (action === "verify" && result.status === "approved") {
+            // backend ปฏิเสธคำขออื่นของของชิ้นเดียวกันให้แล้ว ทำตามในหน้าจอโดยไม่ต้องโหลดใหม่
+            // (โหลดใหม่ไม่ได้ เพราะ API คืนเฉพาะคำขอ pending คำขอที่เพิ่งอนุมัติจะหายไป)
+            lostSets.claims
+              .filter(
+                (claim) =>
+                  claim !== item &&
+                  claim.foundItemBackendId === item.foundItemBackendId &&
+                  ["pending", "additional_info_required"].includes(claim.backendStatus),
+              )
+              .forEach((claim) => {
+                claim.backendStatus = "rejected";
+                claim.status = "ไม่ผ่านการตรวจสอบ";
+              });
+            // ของถูกเอาออกจากหน้า guest แล้ว จึงไม่อยู่ในรายการรับฝากที่ดึงจาก public API อีก
             await loadApprovedLostFoundItems();
           }
           item.assignee = activeStaffName();
@@ -4019,16 +4144,26 @@ export function useStaffDashboard() {
             detail: `ดำเนินการโดย ${activeStaffName()}`,
           });
           renderLost();
+          renderClerkCenter();
+          renderClerkApprovalsOverview();
+          renderMetrics();
           renderNotifications();
+          if (action === "verify") {
+            openAppointment(id, trigger);
+            toast("ยืนยันเจ้าของแล้ว กรุณาระบุนัดหมายรับของ");
+            return;
+          }
+          if (action === "reject") {
+            showSuccess(result.email_sent
+              ? "ปฏิเสธคำขอแล้ว และส่งเหตุผลให้ผู้ขอทางอีเมลแล้ว"
+              : "ปฏิเสธคำขอแล้ว แต่ส่งอีเมลไม่สำเร็จ กรุณาติดต่อผู้ขอเพื่อแจ้งเหตุผล", "ปฏิเสธคำขอแล้ว");
+            return;
+          }
           showSuccess(
-            action === "verify"
-              ? `${id} · ยืนยันความเป็นเจ้าของสำหรับ ${item.requester || "ผู้ยื่นคำขอ"} แล้ว สถานะเปลี่ยนเป็น “${status}”`
-              : action === "returned"
-                ? `${id} · บันทึกว่าส่ง ${item.title} คืนเจ้าของแล้ว`
-                : `อัปเดตคำขอ ${id} เป็น “${status}” แล้ว`,
-            action === "verify"
-              ? "ยืนยันความเป็นเจ้าของแล้ว"
-              : action === "returned"
+            action === "returned"
+                ? `บันทึกว่าส่ง ${item.title} คืนเจ้าของแล้ว`
+                : `อัปเดต ${item.title} เป็น “${status}” แล้ว`,
+            action === "returned"
                 ? "บันทึกการส่งคืนแล้ว"
                 : "อัปเดตคำขอแล้ว",
           );
@@ -4047,11 +4182,14 @@ export function useStaffDashboard() {
         return;
       }
       $("#appointmentItemId").value = id;
-      $("#appointmentTitle").textContent = `นัดหมายรับของ · ${id}`;
+      $("#appointmentTitle").textContent = item.title;
+      $("#appointmentCode").textContent = "";
+      $("#appointmentEndTime").value = item.pickupEndTime || "";
       $("#appointmentDate").min = todayISO();
-      $("#appointmentDate").value = todayISO();
-      $("#appointmentTime").value = "10:00";
-      $("#appointmentNote").value = "";
+      $("#appointmentDate").value = item.pickupDate || todayISO();
+      $("#appointmentTime").value = item.pickupTime || "";
+      $("#appointmentPlace").value = item.pickupLocation || item.custodyLocation || "ประชาสัมพันธ์ ชั้น 1";
+      $("#appointmentNote").value = item.pickupNote || "";
       openModal("appointmentModal", trigger);
     }
 
@@ -4076,7 +4214,7 @@ export function useStaffDashboard() {
               ]
             : currentRole === "clerk"
               ? [
-                  ["found", "ของที่พบใหม่"],
+                  ["found", "รายการของที่รับฝาก"],
                   ["claims", "คำขอรับคืน"],
                   ["appointments", "นัดหมายวันนี้"],
                 ]
@@ -4206,12 +4344,12 @@ export function useStaffDashboard() {
           setClerkCenterView("claims");
           renderClerkCenter();
           const firstClaim = lostSets.claims.find(
-            (item) => item.status !== "คืนของแล้ว",
+            (item) => !["คืนของแล้ว", "ไม่ผ่านการตรวจสอบ"].includes(item.status),
           );
           if (index === 4 && firstClaim) {
             openAppointment(firstClaim.id, button);
           } else if (index === 5 && firstClaim) {
-            openClaimDetail(firstClaim.id, button);
+            openClaimDetail(firstClaim.id, button, "center");
           }
         } else {
           currentLostTab = index === 2 ? "inventory" : "lostposts";
@@ -4220,7 +4358,6 @@ export function useStaffDashboard() {
             tab.classList.toggle("active", tab.dataset.tab === currentLostTab),
           );
           renderLost();
-          if (index === 2) openFoundForm(button);
         }
         return;
       }
@@ -4298,11 +4435,16 @@ export function useStaffDashboard() {
         navigate(currentRole === "admin" ? "history" : "lost");
         currentLostTab = "inventory";
         renderLost();
-        openFoundForm(button);
       } else if (action === "claims" || action === "appointments") {
-        navigate(currentRole === "admin" ? "history" : "lost");
-        currentLostTab = "claims";
-        renderLost();
+        if (currentRole === "clerk") {
+          navigate("clerk-center");
+          setClerkCenterView("claims");
+          renderClerkCenter();
+        } else {
+          navigate(currentRole === "admin" ? "history" : "lost");
+          currentLostTab = "claims";
+          renderLost();
+        }
         if (action === "appointments" && lostSets.claims[0])
           openAppointment(lostSets.claims[0].id, button);
       } else if (action === "add-staff") openModal("staffModal", button);
@@ -4377,6 +4519,7 @@ export function useStaffDashboard() {
         if (action === "return") openReturnJob(id);
         if (action === "status") openStatusUpdate(id, actionButton);
         if (action === "detail") openJobDetail(id, actionButton);
+        if (action === "complete") openCompleteModal(id, actionButton);
         return;
       }
       const card = event.target.closest("[data-job-card]");
@@ -4408,9 +4551,15 @@ export function useStaffDashboard() {
           lostAction.dataset.itemId,
         );
       else {
-        currentLostTab = "claims";
-        renderLost();
-        navigate(currentRole === "admin" ? "history" : "lost");
+        if (currentRole === "clerk") {
+          navigate("clerk-center");
+          setClerkCenterView("claims");
+          renderClerkCenter();
+        } else {
+          currentLostTab = "claims";
+          renderLost();
+          navigate(currentRole === "admin" ? "history" : "lost");
+        }
       }
     });
     $("#assignForm")?.addEventListener("submit", (event) => {
@@ -4690,43 +4839,51 @@ export function useStaffDashboard() {
       }
       completionNoteInput.setCustomValidity("");
       const summary = [$("#completeResult").value.trim(), completionNote].filter(Boolean).join(" · ");
-      if (!(job.backendId && job.backendStatus === "completed")) {
-        const updated = await applyJobStatus(job, "เสร็จสิ้น", summary);
-        if (!updated) return;
+      if (summary.length > 2000) {
+        toast("ผลการดำเนินการและหมายเหตุรวมกันต้องไม่เกิน 2,000 ตัวอักษร");
+        return;
       }
-
-      // Backend อนุญาตให้เพิ่ม note และรูปได้หลังเปลี่ยนสถานะเป็น completed แล้ว
-      if (job.backendId) {
-        try {
-          // บันทึกผลทันทีเพื่อไม่สร้างหมายเหตุซ้ำ หากรูปอัปโหลดไม่สำเร็จ
-          if (completionNote && !job.completionNoteId) {
-            const noteResult =
-              job.type === "repair"
-                ? await addRepairCompletionNote(job.backendId, completionNote)
-                : await addCleaningCompletionNote(
-                    job.backendId,
-                    completionNote,
-                  );
-            job.completionNoteId = noteResult.id;
-            job.note = noteResult.note;
+      const wasCompleted = job.backendStatus === "completed";
+      const button = event.currentTarget.querySelector('[type="submit"]');
+      if (button?.disabled) return;
+      if (button) button.disabled = true;
+      try {
+        if (job.backendId && job.backendStatus !== "completed") {
+          const result = job.type === "repair"
+            ? await completeRepairRequest(job.backendId, summary, file ? [file] : [])
+            : await completeCleaningTask(job.backendId, summary, file ? [file] : []);
+          job.backendStatus = result.status;
+          job.status = "เสร็จสิ้น";
+          job.note = summary;
+        } else if (job.backendId) {
+          // Legacy completed tasks can still receive missing reports.
+          if (!job.completionNoteId) {
+            const result = job.type === "repair"
+              ? await addRepairCompletionNote(job.backendId, summary)
+              : await addCleaningCompletionNote(job.backendId, summary);
+            job.completionNoteId = result.id;
           }
           if (file) {
-            const photoResult =
-              job.type === "repair"
-                ? await uploadRepairCompletionPhotos(job.backendId, [file])
-                : await uploadCleaningCompletionPhotos(job.backendId, [file]);
-            job.completionPhotos = photoResult.photos;
-            job.completionPhotoCount = photoResult.image_count;
+            if (job.type === "repair") await uploadRepairCompletionPhotos(job.backendId, [file]);
+            else await uploadCleaningCompletionPhotos(job.backendId, [file]);
           }
-        } catch (error) {
-          if (await handleUnauthorizedResponse(error.status)) return;
-          console.error("Saving task completion details failed:", error);
-          toast(
-            error.message || "บันทึกรายละเอียดปิดงานไม่สำเร็จ กรุณาลองใหม่",
-          );
-          return;
+        } else {
+          await applyJobStatus(job, "เสร็จสิ้น", summary);
         }
+      } catch (error) {
+        if (await handleUnauthorizedResponse(error.status)) return;
+        toast(error.message || "บันทึกรายงานไม่สำเร็จ กรุณาลองใหม่");
+        return;
+      } finally {
+        if (button) button.disabled = false;
       }
+      job.hasCompletionReport = true;
+      job.note = summary;
+      recordWorkHistory({itemId: job.id, title: job.title, category: job.category,
+        action: wasCompleted ? "หมายเหตุปิดงาน" : "ปิดงาน", status: job.status, detail: summary});
+      renderMetrics();
+      renderQueue();
+      renderStaffOverview();
       if (job.completionPhotoUrl?.startsWith("blob:")) {
         URL.revokeObjectURL(job.completionPhotoUrl);
         job.completionPhotoUrl = "";
@@ -4757,8 +4914,16 @@ export function useStaffDashboard() {
         (item) => item.id === button.dataset.historyDetail,
       );
       if (job) openJobDetail(job.id, button);
-      else
-        toast(`แสดงรายละเอียด ${button.dataset.historyDetail} จากประวัติแล้ว`);
+      else {
+        const record = workHistory.find(item => item.itemId === button.dataset.historyDetail);
+        if (record?.tab) {
+          if (!lostSets[record.tab].some(item => item.id === record.itemId)) {
+            lostSets[record.tab].push({id: record.itemId, backendId: record.backendId,
+              title: record.title, status: record.status});
+          }
+          openLostDetail(record.tab, record.itemId, button);
+        }
+      }
     });
     $("#staffOverviewSummary")?.addEventListener("click", (event) => {
       if (event.target.closest('[data-overview-retry="summary"]')) loadStaffWorkOverview();
@@ -4904,7 +5069,7 @@ export function useStaffDashboard() {
     $("#activeClaimList")?.addEventListener("click", (event) => {
       const button = event.target.closest("[data-center-action]");
       if (button?.dataset.centerAction === "claim-detail")
-        openClaimDetail(button.dataset.itemId, button);
+        openClaimDetail(button.dataset.itemId, button, "center");
     });
     // ฟังคลิกที่ container เพื่อรองรับปุ่มในการ์ดที่ถูกสร้างใหม่หลัง render โดยไม่ต้องผูก event ซ้ำ
     $("#lostGrid")?.addEventListener("click", (event) => {
@@ -4921,46 +5086,20 @@ export function useStaffDashboard() {
       if (action === "delete") deleteLostRecord(tab, id);
       if (action === "appointment") openAppointment(id, button);
       if (action === "detail") openLostDetail(tab, id, button);
-      if (action === "claim-detail") openClaimDetail(id, button);
+      if (action === "claim-detail") openClaimDetail(id, button, "lost");
     });
     // -------------------------------------------------------------------------
     // 19) Event binding: Notification, Staff, Lost & Found, QR และประกาศ
     // -------------------------------------------------------------------------
 
-    // Phones and tablets show notifications as a bottom navigation page.
-    function openMobileNotifications(button) {
-      const panel = $("#notificationPanel");
-      if (!panel) return;
-      panel.classList.add("open", "mobile-notification-page");
-      $("#notificationButton")?.setAttribute("aria-expanded", "false");
-      $$(".bottom-nav button").forEach((item) => item.classList.remove("active"));
-      button.classList.add("active");
-      button.setAttribute("aria-current", "page");
-      closeSidebar();
-      panel.scrollTop = 0;
-      window.scrollTo(0, 0);
-    }
-    function toggleNotificationPanel() {
-      const panel = $("#notificationPanel");
-      if (!panel) return;
-      const open = !panel.classList.contains("open");
-      panel.classList.toggle("open", open);
-      $("#notificationButton")?.setAttribute("aria-expanded", String(open));
-      if (open) panel.querySelector("button")?.focus();
-    }
-    $("#notificationButton")?.addEventListener("click", (event) => {
-      event.stopPropagation();
-      toggleNotificationPanel();
-    });
+    // Notification center is a regular dashboard page on every viewport.
     $(".bottom-nav")?.addEventListener("click", (event) => {
       const button = event.target.closest("[data-mobile-notification]");
       if (!button) return;
       event.stopPropagation();
-      if (window.matchMedia("(max-width: 1024px)").matches)
-        openMobileNotifications(button);
-      else toggleNotificationPanel();
+      navigate("notifications");
     });
-    $("#notificationPanel")?.addEventListener("click", async (event) => {
+    $("#notificationList")?.addEventListener("click", async (event) => {
       event.stopPropagation();
       if (event.target.closest("[data-close-notifications]")) {
         event.currentTarget.classList.remove("open");
@@ -5028,7 +5167,6 @@ export function useStaffDashboard() {
           job = allJobs.find((entry) => entry.backendId === item.requestId);
         }
         if (job) {
-          navigate("jobs");
           openJobDetail(job.id, itemButton);
         } else {
           toast("ไม่พบงานซ่อมที่เชื่อมกับการแจ้งเตือนนี้");
@@ -5040,11 +5178,6 @@ export function useStaffDashboard() {
       else if (currentRole === "clerk") navigate("clerk-center");
       else toast(item.title);
     });
-    document.addEventListener("click", () => {
-      if ($("#notificationPanel")?.classList.contains("mobile-notification-page")) return;
-      $("#notificationPanel")?.classList.remove("open");
-      $("#notificationButton")?.setAttribute("aria-expanded", "false");
-    });
     $("#markAllRead")?.addEventListener("click", markNotificationsRead);
     $("#openStaffModal")?.addEventListener("click", (event) => {
       const form = $("#staffForm");
@@ -5052,17 +5185,6 @@ export function useStaffDashboard() {
       clearStaffFormValidation(form);
       openModal("staffModal", event.currentTarget);
     });
-    function openFoundForm(trigger) {
-      const form = $("#foundForm");
-      form?.reset();
-      if ($("#custodyPoint")) $("#custodyPoint").value = "ประชาสัมพันธ์ชั้น 1";
-      if ($("#foundDate")) $("#foundDate").value = todayISO();
-      if ($("#foundTime")) $("#foundTime").value = currentTimeHM();
-      openModal("foundModal", trigger);
-    }
-    $("#addFoundBtn")?.addEventListener("click", (event) =>
-      openFoundForm(event.currentTarget),
-    );
     $("#openAnnouncementModal")?.addEventListener("click", (event) =>
       openAnnouncementEditor(null, event.currentTarget),
     );
@@ -5104,6 +5226,7 @@ export function useStaffDashboard() {
       const action = pendingConfirmAction;
       pendingConfirmAction = null;
       closeModal("confirmModal", false);
+      updateDashboardRoute("", "replace");
       if (typeof action === "function") action();
     });
     const staffForm = $("#staffForm");
@@ -5219,6 +5342,7 @@ export function useStaffDashboard() {
       const fullName = `${firstName} ${lastName}`.trim();
 
       if (!validateStaffForm(form)) return;
+      if (emailSending.value) return;
       const submitButton = $("#createStaffButton");
       if (submitButton.disabled) return;
       submitButton.disabled = true;
@@ -5231,6 +5355,7 @@ export function useStaffDashboard() {
         email: $("#newEmail").value.trim(),
         role: $("#newRole").value,
       };
+      emailSending.value = true;
       try {
         const account = await createStaffAccount(payload);
         const record = toDashboardStaff(account);
@@ -5271,6 +5396,7 @@ export function useStaffDashboard() {
         submitButton.removeAttribute("aria-busy");
         submitButton.textContent = "สร้างบัญชี";
         form.removeAttribute("aria-busy");
+        emailSending.value = false;
       }
     });
     $("#editStaffForm")?.addEventListener("submit", (event) => {
@@ -5303,67 +5429,6 @@ export function useStaffDashboard() {
           button,
         );
     });
-    $("#foundForm")?.addEventListener("submit", (event) => {
-      event.preventDefault();
-      if (!event.currentTarget.checkValidity()) {
-        event.currentTarget.reportValidity();
-        return;
-      }
-      const photo = $("#foundPhoto")?.files?.[0];
-      if (photo && photo.size > 5 * 1024 * 1024) {
-        toast("รูปสิ่งของต้องมีขนาดไม่เกิน 5 MB");
-        $("#foundPhoto").focus();
-        return;
-      }
-      const nextFoundNumber =
-        Math.max(
-          81,
-          ...lostSets.inventory.map(
-            (item) => Number(item.id.replace("FD-", "")) || 0,
-          ),
-        ) + 1;
-      const record = {
-        id: `FD-${String(nextFoundNumber).padStart(3, "0")}`,
-        title: $("#foundName").value.trim(),
-        category: $("#foundCategory").value,
-        place: `พบที่ ${$("#foundLocation").value.trim()}`,
-        foundDate: $("#foundDate").value,
-        foundTime: $("#foundTime").value,
-        custody: $("#custodyPoint").value.trim(),
-        finder: $("#foundFinder").value.trim(),
-        finderContact: $("#foundContact").value.trim(),
-        description: $("#foundDescription").value.trim(),
-        privateDetail: $("#privateDetail").value.trim(),
-        photoName: photo?.name || "",
-        status: "รออนุมัติรับฝาก",
-        decisionReason: "",
-        assignee: activeStaffName(),
-      };
-      lostSets.inventory.unshift(record);
-      addAudit(
-        "lost",
-        "สร้างรายการรับฝาก",
-        record.id,
-        record.title,
-        "บันทึกรายการใหม่และรออนุมัติรับฝาก",
-      );
-      recordWorkHistory({
-        itemId: record.id,
-        title: record.title,
-        category: "ของที่รับฝาก",
-        action: "รับฝากรายการใหม่",
-        status: record.status,
-        detail: `${record.category} · ${record.place} · พบวันที่ ${record.foundDate} ${record.foundTime} · จุดเก็บ ${record.custody}`,
-      });
-      currentLostTab = "inventory";
-      renderLost();
-      renderClerkCenter();
-      renderNotifications();
-      renderMetrics();
-      closeModal("foundModal", false);
-      event.currentTarget.reset();
-      showSuccess("ส่งคำขอรับฝากแล้ว · รายการอยู่ในศูนย์รับงานเพื่อรออนุมัติ");
-    });
     $("#rejectForm")?.addEventListener("submit", (event) => {
       event.preventDefault();
       if (!event.currentTarget.checkValidity()) {
@@ -5386,7 +5451,7 @@ export function useStaffDashboard() {
         isLostAnnouncement
           ? "ยืนยันปฏิเสธประกาศของหาย"
           : "ยืนยันไม่อนุมัติรายการรับฝาก",
-        `${id} · ${item.title}\nเหตุผล: ${decisionReason}\n\n${
+        `${item.title}\nเหตุผล: ${decisionReason}\n\n${
           isLostAnnouncement
             ? "ประกาศนี้จะไม่ถูกเผยแพร่ให้ผู้ใช้งานเห็น"
             : "รายการนี้จะไม่ได้รับการอนุมัติเข้าสู่ระบบรับฝาก"
@@ -5480,9 +5545,21 @@ export function useStaffDashboard() {
         "replace",
       );
     });
+    $("#claimMoreForm")?.addEventListener("submit", event => {
+      event.preventDefault();
+      const message = $("#claimMoreMessage").value.trim();
+      if (!message) return;
+      const id = $("#claimMoreId").value;
+      closeModal("claimMoreModal", false);
+      updateClaimWithConfirmation(id, $("#claimMoreAction").value || "more", event.submitter, message);
+    });
+    ["#appointmentDate", "#appointmentTime"].forEach(selector => {
+      $(selector)?.addEventListener("change", () => $("#appointmentTime").setCustomValidity(""));
+    });
     $("#appointmentForm")?.addEventListener("submit", async (event) => {
       event.preventDefault();
       const form = event.currentTarget;
+      if (form.getAttribute("aria-busy") === "true") return;
       const appointmentTimeInput = $("#appointmentTime");
       appointmentTimeInput.setCustomValidity("");
       if (!form.checkValidity()) {
@@ -5495,9 +5572,19 @@ export function useStaffDashboard() {
       if (!item) return;
       const appointmentDate = $("#appointmentDate").value;
       const appointmentTime = $("#appointmentTime").value;
+      const endTime = $("#appointmentEndTime").value;
+      if (endTime <= appointmentTime) {
+        toast("เวลาสิ้นสุดต้องหลังเวลาเริ่ม");
+        return;
+      }
       const appointmentPlace = $("#appointmentPlace").value.trim();
       const note = $("#appointmentNote").value.trim();
       const pickupAt = new Date(`${appointmentDate}T${appointmentTime}`);
+      const weekday = new Date(`${appointmentDate}T12:00:00+07:00`).getUTCDay();
+      if ([0, 6].includes(weekday) || appointmentTime < "08:30" || appointmentTime > "16:30") {
+        toast("นัดรับได้เฉพาะจันทร์–ศุกร์ เวลา 08:30–16:30 น.");
+        return;
+      }
       if (
         Number.isNaN(pickupAt.getTime()) ||
         pickupAt.getTime() <= Date.now()
@@ -5509,11 +5596,18 @@ export function useStaffDashboard() {
         return;
       }
       const submitButton = form.querySelector('button[type="submit"]');
-      if (submitButton) submitButton.disabled = true;
+      const originalLabel = submitButton?.textContent;
+      form.setAttribute("aria-busy", "true");
+      $("#appointmentSendingStatus").hidden = false;
+      if (submitButton) {
+        submitButton.disabled = true;
+        submitButton.textContent = "กำลังส่งอีเมล…";
+      }
       try {
         const result = await scheduleOwnershipPickup(item.backendId, {
           date: appointmentDate,
           time: appointmentTime,
+          endTime,
           location: appointmentPlace,
           note,
         });
@@ -5523,43 +5617,34 @@ export function useStaffDashboard() {
           item.returnStatusCode,
           item.backendStatus,
         );
-        item.pickupDate =
-          result.pickup_date ||
-          result.appointment?.pickup_date ||
-          appointmentDate;
-        item.pickupTime =
-          result.pickup_time ||
-          result.appointment?.pickup_time ||
-          appointmentTime;
-        item.pickupLocation =
-          result.pickup_location ||
-          result.appointment?.pickup_location ||
-          appointmentPlace;
-        item.pickupNote =
-          result.pickup_note || result.appointment?.note || note;
+        item.pickupDate = appointmentDate;
+        item.pickupTime = appointmentTime;
+        item.pickupLocation = result.pickup_location || appointmentPlace;
+        item.pickupNote = result.pickup_note || note;
         item.status = "นัดหมายแล้ว";
         item.assignee = activeStaffName();
-        item.appointment = `${appointmentDate} เวลา ${appointmentTime} · ${appointmentPlace}`;
-        item.custody = `นัด ${item.appointment}`;
+        item.pickupEndTime = endTime;
+        item.appointment = `${appointmentDate} เวลา ${appointmentTime}–${endTime} · ${appointmentPlace}`;
+        item.activityLabel = `นัด ${item.appointment}`;
         if (note) {
           item.appointment += ` · ${note}`;
-          item.custody += ` · ${note}`;
+          item.activityLabel += ` · ${note}`;
         }
-        addAudit("lost", "สร้างนัดหมาย", item.id, item.title, item.custody);
+        addAudit("lost", "สร้างนัดหมาย", item.id, item.title, item.activityLabel);
         recordWorkHistory({
           itemId: item.id,
           title: item.title,
           category: "คำขอรับของ",
           action: "สร้างนัดหมาย",
           status: item.status,
-          detail: item.custody,
+          detail: item.activityLabel,
         });
         closeModal("appointmentModal", false);
         renderLost();
         renderClerkCenter();
         renderMetrics();
         showSuccess(
-          `${item.id} · นัดรับ ${item.title}\n${item.appointment}`,
+          `นัดรับ ${item.title}\n${item.appointment}\n${result.email_sent ? "ส่งอีเมลนัดหมายให้ผู้ขอแล้ว" : "บันทึกนัดหมายแล้ว แต่ส่งอีเมลไม่สำเร็จ กรุณาติดต่อผู้ขอหรือบันทึกนัดหมายอีกครั้งเพื่อส่งใหม่"}`,
           "สร้างนัดหมายรับของแล้ว",
         );
       } catch (error) {
@@ -5567,7 +5652,12 @@ export function useStaffDashboard() {
         console.error("Scheduling ownership pickup failed:", error);
         toast(error.message || "ไม่สามารถสร้างนัดหมายรับของได้");
       } finally {
-        if (submitButton) submitButton.disabled = false;
+        form.removeAttribute("aria-busy");
+        $("#appointmentSendingStatus").hidden = true;
+        if (submitButton) {
+          submitButton.disabled = false;
+          submitButton.textContent = originalLabel;
+        }
       }
     });
     $("#openQrModal")?.addEventListener("click", (event) =>
@@ -5754,8 +5844,8 @@ export function useStaffDashboard() {
     // DOM พร้อมใช้งานแล้ว จึงแสดงรายการสถานที่และปิด loading mask
     setTimeout(() => {
       renderQrLocations();
-      $(".loading-mask")?.remove();
-    }, 320);
+      dashboardLoading.value = false;
+    }, Math.max(0, 1000 - (performance.now() - loadingStartedAt)));
   }
 
   onMounted(initializeDashboard);
@@ -5764,5 +5854,5 @@ export function useStaffDashboard() {
     cleanupDashboardEvents();
   });
 
-  return { activeRole };
+  return { activeRole, dashboardLoading, emailSending };
 }

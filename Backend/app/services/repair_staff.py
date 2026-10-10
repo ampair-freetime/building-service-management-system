@@ -1,7 +1,6 @@
 """Business logic สำหรับ Repair Staff."""
 
 from dataclasses import dataclass
-from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
 from fastapi import UploadFile
@@ -46,10 +45,6 @@ class RepairTaskAlreadyAssignedError(RuntimeError):
 
 class InvalidRepairStatusTransitionError(RuntimeError):
     """เปลี่ยนสถานะ repair task ไม่ถูกลำดับ."""
-
-
-class RepairTaskNotInProgressError(RuntimeError):
-    """Repair task ต้องอยู่ในสถานะ in progress ก่อนจึงจะ complete ได้."""
 
 
 class RepairTaskNotCompletedError(RuntimeError):
@@ -160,7 +155,7 @@ async def update_repair_task_status(
         select(ServiceRequest).where(
             ServiceRequest.id == request_id,
             ServiceRequest.request_type == RequestType.REPAIR,
-        )
+        ).with_for_update().execution_options(populate_existing=True)
     )
 
     if service_request is None:
@@ -195,54 +190,6 @@ async def update_repair_task_status(
             old_status=old_status,
             new_status=new_status,
             note=f"Repair task status changed to {new_status.value}",
-        )
-    )
-
-    await session.commit()
-    await session.refresh(service_request)
-
-    return service_request
-
-
-async def complete_repair_task(
-    session: AsyncSession,
-    *,
-    request_id: UUID,
-    staff_id: UUID,
-) -> ServiceRequest:
-    """ทำเครื่องหมาย repair task ว่าเสร็จสมบูรณ์."""
-
-    service_request = await session.scalar(
-        select(ServiceRequest).where(
-            ServiceRequest.id == request_id,
-            ServiceRequest.request_type == RequestType.REPAIR,
-        )
-    )
-
-    if service_request is None:
-        raise RepairRequestNotFoundError("Repair request not found")
-
-    # Complete ได้เฉพาะ technician ที่รับงานนี้
-    if service_request.assigned_staff_id != staff_id:
-        raise RepairTaskAlreadyAssignedError("Repair task is assigned to another technician")
-
-    # ต้องผ่านขั้น IN_PROGRESS ก่อน
-    if service_request.status != RequestStatus.IN_PROGRESS:
-        raise RepairTaskNotInProgressError("Repair task must be in progress before completion")
-
-    old_status = service_request.status
-    service_request.status = RequestStatus.COMPLETED
-    service_request.completed_at = datetime.now(UTC)
-
-    session.add(
-        RequestHistory(
-            request_id=service_request.id,
-            action=RequestAction.COMPLETED,
-            performed_by=staff_id,
-            target_staff_id=staff_id,
-            old_status=old_status,
-            new_status=RequestStatus.COMPLETED,
-            note="Repair task completed",
         )
     )
 

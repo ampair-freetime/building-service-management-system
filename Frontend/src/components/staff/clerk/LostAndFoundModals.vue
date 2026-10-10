@@ -1,65 +1,6 @@
 <template>
 <div
       class="modal"
-      id="foundModal"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="foundModalTitle"
-    >
-      <div class="modal-card">
-        <div class="modal-head">
-          <h3 id="foundModalTitle">รับฝากของใหม่</h3>
-          <button class="close" data-close="foundModal" aria-label="ปิด">
-            ×
-          </button>
-        </div>
-        <form id="foundForm">
-          <p class="form-intro">บันทึกข้อมูลสิ่งของที่พบ ข้อมูลลับจะใช้ตรวจสอบเจ้าของและไม่แสดงต่อสาธารณะ</p>
-          <div class="field">
-            <label for="foundName">ชื่อสิ่งของ</label
-            ><input id="foundName" placeholder="เช่น กระเป๋าผ้าสีดำ" maxlength="120" autocomplete="off" required />
-          </div>
-          <div class="form-row">
-            <div class="field">
-              <label for="foundCategory">ประเภทสิ่งของ</label>
-              <select id="foundCategory" required>
-                <option value="">เลือกประเภท</option><option>อุปกรณ์อิเล็กทรอนิกส์</option><option>กระเป๋าและของใช้ส่วนตัว</option><option>บัตรและเอกสาร</option><option>กุญแจ</option><option>เสื้อผ้าและเครื่องแต่งกาย</option><option>อื่น ๆ</option>
-              </select>
-            </div>
-            <div class="field">
-              <label for="foundLocation">สถานที่พบ</label
-              ><input id="foundLocation" placeholder="เช่น CSB ชั้น 3" maxlength="160" required />
-            </div>
-          </div>
-          <div class="form-row">
-            <div class="field"><label for="foundDate">วันที่พบ</label><input id="foundDate" type="date" required /></div>
-            <div class="field"><label for="foundTime">เวลาที่พบ</label><input id="foundTime" type="time" required /></div>
-          </div>
-          <div class="form-row">
-            <div class="field">
-              <label for="custodyPoint">จุดรับฝาก</label
-              ><input id="custodyPoint" value="ประชาสัมพันธ์ชั้น 1" required />
-            </div>
-            <div class="field"><label for="foundFinder">ชื่อผู้ส่งมอบ <span class="optional-label">(ไม่บังคับ)</span></label><input id="foundFinder" maxlength="120" /></div>
-          </div>
-          <div class="field"><label for="foundContact">ช่องทางติดต่อผู้ส่งมอบ <span class="optional-label">(ไม่บังคับ)</span></label><input id="foundContact" placeholder="เบอร์โทรหรืออีเมล" maxlength="120" /></div>
-          <div class="field"><label for="foundDescription">ลักษณะสิ่งของ</label><textarea id="foundDescription" placeholder="สี ยี่ห้อ รอยตำหนิ หรือสภาพตอนพบ" maxlength="600" required></textarea></div>
-          <div class="field"><label for="foundPhoto">รูปสิ่งของ <span class="optional-label">(JPG, PNG หรือ WebP ไม่เกิน 5 MB)</span></label><input id="foundPhoto" type="file" accept="image/jpeg,image/png,image/webp" /></div>
-          <div class="field">
-            <label for="privateDetail">รายละเอียดลับสำหรับยืนยันเจ้าของ</label
-            ><textarea
-              id="privateDetail"
-              placeholder="เช่น สิ่งของภายใน หมายเลขเฉพาะ หรือข้อมูลที่เจ้าของควรทราบ"
-              maxlength="600"
-            ></textarea>
-          </div>
-          <div class="form-actions"><button class="secondary" type="button" data-close="foundModal">ยกเลิก</button><button class="primary" type="submit">บันทึกรับฝาก</button></div>
-        </form>
-      </div>
-    </div>
-
-<div
-      class="modal"
       id="rejectModal"
       role="dialog"
       aria-modal="true"
@@ -117,8 +58,8 @@
       <section class="modal-card">
         <header class="modal-head">
           <div>
-            <span class="eyebrow" id="claimDetailCode">CLM-000</span>
             <h3 id="claimDetailTitle">รายละเอียดคำขอรับคืน</h3>
+            <small id="claimDetailCode">CLM-000</small>
           </div>
           <button
             type="button"
@@ -131,39 +72,37 @@
         </header>
         <div class="inline-summary">
           <div>
-            <small>ผู้ขอรับ</small><strong id="claimRequester">–</strong>
+            <small>ชื่อผู้ขอรับ</small><strong id="claimRequester">–</strong>
           </div>
-          <div><small>ติดต่อ</small><strong id="claimContact">–</strong></div>
+          <div><small>อีเมลติดต่อ</small><strong id="claimContact">–</strong></div>
           <div>
             <small>วันที่ส่งคำขอ</small><strong id="claimDate">–</strong>
           </div>
-          <div>
-            <small>วันที่นัดรับ</small
-            ><strong id="claimPickupDate">ยังไม่มีนัดหมาย</strong>
-          </div>
-          <div>
-            <small>เวลานัดรับ</small><strong id="claimPickupTime">–</strong>
-          </div>
-          <div>
-            <small>จุดรับของ</small
-            ><strong id="claimPickupLocation">ยังไม่ระบุจุดรับของ</strong>
-          </div>
-          <div>
-            <small>หมายเหตุนัดหมาย</small
-            ><strong id="claimPickupNote">ไม่มีหมายเหตุ</strong>
-          </div>
-          <div>
-            <small>สถานะการคืนของ</small
-            ><strong id="claimReturnStatus">รอตรวจสอบคำขอ</strong>
-          </div>
+          <div><small>สถานะการคืนของ</small><strong id="claimReturnStatus">รอตรวจสอบคำขอ</strong></div>
         </div>
-        <h4>หลักฐานและรายละเอียด</h4>
-        <p id="claimEvidence"></p>
-        <div class="claim-secret">
-          <strong>ข้อมูลลับสำหรับตรวจสอบ</strong>
-          <p id="claimSecret"></p>
-        </div>
-        <div class="timeline" id="claimTimeline"></div>
+        <section class="claim-general-section">
+          <h4>รายละเอียดทั่วไปของสิ่งของ</h4>
+          <p id="claimGeneralDescription"></p>
+        </section>
+        <section class="claim-evidence-section">
+          <h4>ตรวจสอบความเป็นเจ้าของ</h4>
+          <div class="claim-evidence-columns">
+            <div><strong>หลักฐานจากผู้ขอรับคืน</strong><p id="claimEvidence"></p></div>
+            <div class="claim-secret"><strong>ข้อมูลลับของสิ่งของ · เฉพาะเจ้าหน้าที่</strong><p id="claimSecret"></p></div>
+          </div>
+          <div class="claim-evidence-images" id="claimImages" hidden></div>
+        </section>
+        <section id="claimAppointmentGroup" hidden>
+          <h4>นัดหมายรับของ</h4>
+          <div class="inline-summary">
+            <div><small>วันที่นัดรับ</small><strong id="claimPickupDate">–</strong></div>
+            <div><small>เวลานัดรับ</small><strong id="claimPickupTime">–</strong></div>
+            <div><small>จุดรับของ</small><strong id="claimPickupLocation">–</strong></div>
+            <div><small>สิ่งที่ต้องนำมาเพื่อยืนยันการรับคืน</small><strong id="claimPickupNote">–</strong></div>
+          </div>
+        </section>
+        <p id="claimNextStep" class="claim-next-step"></p>
+        <details class="claim-history"><summary>ลำดับการดำเนินการ</summary><div class="timeline" id="claimTimeline"></div></details>
         <div class="quick-action-grid" id="claimActions"></div>
       </section>
     </div>
@@ -177,7 +116,7 @@
     >
       <section class="modal-card">
         <header class="modal-head">
-          <h3 id="appointmentTitle">นัดหมายรับของ</h3>
+          <div><h3 id="appointmentTitle">นัดหมายรับของ</h3><small id="appointmentCode" class="lost-record-code"></small></div>
           <button
             type="button"
             class="close"
@@ -188,6 +127,7 @@
           </button>
         </header>
         <form id="appointmentForm">
+          <p class="form-intro">บันทึกนัดหมายแล้วระบบจะส่งวัน เวลา จุดรับของ และสิ่งที่ต้องนำมาเพื่อยืนยันการรับคืนไปยังอีเมลของผู้ขอ</p>
           <input type="hidden" id="appointmentItemId" />
           <div class="form-row">
             <div class="field">
@@ -195,38 +135,55 @@
               ><input id="appointmentDate" type="date" required />
             </div>
             <div class="field">
-              <label for="appointmentTime">เวลา</label
-              ><input
-                id="appointmentTime"
-                type="time"
-                step="300"
-                aria-describedby="appointmentDateTimeHint"
-                required
-              />
+              <label for="appointmentTime">ตั้งแต่เวลา</label
+              > <select id="appointmentTime" required aria-describedby="appointmentDateTimeHint">
+                <option value="">เลือกเวลา (24 ชั่วโมง)</option>
+                <option v-for="minutes in 17" :key="minutes" :value="`${String(Math.floor((510 + (minutes - 1) * 30) / 60)).padStart(2, '0')}:${String((510 + (minutes - 1) * 30) % 60).padStart(2, '0')}`">{{ `${String(Math.floor((510 + (minutes - 1) * 30) / 60)).padStart(2, '0')}:${String((510 + (minutes - 1) * 30) % 60).padStart(2, '0')}` }} น.</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="appointmentEndTime">ถึงเวลา</label>
+              <select id="appointmentEndTime" required>
+                <option value="">เลือกเวลาสิ้นสุด</option>
+                <option v-for="minutes in 17" :key="minutes" :value="`${String(Math.floor((510 + (minutes - 1) * 30) / 60)).padStart(2, '0')}:${String((510 + (minutes - 1) * 30) % 60).padStart(2, '0')}`">{{ `${String(Math.floor((510 + (minutes - 1) * 30) / 60)).padStart(2, '0')}:${String((510 + (minutes - 1) * 30) % 60).padStart(2, '0')}` }} น.</option>
+              </select>
             </div>
           </div>
           <small class="field-hint" id="appointmentDateTimeHint">
-            กรุณาเลือกวันและเวลาที่ยังมาไม่ถึง
+            รับของจันทร์–ศุกร์ เวลา 08:30–16:30 น. (เวลาไทย)
           </small>
           <div class="field">
             <label for="appointmentPlace">จุดรับของ</label
-            ><input
-              id="appointmentPlace"
-              value="ประชาสัมพันธ์ ชั้น 1"
-              required
-            />
-          </div>
-          <div class="field">
-            <label for="appointmentNote">หมายเหตุ</label
             ><textarea
-              id="appointmentNote"
-              placeholder="เอกสารที่ต้องนำมาแสดง"
+              id="appointmentPlace"
+              placeholder="CSB"
             ></textarea>
           </div>
+          <div class="field">
+            <label for="appointmentNote">สิ่งที่ต้องนำมาเพื่อยืนยันการรับคืน</label
+            ><textarea
+              id="appointmentNote"
+              placeholder="เช่น รูปถ่ายสิ่งของหรือหลักฐานการเป็นเจ้าของ"
+            ></textarea>
+          </div>
+          <p id="appointmentSendingStatus" class="appointment-sending-status" role="status" aria-live="polite" hidden>
+            <span class="appointment-spinner" aria-hidden="true"></span>
+            กำลังบันทึกนัดหมายและส่งอีเมล… กรุณารอสักครู่
+          </p>
           <button type="submit" class="primary" style="width: 100%">
             ยืนยันนัดหมาย
           </button>
         </form>
       </section>
     </div>
+<div class="modal" id="claimMoreModal" role="dialog" aria-modal="true" aria-labelledby="claimMoreTitle">
+  <section class="modal-card">
+    <header class="modal-head"><h3 id="claimMoreTitle">ขอข้อมูลเพิ่มเติมจากผู้ขอรับคืน</h3><button type="button" class="close" data-close="claimMoreModal" aria-label="ปิด">×</button></header>
+    <form id="claimMoreForm">
+      <input type="hidden" id="claimMoreId" /><input type="hidden" id="claimMoreAction" />
+      <div class="field"><label id="claimMoreLabel" for="claimMoreMessage">ข้อมูลที่ต้องการให้ส่งเพิ่ม</label><textarea id="claimMoreMessage" required maxlength="2000" placeholder="เช่น ระบุลักษณะรอยตำหนิ หรือสิ่งของที่อยู่ภายใน"></textarea></div>
+      <button id="claimMoreSubmit" type="submit" class="primary">ดำเนินการต่อ</button>
+    </form>
+  </section>
+</div>
 </template>

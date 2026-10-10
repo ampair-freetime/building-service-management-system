@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "lottie-web": "^5.13.0",
     "vue": "^3.5.13",
     "vue-router": "^4.5.0"
   },
@@ -17,4 +18,3 @@
     "vite": "^6.0.7"
   }
 }
-

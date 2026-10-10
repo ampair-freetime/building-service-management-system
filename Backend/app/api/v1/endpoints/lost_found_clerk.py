@@ -1,9 +1,12 @@
 from uuid import UUID
+from zoneinfo import ZoneInfo
+from app.services.invitation_email import send_email, EmailDeliveryError
 
 from fastapi import APIRouter, HTTPException
 
 from app.api.dependencies import ClerkStaff, DbSession, OptionalObjectStorageClient
 from app.schemas.lost_found_clerk import (
+    PersonalLostFoundHistoryResponse,
     FoundItemDetailResponse,
     LostItemDetailResponse,
     OwnershipRequestDetailResponse,
@@ -17,7 +20,10 @@ from app.schemas.lost_found_clerk import (
 )
 from app.models.enums import LostType
 from app.services.lost_found_clerk import (
+    list_personal_lost_found_history,
+    reject_ownership_request,
     ActiveClaimExistsError,
+    ItemAlreadyClaimedError,
     approve_found_item,
     approve_lost_item,
     close_lost_found_item,
@@ -37,6 +43,12 @@ from app.services.lost_found_clerk import (
 )
 
 router = APIRouter()
+
+
+@router.get("/my-history", response_model=list[PersonalLostFoundHistoryResponse])
+async def read_personal_history(session: DbSession, staff: ClerkStaff):
+    return await list_personal_lost_found_history(session, staff.id)
+
 
 @router.get(
     "/pending-found-items",
@@ -302,7 +314,7 @@ async def get_pending_ownership_requests(
     session: DbSession,
     _: ClerkStaff,
 ) -> list[OwnershipRequestListResponse]:
-    """คืนรายการคำขอรับของคืนที่กำลังรอตรวจสอบ"""
+    """คืนรายการคำขอรับของคืนที่ยังอยู่ระหว่างดำเนินการ"""
 
     return await list_pending_ownership_requests(session)
 
@@ -343,11 +355,14 @@ async def approve_ownership_request_endpoint(
 ) -> OwnershipRequestListResponse:
     """อนุมัติคำขอรับของคืน"""
 
-    claim = await approve_ownership_request(
-        session,
-        claim_id,
-        current_staff.id,
-    )
+    try:
+        claim = await approve_ownership_request(
+            session,
+            claim_id,
+            current_staff.id,
+        )
+    except ItemAlreadyClaimedError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
 
     if claim is None:
         raise HTTPException(
@@ -426,6 +441,9 @@ async def schedule_ownership_pickup(
         session,
         claim_id,
         request.pickup_datetime,
+        request.pickup_location,
+        request.note,
+        request.pickup_end_datetime,
     )
 
     if claim is None:
@@ -442,4 +460,61 @@ async def schedule_ownership_pickup(
             detail="Ownership request not found",
         )
 
+    local = request.pickup_datetime
+    zone = ZoneInfo("Asia/Bangkok")
+    local = local.replace(tzinfo=zone) if local.tzinfo is None else local.astimezone(zone)
+    end = request.pickup_end_datetime
+    end = (end.replace(tzinfo=zone) if end.tzinfo is None else end.astimezone(zone)) if end else None
+    time_label = local.strftime("%H:%M") + (f"–{end.strftime('%H:%M')}" if end else "")
+    try:
+        await send_email(
+            recipient=detail["claimant_email"],
+            subject=f"นัดรับคืน {detail['item_name']} · {local.strftime('%d/%m/%Y')}",
+            body=(f"เรียน {detail['claimant_name']}\n\n"
+                  "เจ้าหน้าที่ได้กำหนดนัดหมายรับคืนทรัพย์สินของท่าน โดยมีรายละเอียดดังนี้\n\n"
+                  f"ทรัพย์สิน: {detail['item_name']}\n"
+                  f"รหัสคำขอรับคืน: {detail['claim_code']}\n"
+                  f"วันที่นัดรับคืน: {local.strftime('%d/%m/%Y')}\n"
+                  f"เวลารับคืน: {time_label} น.\n"
+                  f"สถานที่รับคืน: {request.pickup_location or detail['custody_location'] or 'ติดต่อห้องธุรการ CSB'}\n"
+                  f"หลักฐานที่ต้องนำมาเพื่อยืนยันการรับคืน: {request.note or 'ไม่ได้ระบุ กรุณาติดต่อธุรการก่อนเข้ารับของ'}\n\n"
+                  "หากไม่สะดวกมารับคืนตามวันและเวลาที่กำหนด กรุณาติดต่อเจ้าหน้าที่ธุรการเพื่อประสานงานนัดหมายใหม่\n\n"
+                  "ช่องทางติดต่อ\n"
+                  "โทรศัพท์: 053-943433 หรือ 063-0807969\n"
+                  "อีเมล: Compsci@cmu.ac.th\n"
+                  "เวลาทำการ: วันจันทร์–ศุกร์ เวลา 08:30–16:30 น. (ยกเว้นวันหยุดนักขัตฤกษ์)"),
+
+        )
+        detail["email_sent"] = True
+    except EmailDeliveryError:
+        detail["email_sent"] = False
     return detail
+
+@router.post("/ownership-requests/{claim_id}/reject", response_model=OwnershipRequestListResponse)
+async def reject_ownership_request_endpoint(
+    claim_id: UUID, request: RejectFoundItemRequest, session: DbSession, staff: ClerkStaff,
+):
+    claim = await reject_ownership_request(session, claim_id, staff.id, request.reason)
+    if claim is None:
+        raise HTTPException(status_code=409, detail="คำขอนี้ไม่อยู่ในสถานะที่ปฏิเสธได้")
+    detail = await get_ownership_request_detail(session, claim_id)
+    email_sent = False
+    try:
+        await send_email(
+            recipient=claim.claimant_email,
+            subject="ผลการตรวจสอบคำขอรับคืนสิ่งของ · อาคาร CSB",
+            body=(f"เรียน {claim.claimant_name}\n\n"
+                  f"คำขอรับคืน: {detail['item_name']}\n"
+                  f"รหัสคำขอรับคืน: {detail['claim_code']}\n"
+                  "ผลการตรวจสอบ: ไม่อนุมัติคำขอ\n"
+                  f"เหตุผล: {request.reason}\n\n"
+                  "หากมีข้อสงสัยหรือต้องการสอบถามเพิ่มเติม กรุณาติดต่อเจ้าหน้าที่ที่ห้องธุรการหรือห้องประชาสัมพันธ์ ชั้น 1 อาคาร CSB\n"
+                  "โทรศัพท์: 053-943433 หรือ 063-0807969\n"
+                  "อีเมล: Compsci@cmu.ac.th"),
+        )
+        email_sent = True
+    except EmailDeliveryError:
+        pass
+    return OwnershipRequestListResponse.model_validate(claim).model_copy(
+        update={"email_sent": email_sent}
+    )

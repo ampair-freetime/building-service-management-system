@@ -144,7 +144,7 @@ export async function getLostItemDetail(itemId) {
   }
 }
 
-// โหลดคำร้องขอรับของคืนทั้งหมดที่รอให้เจ้าหน้าที่ตรวจสอบ
+// โหลดคำร้องขอรับของคืนที่ยังอยู่ระหว่างตรวจสอบ ยืนยัน หรือนัดหมาย
 export async function getPendingOwnershipRequests() {
   const controller = new AbortController();
 
@@ -254,11 +254,11 @@ export async function scheduleOwnershipPickup(claimId, appointment) {
       method: "POST",
       headers: {
         Authorization: `Bearer ${localStorage.getItem("buildingCareAccessToken") || ""}`,
-        "Content-Type": "application/json",
+      "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        pickup_date: appointment.date,
-        pickup_time: appointment.time,
+        pickup_end_datetime: new Date(`${appointment.date}T${appointment.endTime}:00+07:00`).toISOString(),
+        pickup_datetime: new Date(`${appointment.date}T${appointment.time}:00+07:00`).toISOString(),
         pickup_location: appointment.location,
         note: appointment.note || null,
       }),
@@ -370,4 +370,20 @@ export async function rejectLostItemAnnouncement(itemId, reason) {
     response,
     "ไม่สามารถปฏิเสธประกาศของหายได้",
   );
+}
+
+
+export async function getPersonalLostFoundHistory() {
+  const response = await fetch(`${API_BASE_URL}/lost-found/my-history`, {
+    headers: {Authorization: `Bearer ${localStorage.getItem("buildingCareAccessToken") || ""}`},
+  });
+  return parseResponse(response, "ไม่สามารถโหลดประวัติงานธุรการได้");
+}
+
+export async function rejectOwnershipRequest(claimId, reason) {
+  const response = await fetch(`${API_BASE_URL}/lost-found/ownership-requests/${encodeURIComponent(claimId)}/reject`, {
+    method: "POST", headers: {Authorization: `Bearer ${localStorage.getItem("buildingCareAccessToken") || ""}`, "Content-Type": "application/json"},
+    body: JSON.stringify({reason}),
+  });
+  return parseResponse(response, "ไม่สามารถปฏิเสธคำขอได้");
 }

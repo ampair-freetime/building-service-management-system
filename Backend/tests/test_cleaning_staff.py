@@ -137,10 +137,13 @@ def complete_cleaning_task(
     assert accepted.status_code == 200
 
     for new_status in ("received", "in_progress", "completed"):
-        response = client.patch(
-            f"/api/v1/cleaning-tasks/{request_id}/status",
-            headers=headers,
-            json={"status": new_status},
+        response = (
+            client.post(f"/api/v1/cleaning-tasks/{request_id}/complete",
+                        headers=headers, data={"note": "Initial completion report"})
+            if new_status == "completed" else client.patch(
+                f"/api/v1/cleaning-tasks/{request_id}/status",
+                headers=headers, json={"status": new_status},
+            )
         )
         assert response.status_code == 200
         assert response.json()["status"] == new_status
@@ -467,10 +470,9 @@ def test_housekeeper_can_update_cleaning_status_in_order(
     assert in_progress.json()["status"] == "in_progress"
 
     # in_progress -> completed
-    completed = client.patch(
-        f"/api/v1/cleaning-tasks/{request_id}/status",
-        headers=headers,
-        json={"status": "completed"},
+    completed = client.post(
+        f"/api/v1/cleaning-tasks/{request_id}/complete",
+        headers=headers, data={"note": "Initial completion report"},
     )
 
     assert completed.status_code == 200
@@ -687,10 +689,13 @@ def test_housekeeper_can_upload_completion_photos(
 
     # assigned -> received -> in_progress -> completed
     for new_status in ("received", "in_progress", "completed"):
-        response = client.patch(
-            f"/api/v1/cleaning-tasks/{request_id}/status",
-            headers=headers,
-            json={"status": new_status},
+        response = (
+            client.post(f"/api/v1/cleaning-tasks/{request_id}/complete",
+                        headers=headers, data={"note": "Initial completion report"})
+            if new_status == "completed" else client.patch(
+                f"/api/v1/cleaning-tasks/{request_id}/status",
+                headers=headers, json={"status": new_status},
+            )
         )
         assert response.status_code == 200
 
@@ -872,10 +877,13 @@ def test_housekeeper_cannot_upload_completion_photos_before_completed(
 
     # ไปถึงแค่ in_progress ยังไม่ completed
     for new_status in ("received", "in_progress"):
-        response = client.patch(
-            f"/api/v1/cleaning-tasks/{request_id}/status",
-            headers=headers,
-            json={"status": new_status},
+        response = (
+            client.post(f"/api/v1/cleaning-tasks/{request_id}/complete",
+                        headers=headers, data={"note": "Initial completion report"})
+            if new_status == "completed" else client.patch(
+                f"/api/v1/cleaning-tasks/{request_id}/status",
+                headers=headers, json={"status": new_status},
+            )
         )
         assert response.status_code == 200
 
@@ -1047,6 +1055,7 @@ def test_housekeeper_can_add_completion_note(
                     RequestHistory.request_id == request_id,
                     RequestHistory.action
                     == RequestAction.COMPLETION_NOTE_ADDED,
+                    RequestHistory.note != "Initial completion report",
                 )
             )
 
@@ -1118,6 +1127,7 @@ def test_empty_completion_note_is_rejected(
                     RequestHistory.request_id == request_id,
                     RequestHistory.action
                     == RequestAction.COMPLETION_NOTE_ADDED,
+                    RequestHistory.note != "Initial completion report",
                 )
             )
 
@@ -1324,7 +1334,8 @@ def test_completion_note_appears_in_work_history(
         if item["action"] == "completion_note_added"
     ]
 
-    assert len(completion_notes) == 1
+    assert len(completion_notes) == 2
+    completion_notes = [entry for entry in completion_notes if entry["note"] != "Initial completion report"]
     assert completion_notes[0]["note"] == (
         "ทำความสะอาดพื้นและนำขยะออกเรียบร้อยแล้ว"
     )

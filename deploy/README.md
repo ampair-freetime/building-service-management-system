@@ -22,7 +22,7 @@ Backend อ่านค่าโดยเรียงลำดับความ
 6. ตรวจบริการ: `docker compose --env-file .env.production -f compose.production.yaml exec backend python scripts/check_services.py`
 7. เริ่ม frontend หลังจัดบัญชี admin: `docker compose --env-file .env.production -f compose.production.yaml up -d frontend` ให้ผู้ดูแลตั้ง HTTPS reverse proxy ไป `127.0.0.1:8080`
 
-ไฟล์ production เป็น standalone ใช้ `-f compose.production.yaml` เพียงไฟล์เดียว ไม่ merge กับ development compose มีสาม container: PostgreSQL, backend, static frontend ไม่มี Mailpit/dev server/source bind mounts ฐานข้อมูลใช้ named volume; backend/database ไม่ publish port ออก host
+ไฟล์ production เป็น standalone ใช้ `-f compose.production.yaml` เพียงไฟล์เดียว ไม่ merge กับ development compose มีสาม container: PostgreSQL, backend, static frontend ไม่มี dev server/source bind mounts ฐานข้อมูลใช้ named volume; backend/database ไม่ publish port ออก host
 
 Frontend build ใช้ `VITE_API_BASE_URL=/api/v1` เพื่อให้ browser เรียกโดเมนเดียวกับเว็บ Nginx ส่ง `/api/...` ต่อไป backend และเก็บ path เดิมไว้ ส่วน `/staff/setup-password` และ Vue routes อื่นใช้ SPA fallback ไป index.html การเปลี่ยน `VITE_API_BASE_URL` ต้อง build frontend ใหม่
 
@@ -46,7 +46,7 @@ Frontend ผูก host port ที่ loopback โดย default และย�
 
 - STARTTLS: โดยทั่วไปใช้ port 587, `SMTP_USE_STARTTLS=true`, `SMTP_USE_SSL=false`
 - Implicit TLS: โดยทั่วไปใช้ port 465, `SMTP_USE_SSL=true`, `SMTP_USE_STARTTLS=false`
-- Mailpit/relay ภายในที่อนุญาต plaintext: ตั้ง TLS ทั้งสองค่าเป็น false ตามนโยบายผู้ดูแล ห้ามส่งรหัสผ่านผ่าน plaintext ไปอินเทอร์เน็ต
+- SMTP relay ภายในที่อนุญาต plaintext: ตั้ง TLS ทั้งสองค่าเป็น false ตามนโยบายผู้ดูแล ห้ามส่งรหัสผ่านผ่าน plaintext ไปอินเทอร์เน็ต
 - Username/password ต้องตั้งคู่กัน; relay ที่ไม่ต้อง authentication ให้เว้นทั้งสองค่า
 - ไม่ตั้ง host จะสร้างบัญชีได้ แต่ `email_sent=false`; Admin ใช้ resend เมื่อพร้อม
 

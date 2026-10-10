@@ -10,6 +10,7 @@ const dateTo = ref("");
 const announcementType = ref("");
 const overview = ref(null);
 const loading = ref(true);
+const loadingAction = ref("initial");
 const errorMessage = ref("");
 const errorStatus = ref(null);
 const detailOpen = ref(false);
@@ -68,6 +69,7 @@ const metricLabels = {
 async function loadOverview() {
   if (dateError.value) return;
   const request = ++overviewRequest;
+  const startedAt = performance.now();
   loading.value = true;
   errorMessage.value = "";
   errorStatus.value = null;
@@ -83,17 +85,23 @@ async function loadOverview() {
       ? "เซสชันหมดอายุ กรุณาเข้าสู่ระบบอีกครั้ง"
       : "ไม่สามารถโหลดภาพรวมงานอนุมัติได้ กรุณาลองใหม่";
   } finally {
-    if (request === overviewRequest) loading.value = false;
+    if (request === overviewRequest) {
+      const remaining = Math.max(0, 400 - (performance.now() - startedAt));
+      if (remaining) await new Promise((resolve) => setTimeout(resolve, remaining));
+      if (request === overviewRequest) loading.value = false;
+    }
   }
 }
 
 function applyFilters() {
   if (dateError.value) return;
+  loadingAction.value = "apply";
   closeDetail();
   appliedFilters.value = filters();
   loadOverview();
 }
 function clearFilters() {
+  loadingAction.value = "clear";
   dateFrom.value = "";
   dateTo.value = "";
   announcementType.value = "";
@@ -164,12 +172,26 @@ onBeforeUnmount(() => {
           <option value="lost">ประกาศของหาย</option>
         </select>
       </label>
-      <button class="primary" type="submit" :disabled="Boolean(dateError)">แสดงผล</button>
-      <button class="secondary" type="button" @click="clearFilters">ล้างตัวกรอง</button>
+      <button class="primary" type="submit" :disabled="Boolean(dateError) || loading" :aria-busy="loading">
+        <span v-if="loading && loadingAction === 'apply'" class="clerk-admin-button-spinner" aria-hidden="true"></span>
+        {{ loading && loadingAction === 'apply' ? 'กำลังแสดงผล…' : 'แสดงผล' }}
+      </button>
+      <button class="secondary" type="button" :disabled="loading" :aria-busy="loading" @click="clearFilters">
+        <span v-if="loading && loadingAction === 'clear'" class="clerk-admin-button-spinner" aria-hidden="true"></span>
+        {{ loading && loadingAction === 'clear' ? 'กำลังล้าง…' : 'ล้างตัวกรอง' }}
+      </button>
     </form>
-    <p class="clerk-admin-filter-note">ตัวกรองนี้ใช้กับภาพรวมการอนุมัติเท่านั้น · ช่วงวันที่อ้างอิงวันที่ส่งประกาศตามเวลา UTC<span v-if="filtersDirty"> · กด “แสดงผล” เพื่อใช้ตัวกรองที่เลือก</span></p>
+
     <div v-if="dateError" class="clerk-admin-state clerk-admin-error" role="alert">{{ dateError }}</div>
-    <div v-else-if="loading" class="clerk-admin-state" role="status">กำลังโหลดภาพรวมงานอนุมัติ…</div>
+    <div v-else-if="loading" class="clerk-admin-state clerk-admin-loading" role="status" aria-live="polite">
+      <div class="clerk-admin-loading-label">
+        <span class="clerk-admin-spinner" aria-hidden="true"></span>
+        <strong>{{ loadingAction === 'clear' ? 'กำลังล้างตัวกรอง…' : 'กำลังโหลดผลลัพธ์…' }}</strong>
+      </div>
+      <div class="clerk-admin-loading-grid" aria-hidden="true">
+        <span v-for="item in 4" :key="item" class="skeleton"></span>
+      </div>
+    </div>
     <div v-else-if="errorMessage" class="clerk-admin-state" role="alert">
       {{ errorMessage }} <button v-if="errorStatus !== 401" class="small-btn" type="button" @click="loadOverview">ลองใหม่</button>
     </div>

@@ -9,6 +9,7 @@ from app.api.v1.endpoints import (
     cleaning_staff,
     clerk_work_overview,
     found_item,
+    guest_claim,
     lost_found_clerk,
     lost_item,
     notification,
@@ -84,3 +85,5 @@ api_router.include_router(
     prefix="/repair-requests",
     tags=["repair staff"],
 )
+
+api_router.include_router(guest_claim.router, prefix="/guest/claims", tags=["guest claims"])

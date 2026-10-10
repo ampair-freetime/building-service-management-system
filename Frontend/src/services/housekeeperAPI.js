@@ -134,3 +134,14 @@ export async function getCleaningTaskHistory(requestId) {
   );
   return parseResponse(response, "ไม่สามารถโหลดประวัติงานได้");
 }
+
+export async function completeCleaningTask(requestId, note, files = []) {
+  const body = new FormData();
+  body.append("note", note);
+  files.forEach(file => body.append("image", file));
+  const response = await fetch(
+    `${API_BASE_URL}/cleaning-tasks/${encodeURIComponent(requestId)}/complete`,
+    { method: "POST", headers: authHeaders(), body },
+  );
+  return parseResponse(response, "ไม่สามารถปิดงานพร้อมรายงานได้");
+}

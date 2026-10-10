@@ -28,11 +28,11 @@ services:
       BACKEND_CORS_ORIGINS: '${BACKEND_CORS_ORIGINS:-["http://localhost:5173"]}'
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-building_service}:${POSTGRES_PASSWORD:-building_service}@database:5432/${POSTGRES_DB:-building_service}
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:-development-only-change-this-secret}
-      SMTP_HOST: ${SMTP_HOST:-mailpit}
-      SMTP_PORT: ${SMTP_PORT:-1025}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
       SMTP_USERNAME: ${SMTP_USERNAME:-}
       SMTP_PASSWORD: ${SMTP_PASSWORD:-}
-      SMTP_USE_STARTTLS: ${SMTP_USE_STARTTLS:-false}
+      SMTP_USE_STARTTLS: ${SMTP_USE_STARTTLS:-true}
       SMTP_USE_SSL: ${SMTP_USE_SSL:-false}
       SMTP_TIMEOUT_SECONDS: ${SMTP_TIMEOUT_SECONDS:-10}
       MAIL_FROM: ${MAIL_FROM:-Building Care <no-reply@example.com>}
@@ -46,9 +46,12 @@ services:
       R2_CONNECT_TIMEOUT_SECONDS: ${R2_CONNECT_TIMEOUT_SECONDS:-5}
       R2_READ_TIMEOUT_SECONDS: ${R2_READ_TIMEOUT_SECONDS:-15}
       R2_TOTAL_MAX_ATTEMPTS: ${R2_TOTAL_MAX_ATTEMPTS:-2}
-      MAX_IMAGE_UPLOAD_BYTES: ${MAX_IMAGE_UPLOAD_BYTES:-5242880}
+      MAX_IMAGE_UPLOAD_BYTES: ${MAX_IMAGE_UPLOAD_BYTES:-26214400}
       MAX_GUEST_IMAGES: ${MAX_GUEST_IMAGES:-5}
-      MAX_IMAGE_PIXELS: ${MAX_IMAGE_PIXELS:-8000000}
+      MAX_IMAGE_PIXELS: ${MAX_IMAGE_PIXELS:-50000000}
+      IMAGE_MAX_DIMENSION: ${IMAGE_MAX_DIMENSION:-2048}
+      IMAGE_WEBP_QUALITY: ${IMAGE_WEBP_QUALITY:-78}
+      MAX_IMAGE_OUTPUT_BYTES: ${MAX_IMAGE_OUTPUT_BYTES:-1048576}
       MAX_IMAGE_PROCESSING_CONCURRENCY: ${MAX_IMAGE_PROCESSING_CONCURRENCY:-1}
     ports:
       - "8000:8000"
@@ -57,11 +60,6 @@ services:
     depends_on:
       database:
         condition: service_healthy
-
-  mailpit:
-    image: axllent/mailpit
-    ports:
-      - "8025:8025"
 
   frontend:
     build:
