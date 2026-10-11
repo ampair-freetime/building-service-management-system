@@ -23,6 +23,7 @@ from app.schemas.repair_guest import (
     GuestRepairTrackingResponse,
 )
 from app.services.images import ProcessedImage, prepare_guest_image
+from app.services.notification import create_repair_request_notifications
 from app.services.object_storage import (
     ObjectStorage,
     StorageConfigurationError,
@@ -167,6 +168,12 @@ async def create_guest_repair_request(
                 new_status=RequestStatus.WAITING,
                 note=REPAIR_HISTORY_NOTE,
             )
+        )
+        await create_repair_request_notifications(
+            session,
+            request_id=request_id,
+            request_code=request_code,
+            request_title=payload.title,
         )
         for item in prepared:
             session.add(

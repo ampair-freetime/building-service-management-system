@@ -127,6 +127,49 @@ def test_housekeeper_receives_notification_when_cleaning_request_created(
     assert after.json()[0]["is_read"] is True
 
 
+def test_technician_receives_notification_when_repair_request_created(
+    test_context: tuple[TestClient, async_sessionmaker[AsyncSession]],
+) -> None:
+    client, session_factory = test_context
+
+    seed_location(session_factory)
+    seed_staff(
+        session_factory,
+        email="technician@example.com",
+        password="correct-password",
+        role="technician",
+        full_name="Repair Technician",
+    )
+    headers = login_staff(
+        client,
+        "technician@example.com",
+        "correct-password",
+    )
+
+    created = client.post(
+        "/api/v1/guest/repair-requests",
+        data={
+            "title": "แอร์เสีย",
+            "description": "แอร์ไม่เย็นและมีเสียงดัง",
+            "priority": "urgent",
+            "reporter_email": "guest@example.com",
+            "location_id": "1",
+        },
+    )
+
+    assert created.status_code == 201
+
+    response = client.get("/api/v1/notifications", headers=headers)
+    assert response.status_code == 200
+
+    notifications = response.json()
+    assert len(notifications) == 1
+    assert notifications[0]["title"] == "New repair request"
+    assert created.json()["request_code"] in notifications[0]["message"]
+    assert notifications[0]["request_id"] is not None
+    assert notifications[0]["is_read"] is False
+
+
 def test_housekeeper_cannot_mark_another_housekeepers_notification_as_read(
     test_context: tuple[TestClient, async_sessionmaker[AsyncSession]],
 ) -> None:
