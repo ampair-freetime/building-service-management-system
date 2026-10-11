@@ -171,6 +171,13 @@ const { activeRole, dashboardLoading, emailSending } = useStaffDashboard();
             <span class="nav-icon">QR</span>จัดการสถานที่
           </button>
           <button
+            class="nav-item"
+            data-page="my-history"
+            data-roles="housekeeper,technician,clerk"
+          >
+            <span class="nav-icon">H</span>ประวัติงานของฉัน
+          </button>
+          <button
             class="nav-item notification-nav-item"
             data-page="notifications"
             data-roles="housekeeper,technician,clerk"
@@ -185,13 +192,6 @@ const { activeRole, dashboardLoading, emailSending } = useStaffDashboard();
               aria-live="polite"
               hidden
             ></span>
-          </button>
-          <button
-            class="nav-item"
-            data-page="my-history"
-            data-roles="housekeeper,technician,clerk"
-          >
-            <span class="nav-icon">H</span>ประวัติงานของฉัน
           </button>
         </nav>
         <div class="sidebar-foot">
