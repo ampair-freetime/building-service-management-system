@@ -102,6 +102,6 @@ export function validImage(file) {
   return Boolean(
     file &&
       ["image/jpeg", "image/png", "image/webp"].includes(file.type) &&
-      file.size <= 5242880
+      file.size <= 10485760
   );
 }

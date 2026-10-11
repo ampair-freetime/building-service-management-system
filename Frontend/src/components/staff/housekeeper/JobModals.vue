@@ -291,7 +291,7 @@
               ><svg class="icon" style="margin: auto">
                 <use href="#i-upload" /></svg
               ><strong>ลากรูปมาวาง หรือเลือกจากเครื่อง</strong
-              ><small>JPG, PNG, WebP · ไม่เกิน 5 MB</small></span
+              ><small>JPG, PNG, WebP · ไม่เกิน 10 MB</small></span
             ></label
           >
           <div class="upload-preview" id="progressPreview">
@@ -366,7 +366,7 @@
                   <use href="#i-upload" />
                 </svg>
                 <strong>ลากรูปหลังดำเนินการมาวาง หรือเลือกจากเครื่อง</strong>
-                <small>JPG, PNG, WebP · ไม่เกิน 5 MB</small>
+                <small>JPG, PNG, WebP · ไม่เกิน 10 MB</small>
               </span>
             </label>
             <div class="upload-preview" id="completionPreview">

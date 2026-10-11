@@ -86,7 +86,7 @@ const photoInput = ref(null);
 const photos = ref([]);
 const photoErrors = ref([]);
 const MAX_PHOTOS = 5;
-const MAX_PHOTO_BYTES = 5 * 1024 * 1024;
+const MAX_PHOTO_BYTES = 10 * 1024 * 1024;
 const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
 
 const floorOptions = computed(() => [...new Set([
@@ -198,7 +198,7 @@ function addPhotos(event) {
       );
     } else if (file.size > MAX_PHOTO_BYTES) {
       errors.push(
-        `${file.name}: ไม่ได้แนบไฟล์ ขนาดเกิน 5 MB ต่อรูป กรุณาลดขนาดไฟล์`,
+        `${file.name}: ไม่ได้แนบไฟล์ ขนาดเกิน 10 MB ต่อรูป กรุณาลดขนาดไฟล์`,
       );
     } else if (
       photos.value.some(
@@ -373,7 +373,7 @@ onBeforeUnmount(clearPhotos);
                   }}</strong>
                   <small id="cleanImageHint"
                     >แนบได้สูงสุด {{ MAX_PHOTOS }} รูป · JPG, PNG หรือ WebP
-                    ไม่เกิน 5 MB ต่อรูป</small
+                    ไม่เกิน 10 MB ต่อรูป</small
                   >
                 </span>
               </label>

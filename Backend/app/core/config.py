@@ -76,7 +76,7 @@ class Settings(BaseSettings):
     r2_total_max_attempts: int = Field(default=2, ge=1, le=5)
 
     # จำกัดทั้งขนาดไฟล์และจำนวน pixel เพื่อลดความเสี่ยงจากไฟล์ภาพผิดปกติ
-    max_image_upload_bytes: int = Field(default=25 * 1024 * 1024, gt=0)
+    max_image_upload_bytes: int = Field(default=10 * 1024 * 1024, gt=0)
     max_guest_images: int = Field(default=5, ge=1, le=5)
     max_image_pixels: int = Field(default=50_000_000, gt=0)
     # รูปที่เก็บจริงใน R2: ย่อด้านยาวและบีบอัดให้เล็ก แยกจากขีดจำกัดของไฟล์ที่อัปโหลด

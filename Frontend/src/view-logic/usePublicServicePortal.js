@@ -1091,7 +1091,7 @@ export function usePublicServicePortal() {
       const uploadAction = container.querySelector(".image-upload-action");
       const fileError = document.getElementById(input.dataset.errorId);
       const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
-      const maxSize = Number(input.dataset.maxSize) || 5 * 1024 * 1024;
+      const maxSize = Number(input.dataset.maxSize) || 10 * 1024 * 1024;
       const maxFiles = Number(input.dataset.maxFiles) || 5;
       const maxSizeMB = maxSize / (1024 * 1024);
       const selectedPhotos = [];
