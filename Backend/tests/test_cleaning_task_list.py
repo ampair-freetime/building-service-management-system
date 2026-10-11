@@ -12,6 +12,7 @@ from app.models.enums import ImageType, RequestStatus, RequestType
 from app.models.image import Image
 from app.models.location import Location
 from app.models.service_request import ServiceRequest
+from app.services.image_urls import build_image_url
 
 PASSWORD = "Staff-Pass1!"
 Context = tuple[TestClient, async_sessionmaker[AsyncSession]]
@@ -145,7 +146,7 @@ def test_detail_for_visible_task_with_images(test_context: Context) -> None:
     assert body["reporter_email"] == "guest@example.com"
     assert body["location"]["area"] == "ห้อง 201"
     assert [image["url"] for image in body["images"]] == [
-        "https://example.test/guest/cleaning/1.webp"
+        build_image_url(UUID(body["images"][0]["id"]))
     ]
 
 

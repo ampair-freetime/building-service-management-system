@@ -59,11 +59,6 @@ class LostItem(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
-    # ช่องสำหรับ retention policy ในอนาคต รอบนี้ยังไม่มี job เปลี่ยนค่าอัตโนมัติ
-    expires_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True, index=True
-    )
-    archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     location: Mapped["Location | None"] = relationship(

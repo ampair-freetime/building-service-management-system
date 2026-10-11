@@ -131,22 +131,35 @@ export async function resendStaffInvitation(staffId) {
   return parseResponse(response, "ไม่สามารถส่งคำเชิญซ้ำได้");
 }
 
-export async function deleteStaffAccount(staffId) {
-  const response = await fetch(`${STAFF_ENDPOINT}/${encodeURIComponent(staffId)}`, {
-    method: "DELETE",
-    headers: authHeaders(),
-  });
-  if (response.ok) return;
-
+async function staffChangeError(response, fallbackMessage) {
   const body = await response.json().catch(() => ({}));
   const detail = body.detail;
   const message = typeof detail === "string"
     ? detail
     : typeof detail?.message === "string"
       ? detail.message
-      : "ไม่สามารถลบบัญชีเจ้าหน้าที่ได้";
+      : fallbackMessage;
   const error = new Error(message);
   error.status = response.status;
   error.unfinishedAssignments = detail?.unfinished_assignments || [];
-  throw error;
+  return error;
+}
+
+export async function updateStaffStatus(staffId, status) {
+  const response = await fetch(`${STAFF_ENDPOINT}/${encodeURIComponent(staffId)}/status`, {
+    method: "PATCH",
+    headers: authHeaders(true),
+    body: JSON.stringify({ status }),
+  });
+  if (response.ok) return response.json();
+  throw await staffChangeError(response, "ไม่สามารถเปลี่ยนสถานะบัญชีได้");
+}
+
+export async function deleteStaffAccount(staffId) {
+  const response = await fetch(`${STAFF_ENDPOINT}/${encodeURIComponent(staffId)}`, {
+    method: "DELETE",
+    headers: authHeaders(),
+  });
+  if (response.ok) return;
+  throw await staffChangeError(response, "ไม่สามารถลบบัญชีเจ้าหน้าที่ได้");
 }

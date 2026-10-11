@@ -1,7 +1,7 @@
 import asyncio
 from datetime import datetime, timezone
 
-from uuid import uuid4
+from uuid import UUID, uuid4
 from unittest.mock import Mock
 
 import pytest
@@ -11,6 +11,7 @@ from conftest import seed_staff
 from sqlalchemy import select
 from app.models.enums import ClaimStatus, LostStatus, LostType, ReturnStatus
 from app.models.image import Image
+from app.services.image_urls import build_image_url
 from app.models.lost_found import (
     LostClaim,
     LostClaimReturnStatusHistory,
@@ -217,8 +218,9 @@ def test_cannot_approve_already_approved_found_item(test_context):
         headers=headers,
     )
 
-    assert response.status_code == 404
-    assert response.json()["detail"] == "Pending found item not found"
+    # มีรายการอยู่จริงแต่ถูกตัดสินไปแล้ว → 409 (ต่างจากไม่มีรายการ → 404)
+    assert response.status_code == 409
+    assert response.json()["detail"] == "รายการนี้มีเจ้าหน้าที่ดำเนินการไปแล้ว กรุณารีเฟรชข้อมูล"
 
 
 def test_cannot_approve_lost_item(test_context):
@@ -1470,8 +1472,8 @@ def test_cannot_update_return_status_for_unapproved_claim(test_context):
         },
     )
 
-    assert response.status_code == 404
-    assert response.json()["detail"] == "Approved ownership request not found"
+    assert response.status_code == 409
+    assert response.json()["detail"] == "รายการนี้มีเจ้าหน้าที่ดำเนินการไปแล้ว กรุณารีเฟรชข้อมูล"
 
 
 def test_return_status_history_is_saved(test_context):
@@ -2222,6 +2224,14 @@ def _seed_image(session_factory, item_id, *, sort_order=0):
     return asyncio.run(seed())
 
 
+def _image_id(session_factory, object_key):
+    async def read():
+        async with session_factory() as session:
+            return await session.scalar(select(Image.id).where(Image.object_key == object_key))
+
+    return asyncio.run(read())
+
+
 @pytest.mark.parametrize(
     ("report_type", "collection"),
     [(LostType.FOUND, "found-items"), (LostType.LOST, "lost-items")],
@@ -2239,13 +2249,19 @@ def test_clerk_sees_images_of_pending_item_before_approval(
     pending = client.get(f"/api/v1/lost-found/pending-{collection}", headers=headers)
 
     assert detail.status_code == 200
-    assert [image["url"] for image in detail.json()["images"]] == [
-        f"https://signed.example/{first_key}",
-        f"https://signed.example/{second_key}",
+    images = detail.json()["images"]
+    assert [image["id"] for image in images] == [
+        str(_image_id(session_factory, first_key)),
+        str(_image_id(session_factory, second_key)),
+    ]
+    assert [image["url"] for image in images] == [
+        build_image_url(UUID(image["id"])) for image in images
     ]
     assert pending.status_code == 200
     pending_item = next(item for item in pending.json() if item["id"] == str(item_id))
-    assert pending_item["images"][0]["url"] == f"https://signed.example/{first_key}"
+    assert pending_item["images"][0]["url"] == build_image_url(
+        _image_id(session_factory, first_key)
+    )
 
 
 def test_item_without_images_returns_empty_list(test_context, staff_image_storage):
@@ -2449,3 +2465,92 @@ def test_guest_cannot_claim_but_owner_can_still_track_after_approval(test_contex
     assert tracking.status_code == 200
     assert tracking.json()["status"] == "approved"
     assert tracking.json()["custody_location"] == "Clerk Office"
+
+
+CONFLICT_DETAIL = "รายการนี้มีเจ้าหน้าที่ดำเนินการไปแล้ว กรุณารีเฟรชข้อมูล"
+
+
+def _item_history_count(session_factory, item_id):
+    from app.models.lost_found import LostItemHistory
+
+    async def read():
+        async with session_factory() as session:
+            rows = await session.scalars(
+                select(LostItemHistory).where(LostItemHistory.lost_item_id == item_id)
+            )
+            return len(rows.all())
+
+    return asyncio.run(read())
+
+
+def test_second_decision_on_reviewed_item_gets_conflict(test_context):
+    """Approve then reject the same item: the second clerk sees 409, nothing is overwritten."""
+    client, session_factory = test_context
+    headers = _clerk_headers(client, session_factory)
+    item_id = _seed_item(session_factory, report_type=LostType.FOUND, status=LostStatus.PENDING)
+
+    first = client.post(f"/api/v1/lost-found/found-items/{item_id}/approve", headers=headers)
+    second = client.post(
+        f"/api/v1/lost-found/found-items/{item_id}/reject",
+        headers=headers,
+        json={"reason": "ข้อมูลไม่ครบ"},
+    )
+
+    assert first.status_code == 200
+    assert second.status_code == 409
+    assert second.json()["detail"] == CONFLICT_DETAIL
+    assert _item_status(session_factory, item_id) == LostStatus.APPROVED
+    assert _item_history_count(session_factory, item_id) == 1
+
+
+def test_missing_item_still_returns_not_found(test_context):
+    client, session_factory = test_context
+    headers = _clerk_headers(client, session_factory)
+
+    response = client.post(f"/api/v1/lost-found/lost-items/{uuid4()}/approve", headers=headers)
+
+    assert response.status_code == 404
+
+
+def test_repeating_same_return_status_adds_no_history(test_context):
+    client, session_factory = test_context
+    headers = _clerk_headers(client, session_factory)
+    item_id = _seed_item(session_factory, report_type=LostType.FOUND, status=LostStatus.CLAIMED)
+    claim_id = _seed_claim(
+        session_factory, item_id, email="owner-repeat@example.com", status=ClaimStatus.APPROVED
+    )
+    url = f"/api/v1/lost-found/ownership-requests/{claim_id}/return-status"
+
+    first = client.patch(url, headers=headers, json={"return_status": "ready_for_pickup"})
+    second = client.patch(url, headers=headers, json={"return_status": "ready_for_pickup"})
+
+    assert first.status_code == 200
+    assert second.status_code == 200
+
+    async def history_rows():
+        async with session_factory() as session:
+            rows = await session.scalars(
+                select(LostClaimReturnStatusHistory).where(
+                    LostClaimReturnStatusHistory.claim_id == claim_id
+                )
+            )
+            return len(rows.all())
+
+    assert asyncio.run(history_rows()) == 1
+
+
+def test_schedule_pickup_on_unverified_claim_gets_conflict(test_context):
+    client, session_factory = test_context
+    headers = _clerk_headers(client, session_factory)
+    item_id = _seed_item(session_factory, report_type=LostType.FOUND, status=LostStatus.APPROVED)
+    claim_id = _seed_claim(session_factory, item_id, email="owner-pending@example.com")
+
+    response = client.post(
+        f"/api/v1/lost-found/ownership-requests/{claim_id}/schedule-pickup",
+        headers=headers,
+        json={"pickup_datetime": "2030-01-15T10:00:00+07:00"},
+    )
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == CONFLICT_DETAIL
+    assert _claim(session_factory, claim_id).status == ClaimStatus.PENDING

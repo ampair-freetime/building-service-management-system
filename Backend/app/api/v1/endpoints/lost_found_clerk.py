@@ -3,8 +3,11 @@ from zoneinfo import ZoneInfo
 from app.services.invitation_email import send_email, EmailDeliveryError
 
 from fastapi import APIRouter, HTTPException
+from sqlalchemy import select
+from app.models.lost_found import LostItem
 
-from app.api.dependencies import ClerkStaff, DbSession, OptionalObjectStorageClient
+from app.core.config import settings
+from app.api.dependencies import ClerkStaff, CurrentStaff, DbSession, OptionalObjectStorageClient
 from app.schemas.lost_found_clerk import (
     PersonalLostFoundHistoryResponse,
     FoundItemDetailResponse,
@@ -18,12 +21,13 @@ from app.schemas.lost_found_clerk import (
     UpdateReturnStatusRequest,
     SchedulePickupRequest,
 )
-from app.models.enums import LostType
+from app.models.enums import LostType, LostStatus
 from app.services.lost_found_clerk import (
     list_personal_lost_found_history,
     reject_ownership_request,
     ActiveClaimExistsError,
     ItemAlreadyClaimedError,
+    LostFoundStateConflictError,
     approve_found_item,
     approve_lost_item,
     close_lost_found_item,
@@ -43,6 +47,22 @@ from app.services.lost_found_clerk import (
 )
 
 router = APIRouter()
+
+
+@router.get("/items", response_model=list[FoundItemDetailResponse])
+async def read_processed_items(
+    session: DbSession, storage: OptionalObjectStorageClient, staff: CurrentStaff,
+):
+    if staff.role.value not in ("clerk", "admin"):
+        raise HTTPException(status_code=403, detail="Clerk or admin access required")
+    items = list(await session.scalars(select(LostItem).where(
+        LostItem.status.in_([LostStatus.APPROVED, LostStatus.CLAIMED]),
+        LostItem.deleted_at.is_(None),
+    ).order_by(LostItem.created_at.desc())))
+    image_urls = await load_staff_image_urls(session, [item.id for item in items], storage)
+    return [FoundItemDetailResponse.model_validate(item).model_copy(
+        update={"images": image_urls.get(item.id, [])}
+    ) for item in items]
 
 
 @router.get("/my-history", response_model=list[PersonalLostFoundHistoryResponse])
@@ -152,11 +172,15 @@ async def approve_found_item_report(
 ) -> FoundItemDetailResponse:
     """ อนุมัติรายการของที่พบโดยเจ้าหน้าที่ธุรการ"""
 
-    item = await approve_found_item(
-        session,
-        item_id,
-        current_staff.id,
-    )
+    try:
+        item = await approve_found_item(
+            session,
+            item_id,
+            current_staff.id,
+        )
+    except LostFoundStateConflictError as exc:
+        # เจ้าหน้าที่อีกคนดำเนินการไปก่อนแล้ว
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     
     if item is None:
         raise HTTPException(
@@ -178,11 +202,15 @@ async def approve_lost_item_report(
 ) -> LostItemDetailResponse:
     """อนุมัติประกาศของหายโดยเจ้าหน้าที่ธุรการ"""
 
-    item = await approve_lost_item(
-        session,
-        item_id,
-        current_staff.id,
-    )
+    try:
+        item = await approve_lost_item(
+            session,
+            item_id,
+            current_staff.id,
+        )
+    except LostFoundStateConflictError as exc:
+        # เจ้าหน้าที่อีกคนดำเนินการไปก่อนแล้ว
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
 
     if item is None:
         raise HTTPException(
@@ -205,12 +233,16 @@ async def reject_lost_item_report(
 ) -> LostItemDetailResponse:
     """ปฏิเสธประกาศของหายโดยเจ้าหน้าที่ธุรการ"""
 
-    item = await reject_lost_item(
-        session,
-        item_id,
-        current_staff.id,
-        request.reason,
-    )
+    try:
+        item = await reject_lost_item(
+            session,
+            item_id,
+            current_staff.id,
+            request.reason,
+        )
+    except LostFoundStateConflictError as exc:
+        # เจ้าหน้าที่อีกคนดำเนินการไปก่อนแล้ว
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
 
     if item is None:
         raise HTTPException(
@@ -233,12 +265,16 @@ async def reject_found_item_report(
 ) -> FoundItemDetailResponse:
     """ปฏิเสธรายการของที่พบโดยเจ้าหน้าที่ธุรการ"""
 
-    item = await reject_found_item(
-        session,
-        item_id,
-        current_staff.id,
-        request.reason,
-    )
+    try:
+        item = await reject_found_item(
+            session,
+            item_id,
+            current_staff.id,
+            request.reason,
+        )
+    except LostFoundStateConflictError as exc:
+        # เจ้าหน้าที่อีกคนดำเนินการไปก่อนแล้ว
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
 
     if item is None:
         raise HTTPException(
@@ -411,12 +447,16 @@ async def update_return_status(
     session: DbSession,
     current_staff: ClerkStaff,
 ) -> OwnershipRequestListResponse:
-    claim = await update_ownership_return_status(
-        session,
-        claim_id,
-        request.return_status,
-        current_staff.id,
-    )
+    try:
+        claim = await update_ownership_return_status(
+            session,
+            claim_id,
+            request.return_status,
+            current_staff.id,
+        )
+    except LostFoundStateConflictError as exc:
+        # เจ้าหน้าที่อีกคนดำเนินการไปก่อนแล้ว
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
 
     if claim is None:
         raise HTTPException(
@@ -437,14 +477,18 @@ async def schedule_ownership_pickup(
     session: DbSession,
     _: ClerkStaff,
 ) -> OwnershipRequestDetailResponse:
-    claim = await schedule_pickup(
-        session,
-        claim_id,
-        request.pickup_datetime,
-        request.pickup_location,
-        request.note,
-        request.pickup_end_datetime,
-    )
+    try:
+        claim = await schedule_pickup(
+            session,
+            claim_id,
+            request.pickup_datetime,
+            request.pickup_location,
+            request.note,
+            request.pickup_end_datetime,
+        )
+    except LostFoundStateConflictError as exc:
+        # เจ้าหน้าที่อีกคนดำเนินการไปก่อนแล้ว
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
 
     if claim is None:
         raise HTTPException(
@@ -476,7 +520,7 @@ async def schedule_ownership_pickup(
                   f"รหัสคำขอรับคืน: {detail['claim_code']}\n"
                   f"วันที่นัดรับคืน: {local.strftime('%d/%m/%Y')}\n"
                   f"เวลารับคืน: {time_label} น.\n"
-                  f"สถานที่รับคืน: {request.pickup_location or detail['custody_location'] or 'ติดต่อห้องธุรการ CSB'}\n"
+                  f"สถานที่รับคืน: {request.pickup_location or detail['custody_location'] or settings.default_custody_location}\n"
                   f"หลักฐานที่ต้องนำมาเพื่อยืนยันการรับคืน: {request.note or 'ไม่ได้ระบุ กรุณาติดต่อธุรการก่อนเข้ารับของ'}\n\n"
                   "หากไม่สะดวกมารับคืนตามวันและเวลาที่กำหนด กรุณาติดต่อเจ้าหน้าที่ธุรการเพื่อประสานงานนัดหมายใหม่\n\n"
                   "ช่องทางติดต่อ\n"

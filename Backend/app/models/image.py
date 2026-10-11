@@ -66,10 +66,6 @@ class Image(Base):
     )
     uploaded_by_staff_id: Mapped[UUID | None] = mapped_column(ForeignKey("staff.id"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    # รอบนี้ยังไม่ลบอัตโนมัติ แต่เตรียมช่องไว้ให้ retention job ใช้ภายหลัง
-    purge_after: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True, index=True
-    )
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     service_request: Mapped["ServiceRequest | None"] = relationship(

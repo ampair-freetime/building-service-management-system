@@ -13,6 +13,7 @@ from app.models.lost_found import (
     LostItemHistory,
 )
 from app.schemas.lost_found_item import GuestImageResponse
+from app.services.image_urls import build_image_url
 from app.services.lost_found import load_image_map
 from app.services.invitation_email import EmailDeliveryError, send_email
 from app.services.object_storage import ObjectStorage, StorageOperationError
@@ -36,6 +37,13 @@ class ItemAlreadyClaimedError(Exception):
     """ยืนยันเจ้าของไม่ได้เพราะรายการนี้ยืนยันเจ้าของคนอื่นไปแล้วหรือไม่ได้เผยแพร่อยู่"""
 
 
+class LostFoundStateConflictError(Exception):
+    """รายการมีอยู่จริง แต่สถานะเปลี่ยนไปแล้ว ส่วนใหญ่เพราะเจ้าหน้าที่อีกคนกดก่อน"""
+
+
+STATE_CONFLICT_MESSAGE = "รายการนี้มีเจ้าหน้าที่ดำเนินการไปแล้ว กรุณารีเฟรชข้อมูล"
+
+
 AUTO_REJECT_NOTE = "รายการนี้ยืนยันเจ้าของแล้ว"
 
 
@@ -57,7 +65,7 @@ async def load_staff_image_urls(
             item_id: [
                 GuestImageResponse(
                     id=image.id,
-                    url=storage.create_download_url(image.object_key),
+                    url=build_image_url(image.id),
                     content_type=image.content_type,
                     width=image.width,
                     height=image.height,
@@ -139,38 +147,61 @@ async def get_lost_item_detail(
     return result
 
 
+async def _lock_item_for_review(
+    session: AsyncSession, item_id: UUID, report_type: LostType
+) -> LostItem | None:
+    """ล็อกรายการก่อนตรวจสถานะ ให้ clerk ที่กดพร้อมกันต้องรอกันทีละคน
+
+    ไม่ใส่ status ใน WHERE เพื่อแยก "ไม่มีรายการนี้" (None → 404)
+    ออกจาก "มีคนตัดสินไปแล้ว" (LostFoundStateConflictError → 409)
+    """
+    item = await session.scalar(
+        select(LostItem)
+        .where(LostItem.id == item_id, LostItem.report_type == report_type)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    )
+    if item is None:
+        return None
+    if item.status != LostStatus.PENDING:
+        raise LostFoundStateConflictError(STATE_CONFLICT_MESSAGE)
+    return item
+
+
+async def _review_item(
+    session: AsyncSession,
+    item_id: UUID,
+    report_type: LostType,
+    staff_id: UUID,
+    new_status: LostStatus,
+    reason: str | None = None,
+) -> LostItem | None:
+    item = await _lock_item_for_review(session, item_id, report_type)
+    if item is None:
+        return None
+
+    session.add(LostItemHistory(
+        lost_item_id=item.id, staff_id=staff_id, old_status=item.status,
+        new_status=new_status,
+        note=reason if reason is not None else "เจ้าหน้าที่อนุมัติรายการ",
+    ))
+    item.status = new_status
+    item.reviewed_by = staff_id
+    if reason is not None:
+        item.review_note = reason
+
+    await session.commit()
+    await session.refresh(item)
+    return item
+
+
 async def approve_found_item(
     session: AsyncSession,
     item_id: UUID,
     staff_id: UUID,
 ) -> LostItem | None:
     """อนุมัติรายการของที่พบและบันทึกเจ้าหน้าที่ผู้ตรวจสอบ"""
-
-    statement = (
-        select(LostItem)
-        .where(
-            LostItem.id == item_id,
-            LostItem.report_type == LostType.FOUND,
-            LostItem.status == LostStatus.PENDING,
-        )
-    )
-
-    item = await session.scalar(statement)
-
-    if item is None:
-        return None
-
-    session.add(LostItemHistory(
-        lost_item_id=item.id, staff_id=staff_id, old_status=item.status,
-        new_status=LostStatus.APPROVED, note="เจ้าหน้าที่อนุมัติรายการ",
-    ))
-    item.status = LostStatus.APPROVED
-    item.reviewed_by = staff_id
-
-    await session.commit()
-    await session.refresh(item)
-
-    return item
+    return await _review_item(session, item_id, LostType.FOUND, staff_id, LostStatus.APPROVED)
 
 
 async def approve_lost_item(
@@ -179,32 +210,7 @@ async def approve_lost_item(
     staff_id: UUID,
 ) -> LostItem | None:
     """อนุมัติประกาศของหายและบันทึกเจ้าหน้าที่ผู้ตรวจสอบ"""
-
-    statement = (
-        select(LostItem)
-        .where(
-            LostItem.id == item_id,
-            LostItem.report_type == LostType.LOST,
-            LostItem.status == LostStatus.PENDING,
-        )
-    )
-
-    item = await session.scalar(statement)
-
-    if item is None:
-        return None
-
-    session.add(LostItemHistory(
-        lost_item_id=item.id, staff_id=staff_id, old_status=item.status,
-        new_status=LostStatus.APPROVED, note="เจ้าหน้าที่อนุมัติรายการ",
-    ))
-    item.status = LostStatus.APPROVED
-    item.reviewed_by = staff_id
-
-    await session.commit()
-    await session.refresh(item)
-
-    return item  
+    return await _review_item(session, item_id, LostType.LOST, staff_id, LostStatus.APPROVED)
 
 
 async def reject_lost_item(
@@ -214,33 +220,9 @@ async def reject_lost_item(
     reason: str,
 ) -> LostItem | None:
     """ปฏิเสธประกาศของหายและบันทึกเหตุผลการปฏิเสธ"""
-
-    statement = (
-        select(LostItem)
-        .where(
-            LostItem.id == item_id,
-            LostItem.report_type == LostType.LOST,
-            LostItem.status == LostStatus.PENDING,
-        )
+    return await _review_item(
+        session, item_id, LostType.LOST, staff_id, LostStatus.REJECTED, reason
     )
-
-    item = await session.scalar(statement)
-
-    if item is None:
-        return None
-
-    session.add(LostItemHistory(
-        lost_item_id=item.id, staff_id=staff_id, old_status=item.status,
-        new_status=LostStatus.REJECTED, note=reason,
-    ))
-    item.status = LostStatus.REJECTED
-    item.reviewed_by = staff_id
-    item.review_note = reason
-
-    await session.commit()
-    await session.refresh(item)
-
-    return item 
 
 
 async def reject_found_item(
@@ -250,33 +232,9 @@ async def reject_found_item(
     reason: str,
 ) -> LostItem | None:
     """ปฏิเสธรายการของที่พบและบันทึกเหตุผลการปฏิเสธ"""
-
-    statement = (
-        select(LostItem)
-        .where(
-            LostItem.id == item_id,
-            LostItem.report_type == LostType.FOUND,
-            LostItem.status == LostStatus.PENDING,
-        )
+    return await _review_item(
+        session, item_id, LostType.FOUND, staff_id, LostStatus.REJECTED, reason
     )
-
-    item = await session.scalar(statement)
-
-    if item is None:
-        return None
-
-    session.add(LostItemHistory(
-        lost_item_id=item.id, staff_id=staff_id, old_status=item.status,
-        new_status=LostStatus.REJECTED, note=reason,
-    ))
-    item.status = LostStatus.REJECTED
-    item.reviewed_by = staff_id
-    item.review_note = reason
-
-    await session.commit()
-    await session.refresh(item)
-
-    return item
 
 
 async def list_pending_ownership_requests(
@@ -474,25 +432,37 @@ async def update_ownership_return_status(
     new_status: ReturnStatus,
     staff_id: UUID,
 ) -> LostClaim | None:
-    """อัปเดตสถานะการคืนของและบันทึกประวัติ"""
+    """อัปเดตสถานะการคืนของและบันทึกประวัติ
 
-    statement = (
-        select(LostClaim)
-        .where(
-            LostClaim.id == claim_id,
-            LostClaim.status.in_(
-                [
-                    ClaimStatus.APPROVED,
-                    ClaimStatus.SCHEDULED,
-                ]
-            ),
-        )
+    ล็อก item ก่อน claim ตามลำดับเดียวกับ approve_ownership_request เพื่อไม่ให้เกิด deadlock
+    และให้การกด "คืนแล้ว" ซ้ำพร้อมกันได้ history แถวเดียว
+    """
+
+    found_item_id = await session.scalar(
+        select(LostClaim.found_item_id).where(LostClaim.id == claim_id)
     )
+    if found_item_id is None:
+        return None
 
-    claim = await session.scalar(statement)
-
+    item = await session.scalar(
+        select(LostItem)
+        .where(LostItem.id == found_item_id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    )
+    claim = await session.scalar(
+        select(LostClaim)
+        .where(LostClaim.id == claim_id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    )
     if claim is None:
         return None
+    if claim.status not in (ClaimStatus.APPROVED, ClaimStatus.SCHEDULED):
+        raise LostFoundStateConflictError(STATE_CONFLICT_MESSAGE)
+    if claim.return_status == new_status:
+        # กดซ้ำด้วยค่าเดิม: ไม่มีอะไรเปลี่ยน จึงไม่เพิ่ม history
+        return claim
 
     old_status = claim.return_status
 
@@ -510,7 +480,6 @@ async def update_ownership_return_status(
     if new_status == ReturnStatus.RETURNED:
         claim.status = ClaimStatus.COMPLETED
         # คืนของให้เจ้าของแล้ว จึงต้องเอาประกาศออกจากหน้า guest ใน commit เดียวกับ claim
-        item = await session.get(LostItem, claim.found_item_id)
         if item is not None and item.status in (LostStatus.APPROVED, LostStatus.CLAIMED):
             previous_item_status = item.status
             item.status = LostStatus.CLOSED
@@ -538,20 +507,22 @@ async def schedule_pickup(
     note: str | None = None,
     pickup_end_datetime: datetime | None = None,
 ) -> LostClaim | None:
-    """นัดวันและเวลารับของสำหรับ ownership request ที่ยืนยันแล้ว"""
+    """นัดวันและเวลารับของสำหรับ ownership request ที่ยืนยันแล้ว
 
-    statement = (
+    ล็อก claim ไว้ ถ้า clerk สองคนนัดพร้อมกัน คนที่สองจะรอแล้วเขียนทับเป็นนัดล่าสุด
+    """
+
+    claim = await session.scalar(
         select(LostClaim)
-        .where(
-            LostClaim.id == claim_id,
-            LostClaim.status.in_([ClaimStatus.APPROVED, ClaimStatus.SCHEDULED]),
-        )
+        .where(LostClaim.id == claim_id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
     )
-
-    claim = await session.scalar(statement)
 
     if claim is None:
         return None
+    if claim.status not in (ClaimStatus.APPROVED, ClaimStatus.SCHEDULED):
+        raise LostFoundStateConflictError(STATE_CONFLICT_MESSAGE)
 
     claim.pickup_end_datetime = pickup_end_datetime
     claim.pickup_datetime = pickup_datetime

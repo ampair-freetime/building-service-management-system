@@ -27,6 +27,7 @@ from app.schemas.repair_staff import (
     RepairWorkHistoryItem,
     RepairWorkHistoryResponse,
 )
+from app.services.image_urls import build_image_url
 from app.services.images import InvalidImageError
 from app.services.object_storage import StorageOperationError
 from app.services.repair_staff import (
@@ -128,7 +129,7 @@ async def read_repair_request_detail(
                 width=image.width,
                 height=image.height,
                 sort_order=image.sort_order,
-                url=storage.create_download_url(image.object_key),
+                url=build_image_url(image.id),
                 created_at=image.created_at,
             )
             for image in sorted(

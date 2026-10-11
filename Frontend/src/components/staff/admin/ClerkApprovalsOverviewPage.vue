@@ -1,5 +1,5 @@
 <script setup>
-import { computed, nextTick, onBeforeUnmount, onMounted, ref } from "vue";
+import { computed, watch, nextTick, onBeforeUnmount, onMounted, ref } from "vue";
 import {
   fetchAdminClerkAnnouncements,
   fetchAdminClerkOverview,
@@ -21,6 +21,28 @@ const detailErrorStatus = ref(null);
 const detailItems = ref([]);
 const detailTotal = ref(0);
 const selectedRequestId = ref(null);
+const selectedClaimId = ref(null);
+const claimTabActive = ref(false);
+const claimSearch = ref("");
+const claims = computed(() => (overview.value?.claims || []).filter(item =>
+  !claimSearch.value || `${item.claim_code} ${item.item_name} ${item.claimant_name} ${item.claimant_email} ${claimStatusLabel(item)}`.toLowerCase().includes(claimSearch.value),
+));
+function onClaimTab(event) {
+  claimTabActive.value = event.detail.tab === "claims";
+  claimSearch.value = event.detail.search || "";
+}
+function updateClaimCount() {
+  const count = document.querySelector('[data-lost-count="claims"]');
+  if (count) count.textContent = claims.value.length;
+}
+const claimStatusLabel = (item) => item.return_status === "returned" ? "ส่งคืนแล้ว" : ({
+  pending: "รอตรวจสอบหลักฐาน",
+  additional_info_required: "ขอข้อมูลเพิ่มเติม",
+  approved: "ยืนยันเจ้าของแล้ว · รอนัดรับ",
+  scheduled: "นัดรับแล้ว · รอส่งคืน",
+  rejected: "ปฏิเสธคำขอ",
+  completed: "ส่งคืนแล้ว",
+})[item.status] || item.status;
 const appliedFilters = ref({ dateFrom: "", dateTo: "", announcementType: "" });
 const dialogClose = ref(null);
 let overviewRequest = 0;
@@ -143,10 +165,12 @@ function closeDetail() {
   detailOpen.value = false;
   if (lastTrigger?.isConnected) lastTrigger.focus();
 }
+watch(claims, updateClaimCount, { flush: "post" });
 function onKeydown(event) {
   if (event.key === "Escape" && detailOpen.value) closeDetail();
 }
 onMounted(() => {
+  window.addEventListener("admin-claims:tab", onClaimTab);
   window.addEventListener("keydown", onKeydown);
   window.addEventListener("clerk-approvals:refresh", loadOverview);
   loadOverview();
@@ -154,6 +178,7 @@ onMounted(() => {
 onBeforeUnmount(() => {
   overviewRequest += 1;
   detailRequest += 1;
+  window.removeEventListener("admin-claims:tab", onClaimTab);
   window.removeEventListener("keydown", onKeydown);
   window.removeEventListener("clerk-approvals:refresh", loadOverview);
 });
@@ -209,9 +234,31 @@ onBeforeUnmount(() => {
           <small>ดูรายการ →</small>
         </button>
       </div>
-      
+
     </template>
   </section>
+
+  <Teleport defer to="#adminClaimTabContent">
+      <section v-if="claimTabActive" class="clerk-admin-claims">
+        <h3>คำขอรับของคืน <small>{{ claims.length }} รายการ</small></h3>
+        <div v-if="loading" class="clerk-admin-state" role="status">กำลังโหลดคำขอรับของคืน…</div>
+        <div v-else-if="errorMessage" class="clerk-admin-state" role="alert">{{ errorMessage }}</div>
+        <div v-else-if="!claims.length" class="clerk-admin-state" role="status">ไม่มีคำขอรับของคืนในช่วงที่เลือก</div>
+        <div v-else class="clerk-admin-item-list">
+          <article v-for="item in claims" :key="item.id">
+            <div><strong>{{ item.item_name }}</strong><small>{{ item.claim_code }}</small><span>ผู้ขอ: {{ item.claimant_name }}</span></div>
+            <div><strong>{{ claimStatusLabel(item) }}</strong><time :datetime="item.submission_date">{{ new Date(item.submission_date).toLocaleString('th-TH') }}</time></div>
+            <button class="small-btn" type="button" :aria-expanded="selectedClaimId === item.id" @click="selectedClaimId = selectedClaimId === item.id ? null : item.id">{{ selectedClaimId === item.id ? 'ซ่อนข้อมูล' : 'ดูรายละเอียด' }}</button>
+            <div v-if="selectedClaimId === item.id" class="clerk-admin-request-details">
+              <div><span>อีเมลผู้ขอ</span><strong>{{ item.claimant_email }}</strong></div>
+              <div><span>อัปเดตล่าสุด</span><strong>{{ new Date(item.updated_at).toLocaleString('th-TH') }}</strong></div>
+              <div><span>หลักฐานจากผู้ขอ</span><strong>{{ item.proof_detail }}</strong></div>
+              <div v-if="item.staff_message"><span>ข้อความจากธุรการ</span><strong>{{ item.staff_message }}</strong></div>
+            </div>
+          </article>
+        </div>
+      </section>
+  </Teleport>
 
   <Teleport to="body">
     <div v-if="detailOpen" class="clerk-admin-overlay" @click.self="closeDetail">

@@ -30,7 +30,7 @@ from app.services.invitations import (
     activate_staff_account,
     validate_activation_token,
 )
-from app.services.auth import authenticate_staff
+from app.services.auth import authenticate_staff, record_successful_login
 from app.services.password_reset import (
     InvalidResetTokenError,
     confirm_password_reset,
@@ -70,6 +70,7 @@ async def login(payload: LoginRequest, session: DbSession) -> LoginResponse:
             headers={"WWW-Authenticate": "Bearer"},
         )
 
+    await record_successful_login(session, account)
     token = create_access_token(account.id, account.role.value)
     return LoginResponse(access_token=token, staff=StaffResponse.model_validate(account))
 

@@ -7,8 +7,8 @@ from conftest import seed_staff
 from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from app.models.enums import LostStatus, LostType
-from app.models.lost_found import LostItem
+from app.models.enums import ClaimStatus, LostStatus, LostType, ReturnStatus
+from app.models.lost_found import LostClaim, LostItem
 
 
 def _login_headers(client: TestClient, email: str, password: str) -> dict[str, str]:
@@ -188,3 +188,58 @@ def test_empty_clerk_work_overview_and_non_admin_access(
 
     clerk_headers = _login_headers(client, "clerk@example.com", "clerk-password")
     assert client.get("/api/v1/clerk-work-overview", headers=clerk_headers).status_code == 403
+
+
+def test_admin_overview_includes_claims_and_filters_submission_date(test_context):
+    client, factory = test_context
+    seed_staff(factory, email="admin@example.com", password="admin-password", role="admin")
+    day = datetime(2026, 1, 10, 12, tzinfo=UTC)
+
+    async def seed():
+        async with factory() as session:
+            item = _item("FOUND-CLAIMS", LostType.FOUND, LostStatus.APPROVED, day)
+            session.add(item)
+            await session.flush()
+            for index, status in enumerate((ClaimStatus.PENDING, ClaimStatus.SCHEDULED, ClaimStatus.COMPLETED, ClaimStatus.REJECTED)):
+                session.add(LostClaim(
+                    found_item_id=item.id, claim_code=f"CLM-TEST-{index}",
+                    claimant_name=f"Owner {index}", claimant_email=f"owner{index}@example.com",
+                    proof_detail="Ownership evidence", status=status,
+                    return_status=ReturnStatus.RETURNED if status == ClaimStatus.COMPLETED else None,
+                    staff_message="Rejected reason" if status == ClaimStatus.REJECTED else None,
+                    created_at=day if index < 3 else day + timedelta(days=1),
+                ))
+            await session.commit()
+
+    asyncio.run(seed())
+    headers = _login_headers(client, "admin@example.com", "admin-password")
+    response = client.get("/api/v1/clerk-work-overview", headers=headers)
+    assert response.status_code == 200
+    claims = response.json()["claims"]
+    assert len(claims) == 4
+    assert {claim["status"] for claim in claims} == {"pending", "scheduled", "completed", "rejected"}
+    assert all(claim["item_name"] == "FOUND-CLAIMS" for claim in claims)
+    assert next(claim for claim in claims if claim["status"] == "completed")["return_status"] == "returned"
+    assert next(claim for claim in claims if claim["status"] == "rejected")["staff_message"] == "Rejected reason"
+    filtered = client.get("/api/v1/clerk-work-overview", headers=headers, params={"date_from": "2026-01-10", "date_to": "2026-01-10"})
+    assert filtered.status_code == 200
+    assert len(filtered.json()["claims"]) == 3
+
+
+def test_staff_items_retain_claimed_but_exclude_closed_items(test_context):
+    client, factory = test_context
+    for role in ("admin", "clerk", "technician"):
+        seed_staff(factory, email=f"{role}@example.com", password="password-test", role=role)
+    async def seed():
+        async with factory() as session:
+            for status in (LostStatus.APPROVED, LostStatus.CLAIMED, LostStatus.CLOSED, LostStatus.PENDING):
+                session.add(_item(f"FOUND-{status.value}", LostType.FOUND, status, datetime.now(UTC)))
+            await session.commit()
+    asyncio.run(seed())
+    for role in ("admin", "clerk"):
+        response = client.get("/api/v1/lost-found/items", headers=_login_headers(client, f"{role}@example.com", "password-test"))
+        assert response.status_code == 200
+        assert {item["status"] for item in response.json()} == {"approved", "claimed"}
+    assert client.get("/api/v1/lost-found/items").status_code == 401
+    headers = _login_headers(client, "technician@example.com", "password-test")
+    assert client.get("/api/v1/lost-found/items", headers=headers).status_code == 403

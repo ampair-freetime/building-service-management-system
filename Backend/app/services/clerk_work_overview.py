@@ -6,13 +6,14 @@ from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.enums import LostStatus, LostType
-from app.models.lost_found import LostItem
+from app.models.lost_found import LostClaim, LostItem
 from app.schemas.clerk_work_overview import (
     AnnouncementStatistics,
     ClerkAnnouncementListItem,
     ClerkAnnouncementListResponse,
     ClerkApprovalMetric,
     ClerkWorkOverviewResponse,
+    ClerkClaimOverviewItem,
 )
 
 
@@ -105,7 +106,31 @@ async def get_clerk_work_overview(
         if announcement_type is not None
         else [age for ages in pending_ages.values() for age in ages]
     )
+    claim_filters = []
+    if date_from is not None:
+        claim_filters.append(LostClaim.created_at >= datetime.combine(date_from, time.min, UTC))
+    if date_to is not None:
+        claim_filters.append(LostClaim.created_at < datetime.combine(date_to + timedelta(days=1), time.min, UTC))
+    if announcement_type is not None:
+        claim_filters.append(LostItem.report_type == announcement_type)
+    claim_rows = await session.execute(
+        select(LostClaim, LostItem.item_name)
+        .join(LostItem, LostClaim.found_item_id == LostItem.id)
+        .where(*claim_filters)
+        .order_by(LostClaim.created_at.desc(), LostClaim.claim_code.asc())
+    )
+    claims = [
+        ClerkClaimOverviewItem(
+            id=claim.id, claim_code=claim.claim_code, item_name=item_name,
+            claimant_name=claim.claimant_name, claimant_email=claim.claimant_email,
+            status=claim.status, return_status=claim.return_status,
+            proof_detail=claim.proof_detail, staff_message=claim.staff_message,
+            submission_date=claim.created_at, updated_at=claim.updated_at,
+        )
+        for claim, item_name in claim_rows
+    ]
     return ClerkWorkOverviewResponse(
+        claims=claims,
         summary=statistics(overall, selected_ages),
         by_announcement_type={
             item_type: statistics(rows[item_type], pending_ages[item_type]) for item_type in types

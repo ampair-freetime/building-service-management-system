@@ -150,7 +150,7 @@
             <label for="appointmentPlace">จุดรับของ</label
             ><input
               id="appointmentPlace"
-              value="ประชาสัมพันธ์ ชั้น 1"
+              value="ห้องธุรการ ชั้น 1"
               required
             />
           </div>

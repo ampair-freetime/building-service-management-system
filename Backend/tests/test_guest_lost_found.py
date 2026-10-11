@@ -16,6 +16,7 @@ from app.core.config import settings
 from app.models.enums import ClaimStatus, LostStatus, LostType, ReturnStatus
 from app.models.image import Image
 from app.models.lost_found import LostClaim, LostItem
+from app.services.image_urls import build_image_url
 from app.services.object_storage import StorageOperationError, StoredObject
 
 
@@ -156,7 +157,6 @@ def test_guest_creates_lost_item_and_image_is_normalized_to_r2(
     assert image.etag == "fake-etag"
     assert image.width == 32
     assert image.height == 24
-    assert image.purge_after is None
 
 
 def test_public_list_only_returns_approved_items_and_hides_private_fields(
@@ -191,7 +191,10 @@ def test_public_list_only_returns_approved_items_and_hides_private_fields(
     assert body["total"] == 1
     public_item = body["items"][0]
     assert public_item["item_code"] == item_code
-    assert public_item["images"][0]["url"].startswith("https://signed.example/lost-found/found/")
+    image = public_item["images"][0]
+    # Stable link, never an R2 link: it must survive for as long as the page stays open.
+    assert image["url"] == build_image_url(UUID(image["id"]))
+    assert "signed.example" not in image["url"]
     assert "reporter_email" not in public_item
     assert "private_verification_detail" not in public_item
     # ที่เก็บของต้องไม่หลุดสู่ public ไม่งั้นคนเดินไปเอาเองได้โดยข้าม flow claim

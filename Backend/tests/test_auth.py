@@ -168,3 +168,35 @@ def test_non_admin_cannot_manage_staff(
 
     assert response.status_code == 403
     assert response.json()["detail"] == "Administrator access required"
+
+
+def test_successful_login_records_time_without_touching_updated_at(test_context) -> None:
+    import asyncio
+
+    from app.models.staff import Staff
+
+    client, session_factory = test_context
+    account = seed_staff(
+        session_factory, email="recorded@example.com", password="pw-123456", role="clerk"
+    )
+
+    failed = client.post(
+        "/api/v1/auth/login", json={"identifier": "recorded@example.com", "password": "wrong"}
+    )
+    assert failed.status_code == 401
+
+    async def read():
+        async with session_factory() as session:
+            return await session.get(Staff, account.id)
+
+    assert asyncio.run(read()).last_login_at is None
+
+    response = client.post(
+        "/api/v1/auth/login", json={"identifier": "recorded@example.com", "password": "pw-123456"}
+    )
+    assert response.status_code == 200
+    assert response.json()["staff"]["last_login_at"] is not None
+
+    stored = asyncio.run(read())
+    assert stored.last_login_at is not None
+    assert stored.updated_at == account.updated_at

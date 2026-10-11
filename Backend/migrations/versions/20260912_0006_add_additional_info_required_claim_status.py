@@ -17,9 +17,12 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
-    op.execute(
-        "ALTER TYPE claim_status ADD VALUE IF NOT EXISTS 'additional_info_required'"
-    )
+    # PostgreSQL requires a newly-added enum value to be committed before a
+    # later migration can use it in data updates.
+    with op.get_context().autocommit_block():
+        op.execute(
+            "ALTER TYPE claim_status ADD VALUE IF NOT EXISTS 'additional_info_required'"
+        )
 
 
 def downgrade() -> None:

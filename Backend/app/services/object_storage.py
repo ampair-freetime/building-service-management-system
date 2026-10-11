@@ -104,13 +104,13 @@ class ObjectStorage:
         except (BotoCoreError, ClientError) as exc:
             raise StorageOperationError("Unable to delete image from R2") from exc
 
-    def create_download_url(self, object_key: str) -> str:
+    def create_download_url(self, object_key: str, expires_in: int | None = None) -> str:
         """สร้าง URL ชั่วคราวสำหรับอ่าน object ใน private bucket."""
         try:
             return self._client.generate_presigned_url(
                 "get_object",
                 Params={"Bucket": self.bucket_name, "Key": object_key},
-                ExpiresIn=self.presigned_url_expire_seconds,
+                ExpiresIn=expires_in or self.presigned_url_expire_seconds,
             )
         except (BotoCoreError, ClientError) as exc:
             raise StorageOperationError("Unable to create image download URL") from exc

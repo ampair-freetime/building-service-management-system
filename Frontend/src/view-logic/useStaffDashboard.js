@@ -1363,6 +1363,7 @@ export function useStaffDashboard() {
     }
     function decisionButtons(tab, item) {
       if (currentRole === "admin" || tab === "claims") return "";
+      if (["claimed", "closed"].includes(item.backendStatus)) return "";
       const decision = approvalGroup(item.status);
       if (decision === "rejected") return "";
       if (decision === "approved") {
@@ -1464,6 +1465,15 @@ export function useStaffDashboard() {
       }
       if (item.status === "คืนของแล้ว") return "ส่งคืนเจ้าของแล้ว";
       return "ยังไม่มีคำขอรับคืน";
+    }
+    function approvalReviewerName(item) {
+      return (
+        item.reviewerName ||
+        staffData.find((staff) => staff.id === item.reviewerId)?.name ||
+        item.decidedBy ||
+        item.assignee ||
+        "ธุรการ"
+      );
     }
     function approvalTypeLabel(tab) {
       return tab === "inventory"
@@ -1674,24 +1684,44 @@ export function useStaffDashboard() {
                   ["ผ่านการตรวจสอบ", "นัดหมายแล้ว"].includes(item.status),
               )
             : lostSets[view].filter(
-                (item) => approvalGroup(item.status) === "approved",
+                (item) =>
+                  approvalGroup(item.status) === "approved" &&
+                  item.backendStatus !== "closed" &&
+                  item.status !== "ปิดรายการแล้ว",
               );
         return data.map((item) => ({ item, tab: view }));
       };
       const historySearch = currentRole === "admin" ? appliedHistorySearch : "";
-      const matchesSearch = ({ item }) =>
-        !historySearch ||
-        `${item.id} ${item.title} ${item.place} ${item.status} ${item.activityLabel}`
+      const custodySearch = currentRole === "clerk" ? ($("#clerkLostSearch")?.value || "").trim().toLowerCase() : "";
+      const custodyStatus = currentRole === "clerk" ? $("#clerkLostStatus")?.value || "all" : "all";
+      const matchesSearch = ({ item, tab }) =>
+        (custodyStatus === "all" ||
+          (custodyStatus === "announcement" && tab === "lostposts") ||
+          (custodyStatus === "claimed" && tab === "inventory" && item.backendStatus === "claimed") ||
+          (custodyStatus === "stored" && tab === "inventory" && item.backendStatus !== "claimed")) &&
+        (!(historySearch || custodySearch) ||
+        `${item.id} ${item.title} ${item.place} ${item.custodyLocation || ""} ${item.status} ${item.activityLabel}`
           .toLowerCase()
-          .includes(historySearch);
+          .includes(historySearch || custodySearch));
       const visibleEntries =
         entriesForView(currentLostTab).filter(matchesSearch);
+      if (currentRole === "clerk") {
+        $$("#lostTabs [data-custody-count]").forEach((count) => {
+          count.textContent = entriesForView(count.dataset.custodyCount).filter(matchesSearch).length;
+        });
+      }
       if (currentRole === "admin") {
         $$("#lostTabs [data-lost-count]").forEach((count) => {
+          if (count.dataset.lostCount === "claims") return;
           count.textContent = entriesForView(count.dataset.lostCount).filter(
             matchesSearch,
           ).length;
         });
+      }
+      if (currentRole === "admin") {
+        window.dispatchEvent(new CustomEvent("admin-claims:tab", { detail: { tab: currentLostTab, search: historySearch } }));
+        $("#lostGrid").hidden = currentLostTab === "claims";
+        if (currentLostTab === "claims") return;
       }
       renderClerkCenter();
       const emptyLabel =
@@ -1699,28 +1729,27 @@ export function useStaffDashboard() {
           ? "ยังไม่มีรายการที่อนุมัติแล้ว"
           : currentLostTab === "rejected"
             ? "ยังไม่มีรายการที่ไม่อนุมัติ"
-            : "ไม่มีรายการในหมวดนี้";
+            : custodySearch || custodyStatus !== "all"
+              ? "ไม่พบรายการที่ตรงกับตัวกรอง ลองเปลี่ยนคำค้นหาหรือล้างตัวกรอง"
+              : "ไม่มีรายการในหมวดนี้";
       $("#lostGrid").innerHTML = visibleEntries.length
         ? visibleEntries
             .map(({ item: i, tab }) => {
-              const note = i.decisionReason
-                ? `<div class="approval-note"><strong>${
-                    i.status.includes("ไม่อนุมัติ")
-                      ? "เหตุผลที่ไม่อนุมัติ"
-                      : "บันทึกการอนุมัติ"
-                  }:</strong> ${i.decisionReason}</div>`
-                : "";
+              const note =
+                i.decisionReason && i.status.includes("ไม่อนุมัติ")
+                  ? `<div class="approval-note"><strong>เหตุผลที่ไม่อนุมัติ:</strong> ${i.decisionReason}</div>`
+                  : "";
               const inlineClose = ["lostposts", "inventory"].includes(tab) && approvalGroup(i.status) === "approved";
-              const inventoryMeta = tab === "inventory"
-                ? `<div class="lost-foot"><span class="custody">${escapeHtml(i.custodyLocation || i.activityLabel || "")}</span><span class="badge progress">สถานะการคืน: ${escapeHtml(returnStatusForFoundItem(i))}</span></div>`
+              const approvalMeta = ["inventory", "lostposts"].includes(tab)
+                ? `<div class="lost-foot"><span class="custody">${escapeHtml(i.custodyLocation || i.activityLabel || "")}</span><span class="badge progress">ยืนยันโดย: ${escapeHtml(approvalReviewerName(i))}</span></div>`
                 : "";
               const detailsButton = `<button class="small-btn" type="button" data-lost-action="detail" data-tab="${tab}" data-item-id="${i.id}">ดูรายละเอียด</button>`;
               const controls =
                 tab === "claims"
                   ? `<div class="claim-controls"><button type="button" class="primary" data-lost-action="claim-detail" data-tab="claims" data-item-id="${i.id}">ดูรายละเอียดคำขอ</button></div>`
                   : inlineClose
-                    ? `${note}${inventoryMeta}<div class="lost-card-actions">${detailsButton}${decisionButtons(tab, i)}</div>`
-                    : `${note}<div class="lost-foot">${tab === "inventory" ? `<span class="custody">${escapeHtml(i.custodyLocation || i.activityLabel || "")}</span><span class="badge progress">สถานะการคืน: ${escapeHtml(returnStatusForFoundItem(i))}</span>` : ""}${detailsButton}</div>`;
+                    ? `${note}${approvalMeta}<div class="lost-card-actions">${detailsButton}${decisionButtons(tab, i)}</div>`
+                    : `${note}<div class="lost-foot">${tab === "inventory" ? `<span class="custody">${escapeHtml(i.custodyLocation || i.activityLabel || "")}</span><span class="badge progress">ยืนยันโดย: ${escapeHtml(approvalReviewerName(i))}</span>` : ""}${detailsButton}</div>`;
               const claimHint =
                 tab === "claims"
                   ? '<div class="approval-note"><strong>รับคำขออัตโนมัติ:</strong> ธุรการไม่ต้องกดอนุมัติ สามารถตรวจรายละเอียด นัดหมาย และยืนยันการส่งคืนได้</div>'
@@ -2107,15 +2136,13 @@ export function useStaffDashboard() {
       const closed = new Set(own.filter(
           (x) => ["ปิดงาน", "ปิดคำขอ"].includes(x.action),
         ).map((x) => x.itemId)).size,
-        returned = own.filter((x) => x.action === "คืนงาน").length,
         decisions = own.filter((x) =>
           ["อนุมัติ", "ไม่อนุมัติ"].includes(x.action),
         ).length;
       summary.innerHTML = [
-        [own.length, "รายการดำเนินการทั้งหมด", "นับทุกครั้งที่บันทึก รวมงานเดิมที่ทำหลายครั้ง"],
-        [closed, "รายการที่ปิดแล้ว", "นับแต่ละงานหรือคำขอเพียงครั้งเดียว"],
-        [returned, "ครั้งที่คืนงานเข้าคิว", "ส่งงานกลับให้เจ้าหน้าที่คนอื่นรับต่อ"],
-        [decisions, "ครั้งที่ตรวจอนุมัติ", "รวมทั้งอนุมัติและไม่อนุมัติ"],
+        [own.length, "กิจกรรมทั้งหมด", "บันทึกการทำงานของฉัน"],
+        [closed, "รายการที่ปิดแล้ว", "งานและคำขอที่ดำเนินการเสร็จแล้ว"],
+        [decisions, "การอนุมัติ / ไม่อนุมัติ", "ผลการพิจารณาของที่พบและประกาศของหาย"],
       ]
         .map(
           (v, i) =>
@@ -2659,8 +2686,6 @@ export function useStaffDashboard() {
     function openEditStaff(index, trigger = document.activeElement) {
       const staff = staffData[index];
       if (!staff || currentRole !== "admin") return;
-      if (emailSending.value) return;
-      emailSending.value = true;
       $("#editStaffIndex").value = staff.id;
       $("#editStaffName").value = staff.name;
       $("#editStaffEmail").value = staff.email;
@@ -2735,6 +2760,8 @@ export function useStaffDashboard() {
     async function performResendStaffInvitation(index, button) {
       const staff = staffData[index];
       if (!staff || currentRole !== "admin") return;
+      if (emailSending.value) return;
+      emailSending.value = true;
       button.disabled = true;
       button.classList.add("is-loading");
       button.setAttribute("aria-busy", "true");
@@ -3789,7 +3816,9 @@ export function useStaffDashboard() {
       const privateText = $("#jobDetailPrivate");
       if (privateText) privateText.textContent = item.privateVerificationDetail || "";
       const notesGroup = $("#jobDetailNotesGroup");
-      if (notesGroup) notesGroup.hidden = !item.decisionReason;
+      if (notesGroup)
+        notesGroup.hidden =
+          !item.decisionReason || !item.status.includes("ไม่อนุมัติ");
       const isLostAnnouncement = tab === "lostposts";
       selectedJobId = "";
       $("#jobDetailModal")?.classList.add("lost-post-detail");
@@ -4188,7 +4217,7 @@ export function useStaffDashboard() {
       $("#appointmentDate").min = todayISO();
       $("#appointmentDate").value = item.pickupDate || todayISO();
       $("#appointmentTime").value = item.pickupTime || "";
-      $("#appointmentPlace").value = item.pickupLocation || item.custodyLocation || "ประชาสัมพันธ์ ชั้น 1";
+      $("#appointmentPlace").value = item.pickupLocation || item.custodyLocation || "ห้องธุรการ ชั้น 1";
       $("#appointmentNote").value = item.pickupNote || "";
       openModal("appointmentModal", trigger);
     }
@@ -5028,6 +5057,13 @@ export function useStaffDashboard() {
       } finally {
         button.disabled = false;
       }
+    });
+    $("#clerkLostSearch")?.addEventListener("input", renderLost);
+    $("#clerkLostStatus")?.addEventListener("change", renderLost);
+    $("#clerkLostReset")?.addEventListener("click", () => {
+      $("#clerkLostSearch").value = "";
+      $("#clerkLostStatus").value = "all";
+      renderLost();
     });
     $("#page-dashboard")?.addEventListener("click", (event) => {
       if (currentRole !== "clerk") return;
