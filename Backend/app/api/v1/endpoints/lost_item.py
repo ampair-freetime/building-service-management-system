@@ -1,12 +1,23 @@
 """Guest API สำหรับสร้างและอ่านประกาศของหาย."""
 
+from datetime import UTC, datetime
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, status
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    HTTPException,
+    Query,
+    Request,
+    UploadFile,
+    status,
+)
 from pydantic import EmailStr
 
 from app.api.dependencies import DbSession, ObjectStorageClient
 from app.api.v1.forms import parse_guest_image_uploads, parse_guest_lost_item_form
+from app.api.v1.guest_receipts import schedule_submission_email
 from app.models.enums import LostType
 from app.schemas.lost_found_item import (
     GuestItemCreatedResponse,
@@ -14,6 +25,7 @@ from app.schemas.lost_found_item import (
     GuestItemPublicResponse,
     GuestLostItemCreate,
 )
+from app.services.guest_email import SubmissionReceipt
 from app.services.images import InvalidImageError
 from app.services.lost_found import (
     ItemPersistenceError,
@@ -38,10 +50,12 @@ async def add_lost_item(
     session: DbSession,
     storage: ObjectStorageClient,
     images: Annotated[list[UploadFile], Depends(parse_guest_image_uploads)],
+    request: Request,
+    background_tasks: BackgroundTasks,
 ) -> GuestItemCreatedResponse:
     """รับรายงานของหายจาก guest และส่งรูปที่ตรวจแล้วไปเก็บใน R2."""
     try:
-        return await create_guest_item(
+        created = await create_guest_item(
             session,
             payload=payload,
             report_type=LostType.LOST,
@@ -63,6 +77,15 @@ async def add_lost_item(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(exc),
         ) from exc
+    schedule_submission_email(
+        request,
+        background_tasks,
+        recipient=payload.reporter_email,
+        receipt=SubmissionReceipt(
+            kind="lost", code=created.item_code, created_at=datetime.now(UTC)
+        ),
+    )
+    return created
 
 
 @router.get("", response_model=GuestItemListResponse)

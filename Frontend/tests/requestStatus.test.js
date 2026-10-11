@@ -6,6 +6,7 @@ import {
   requestTitleForTracking,
   serviceProgress,
   serviceTypeForRequest,
+  trackingCodeFromSearch,
 } from "../src/services/requestStatus.js";
 
 test("maps every service status to a clear Thai label and badge style", () => {
@@ -104,4 +105,16 @@ test("renders lost-and-found as a three-step progress indicator", () => {
     requestProgress({ status: "approved" }, "LOST-20260916-1234").steps[2].label,
     "พบของแล้ว",
   );
+});
+
+test("an email tracking link yields only a well-formed system tracking code", () => {
+  assert.equal(trackingCodeFromSearch("?track=rpr-20261011-1a2b3c4d"), "RPR-20261011-1A2B3C4D");
+  for (const prefix of ["CLN", "RPR", "LOST", "FOUND", "CLM"]) {
+    assert.equal(trackingCodeFromSearch(`?track=${prefix}-20261011-ABCDEF12`), `${prefix}-20261011-ABCDEF12`);
+  }
+  assert.equal(trackingCodeFromSearch(""), null);
+  assert.equal(trackingCodeFromSearch("?service=clean"), null);
+  assert.equal(trackingCodeFromSearch("?track=REP-20261011-1A2B3C4D"), null);
+  assert.equal(trackingCodeFromSearch("?track=<script>"), null);
+  assert.equal(trackingCodeFromSearch("?track=RPR-20261011-1A2B3C4D%20extra"), null);
 });

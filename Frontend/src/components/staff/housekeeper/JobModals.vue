@@ -1,4 +1,5 @@
 <template>
+  <div class="job-modals">
 <div
       class="modal"
       id="returnJobModal"
@@ -338,14 +339,11 @@
           <input type="hidden" id="completeJobId" />
           <div class="field">
             <label for="completeResult">ผลการดำเนินงาน</label
-            ><textarea id="completeResult"></textarea>
-          </div>
-          <div class="field">
-            <label for="completeNote">หมายเหตุปิดงาน</label>
-            <textarea
-              id="completeNote" required
+            ><textarea
+              id="completeResult"
+              required
               maxlength="2000"
-              placeholder="ระบุรายละเอียดเพิ่มเติม เช่น จุดที่ทำความสะอาดหรือสิ่งที่ควรติดตาม"
+              placeholder="สรุปผลการทำความสะอาด"
             ></textarea>
             <small>สูงสุด 2,000 ตัวอักษร</small>
           </div>
@@ -382,8 +380,8 @@
             </div>
           </div>
           <div class="field">
-            <label for="completeDate">วันที่เสร็จ</label
-            ><input id="completeDate" type="date" required />
+            <label for="completeDate">วันและเวลาปิดงาน</label
+            ><input id="completeDate" type="datetime-local" required />
           </div>
           <button type="submit" class="primary" style="width: 100%">
             ยืนยันปิดงาน
@@ -391,4 +389,5 @@
         </form>
       </section>
     </div>
+  </div>
 </template>

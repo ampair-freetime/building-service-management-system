@@ -163,7 +163,7 @@ async def create_guest_item(
         report_type=item.report_type,
         status=item.status,
         image_count=len(prepared),
-        message="รับรายงานแล้ว กรุณารอเจ้าหน้าที่ตรวจสอบก่อนเผยแพร่",
+        message="รับรายงานแล้ว ระบบจะส่งรหัสติดตามไปทางอีเมล กรุณารอเจ้าหน้าที่ตรวจสอบก่อนเผยแพร่",
     )
 
 

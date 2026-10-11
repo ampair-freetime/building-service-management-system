@@ -106,7 +106,7 @@ async def create_guest_claim(
         found_item_code=found_item_code,
         status=claim.status,
         created_at=claim.created_at,
-        message="รับคำขอแล้ว กรุณารอเจ้าหน้าที่ตรวจสอบหลักฐาน",
+        message="รับคำขอแล้ว ระบบจะส่งรหัสคำขอไปทางอีเมล กรุณารอเจ้าหน้าที่ตรวจสอบหลักฐาน",
     )
 
 

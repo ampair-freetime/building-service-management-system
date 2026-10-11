@@ -3644,10 +3644,14 @@ export function useStaffDashboard() {
       }
       $("#completeJobId").value = id;
       $("#completeResult").value = "";
-      $("#completeNote").value = "";
+      if ($("#completeNote")) $("#completeNote").value = "";
       $("#completeImage").value = "";
       resetCompletionPreview();
-      $("#completeDate").value = todayISO();
+      const completeDateInput = $("#completeDate");
+      completeDateInput.value =
+        completeDateInput.type === "datetime-local"
+          ? `${todayISO()}T${currentTimeHM()}`
+          : todayISO();
       openModal("completeModal", trigger, historyMode);
     }
     function changeJobFromDetail(action) {
@@ -4863,14 +4867,8 @@ export function useStaffDashboard() {
         return;
       }
       const completionNoteInput = $("#completeNote");
-      const completionNote = completionNoteInput.value.trim();
-      if (!completionNote) {
-        completionNoteInput.setCustomValidity("กรุณากรอกหมายเหตุปิดงาน");
-        completionNoteInput.reportValidity();
-        completionNoteInput.focus();
-        return;
-      }
-      if (completionNote.length > 2000) {
+      const completionNote = completionNoteInput?.value.trim() || "";
+      if (completionNoteInput && completionNote.length > 2000) {
         completionNoteInput.setCustomValidity(
           "หมายเหตุปิดงานต้องไม่เกิน 2,000 ตัวอักษร",
         );
@@ -4878,7 +4876,7 @@ export function useStaffDashboard() {
         completionNoteInput.focus();
         return;
       }
-      completionNoteInput.setCustomValidity("");
+      completionNoteInput?.setCustomValidity("");
       const summary = [$("#completeResult").value.trim(), completionNote].filter(Boolean).join(" · ");
       if (summary.length > 2000) {
         toast("ผลการดำเนินการและหมายเหตุรวมกันต้องไม่เกิน 2,000 ตัวอักษร");
@@ -4936,7 +4934,7 @@ export function useStaffDashboard() {
       appendJobTimeline(
         job,
         "ปิดงาน",
-        `เสร็จวันที่ ${$("#completeDate").value}`,
+        `เสร็จวันที่ ${$("#completeDate").value.replace("T", " ")}${$("#completeDate").type === "datetime-local" ? " น." : ""}`,
       );
       renderJobs();
       closeModal("completeModal", false, false);

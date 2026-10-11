@@ -4,6 +4,7 @@ import {
   requestStatusPresentation,
   requestTitleForTracking,
   serviceTypeForRequest,
+  trackingCodeFromSearch,
 } from "../services/requestStatus.js";
 import { onMounted, onUnmounted, ref } from "vue";
 import {
@@ -754,8 +755,10 @@ export function usePublicServicePortal() {
         email: recipientEmail.trim().toLowerCase(),
       });
       document.getElementById("successType").textContent = type;
-      document.getElementById("successInstruction").textContent =
-        "เก็บรหัสคำร้องนี้ไว้เพื่อติดตามสถานะ";
+      // backend ส่งอีเมลหลังตอบ response จึงบอกได้แค่ว่า "จะส่ง" ไม่ใช่ "ส่งแล้ว"
+      document.getElementById("successInstruction").textContent = recipientEmail
+        ? `ระบบจะส่งรหัสนี้ไปที่ ${recipientEmail} หากไม่พบ กรุณาตรวจโฟลเดอร์จดหมายขยะ และเก็บรหัสนี้ไว้เพื่อติดตามสถานะ`
+        : "เก็บรหัสคำร้องนี้ไว้เพื่อติดตามสถานะ";
       document.getElementById("successCode").textContent = trackingCode;
       document.getElementById("successCode").hidden = false;
       document.getElementById("successEmail").textContent = recipientEmail
@@ -1533,7 +1536,35 @@ export function usePublicServicePortal() {
     refreshTrackingButton.addEventListener("click", () => {
       void loadTrackingStatus({ refreshed: true });
     });
-    restoreTracking(savedTracking[0]);
+    // ลิงก์จากอีเมลยืนยันรับเรื่อง (/user?track=รหัส) มีแค่รหัส ไม่มีอีเมล:
+    // ถ้าเครื่องนี้เคยบันทึกรหัสนั้นไว้ ใช้อีเมลที่บันทึกไว้ติดตามได้ทันที
+    // ไม่อย่างนั้นเติมรหัสให้แล้วให้ guest กรอกอีเมลเอง
+    const linkedTrackingCode = trackingCodeFromSearch(window.location.search);
+    const savedLinkedTracking = linkedTrackingCode
+      ? savedTracking.find((entry) => entry.code === linkedTrackingCode)
+      : null;
+    if (savedLinkedTracking) {
+      restoreTracking(savedLinkedTracking);
+    } else if (linkedTrackingCode) {
+      document.getElementById("trackingCode").value = linkedTrackingCode;
+      document.getElementById("trackingEmail").value = "";
+      validateTrackingField(document.getElementById("trackingCode"));
+    } else {
+      restoreTracking(savedTracking[0]);
+    }
+    if (linkedTrackingCode) {
+      navigate("dashboard");
+      window.setTimeout(
+        () => {
+          document.getElementById("trackingSection").scrollIntoView({
+            behavior: prefersReducedMotion ? "auto" : "smooth",
+            block: "center",
+          });
+          if (!savedLinkedTracking) document.getElementById("trackingEmail").focus();
+        },
+        prefersReducedMotion ? 0 : 120,
+      );
+    }
     document.querySelectorAll("[data-scroll-track]").forEach((button) =>
       button.addEventListener("click", () => {
         navigate("dashboard");

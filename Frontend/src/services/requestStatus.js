@@ -191,3 +191,13 @@ export function requestProgress(item = {}, code = "") {
         : lostFoundSteps,
   };
 }
+
+// รหัสทุกประเภทที่ backend สร้าง: PREFIX-YYYYMMDD-HEX8 (เช่น RPR-20261011-1A2B3C4D)
+const TRACKING_CODE_PATTERN = /^(CLN|RPR|LOST|FOUND|CLM)-\d{8}-[0-9A-F]{8}$/;
+
+// ลิงก์ในอีเมลยืนยันรับเรื่องเป็น /user?track=<รหัส>; query string มาจากภายนอก
+// จึงรับเฉพาะรูปแบบรหัสที่ระบบสร้างเท่านั้น ค่าอื่นถือว่าไม่มี
+export function trackingCodeFromSearch(search = "") {
+  const code = (new URLSearchParams(search).get("track") || "").trim().toUpperCase();
+  return TRACKING_CODE_PATTERN.test(code) ? code : null;
+}
