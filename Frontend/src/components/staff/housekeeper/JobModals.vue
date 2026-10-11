@@ -1,4 +1,5 @@
 <template>
+  <div class="job-modals">
 <div
       class="modal"
       id="returnJobModal"
@@ -388,4 +389,5 @@
         </form>
       </section>
     </div>
+  </div>
 </template>
