@@ -1,6 +1,8 @@
 """อีเมลยืนยันรับเรื่องพร้อมรหัสติดตาม ที่ส่งหลัง guest ส่งคำร้อง 5 ประเภท."""
 
 import asyncio
+import logging
+import smtplib
 from datetime import UTC, datetime
 from io import BytesIO
 from urllib.parse import parse_qs, urlsplit
@@ -305,3 +307,26 @@ def test_claim_receipt_mentions_the_found_item_it_refers_to() -> None:
     _, body = build_submission_email(receipt)
 
     assert "รหัสประกาศที่ขอรับคืน: FOUND-20261010-BBBB2222" in body
+
+
+def test_failed_delivery_logs_the_smtp_reason_without_the_recipient(
+    test_context: Context,
+    storage: FakeStorage,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    client, _ = test_context
+
+    async def refuse(*, recipient: str, subject: str, body: str) -> None:
+        try:
+            raise smtplib.SMTPDataError(421, b"4.7.0 Try again later, closing connection.")
+        except smtplib.SMTPDataError as exc:
+            raise EmailDeliveryError("Email delivery failed") from exc
+
+    monkeypatch.setattr(guest_email, "send_email", refuse)
+    with caplog.at_level(logging.WARNING, logger="app.services.guest_email"):
+        response = client.post("/api/v1/guest/repair-requests", data=service_form())
+
+    assert response.status_code == 201
+    assert "reason=SMTPDataError smtp_code=421" in caplog.text
+    assert "guest@example.com" not in caplog.text

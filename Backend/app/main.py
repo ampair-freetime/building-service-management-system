@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -5,7 +7,23 @@ from app.api.v1.router import api_router
 from app.core.config import settings
 
 
+def _configure_app_logging() -> None:
+    """Show INFO logs from app.* modules; Uvicorn only configures its own loggers.
+
+    Without a handler Python prints WARNING and above only, so successful email
+    deliveries and other logger.info() events were invisible.
+    """
+    logger = logging.getLogger("app")
+    if logger.handlers:
+        return
+    handler = logging.StreamHandler()
+    handler.setFormatter(logging.Formatter("%(levelname)s:     %(name)s: %(message)s"))
+    logger.addHandler(handler)
+    logger.setLevel(logging.INFO)
+
+
 def create_application() -> FastAPI:
+    _configure_app_logging()
     application = FastAPI(
         title=settings.app_name,
         version="0.1.0",

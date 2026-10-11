@@ -94,10 +94,16 @@ async def deliver_submission_email(recipient: str, receipt: SubmissionReceipt) -
     subject, body = build_submission_email(receipt)
     try:
         await send_email(recipient=recipient, subject=subject, body=body)
-    except EmailDeliveryError:
-        # ไม่ log อีเมลผู้รับ (ข้อมูลส่วนบุคคล) คำร้องถูกบันทึกแล้วและ guest เห็นรหัสบนจอ
+    except EmailDeliveryError as exc:
+        # ไม่ log อีเมลผู้รับหรือข้อความดิบจาก SMTP (มักมีที่อยู่ผู้รับอยู่ในนั้น) แค่ชนิด error
+        # กับรหัส SMTP ก็พอแยกได้ว่าเป็น timeout, login ไม่ผ่าน หรือ Gmail ปฏิเสธ
+        cause = exc.__cause__
         logger.warning(
-            "Guest submission email not delivered; kind=%s code=%s", receipt.kind, receipt.code
+            "Guest submission email not delivered; kind=%s code=%s reason=%s smtp_code=%s",
+            receipt.kind,
+            receipt.code,
+            type(cause).__name__ if cause else "not configured",
+            getattr(cause, "smtp_code", None),
         )
         return
     logger.info("Guest submission email delivered; kind=%s code=%s", receipt.kind, receipt.code)
