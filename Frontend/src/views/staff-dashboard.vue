@@ -300,7 +300,9 @@ const { activeRole, dashboardLoading, emailSending } = useStaffDashboard();
           <svg class="icon"><use href="#i-list" /></svg><span>งาน</span>
         </button>
         <button type="button" data-mobile-page="my-jobs">
-          <svg class="icon"><use href="#i-user" /></svg><span>งานของฉัน</span>
+          <svg class="icon">
+            <use :href="activeRole === 'housekeeper' ? '#i-broom' : '#i-tools'" />
+          </svg><span>งานของฉัน</span>
         </button>
         <button
           type="button"

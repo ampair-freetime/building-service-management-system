@@ -2450,7 +2450,12 @@ export function useStaffDashboard() {
     // อัปเดต badge ทั้ง Desktop/Mobile และซ่อนเมื่อไม่มีรายการที่ยังไม่อ่าน
     function updateUnreadNotificationCount(unreadCount) {
       const visibleCount = unreadCount > 99 ? "99+" : String(unreadCount);
-      [$("#notificationCount"), $("#mobileNotificationCount"), $("#mobileAdminNotificationCount")].forEach(
+      new Set([
+        $("#notificationCount"),
+        $("#mobileNotificationCount"),
+        $("#mobileAdminNotificationCount"),
+        ...$$("[data-notification-count]"),
+      ]).forEach(
         (badge) => {
           if (!badge) return;
           badge.textContent = visibleCount;
@@ -2474,6 +2479,13 @@ export function useStaffDashboard() {
         unreadCount > 0
           ? `เปิดการแจ้งเตือน มี ${unreadCount} รายการที่ยังไม่ได้อ่าน`
           : "เปิดการแจ้งเตือน",
+      );
+
+      $("#mobileNotificationButton")?.setAttribute(
+        "aria-label",
+        unreadCount > 0
+          ? `เปิดศูนย์การแจ้งเตือน มี ${unreadCount} รายการที่ยังไม่ได้อ่าน`
+          : "เปิดศูนย์การแจ้งเตือน",
       );
 
       $("#mobileNotificationAdmin")?.setAttribute(
