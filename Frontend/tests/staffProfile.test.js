@@ -5,6 +5,7 @@ import {
   toDashboardStaff,
   toUpdatedDashboardStaff,
   updateStaffProfile,
+  updateStaffStatus,
 } from "../src/view-logic/staff-dashboard/staff-accounts.js";
 
 const account = {
@@ -60,4 +61,36 @@ test("changing only the name preserves delivery status; changing email clears ol
   assert.equal(newEmail.invitationDeliveryStatus, "unknown");
   assert.equal(newEmail.role, before.role);
   assert.equal(JSON.parse(data.get("buildingCareInvitationDeliveryResults"))[account.id], undefined);
+});
+
+test("status PATCH asks the backend and the dashboard shows the server status", async (t) => {
+  mockStorage(t);
+  const previousFetch = globalThis.fetch;
+  t.after(() => { globalThis.fetch = previousFetch; });
+  globalThis.fetch = async (url, options) => {
+    assert.equal(url, "http://localhost:8000/api/v1/staff/staff-id/status");
+    assert.equal(options.method, "PATCH");
+    assert.equal(options.headers.Authorization, "Bearer test-token");
+    assert.deepEqual(JSON.parse(options.body), { status: "suspended" });
+    return new Response(JSON.stringify({ ...account, status: "suspended" }));
+  };
+  const saved = await updateStaffStatus(account.id, "suspended");
+  assert.equal(toDashboardStaff(saved).status, "พักงาน");
+});
+
+test("blocked suspension keeps the HTTP status and unfinished work codes", async (t) => {
+  mockStorage(t);
+  const previousFetch = globalThis.fetch;
+  t.after(() => { globalThis.fetch = previousFetch; });
+  globalThis.fetch = async () => new Response(JSON.stringify({
+    detail: {
+      message: "Reassign or unassign all unfinished work before suspending this account",
+      unfinished_assignments: [{ request_code: "RPR-1" }],
+    },
+  }), { status: 409 });
+  await assert.rejects(updateStaffStatus(account.id, "suspended"), (error) => {
+    assert.equal(error.status, 409);
+    assert.deepEqual(error.unfinishedAssignments.map((item) => item.request_code), ["RPR-1"]);
+    return true;
+  });
 });

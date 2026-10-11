@@ -58,6 +58,7 @@ import {
   toDashboardStaff,
   toUpdatedDashboardStaff,
   updateStaffProfile,
+  updateStaffStatus,
 } from "./staff-dashboard/staff-accounts.js";
 import {
   acceptCleaningTask,
@@ -2773,25 +2774,57 @@ export function useStaffDashboard() {
         button.textContent = "บันทึกข้อมูล";
       }
     }
+    const togglingStaffIds = new Set();
     function toggleStaff(i) {
+      if (currentRole !== "admin") return;
       const staff = staffData[i];
+      if (!staff || togglingStaffIds.has(staff.id)) return;
+      const suspending = staff.status === "ใช้งาน";
       requestConfirmation(
-        staff.status === "ใช้งาน" ? "ยืนยันปิดบัญชี" : "ยืนยันเปิดบัญชี",
-        `${staff.status === "ใช้งาน" ? "ปิด" : "เปิด"}การใช้งานบัญชี ${
-          staff.name
-        } หรือไม่?`,
-        () => {
-          staff.status = staff.status === "ใช้งาน" ? "พักงาน" : "ใช้งาน";
-          addAudit(
-            "staff",
-            "อัปเดตสถานะ",
-            staff.id,
-            staff.name,
-            `เปลี่ยนสถานะบัญชีเป็น ${staff.status}`,
-          );
-          renderStaff();
-          toast("อัปเดตสถานะบัญชีแล้ว");
+        suspending ? "ยืนยันปิดบัญชี" : "ยืนยันเปิดบัญชี",
+        suspending
+          ? `ปิดการใช้งานบัญชี ${staff.name} หรือไม่? บัญชีนี้จะเข้าสู่ระบบไม่ได้ และเครื่องที่เข้าระบบอยู่จะถูกออกจากระบบทันที`
+          : `เปิดการใช้งานบัญชี ${staff.name} หรือไม่?`,
+        async () => {
+          if (togglingStaffIds.has(staff.id)) return;
+          togglingStaffIds.add(staff.id);
+          try {
+            // ให้ backend เป็นคนเปลี่ยนสถานะจริง แล้วแสดงตามค่าที่ backend ตอบกลับ
+            const account = await updateStaffStatus(staff.id, suspending ? "suspended" : "active");
+            const index = staffData.findIndex((item) => item.id === staff.id);
+            const updated = toUpdatedDashboardStaff(staff, account);
+            if (index !== -1) staffData[index] = updated;
+            addAudit(
+              "staff",
+              "อัปเดตสถานะ",
+              updated.id,
+              updated.name,
+              `เปลี่ยนสถานะบัญชีเป็น ${updated.status}`,
+            );
+            renderStaff();
+            toast("อัปเดตสถานะบัญชีแล้ว");
+          } catch (error) {
+            if (await handleUnauthorizedResponse(error.status)) return;
+            const codes = (error.unfinishedAssignments || [])
+              .map((item) => item.request_code)
+              .filter(Boolean);
+            const message = codes.length
+              ? `กรุณาโอนงานที่ยังไม่เสร็จก่อนปิดบัญชี: ${codes.join(", ")}`
+              : error.status === 404
+                ? "ไม่พบบัญชีนี้ในระบบ กรุณาโหลดรายการพนักงานใหม่"
+                : error.message === "You cannot change your own account status"
+                  ? "ไม่สามารถปิดบัญชีของตัวเองได้"
+                  : error.message === "You cannot suspend the last active administrator"
+                    ? "ไม่สามารถปิดบัญชีแอดมินที่ใช้งานอยู่คนสุดท้ายได้"
+                    : error instanceof TypeError
+                      ? "เชื่อมต่อระบบไม่ได้ กรุณาลองใหม่อีกครั้ง"
+                      : error.message || "ไม่สามารถเปลี่ยนสถานะบัญชีได้";
+            showSuccess(message, "เปลี่ยนสถานะบัญชีไม่สำเร็จ", "error");
+          } finally {
+            togglingStaffIds.delete(staff.id);
+          }
         },
+        suspending ? "ปิดบัญชี" : "เปิดบัญชี",
       );
     }
     async function performResendStaffInvitation(index, button) {

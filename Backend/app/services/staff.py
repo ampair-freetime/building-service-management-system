@@ -23,8 +23,8 @@ class DuplicateStaffError(Exception):
     """แจ้งว่าอีเมลซ้ำกับบัญชีที่มีอยู่."""
 
 
-class StaffDeletionBlockedError(Exception):
-    """Deletion violates a safety rule; assignments are included when relevant."""
+class StaffChangeBlockedError(Exception):
+    """Deletion or suspension violates a safety rule; assignments are included when relevant."""
 
     def __init__(self, message: str, assignments: list[ServiceRequest] | None = None):
         super().__init__(message)
@@ -170,12 +170,77 @@ async def list_staff(session: AsyncSession) -> list[Staff]:
     return list(result)
 
 
+async def _unfinished_assignments(session: AsyncSession, staff_id: UUID) -> list[ServiceRequest]:
+    """Work still held by this account; it must move before the account stops working."""
+    unfinished_statuses = (
+        RequestStatus.WAITING,
+        RequestStatus.ASSIGNED,
+        RequestStatus.RECEIVED,
+        RequestStatus.IN_PROGRESS,
+    )
+    return list(
+        await session.scalars(
+            select(ServiceRequest)
+            .where(
+                ServiceRequest.assigned_staff_id == staff_id,
+                ServiceRequest.status.in_(unfinished_statuses),
+            )
+            .order_by(ServiceRequest.created_at)
+        )
+    )
+
+
+async def set_staff_status(
+    session: AsyncSession, *, staff_id: UUID, new_status: AccountStatus, actor: Staff
+) -> Staff:
+    """Suspend or reactivate an account; a suspended account fails login and every token check."""
+    if staff_id == actor.id:
+        raise StaffChangeBlockedError("You cannot change your own account status")
+
+    # Unlocked peek: only decides whether the admin group must be locked first.
+    target = await get_staff_by_id(session, staff_id)
+    if target is None or target.status == AccountStatus.DELETED:
+        raise LookupError("Staff account not found")
+
+    suspending = new_status == AccountStatus.SUSPENDED
+    if suspending and target.role == StaffRole.ADMIN and target.status == AccountStatus.ACTIVE:
+        # Same lock order as delete_staff_account: admin group first, then the target row.
+        active_admin_ids = {admin.id for admin in await lock_active_admins(session)}
+        if actor.id not in active_admin_ids:
+            raise StaffActorNotAuthorizedError("Your administrator access is no longer active")
+        if staff_id in active_admin_ids and len(active_admin_ids) <= 1:
+            raise StaffChangeBlockedError("You cannot suspend the last active administrator")
+
+    account = await get_staff_for_update(session, staff_id)
+    if account is None or account.status == AccountStatus.DELETED:
+        raise LookupError("Staff account not found")
+    if account.status == new_status:
+        return account
+
+    if suspending:
+        unfinished = await _unfinished_assignments(session, account.id)
+        if unfinished:
+            raise StaffChangeBlockedError(
+                "Reassign or unassign all unfinished work before suspending this account",
+                unfinished,
+            )
+
+    account.status = new_status
+    await session.commit()
+    await session.refresh(account)
+    logger.info(
+        "Staff status changed; staff_id=%s status=%s actor_id=%s",
+        staff_id, new_status.value, actor.id,
+    )
+    return account
+
+
 async def delete_staff_account(
     session: AsyncSession, *, staff_id: UUID, deleted_by: Staff
 ) -> None:
     """Soft-delete a staff account after checking work and administrator safeguards."""
     if staff_id == deleted_by.id:
-        raise StaffDeletionBlockedError("You cannot delete your own account")
+        raise StaffChangeBlockedError("You cannot delete your own account")
 
     # Unlocked peek: only decides whether the admin group must be locked first.
     target = await get_staff_by_id(session, staff_id)
@@ -188,30 +253,15 @@ async def delete_staff_account(
         if deleted_by.id not in active_admin_ids:
             raise StaffActorNotAuthorizedError("Your administrator access is no longer active")
         if staff_id in active_admin_ids and len(active_admin_ids) <= 1:
-            raise StaffDeletionBlockedError("You cannot delete the last active administrator")
+            raise StaffChangeBlockedError("You cannot delete the last active administrator")
 
     account = await get_staff_for_update(session, staff_id)
     if account is None or account.status == AccountStatus.DELETED:
         raise LookupError("Staff account not found")
 
-    unfinished_statuses = (
-        RequestStatus.WAITING,
-        RequestStatus.ASSIGNED,
-        RequestStatus.RECEIVED,
-        RequestStatus.IN_PROGRESS,
-    )
-    unfinished = list(
-        await session.scalars(
-            select(ServiceRequest)
-            .where(
-                ServiceRequest.assigned_staff_id == account.id,
-                ServiceRequest.status.in_(unfinished_statuses),
-            )
-            .order_by(ServiceRequest.created_at)
-        )
-    )
+    unfinished = await _unfinished_assignments(session, account.id)
     if unfinished:
-        raise StaffDeletionBlockedError(
+        raise StaffChangeBlockedError(
             "Reassign or unassign all unfinished work before deleting this account",
             unfinished,
         )

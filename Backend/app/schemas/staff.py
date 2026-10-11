@@ -59,6 +59,21 @@ class StaffUpdate(BaseModel):
         return StaffCreate.normalize_email(value)
 
 
+class StaffStatusUpdate(BaseModel):
+    """Admin เปิด/ปิดการใช้งานบัญชี; การลบบัญชีใช้ DELETE แยกต่างหาก."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    status: AccountStatus
+
+    @field_validator("status")
+    @classmethod
+    def reject_deleted(cls, value: AccountStatus) -> AccountStatus:
+        if value == AccountStatus.DELETED:
+            raise ValueError("Use DELETE /staff/{staff_id} to delete an account")
+        return value
+
+
 class StaffResponse(BaseModel):
     """ข้อมูลพนักงานที่อนุญาตให้ส่งออก API โดยไม่รวม password_hash."""
 

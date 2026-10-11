@@ -5,7 +5,13 @@ from uuid import UUID
 from fastapi import APIRouter, HTTPException, status
 
 from app.api.dependencies import AdminStaff, DbSession
-from app.schemas.staff import StaffCreate, StaffCreatedResponse, StaffResponse, StaffUpdate
+from app.schemas.staff import (
+    StaffCreate,
+    StaffCreatedResponse,
+    StaffResponse,
+    StaffStatusUpdate,
+    StaffUpdate,
+)
 from app.services.invitations import (
     InvitationNotAvailableError,
     create_staff_and_invite,
@@ -14,9 +20,10 @@ from app.services.invitations import (
 from app.services.staff import (
     DuplicateStaffError,
     StaffActorNotAuthorizedError,
-    StaffDeletionBlockedError,
+    StaffChangeBlockedError,
     delete_staff_account,
     list_staff,
+    set_staff_status,
     update_staff_profile,
 )
 
@@ -77,6 +84,43 @@ async def edit_staff(
     return StaffResponse.model_validate(account)
 
 
+def _blocked_conflict(exc: StaffChangeBlockedError) -> HTTPException:
+    """409 ที่แนบรายการงานค้าง เพื่อให้หน้า admin บอกได้ว่าต้องโอนงานไหนก่อน."""
+    detail: str | dict[str, object] = str(exc)
+    if exc.assignments:
+        detail = {
+            "message": str(exc),
+            "unfinished_assignments": [
+                {
+                    "id": str(request.id),
+                    "request_code": request.request_code,
+                    "title": request.title,
+                    "status": request.status.value,
+                }
+                for request in exc.assignments
+            ],
+        }
+    return HTTPException(status_code=status.HTTP_409_CONFLICT, detail=detail)
+
+
+@router.patch("/{staff_id}/status", response_model=StaffResponse)
+async def change_staff_status(
+    staff_id: UUID, payload: StaffStatusUpdate, session: DbSession, admin: AdminStaff
+) -> StaffResponse:
+    """Admin ระงับหรือเปิดบัญชีคืน; บัญชีที่ถูกระงับจะ login และใช้ token เดิมไม่ได้ทันที."""
+    try:
+        account = await set_staff_status(
+            session, staff_id=staff_id, new_status=payload.status, actor=admin
+        )
+    except LookupError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except StaffActorNotAuthorizedError as exc:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
+    except StaffChangeBlockedError as exc:
+        raise _blocked_conflict(exc) from exc
+    return StaffResponse.model_validate(account)
+
+
 @router.delete("/{staff_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_staff(staff_id: UUID, session: DbSession, admin: AdminStaff) -> None:
     """Remove a staff account from active use while retaining historical records."""
@@ -86,19 +130,5 @@ async def delete_staff(staff_id: UUID, session: DbSession, admin: AdminStaff) ->
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except StaffActorNotAuthorizedError as exc:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
-    except StaffDeletionBlockedError as exc:
-        detail: str | dict[str, object] = str(exc)
-        if exc.assignments:
-            detail = {
-                "message": str(exc),
-                "unfinished_assignments": [
-                    {
-                        "id": str(request.id),
-                        "request_code": request.request_code,
-                        "title": request.title,
-                        "status": request.status.value,
-                    }
-                    for request in exc.assignments
-                ],
-            }
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=detail) from exc
+    except StaffChangeBlockedError as exc:
+        raise _blocked_conflict(exc) from exc
