@@ -199,7 +199,7 @@ async def create_guest_repair_request(
             location=_format_location(location),
             image_count=len(prepared),
             created_at=service_request.created_at,
-            message="รับคำร้องแจ้งซ่อมแล้ว กรุณาเก็บรหัสคำร้องไว้ใช้ติดตามสถานะ",
+            message="รับคำร้องแจ้งซ่อมแล้ว ระบบจะส่งรหัสคำร้องไปทางอีเมล กรุณาเก็บรหัสไว้ใช้ติดตามสถานะ",
         )
         # หลัง commit ไม่อ่าน ORM หรือสร้าง response อีก เพื่อไม่ให้สำเร็จแล้วตอบ error
         commit_started = True

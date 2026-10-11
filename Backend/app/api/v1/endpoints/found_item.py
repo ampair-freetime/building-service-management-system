@@ -1,13 +1,24 @@
 """Guest API สำหรับสร้างและอ่านประกาศพบของ."""
 
+from datetime import UTC, datetime
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, status
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    HTTPException,
+    Query,
+    Request,
+    UploadFile,
+    status,
+)
 from pydantic import EmailStr
 
 from app.api.dependencies import DbSession, ObjectStorageClient
 from app.api.v1.forms import parse_guest_found_item_form, parse_guest_image_uploads
+from app.api.v1.guest_receipts import schedule_submission_email
 from app.models.enums import LostType
 from app.schemas.lost_found_item import (
     GuestClaimCreatedResponse,
@@ -18,6 +29,7 @@ from app.schemas.lost_found_item import (
     GuestItemListResponse,
     GuestItemPublicResponse,
 )
+from app.services.guest_email import SubmissionReceipt
 from app.services.images import InvalidImageError
 from app.services.lost_found import (
     ItemPersistenceError,
@@ -59,10 +71,12 @@ async def add_found_item(
     session: DbSession,
     storage: ObjectStorageClient,
     images: Annotated[list[UploadFile], Depends(parse_guest_image_uploads)],
+    request: Request,
+    background_tasks: BackgroundTasks,
 ) -> GuestItemCreatedResponse:
     """รับรายงานพบของ โดยเก็บข้อมูลยืนยันไว้ private และส่งรูปไป R2."""
     try:
-        return await create_guest_item(
+        created = await create_guest_item(
             session,
             payload=payload,
             report_type=LostType.FOUND,
@@ -84,6 +98,15 @@ async def add_found_item(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(exc),
         ) from exc
+    schedule_submission_email(
+        request,
+        background_tasks,
+        recipient=payload.reporter_email,
+        receipt=SubmissionReceipt(
+            kind="found", code=created.item_code, created_at=datetime.now(UTC)
+        ),
+    )
+    return created
 
 
 @router.get("", response_model=GuestItemListResponse)
@@ -145,10 +168,12 @@ async def add_found_item_claim(
     item_code: str,
     payload: GuestItemClaim,
     session: DbSession,
+    request: Request,
+    background_tasks: BackgroundTasks,
 ) -> GuestClaimCreatedResponse:
     """รับคำขอรับของคืนจาก guest โดยไม่คืนข้อมูลที่ใช้ยืนยันตัวเจ้าของ."""
     try:
-        return await create_guest_claim(
+        created = await create_guest_claim(
             session,
             item_code=item_code,
             payload=payload,
@@ -168,6 +193,18 @@ async def add_found_item_claim(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(exc),
         ) from exc
+    schedule_submission_email(
+        request,
+        background_tasks,
+        recipient=payload.claimant_email,
+        receipt=SubmissionReceipt(
+            kind="claim",
+            code=created.claim_code,
+            created_at=created.created_at,
+            related_code=created.found_item_code,
+        ),
+    )
+    return created
 
 
 @router.get(

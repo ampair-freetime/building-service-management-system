@@ -2,17 +2,29 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Path, Query, UploadFile, status
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    HTTPException,
+    Path,
+    Query,
+    Request,
+    UploadFile,
+    status,
+)
 from pydantic import EmailStr
 
 from app.api.dependencies import DbSession, OptionalObjectStorageClient
 from app.api.v1.forms import parse_guest_image_uploads, parse_guest_repair_form
+from app.api.v1.guest_receipts import schedule_submission_email
 from app.schemas.repair_guest import (
     GuestRepairCreate,
     GuestRepairCreateResponse,
     GuestRepairLocationResponse,
     GuestRepairTrackingResponse,
 )
+from app.services.guest_email import SubmissionReceipt
 from app.services.images import InvalidImageError
 from app.services.object_storage import StorageConfigurationError, StorageOperationError
 from app.services.repair_guest import (
@@ -56,6 +68,8 @@ async def create_repair_request(
     session: DbSession,
     storage: OptionalObjectStorageClient,
     images: Annotated[list[UploadFile], Depends(parse_guest_image_uploads)],
+    request: Request,
+    background_tasks: BackgroundTasks,
 ) -> GuestRepairCreateResponse:
     """สร้างคำร้อง Repair จาก multipart form และรับรูปได้ไม่เกินห้าไฟล์."""
     if images and storage is None:
@@ -66,7 +80,7 @@ async def create_repair_request(
             detail="ระบบจัดเก็บรูปภาพยังไม่ได้ตั้งค่า",
         )
     try:
-        return await create_guest_repair_request(
+        created = await create_guest_repair_request(
             session,
             payload=payload,
             image_uploads=images,
@@ -92,6 +106,18 @@ async def create_repair_request(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(exc),
         ) from exc
+    schedule_submission_email(
+        request,
+        background_tasks,
+        recipient=payload.reporter_email,
+        receipt=SubmissionReceipt(
+            kind="repair",
+            code=created.request_code,
+            created_at=created.created_at,
+            location_label=created.location,
+        ),
+    )
+    return created
 
 
 @router.get("/{request_code}", response_model=GuestRepairTrackingResponse)

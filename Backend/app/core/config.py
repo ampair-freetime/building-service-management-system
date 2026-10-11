@@ -57,6 +57,9 @@ class Settings(BaseSettings):
     smtp_use_ssl: bool = False
     smtp_timeout_seconds: float = Field(default=10, gt=0, le=120)
     mail_from: str = "Building Care <no-reply@example.com>"
+    # อีเมลยืนยันรับเรื่องของ guest: จำกัดต่ออีเมลผู้รับ (หน่วยความจำของ worker เดียว)
+    guest_email_per_recipient_limit: int = Field(default=5, ge=1, le=100)
+    guest_email_per_recipient_window_seconds: int = Field(default=3600, ge=60, le=86400)
     public_base_url: str = "http://localhost:5173"
 
     # Cloudflare R2 ใช้ S3-compatible API โดย credentials ต้องอยู่ฝั่ง backend เท่านั้น
