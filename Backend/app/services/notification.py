@@ -55,6 +55,34 @@ async def create_cleaning_request_notifications(
         )
 
 
+async def create_repair_request_notifications(
+    session: AsyncSession,
+    *,
+    request_id: UUID,
+    request_code: str,
+    request_title: str,
+) -> None:
+    """สร้าง notification ให้ technician ที่ active ทุกคน."""
+
+    result = await session.scalars(
+        select(Staff).where(
+            Staff.role == StaffRole.TECHNICIAN,
+            Staff.status == AccountStatus.ACTIVE,
+        )
+    )
+
+    for technician in result.all():
+        session.add(
+            Notification(
+                staff_id=technician.id,
+                request_id=request_id,
+                title="New repair request",
+                message=f"{request_code}: {request_title}",
+                is_read=False,
+            )
+        )
+
+
 async def mark_notification_as_read(
     session: AsyncSession,
     *,

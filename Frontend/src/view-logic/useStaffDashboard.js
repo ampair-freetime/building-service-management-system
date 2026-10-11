@@ -4655,7 +4655,7 @@ export function useStaffDashboard() {
     }
     function previewProgressFile(file) {
       if (!validImage(file)) {
-        toast("รองรับ JPG, PNG หรือ WebP ไม่เกิน 5 MB");
+        toast("รองรับ JPG, PNG หรือ WebP ไม่เกิน 10 MB");
         $("#progressImage").value = "";
         resetUploadPreview();
         return false;
@@ -4682,7 +4682,7 @@ export function useStaffDashboard() {
 
     function previewCompletionFile(file) {
       if (!validImage(file)) {
-        toast("รองรับ JPG, PNG หรือ WebP ไม่เกิน 5 MB");
+        toast("รองรับ JPG, PNG หรือ WebP ไม่เกิน 10 MB");
         $("#completeImage").value = "";
         resetCompletionPreview();
         return false;
@@ -4732,7 +4732,7 @@ export function useStaffDashboard() {
     $("#uploadDropZone")?.addEventListener("drop", (event) => {
       const file = event.dataTransfer.files[0];
       if (!validImage(file)) {
-        toast("รองรับ JPG, PNG หรือ WebP ไม่เกิน 5 MB");
+        toast("รองรับ JPG, PNG หรือ WebP ไม่เกิน 10 MB");
         return;
       }
       const transfer = new DataTransfer();
@@ -4769,7 +4769,7 @@ export function useStaffDashboard() {
       if (!job) return;
       const file = $("#statusImage").files[0];
       if (file && !validImage(file)) {
-        toast("รองรับ JPG, PNG หรือ WebP ไม่เกิน 5 MB");
+        toast("รองรับ JPG, PNG หรือ WebP ไม่เกิน 10 MB");
         return;
       }
       const next = $("#newJobStatus").value,
@@ -4823,7 +4823,7 @@ export function useStaffDashboard() {
         return;
       }
       if (!validImage(file)) {
-        toast("รองรับ JPG, PNG หรือ WebP ไม่เกิน 5 MB");
+        toast("รองรับ JPG, PNG หรือ WebP ไม่เกิน 10 MB");
         return;
       }
       const job = allJobs.find((item) => item.id === $("#uploadJobId").value);
@@ -4859,7 +4859,7 @@ export function useStaffDashboard() {
       if (!job) return;
       const file = $("#completeImage").files[0];
       if (file && !validImage(file)) {
-        toast("รองรับ JPG, PNG หรือ WebP ไม่เกิน 5 MB");
+        toast("รองรับ JPG, PNG หรือ WebP ไม่เกิน 10 MB");
         return;
       }
       const completionNoteInput = $("#completeNote");

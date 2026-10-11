@@ -207,14 +207,14 @@
                     class="image-input"
                     multiple
                     accept="image/jpeg,image/png,image/webp"
-                    data-max-size="5242880"
+                    data-max-size="10485760"
                     data-max-files="5"
                     data-error-id="lostItemPhotoError"
                     aria-describedby="lostItemPhotoError"
                   /><span class="upload-icon">＋</span
                   ><span class="upload-copy"
                     ><strong class="image-upload-action">เลือกรูปภาพ</strong
-                    ><small>แนบได้สูงสุด 5 รูป · JPG, PNG หรือ WebP ไม่เกิน 5 MB ต่อรูป</small></span
+                    ><small>แนบได้สูงสุด 5 รูป · JPG, PNG หรือ WebP ไม่เกิน 10 MB ต่อรูป</small></span
                   ></label
                 >
                 <ul class="image-preview-list" aria-label="รูปภาพสิ่งของที่แนบ"></ul>
@@ -365,14 +365,14 @@
                     class="image-input"
                     multiple
                     accept="image/jpeg,image/png,image/webp"
-                    data-max-size="5242880"
+                    data-max-size="10485760"
                     data-max-files="5"
                     data-error-id="publicFoundPhotoError"
                     aria-describedby="publicFoundPhotoError"
                   /><span class="upload-icon">＋</span
                   ><span class="upload-copy"
                     ><strong class="image-upload-action">เลือกรูปภาพ</strong
-                    ><small>แนบได้สูงสุด 5 รูป · JPG, PNG หรือ WebP ไม่เกิน 5 MB ต่อรูป</small></span
+                    ><small>แนบได้สูงสุด 5 รูป · JPG, PNG หรือ WebP ไม่เกิน 10 MB ต่อรูป</small></span
                   ></label
                 >
                 <ul class="image-preview-list" aria-label="รูปภาพของที่พบที่แนบ"></ul>

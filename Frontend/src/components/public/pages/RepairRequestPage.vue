@@ -76,7 +76,7 @@ const photoInput = ref(null);
 const photos = ref([]);
 const photoErrors = ref([]);
 const MAX_PHOTOS = 5;
-const MAX_PHOTO_BYTES = 5 * 1024 * 1024;
+const MAX_PHOTO_BYTES = 10 * 1024 * 1024;
 const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
 
 function syncPhotoFiles() {
@@ -94,7 +94,7 @@ function addPhotos(event) {
     } else if (file.size === 0) {
       errors.push(`${file.name}: ไฟล์ว่างเปล่า กรุณาเลือกไฟล์ใหม่`);
     } else if (file.size > MAX_PHOTO_BYTES) {
-      errors.push(`${file.name}: ขนาดเกิน 5 MB`);
+      errors.push(`${file.name}: ขนาดเกิน 10 MB`);
     } else if (photos.value.some(({ file: existing }) =>
       existing.name === file.name &&
       existing.size === file.size &&
@@ -308,7 +308,7 @@ onMounted(() => {
                     <span class="upload-icon" aria-hidden="true">＋</span>
                     <span class="upload-copy">
                       <strong>{{ photos.length ? "เพิ่มรูปภาพ" : "เลือกรูปภาพ" }}</strong>
-                      <small id="repairImageHint">แนบได้สูงสุด {{ MAX_PHOTOS }} รูป · JPG, PNG หรือ WebP ไม่เกิน 5 MB ต่อรูป</small>
+                      <small id="repairImageHint">แนบได้สูงสุด {{ MAX_PHOTOS }} รูป · JPG, PNG หรือ WebP ไม่เกิน 10 MB ต่อรูป</small>
                     </span>
                   </label>
                   <ul v-if="photos.length" class="repair-photo-list" aria-label="รูปจุดชำรุดที่แนบ">

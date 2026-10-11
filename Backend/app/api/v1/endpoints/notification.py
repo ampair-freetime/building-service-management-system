@@ -1,7 +1,6 @@
 """Endpoints สำหรับ Staff notifications."""
 
 from uuid import UUID
-from fastapi import APIRouter
 from fastapi import APIRouter, HTTPException
 
 from app.api.dependencies import CurrentStaff, DbSession
