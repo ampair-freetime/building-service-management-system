@@ -35,6 +35,9 @@
             <button class="secondary" id="resetMyHistoryFilters" type="button">
               ล้างตัวกรอง
             </button>
+            <button class="primary" id="applyMyHistoryFilters" type="button">
+              แสดงผล
+            </button>
           </div>
           <div class="work-history-list" id="myHistoryList"></div>
         </section>

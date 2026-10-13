@@ -5,16 +5,16 @@
         <div class="eyebrow">Lost &amp; found custody</div>
         <h2>ของหายและรับฝาก</h2>
       </div>
-      <button class="small-btn" id="staffLostRefreshButton" type="button">รีเฟรชรายการ</button>
     </div>
-    <div class="custody-toolbar">
-      <input
-        class="field-compact search custody-search"
-        id="clerkLostSearch"
-        type="search"
-        placeholder="ค้นหาชื่อของ รหัสรายการ หรือสถานที่"
-        aria-label="ค้นหารายการ"
-      />
+    <form class="custody-toolbar" id="clerkLostFilters">
+      <label class="custody-search">ค้นหารายการ
+        <input
+          class="field-compact search"
+          id="clerkLostSearch"
+          type="search"
+          placeholder="ค้นหาชื่อของ รหัสรายการ หรือสถานที่"
+        />
+      </label>
       <label>สถานะรายการ
         <select id="clerkLostStatus">
           <option value="all">ทุกสถานะ</option>
@@ -23,8 +23,11 @@
           <option value="announcement">ประกาศตามหา</option>
         </select>
       </label>
-      <button class="small-btn" id="clerkLostReset" type="button">ล้างตัวกรอง</button>
-    </div>
+      <div class="custody-toolbar-actions">
+        <button class="secondary" id="clerkLostReset" type="button">ล้างตัวกรอง</button>
+        <button class="primary" id="clerkLostApply" type="submit">แสดงผล</button>
+      </div>
+    </form>
     <div class="custody-list-heading">
       <div class="tabs" id="lostTabs">
         <button class="tab active" data-tab="all">ทั้งหมด <span data-custody-count="all">0</span></button>
