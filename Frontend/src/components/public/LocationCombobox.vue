@@ -37,7 +37,9 @@ function openSuggestions() {
 function handleInput(event) {
   query.value = event.target.value;
   emit("update:modelValue", query.value);
-  openSuggestions();
+  // การกู้ค่าฟอร์มหลังรีโหลดจะส่ง input event จำลอง จึงไม่ควรเปิดรายการ
+  // คำแนะนำจนกว่าผู้ใช้จะพิมพ์หรือกดเปิด Dropdown ด้วยตัวเอง
+  if (event.isTrusted) openSuggestions();
 }
 
 function selectOption(option) {
