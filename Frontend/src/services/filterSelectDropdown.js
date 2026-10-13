@@ -366,8 +366,25 @@ export function enhanceDatePickers(root = document) {
       menu.append(content);
     }
 
+    function keepMenuInsideViewport() {
+      if (menu.hidden || window.innerWidth > 720) {
+        menu.style.removeProperty("--date-picker-offset-x");
+        return;
+      }
+      menu.style.setProperty("--date-picker-offset-x", "0px");
+      const rect = menu.getBoundingClientRect();
+      const viewportMargin = 14;
+      let offset = 0;
+      if (rect.left < viewportMargin) offset += viewportMargin - rect.left;
+      if (rect.right + offset > window.innerWidth - viewportMargin) {
+        offset -= rect.right + offset - (window.innerWidth - viewportMargin);
+      }
+      menu.style.setProperty("--date-picker-offset-x", `${offset}px`);
+    }
+
     function close() {
       menu.hidden = true;
+      menu.style.removeProperty("--date-picker-offset-x");
       trigger.setAttribute("aria-expanded", "false");
       wrapper.classList.remove("is-open");
     }
@@ -383,6 +400,7 @@ export function enhanceDatePickers(root = document) {
       menu.hidden = false;
       trigger.setAttribute("aria-expanded", "true");
       wrapper.classList.add("is-open");
+      requestAnimationFrame(keepMenuInsideViewport);
     }
 
     function handleOutside(event) {
@@ -410,6 +428,7 @@ export function enhanceDatePickers(root = document) {
     input.addEventListener("change", syncTrigger);
     input.form?.addEventListener("reset", handleReset);
     document.addEventListener("pointerdown", handleOutside);
+    window.addEventListener("resize", keepMenuInsideViewport);
     const observer = new MutationObserver(syncTrigger);
     observer.observe(input, {
       attributes: true,
@@ -421,6 +440,7 @@ export function enhanceDatePickers(root = document) {
       observer.disconnect();
       input.form?.removeEventListener("reset", handleReset);
       document.removeEventListener("pointerdown", handleOutside);
+      window.removeEventListener("resize", keepMenuInsideViewport);
       enhancedDates.delete(input);
     };
     enhancedDates.set(input, cleanup);

@@ -153,6 +153,14 @@ def test_administrative_can_approve_found_item(test_context):
     assert data["report_type"] == "found"
     assert data["status"] == "approved"
 
+    client.app.dependency_overrides[provide_optional_object_storage] = lambda: None
+    try:
+        processed = client.get("/api/v1/lost-found/items", headers=headers)
+        assert processed.status_code == 200
+        assert processed.json()[0]["reviewer_name"] == "Test Staff"
+    finally:
+        client.app.dependency_overrides.pop(provide_optional_object_storage, None)
+
     history = client.get("/api/v1/lost-found/my-history", headers=headers)
     assert history.status_code == 200
     assert len(history.json()) == 1

@@ -1845,7 +1845,7 @@ export function useStaffDashboard() {
                   : "";
               const inlineClose = ["lostposts", "inventory"].includes(tab) && approvalGroup(i.status) === "approved";
               const approvalMeta = ["inventory", "lostposts"].includes(tab)
-                ? `<div class="lost-foot"><span class="custody">${escapeHtml(i.custodyLocation || i.activityLabel || "")}</span><span class="badge progress">ยืนยันโดย: ${escapeHtml(approvalReviewerName(i))}</span></div>`
+                ? `<div class="lost-foot"><span class="badge progress">ยืนยันโดย: ${escapeHtml(approvalReviewerName(i))}</span></div>`
                 : "";
               const detailsButton = `<button class="small-btn" type="button" data-lost-action="detail" data-tab="${tab}" data-item-id="${i.id}">ดูรายละเอียด</button>`;
               const controls =
@@ -1910,6 +1910,7 @@ export function useStaffDashboard() {
       }
       const nextStatus =
         tab === "inventory" ? "อนุมัติรับฝาก" : "อนุมัติเผยแพร่";
+      item.backendStatus = "approved";
       item.status = nextStatus;
       item.decisionReason =
         tab === "inventory"
@@ -2012,6 +2013,7 @@ export function useStaffDashboard() {
       }
       item.status =
         tab === "inventory" ? "ไม่อนุมัติรับฝาก" : "ไม่อนุมัติเผยแพร่";
+      item.backendStatus = "rejected";
       item.decisionReason = decisionReason;
       item.decidedBy = activeStaffName();
       item.decidedAt = nowThai();
@@ -2155,6 +2157,7 @@ export function useStaffDashboard() {
             return {uid: record.uid, source: "clerk-server", actorId: signedInStaffId(),
               staff: activeStaffName(), role: roleConfig[currentRole].label,
               itemId: record.item_code, backendId: record.item_id,
+              backendStatus: record.status,
               tab: record.report_type === "found" ? "inventory" : "lostposts",
               title: record.title, category: record.report_type === "found" ? "ของที่รับฝาก" : "ประกาศตามหา",
               action: record.status === "approved" ? "อนุมัติ" : record.status === "rejected" ? "ไม่อนุมัติ" : "ปิดงาน",
@@ -3992,28 +3995,31 @@ export function useStaffDashboard() {
       detailIcon
         ?.querySelector("use")
         ?.setAttribute("href", isLostAnnouncement ? "#i-search" : "#i-box");
-      const detailTimeline = isLostAnnouncement
+      const lostFoundStatus = String(item.backendStatus || "pending").toLowerCase();
+      const reachedStatusIndex = {
+        pending: 0,
+        approved: 1,
+        claimed: 2,
+        closed: 3,
+      }[lostFoundStatus] ?? 0;
+      const detailTimeline = lostFoundStatus === "rejected"
         ? [
-            ["ส่งประกาศ", item.reportedAt ? new Date(item.reportedAt).toLocaleString("th-TH") : "บันทึกในระบบแล้ว"],
-            ["ตรวจสอบข้อมูล", item.status],
-            [
-              "เผยแพร่ต่อผู้ใช้งาน",
-              approvalGroup(item.status) === "approved"
-                ? "เผยแพร่แล้ว"
-                : "ยังไม่เผยแพร่",
-            ],
+            ["รอเจ้าหน้าที่ตรวจสอบ", "pending", true, ""],
+            ["ไม่อนุมัติ", "rejected", true, "rejected"],
           ]
         : [
-            ["สร้างรายการ", "บันทึกในระบบแล้ว"],
-            ["ตรวจสอบข้อมูล", item.status],
-            ["สถานะการคืนของ", returnStatus],
+            ["รอเจ้าหน้าที่ตรวจสอบ", "pending", reachedStatusIndex >= 0, ""],
+            ["อนุมัติและเผยแพร่แล้ว", "approved", reachedStatusIndex >= 1, ""],
+            ["ยืนยันเจ้าของแล้ว · รอคืนของ", "claimed", reachedStatusIndex >= 2, ""],
+            ["ปิดรายการแล้ว", "closed", reachedStatusIndex >= 3, ""],
           ];
       $("#jobTimeline").innerHTML = detailTimeline
         .map(
-          (step) =>
-            `<div class="timeline-item"><span class="timeline-dot"></span><div><strong>${escapeHtml(step[0])}</strong><small>${escapeHtml(step[1])}</small></div></div>`,
+          (step, index) =>
+            `<div class="timeline-item${step[2] ? " complete" : ""}${detailTimeline[index + 1]?.[2] ? " line-complete" : ""}${step[3] ? ` ${step[3]}` : ""}"><span class="timeline-dot"></span><div><strong>${escapeHtml(step[0])}</strong><small>${escapeHtml(step[1])}</small></div></div>`,
         )
         .join("");
+      $("#jobTimeline").classList.add("lost-found-progress");
       $("#jobDetailNotes").textContent =
         item.decisionReason || "ยังไม่มีหมายเหตุ";
       const approved = approvalGroup(item.status) === "approved";
@@ -4148,16 +4154,38 @@ export function useStaffDashboard() {
       }
       $("#claimSecret").textContent =
         item.secret || "ยังไม่มีข้อมูลลับสำหรับตรวจสอบ";
-      $("#claimTimeline").innerHTML = [
-        ["ส่งคำขอ", $("#claimDate").textContent],
-        ["ตรวจสอบล่าสุด", item.status],
-        ["ผู้รับผิดชอบ", item.assignee || "ธุรการส่วนกลาง"],
-      ]
+      const claimStatus = String(item.backendStatus || "pending").toLowerCase();
+      const claimStatusIndex = {
+        pending: 0,
+        approved: 1,
+        scheduled: 2,
+        completed: 3,
+      }[claimStatus] ?? 0;
+      const claimTimelineSteps = claimStatus === "rejected"
+        ? [
+            ["รอตรวจสอบหลักฐาน", "pending", true, ""],
+            ["ไม่อนุมัติคำขอรับคืน", "rejected", true, "rejected"],
+          ]
+        : claimStatus === "additional_info_required"
+          ? [
+              ["รอตรวจสอบหลักฐาน", "pending", true, ""],
+              ["รอหลักฐานเพิ่มเติม", "additional_info_required", true, ""],
+              ["ยืนยันเจ้าของแล้ว", "approved", false, ""],
+              ["รับของคืนแล้ว", "completed", false, ""],
+            ]
+          : [
+              ["รอตรวจสอบหลักฐาน", "pending", claimStatusIndex >= 0, ""],
+              ["ยืนยันเจ้าของแล้ว", "approved", claimStatusIndex >= 1, ""],
+              ["นัดรับของแล้ว", "scheduled", claimStatusIndex >= 2, ""],
+              ["รับของคืนแล้ว", "completed", claimStatusIndex >= 3, ""],
+            ];
+      $("#claimTimeline").innerHTML = claimTimelineSteps
         .map(
-          (step) =>
-            `<div class="timeline-item"><span class="timeline-dot"></span><div><strong>${escapeHtml(step[0])}</strong><small>${escapeHtml(step[1])}</small></div></div>`,
+          (step, index) =>
+            `<div class="timeline-item${step[2] ? " complete" : ""}${claimTimelineSteps[index + 1]?.[2] ? " line-complete" : ""}${step[3] ? ` ${step[3]}` : ""}"><span class="timeline-dot"></span><div><strong>${escapeHtml(step[0])}</strong><small>${escapeHtml(step[1])}</small></div></div>`,
         )
         .join("");
+      $("#claimTimeline").classList.add("lost-found-progress");
       const verified = ["approved", "scheduled"].includes(item.backendStatus);
       const returned = item.returnStatusCode === "returned";
       const appointmentGroup = $("#claimAppointmentGroup");
@@ -4167,23 +4195,22 @@ export function useStaffDashboard() {
         ? item.pickupDate ? "นัดรับของแล้ว เมื่อส่งมอบของให้ผู้ขอให้กด ยืนยันส่งคืนแล้ว" : "ยืนยันเจ้าของแล้ว กรุณาบันทึกนัดหมายรับของ"
         : "เทียบหลักฐานที่ผู้ขอระบุกับข้อมูลลับของสิ่งของ แล้วจึงยืนยันความเป็นเจ้าของ";
       const claimActions =
-        detailContext === "center" && !verified && !returned && item.backendStatus !== "rejected"
+        detailContext === "center" &&
+        !returned &&
+        ["pending", "additional_info_required"].includes(item.backendStatus)
           ? [
               ["reject", "ปฏิเสธคำขอ", "claim-reject-action"],
               ["more", "ขอข้อมูลเพิ่มเติม", ""],
               ["verify", "ยืนยันความเป็นเจ้าของ", "primary-action"],
             ]
           : [];
-      if (
-        verified && !returned
-      ) {
+      if (item.backendStatus === "approved" && !returned) {
         claimActions.push([
           "appointment",
-          item.status === "นัดหมายแล้ว"
-            ? "แก้ไขนัดหมายรับของ"
-            : "นัดหมายรับของ",
+          "นัดหมายรับของ",
           "",
         ]);
+      } else if (item.backendStatus === "scheduled" && !returned) {
         claimActions.push(["returned", "ยืนยันส่งคืนแล้ว", "primary-action"]);
       }
       $("#claimActions").innerHTML = claimActions
@@ -5073,9 +5100,16 @@ export function useStaffDashboard() {
       else {
         const record = workHistory.find(item => item.itemId === button.dataset.historyDetail);
         if (record?.tab) {
-          if (!lostSets[record.tab].some(item => item.id === record.itemId)) {
+          const historyItem = lostSets[record.tab].find(
+            (item) => item.id === record.itemId,
+          );
+          if (!historyItem) {
             lostSets[record.tab].push({id: record.itemId, backendId: record.backendId,
-              title: record.title, status: record.status});
+              title: record.title, status: record.status,
+              backendStatus: record.backendStatus});
+          } else {
+            historyItem.backendStatus = record.backendStatus;
+            historyItem.status = record.status;
           }
           openLostDetail(record.tab, record.itemId, button);
         }

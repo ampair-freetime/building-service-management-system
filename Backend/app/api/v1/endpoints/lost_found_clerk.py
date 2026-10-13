@@ -5,6 +5,7 @@ from app.services.invitation_email import send_email, EmailDeliveryError
 from fastapi import APIRouter, HTTPException
 from sqlalchemy import select
 from app.models.lost_found import LostItem
+from app.models.staff import Staff
 
 from app.core.config import settings
 from app.api.dependencies import ClerkStaff, CurrentStaff, DbSession, OptionalObjectStorageClient
@@ -55,13 +56,23 @@ async def read_processed_items(
 ):
     if staff.role.value not in ("clerk", "admin"):
         raise HTTPException(status_code=403, detail="Clerk or admin access required")
-    items = list(await session.scalars(select(LostItem).where(
-        LostItem.status.in_([LostStatus.APPROVED, LostStatus.CLAIMED]),
-        LostItem.deleted_at.is_(None),
-    ).order_by(LostItem.created_at.desc())))
+    rows = (await session.execute(
+        select(LostItem, Staff.full_name)
+        .outerjoin(Staff, LostItem.reviewed_by == Staff.id)
+        .where(
+            LostItem.status.in_([LostStatus.APPROVED, LostStatus.CLAIMED]),
+            LostItem.deleted_at.is_(None),
+        )
+        .order_by(LostItem.created_at.desc())
+    )).all()
+    items = [item for item, _ in rows]
     image_urls = await load_staff_image_urls(session, [item.id for item in items], storage)
+    reviewer_names = {item.id: reviewer_name for item, reviewer_name in rows}
     return [FoundItemDetailResponse.model_validate(item).model_copy(
-        update={"images": image_urls.get(item.id, [])}
+        update={
+            "images": image_urls.get(item.id, []),
+            "reviewer_name": reviewer_names.get(item.id),
+        }
     ) for item in items]
 
 

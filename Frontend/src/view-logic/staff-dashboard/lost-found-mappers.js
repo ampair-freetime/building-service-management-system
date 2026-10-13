@@ -1,6 +1,7 @@
 // backendId is an API UUID; id/displayCode are human-readable UI codes.
 export function mapPendingFoundItem(item) {
   return {
+    backendStatus: item.status || "pending",
     backendId: item.id,
     id: item.item_code,
     displayCode: item.item_code,
@@ -22,6 +23,7 @@ export function mapPendingFoundItem(item) {
 
 export function mapPendingLostItem(item) {
   return {
+    backendStatus: item.status || "pending",
     backendId: item.id,
     id: item.item_code,
     displayCode: item.item_code,

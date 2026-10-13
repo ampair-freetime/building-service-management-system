@@ -66,6 +66,8 @@ class FoundItemDetailResponse(BaseModel):
     custody_location: str | None
     reporter_email: str
     status: LostStatus
+    reviewed_by: UUID | None = None
+    reviewer_name: str | None = None
     created_at: datetime
     images: list[GuestImageResponse] = STAFF_IMAGES_FIELD
 
@@ -84,6 +86,8 @@ class LostItemDetailResponse(BaseModel):
     location_detail: str | None
     reporter_email: str
     status: LostStatus
+    reviewed_by: UUID | None = None
+    reviewer_name: str | None = None
     created_at: datetime
     images: list[GuestImageResponse] = STAFF_IMAGES_FIELD
 
