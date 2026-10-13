@@ -4,10 +4,6 @@
             <div>
               <div class="eyebrow">Personal work record</div>
               <h2>ประวัติงานของฉัน</h2>
-              <p>
-                ดูงานที่เคยรับ อัปเดต ปิดงาน หรือคืนกลับเข้ากองกลาง
-                พร้อมกรองช่วงวันที่ได้
-              </p>
             </div>
           </div>
           <div class="history-summary" id="myHistorySummary"></div>

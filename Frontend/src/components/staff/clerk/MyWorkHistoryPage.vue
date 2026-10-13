@@ -2,23 +2,24 @@
 <section class="page" id="page-my-history">
           <div class="section-title">
             <div>
+              <div class="eyebrow">Personal work record</div>
               <h2>ประวัติงานของฉัน</h2>
             </div>
           </div>
           <div class="history-summary" id="myHistorySummary"></div>
           <div class="history-filter-panel">
-            <input
+            <label>ตั้งแต่วันที่<input
               class="field-compact"
               id="myHistoryFrom"
               type="date"
               aria-label="วันที่เริ่มต้น"
-            />
-            <input
+            /></label>
+            <label>ถึงวันที่<input
               class="field-compact"
               id="myHistoryTo"
               type="date"
               aria-label="วันที่สิ้นสุด"
-            />
+            /></label>
             <select
               class="field-compact"
               id="myHistoryType"

@@ -1,5 +1,8 @@
 import { installServiceFormValidation } from "../services/serviceFormValidation.js";
-import { enhanceFilterSelects } from "../services/filterSelectDropdown.js";
+import {
+  enhanceDatePickers,
+  enhanceFilterSelects,
+} from "../services/filterSelectDropdown.js";
 import {
   requestProgress,
   requestStatusPresentation,
@@ -24,6 +27,8 @@ import { createLostFoundStore, filterLostFoundItems } from "../services/lostFoun
 export function usePublicServicePortal() {
   const validationCleanups = [];
   let cleanupFilterSelects = () => {};
+  let cleanupDatePickers = () => {};
+  let cleanupGuestPageState = () => {};
   let portalMounted = true;
   onUnmounted(() => { portalMounted = false; });
   const pageLoading = ref(true);
@@ -44,6 +49,90 @@ export function usePublicServicePortal() {
   onMounted(() => {
     document.title = "CS Building Care";
     cleanupFilterSelects = enhanceFilterSelects();
+    cleanupDatePickers = enhanceDatePickers();
+
+    const guestDraftStorageKey = "building-care-guest-draft-v1";
+    const guestScrollStorageKey = "building-care-guest-scroll-v1";
+    const persistedFields = [
+      ...document.querySelectorAll(
+        'input[id]:not([type="password"]):not([type="file"]):not([type="hidden"]), textarea[id], select[id]',
+      ),
+    ];
+    let restoredScrollTop = 0;
+    try {
+      restoredScrollTop = Number(sessionStorage.getItem(guestScrollStorageKey)) || 0;
+      const draft = JSON.parse(
+        sessionStorage.getItem(guestDraftStorageKey) || "{}",
+      );
+      persistedFields.forEach((field) => {
+        if (!Object.hasOwn(draft, field.id)) return;
+        if (field.type === "checkbox" || field.type === "radio") {
+          field.checked = Boolean(draft[field.id]);
+        } else {
+          field.value = String(draft[field.id] ?? "");
+        }
+        field.dispatchEvent(new Event("input", { bubbles: true }));
+        field.dispatchEvent(new Event("change", { bubbles: true }));
+      });
+    } catch {
+      // Storage อาจถูกปิดไว้ แต่ฟอร์มยังใช้งานได้ตามปกติ
+    }
+
+    function saveGuestDraft() {
+      const draft = {};
+      persistedFields.forEach((field) => {
+        draft[field.id] =
+          field.type === "checkbox" || field.type === "radio"
+            ? field.checked
+            : field.value;
+      });
+      try {
+        sessionStorage.setItem(guestDraftStorageKey, JSON.stringify(draft));
+      } catch {
+        // Storage อาจเต็มหรือถูกปิดไว้
+      }
+    }
+
+    const handleDraftChange = () => saveGuestDraft();
+    const handleFormReset = () => window.setTimeout(saveGuestDraft, 0);
+    persistedFields.forEach((field) => {
+      field.addEventListener("input", handleDraftChange);
+      field.addEventListener("change", handleDraftChange);
+    });
+    document.querySelectorAll("form").forEach((form) =>
+      form.addEventListener("reset", handleFormReset),
+    );
+
+    let scrollFrame = 0;
+    const saveScrollPosition = () => {
+      if (scrollFrame) return;
+      scrollFrame = window.requestAnimationFrame(() => {
+        scrollFrame = 0;
+        try {
+          sessionStorage.setItem(
+            guestScrollStorageKey,
+            String(Math.round(window.scrollY)),
+          );
+        } catch {
+          // Storage อาจถูกปิดไว้
+        }
+      });
+    };
+    const beginScrollPersistence = () => {
+      window.scrollTo({ top: restoredScrollTop, behavior: "auto" });
+      window.addEventListener("scroll", saveScrollPosition, { passive: true });
+    };
+    cleanupGuestPageState = () => {
+      persistedFields.forEach((field) => {
+        field.removeEventListener("input", handleDraftChange);
+        field.removeEventListener("change", handleDraftChange);
+      });
+      document.querySelectorAll("form").forEach((form) =>
+        form.removeEventListener("reset", handleFormReset),
+      );
+      window.removeEventListener("scroll", saveScrollPosition);
+      if (scrollFrame) window.cancelAnimationFrame(scrollFrame);
+    };
 
     const pages = document.querySelectorAll(".page");
     const navItems = document.querySelectorAll(".nav-item");
@@ -63,6 +152,7 @@ export function usePublicServicePortal() {
     let selectedLostItem = null;
     let trackedClaim = null;
     const guestPageStorageKey = "building-care-guest-page-v1";
+    const lostViewStorageKey = "building-care-lost-view-v1";
     // เก็บเฉพาะคำร้องที่ผู้ใช้ส่งจริงในรอบการเปิดหน้านี้ ไม่มีข้อมูลตัวอย่างปะปน
     const trackedRequests = new Map();
 
@@ -79,6 +169,24 @@ export function usePublicServicePortal() {
         return sessionStorage.getItem(guestPageStorageKey);
       } catch {
         return null;
+      }
+    }
+
+    function savedLostView() {
+      try {
+        const linkedView = new URLSearchParams(window.location.search).get(
+          "lostView",
+        );
+        const viewName = ["browse", "report-lost", "report-found"].includes(
+          linkedView,
+        )
+          ? linkedView
+          : sessionStorage.getItem(lostViewStorageKey);
+        return ["browse", "report-lost", "report-found"].includes(viewName)
+          ? viewName
+          : "browse";
+      } catch {
+        return "browse";
       }
     }
 
@@ -114,11 +222,18 @@ export function usePublicServicePortal() {
       );
     }
 
-    function navigate(pageId) {
+    function navigate(pageId, { restoreLostView = false } = {}) {
       const destination = document.getElementById(pageId);
       if (!destination || !destination.classList.contains("page")) return;
       currentPage = pageId;
       rememberCurrentPage(pageId);
+      if (pageId !== "lost") {
+        const url = new URL(window.location.href);
+        if (url.searchParams.has("lostView")) {
+          url.searchParams.delete("lostView");
+          window.history.replaceState({}, "", url);
+        }
+      }
       pages.forEach((page) =>
         page.classList.toggle("active", page.id === pageId),
       );
@@ -133,8 +248,9 @@ export function usePublicServicePortal() {
       });
 
       if (pageId === "lost") {
-        openLostView("browse", false);
-        void filterPosts();
+        const lostView = restoreLostView ? savedLostView() : "browse";
+        openLostView(lostView, false);
+        if (lostView === "browse") void filterPosts();
       }
     }
 
@@ -147,11 +263,16 @@ export function usePublicServicePortal() {
     const initialService = new URLSearchParams(window.location.search).get(
       "service",
     );
+    const linkedLostView = new URLSearchParams(window.location.search).get(
+      "lostView",
+    );
     const initialPage = ["repair", "clean"].includes(initialService)
       ? initialService
-      : savedGuestPage();
+      : ["browse", "report-lost", "report-found"].includes(linkedLostView)
+        ? "lost"
+        : savedGuestPage();
     if (initialPage && initialPage !== "dashboard") {
-      navigate(initialPage);
+      navigate(initialPage, { restoreLostView: initialPage === "lost" });
     }
     document.querySelectorAll("[data-go]").forEach((button) =>
       button.addEventListener("click", (event) => {
@@ -182,6 +303,14 @@ export function usePublicServicePortal() {
     });
 
     function openLostView(viewName, moveToForm = true) {
+      try {
+        sessionStorage.setItem(lostViewStorageKey, viewName);
+      } catch {
+        // Storage อาจถูกปิดไว้ แต่ผู้ใช้ยังสลับแท็บได้ตามปกติ
+      }
+      const url = new URL(window.location.href);
+      url.searchParams.set("lostView", viewName);
+      window.history.replaceState({}, "", url);
       document
         .querySelectorAll(".lost-view")
         .forEach((view) =>
@@ -189,17 +318,18 @@ export function usePublicServicePortal() {
         );
       document
         .querySelectorAll(".lost-tab")
-        .forEach((tab) =>
-          tab.classList.toggle("active", tab.dataset.lostView === viewName),
-        );
+        .forEach((tab) => {
+          const isActive = tab.dataset.lostView === viewName;
+          tab.classList.toggle("active", isActive);
+          tab.setAttribute("aria-selected", String(isActive));
+        });
       document
         .querySelectorAll("[data-open-lost-view]")
-        .forEach((button) =>
-          button.classList.toggle(
-            "active",
-            button.dataset.openLostView === viewName,
-          ),
-        );
+        .forEach((button) => {
+          const isActive = button.dataset.openLostView === viewName;
+          button.classList.toggle("active", isActive);
+          button.setAttribute("aria-pressed", String(isActive));
+        });
       if (viewName === "report-found") {
         const now = new Date();
         const offsetDate = new Date(
@@ -208,6 +338,7 @@ export function usePublicServicePortal() {
         const dateTimeInput = document.getElementById("publicFoundDateTime");
         if (dateTimeInput && !dateTimeInput.value) {
           dateTimeInput.value = offsetDate.toISOString().slice(0, 16);
+          dateTimeInput.dispatchEvent(new Event("input", { bubbles: true }));
         }
       }
 
@@ -231,11 +362,8 @@ export function usePublicServicePortal() {
     document.querySelectorAll("[data-open-lost-view]").forEach((button) =>
       button.addEventListener("click", () => {
         const viewName = button.dataset.openLostView;
-        if (viewName === "browse") {
-          void filterPosts();
-        } else {
-          openLostView(viewName, false);
-        }
+        openLostView(viewName, false);
+        if (viewName === "browse") void filterPosts();
 
         window.requestAnimationFrame(() => {
           document.querySelector(".lost-tabs")?.scrollIntoView({
@@ -372,7 +500,6 @@ export function usePublicServicePortal() {
       const empty = document.getElementById("noSearchResults");
       const grid = document.getElementById("postGrid");
 
-      openLostView("browse", false);
       if (force) postPage = 0;
       summary.textContent = "กำลังโหลดประกาศ...";
       empty.hidden = true;
@@ -1780,13 +1907,18 @@ export function usePublicServicePortal() {
     document
       .querySelectorAll(".ui-modal")
       .forEach((modal) => modal.setAttribute("aria-hidden", "true"));
-    loadingTimer = window.setTimeout(() => { pageLoading.value = false; }, 1000);
+    loadingTimer = window.setTimeout(() => {
+      pageLoading.value = false;
+      window.requestAnimationFrame(beginScrollPersistence);
+    }, 1000);
 
   });
 
   onUnmounted(() => {
     window.clearTimeout(loadingTimer);
     cleanupFilterSelects();
+    cleanupDatePickers();
+    cleanupGuestPageState();
     validationCleanups.forEach((cleanup) => cleanup());
     document.body.classList.remove("modal-open", "offline");
   });

@@ -4,14 +4,17 @@
       <div>
         <div class="eyebrow">Lost &amp; found custody</div>
         <h2>ของหายและรับฝาก</h2>
-        <p>ตรวจสอบของที่ยังรับฝากและประกาศที่ยังเปิดอยู่</p>
       </div>
       <button class="small-btn" id="staffLostRefreshButton" type="button">รีเฟรชรายการ</button>
     </div>
     <div class="custody-toolbar">
-      <label class="custody-search">ค้นหารายการ
-        <input id="clerkLostSearch" type="search" placeholder="ชื่อของ รหัสรายการ หรือสถานที่" />
-      </label>
+      <input
+        class="field-compact search custody-search"
+        id="clerkLostSearch"
+        type="search"
+        placeholder="ค้นหาชื่อของ รหัสรายการ หรือสถานที่"
+        aria-label="ค้นหารายการ"
+      />
       <label>สถานะรายการ
         <select id="clerkLostStatus">
           <option value="all">ทุกสถานะ</option>

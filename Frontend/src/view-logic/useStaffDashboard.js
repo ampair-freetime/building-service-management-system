@@ -1,7 +1,10 @@
 import {mapPendingFoundItem, mapPendingLostItem, mapApprovedItem, mapOwnershipClaim} from "./staff-dashboard/lost-found-mappers.js";
 import { onBeforeUnmount, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
-import { enhanceFilterSelects } from "../services/filterSelectDropdown.js";
+import {
+  enhanceDatePickers,
+  enhanceFilterSelects,
+} from "../services/filterSelectDropdown.js";
 import { requestStatusPresentation, serviceProgress } from "../services/requestStatus.js";
 import {
   createAdminLocation,
@@ -97,6 +100,7 @@ export function useStaffDashboard() {
     allowedRoles.includes(savedRole) ? savedRole : "clerk",
   );
   let cleanupFilterSelects = () => {};
+  let cleanupDatePickers = () => {};
   let cleanupDashboardEvents = () => {};
 
   async function initializeDashboard() {
@@ -1124,6 +1128,12 @@ export function useStaffDashboard() {
     function renderJobs() {
       if (!$("#jobList")) return;
       if (currentRole === "clerk") return;
+      const jobsEyebrow = $("#jobsEyebrow");
+      if (jobsEyebrow) {
+        jobsEyebrow.textContent = currentBoardView === "mine"
+          ? "My Assigned Tasks"
+          : "Shared work queue";
+      }
       const query = $("#jobSearch").value.trim().toLowerCase(),
         category = $("#categoryFilter").value || "all",
         status = $("#jobStatusFilter").value || "all";
@@ -3729,6 +3739,7 @@ export function useStaffDashboard() {
         completeDateInput.type === "datetime-local"
           ? `${todayISO()}T${currentTimeHM()}`
           : todayISO();
+      completeDateInput.dispatchEvent(new Event("input", { bubbles: true }));
       openModal("completeModal", trigger, historyMode);
     }
     function changeJobFromDetail(action) {
@@ -4309,6 +4320,7 @@ export function useStaffDashboard() {
       $("#appointmentEndTime").value = item.pickupEndTime || "";
       $("#appointmentDate").min = todayISO();
       $("#appointmentDate").value = item.pickupDate || todayISO();
+      $("#appointmentDate").dispatchEvent(new Event("input", { bubbles: true }));
       $("#appointmentTime").value = item.pickupTime || "";
       $("#appointmentPlace").value = item.pickupLocation || item.custodyLocation || "ห้องธุรการ ชั้น 1";
       $("#appointmentNote").value = item.pickupNote || "";
@@ -4595,6 +4607,8 @@ export function useStaffDashboard() {
     $("#resetMyHistoryFilters")?.addEventListener("click", () => {
       $("#myHistoryFrom").value = "";
       $("#myHistoryTo").value = "";
+      $("#myHistoryFrom").dispatchEvent(new Event("input", { bubbles: true }));
+      $("#myHistoryTo").dispatchEvent(new Event("input", { bubbles: true }));
       $("#myHistoryType").value = "all";
       $("#myHistoryType").dispatchEvent(new Event("change", { bubbles: true }));
       $("#myHistorySearch").value = "";
@@ -5972,6 +5986,7 @@ export function useStaffDashboard() {
     navigationReady = true;
     updateDashboardRoute(initialModalId, "replace");
     cleanupFilterSelects = enhanceFilterSelects();
+    cleanupDatePickers = enhanceDatePickers();
 
     // DOM พร้อมใช้งานแล้ว จึงแสดงรายการสถานที่และปิด loading mask
     setTimeout(() => {
@@ -5983,6 +5998,7 @@ export function useStaffDashboard() {
   onMounted(initializeDashboard);
   onBeforeUnmount(() => {
     cleanupFilterSelects();
+    cleanupDatePickers();
     cleanupDashboardEvents();
   });
 

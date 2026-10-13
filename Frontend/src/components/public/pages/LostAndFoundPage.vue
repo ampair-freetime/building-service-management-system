@@ -153,6 +153,7 @@
                 id="lostItemDateTime"
                 name="event_datetime"
                 type="datetime-local"
+                data-default-now
                 required
                 aria-describedby="lostItemDateTimeError"
               />
@@ -307,6 +308,7 @@
                 id="publicFoundDateTime"
                 name="event_datetime"
                 type="datetime-local"
+                data-default-now
                 required
                 aria-describedby="publicFoundDateTimeError"
               />

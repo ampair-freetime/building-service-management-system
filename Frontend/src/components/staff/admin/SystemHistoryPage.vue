@@ -8,7 +8,7 @@ import ClerkApprovalsOverviewPage from "./ClerkApprovalsOverviewPage.vue";
       <div>
         <div class="eyebrow">Lost &amp; found overview</div>
         <h2>ของหายและรับฝาก</h2>
-        <p>ติดตามผลการอนุมัติและดูรายการของหาย ของที่รับฝาก และคำขอรับของ</p>
+      
       </div>
     </div>
 
@@ -17,7 +17,6 @@ import ClerkApprovalsOverviewPage from "./ClerkApprovalsOverviewPage.vue";
     <section class="admin-history-items" id="historyLostSection" aria-labelledby="adminHistoryItemsTitle">
       <div class="admin-history-items-heading">
         <h3 id="adminHistoryItemsTitle">ของหายและรับฝาก</h3>
-        <p>รายการที่ธุรการตรวจสอบแล้วและคำขอรับของ เปิดดูรายละเอียดได้</p>
       </div>
       <form class="history-controls admin-history-controls" id="historySearchForm" role="search">
         <button class="small-btn" id="staffLostRefreshButton" type="button">รีเฟรชประกาศ</button>
