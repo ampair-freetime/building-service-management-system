@@ -358,7 +358,6 @@
               <span></span>
               <button type="button" class="small-btn" id="removeCompletionImage">ลบรูป</button>
             </div>
-            <small>รูปจะถูกอัปโหลดหลังปิดงานซ่อมสำเร็จ</small>
           </div>
           <div class="field">
             <label for="completeDate">วันและเวลาปิดงาน</label

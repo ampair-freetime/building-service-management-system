@@ -1401,29 +1401,50 @@ export function usePublicServicePortal() {
       savedTracking.forEach((entry, index) => {
         const option = document.createElement("option");
         option.value = String(index);
-        option.textContent = `${entry.code} · ${entry.email}`;
+        const isCompleted = entry.status === "completed" || entry.status === "closed" ||
+          ["ดำเนินการเสร็จสิ้น", "รับของคืนแล้ว", "ปิดประกาศแล้ว"].includes(entry.statusLabel);
+        option.textContent = [entry.code, entry.email,
+          isCompleted ? "ดำเนินการเสร็จสิ้นแล้ว" : ""]
+          .filter(Boolean).join(" · ");
         savedTrackingSelect.append(option);
       });
       document.getElementById("savedTrackingGroup").hidden = !savedTracking.length;
     }
-    function rememberTracking(code, email) {
+    function rememberTracking(code, email, item = null) {
       code = code.trim().toUpperCase();
       email = email.trim().toLowerCase();
       if (!code || !email) return;
-      savedTracking = [{ code, email }, ...savedTracking.filter((entry) =>
+      const previous = savedTracking.find(entry => entry.code === code && entry.email === email);
+      const entry = { ...previous, code, email };
+      if (item) {
+        entry.title = requestTitleForTracking(item);
+        const presentation = requestStatusPresentation(item, code);
+        entry.statusLabel = presentation.label;
+        entry.status = presentation.status;
+      }
+      savedTracking = [entry, ...savedTracking.filter((entry) =>
         entry.code !== code || entry.email !== email
       )].slice(0, 20);
       try { localStorage.setItem(savedTrackingKey, JSON.stringify(savedTracking)); } catch { }
       renderSavedTracking();
     }
-    function restoreTracking(entry, { announce = true } = {}) {
+    function restoreTracking(entry, { announce = true, loadStatus = true } = {}) {
       if (!entry) return;
       document.getElementById("trackingCode").value = entry.code;
       document.getElementById("trackingEmail").value = entry.email;
-      void loadTrackingStatus({ announce });
+      if (loadStatus) {
+        void loadTrackingStatus({ announce });
+      } else {
+        trackedClaim = null;
+        trackingResult.classList.remove("show");
+        document.getElementById("claimTrackingDetails").hidden = true;
+        document.getElementById("trackingRefreshTime").textContent = "";
+      }
     }
     renderSavedTracking();
-    savedTrackingSelect.addEventListener("change", () => restoreTracking(savedTracking[Number(savedTrackingSelect.value)]));
+    savedTrackingSelect.addEventListener("change", () => restoreTracking(
+      savedTracking[Number(savedTrackingSelect.value)], { loadStatus: false },
+    ));
     document.getElementById("clearSavedTracking").addEventListener("click", () => {
       openUiModal("clearSavedTrackingModal", document.getElementById("clearSavedTracking"));
     });
@@ -1498,7 +1519,7 @@ export function usePublicServicePortal() {
         }
         await loadingDelay;
         renderTrackingResult(item, code, trackingIds, { announce });
-        if (item) rememberTracking(code, email);
+        if (item) rememberTracking(code, email, item);
         document.getElementById("trackingRefreshTime").textContent =
           `ตรวจสอบล่าสุด ${new Intl.DateTimeFormat("th-TH", {
             hour: "2-digit",

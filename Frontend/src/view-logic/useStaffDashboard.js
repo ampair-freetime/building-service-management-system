@@ -1098,7 +1098,8 @@ export function useStaffDashboard() {
         return job.assignee === activeStaffName();
       if (currentBoardView === "unassigned") return !job.assignee && !isTerminalStatus(job.status) && job.backendStatus !== "cancelled" && job.status !== "ยกเลิก";
       if (currentBoardView === "mine")
-        return job.assignee === activeStaffName();
+        return job.assignee === activeStaffName() && !isTerminalStatus(job.status) &&
+          !["completed", "cancelled"].includes(job.backendStatus) && job.status !== "ยกเลิก";
       if (currentBoardView === "team")
         return !!job.assignee && job.assignee !== activeStaffName();
       return true;
@@ -1129,6 +1130,16 @@ export function useStaffDashboard() {
     function renderJobs() {
       if (!$("#jobList")) return;
       if (currentRole === "clerk") return;
+      if (["housekeeper", "technician"].includes(currentRole)) {
+        const statusFilter = $("#jobStatusFilter");
+        const selectedStatus = statusFilter.value;
+        const statuses = currentBoardView === "mine"
+          ? ["รับงานแล้ว", "รับเรื่องแล้ว", "กำลังดำเนินการ"]
+          : ["รอรับงาน"];
+        statusFilter.innerHTML = '<option value="all">ทุกสถานะ</option>' +
+          statuses.map(value => `<option value="${value}">${value}</option>`).join("");
+        statusFilter.value = statuses.includes(selectedStatus) ? selectedStatus : "all";
+      }
       const query = $("#jobSearch").value.trim().toLowerCase(),
         category = $("#categoryFilter").value || "all",
         status = $("#jobStatusFilter").value || "all";
@@ -1154,7 +1165,7 @@ export function useStaffDashboard() {
               else if (isUnassigned && currentRole === "admin")
                 actions = `<button class="accept-btn" type="button" data-job-action="assign" data-job-id="${j.id}">มอบหมายงาน</button>`;
               else if (canEdit) {
-                const isReturnToPool = currentRole === "housekeeper" && j.backendStatus === "in_progress";
+                const isReturnToPool = ["housekeeper", "technician"].includes(currentRole) && j.backendStatus === "in_progress";
                 actions = `<button class="${isReturnToPool ? "return-btn return-to-pool-btn" : "update-btn"}" type="button" data-job-action="status" data-job-id="${
                   j.id
                 }">${isReturnToPool ? "คืนเข้ากองกลาง" : "อัปเดตสถานะ"}</button>${
@@ -2103,7 +2114,7 @@ export function useStaffDashboard() {
               "ปิดคำขอ",
               "รับฝากรายการใหม่",
             ]
-          : ["all", "เสร็จสิ้น", "ยังไม่เสร็จ"];
+          : ["all", "เสร็จสิ้น"];
       select.innerHTML = base
         .map(
           (x) =>
@@ -2274,7 +2285,7 @@ export function useStaffDashboard() {
         const returned = events.findLast(event => event.action === "คืนงาน");
         const note = events.findLast(event => event.action === "เพิ่มหมายเหตุ");
         return {id, events, latest, job, completed, returned, note, status: job?.status || latest.status};
-      });
+      }).filter(job => isTerminalStatus(job.status) || job.status === "ยกเลิก" || job.returned);
       const counts = [
         [jobs.length, "งานทั้งหมด", "หนึ่งรายการต่อหนึ่งงาน"],
         [jobs.filter(job => job.status === "เสร็จสิ้น").length, "เสร็จสิ้น", "งานที่ปิดแล้ว"],
@@ -2287,7 +2298,7 @@ export function useStaffDashboard() {
         (filters.type === "all" || (filters.type === "เสร็จสิ้น" && status === "เสร็จสิ้น") || (filters.type === "คืนเข้ากองกลาง" && returned) || (filters.type === "ยังไม่เสร็จ" && !isTerminalStatus(status))) &&
         `${latest.itemId} ${latest.title} ${job?.room || ""} ${events.map(event => event.detail).join(" ")}`.toLowerCase().includes(filters.q)
       ).sort((a,b) => `${b.latest.date} ${b.latest.time}`.localeCompare(`${a.latest.date} ${a.latest.time}`));
-      const mainRows = rows.filter(row => row.latest.action !== "คืนงาน" && filters.type !== "คืนเข้ากองกลาง");
+      const mainRows = rows.filter(row => (isTerminalStatus(row.status) || row.status === "ยกเลิก") && row.latest.action !== "คืนงาน" && filters.type !== "คืนเข้ากองกลาง");
       const mainMarkup = mainRows.length ? mainRows.map(({id,events,latest,job,status,completed,returned,note}) => `<article class="grouped-history-card">
         <header><div><span class="badge neutral">${escapeHtml(latest.category)}</span><h3>${escapeHtml(id)} · ${escapeHtml(latest.title)}</h3></div><span class="badge ${badgeClass(status)}">${escapeHtml(status)}</span></header>
         <div class="detail-meta"><div><small>สถานที่</small><strong>${escapeHtml(job?.room || "–")}</strong></div><div><small>วันที่รับงาน</small><strong>${dateLabel(events.find(event => event.action === "รับงาน"))}</strong></div><div><small>วันที่เสร็จ</small><strong>${dateLabel(completed)}</strong></div></div>
