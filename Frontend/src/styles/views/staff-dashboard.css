@@ -268,7 +268,10 @@
   .staff-dashboard-page .filter-select-dropdown,
   .staff-dashboard-page .filter-select-menu,
   .staff-dashboard-page .date-picker-dropdown { width: 100%; }
-  .staff-dashboard-page .date-picker-menu { left: 50%; transform: translateX(-50%); }
+  .staff-dashboard-page .date-picker-menu {
+    left: 50%;
+    transform: translateX(calc(-50% + var(--date-picker-offset-x, 0px)));
+  }
   .staff-dashboard-page .date-picker-menu.has-time { width: min(500px, calc(100vw - 28px)); }
 }
 @media (max-width: 520px) {
