@@ -1440,9 +1440,14 @@ export function usePublicServicePortal() {
     renderSavedTracking();
     savedTrackingSelect.addEventListener("change", () => restoreTracking(savedTracking[Number(savedTrackingSelect.value)]));
     document.getElementById("clearSavedTracking").addEventListener("click", () => {
+      openUiModal("clearSavedTrackingModal", document.getElementById("clearSavedTracking"));
+    });
+    document.getElementById("confirmClearSavedTracking").addEventListener("click", () => {
+      closeUiModal("clearSavedTrackingModal", false);
       savedTracking = [];
       try { localStorage.removeItem(savedTrackingKey); } catch { }
       renderSavedTracking();
+      document.getElementById("trackingCode").focus();
     });
 
     async function loadTrackingStatus(
