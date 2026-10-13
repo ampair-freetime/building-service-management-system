@@ -420,6 +420,7 @@ export function useStaffDashboard() {
     }
 
     $$("form").forEach((form) => {
+      if (form.id === "staffForm") return;
       form.noValidate = true;
       form.querySelectorAll("input, select, textarea").forEach((field) => {
         for (const eventName of ["input", "change"]) {
@@ -5517,12 +5518,10 @@ export function useStaffDashboard() {
       let message = "";
 
       if (field.id === "newFirstName") {
-        if (!value) message = "กรุณากรอกชื่อ";
-        else if (value.length < 2) message = "ชื่อต้องมีอย่างน้อย 2 ตัวอักษร";
+        if (value.length < 2) message = "กรุณากรอกชื่อ";
       } else if (field.id === "newLastName") {
-        if (!value) message = "กรุณากรอกนามสกุล";
-        else if (value.length < 2) {
-          message = "นามสกุลต้องมีอย่างน้อย 2 ตัวอักษร";
+        if (value.length < 2) {
+          message = "กรุณากรอกนามสกุล";
         } else if (fullName.length > 150) {
           message = "ชื่อและนามสกุลรวมกันต้องไม่เกิน 150 ตัวอักษร";
         }
@@ -5942,6 +5941,9 @@ export function useStaffDashboard() {
         );
         closeModal("qrFormModal", false);
         form.reset();
+        if (showQrLocation(location)) {
+          openModal("qrDetailModal", $("#openQrModal"));
+        }
       } catch (error) {
         if (await handleUnauthorizedResponse(error.status)) return;
         console.error("Creating QR location failed:", error);
@@ -5995,7 +5997,6 @@ export function useStaffDashboard() {
       link.href = href;
       link.download = `QR-${selectedQrLocation.name.replace(/[^\p{L}\p{N}_-]+/gu, "-")}.png`;
       link.click();
-      toast("ดาวน์โหลด QR Code แล้ว");
     });
     $("#printQr")?.addEventListener("click", () => {
       const imageUrl = createQrPosterDataUrl();

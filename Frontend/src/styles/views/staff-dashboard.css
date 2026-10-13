@@ -1832,6 +1832,18 @@ body {
   min-width: 0;
 }
 
+#staffModal #staffForm input {
+  background: #fff;
+}
+
+#staffModal #staffForm input:-webkit-autofill,
+#staffModal #staffForm input:-webkit-autofill:hover,
+#staffModal #staffForm input:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--ink);
+  -webkit-box-shadow: 0 0 0 1000px #fff inset;
+  caret-color: var(--ink);
+}
+
 #staffModal #staffForm > .field,
 #staffModal #staffForm > .form-row,
 #staffModal #staffForm > .form-row > .field {
