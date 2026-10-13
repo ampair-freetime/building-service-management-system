@@ -343,6 +343,11 @@ export function useStaffDashboard() {
     // -------------------------------------------------------------------------
 
     // แสดงข้อความแจ้งเตือนชั่วคราวบริเวณด้านล่างของหน้าจอ
+    function closeToastAlert() {
+      clearTimeout(window.toastTimer);
+      $("#toastAlert")?.classList.remove("show");
+    }
+
     function toast(message) {
       const el = $("#toast");
       if (!el) {
@@ -350,10 +355,82 @@ export function useStaffDashboard() {
         return;
       }
       el.textContent = message;
-      el.classList.add("show");
+      $("#toastAlert")?.classList.add("show");
       clearTimeout(window.toastTimer);
-      window.toastTimer = setTimeout(() => el.classList.remove("show"), 2300);
+      window.toastTimer = setTimeout(closeToastAlert, 6000);
     }
+
+    function inlineValidationMessage(field) {
+      if (field.validity.valueMissing) return "กรุณากรอกข้อมูลช่องนี้";
+      if (field.validity.typeMismatch) return "กรุณากรอกข้อมูลให้ถูกต้อง";
+      if (field.validity.tooShort) return `กรุณากรอกอย่างน้อย ${field.minLength} ตัวอักษร`;
+      if (field.validity.tooLong) return `กรุณากรอกไม่เกิน ${field.maxLength} ตัวอักษร`;
+      if (field.validity.rangeUnderflow) return `ค่าต้องไม่น้อยกว่า ${field.min}`;
+      if (field.validity.rangeOverflow) return `ค่าต้องไม่เกิน ${field.max}`;
+      if (field.validity.customError) return field.validationMessage;
+      return "กรุณาตรวจสอบข้อมูลช่องนี้";
+    }
+
+    function setInlineFieldError(field, message = "") {
+      if (!field?.id) return;
+      const container = field.closest(".field") || field.parentElement;
+      if (!container) return;
+      const errorId = `${field.id}InlineError`;
+      let error = container.querySelector(`#${errorId}`);
+      if (!error) {
+        error = document.createElement("p");
+        error.id = errorId;
+        error.className = "field-error inline-field-error";
+        error.setAttribute("aria-live", "polite");
+        field.insertAdjacentElement("afterend", error);
+      }
+      error.textContent = message;
+      error.hidden = !message;
+      field.setAttribute("aria-invalid", String(Boolean(message)));
+      if (message) {
+        const describedBy = new Set((field.getAttribute("aria-describedby") || "").split(/\s+/).filter(Boolean));
+        describedBy.add(errorId);
+        field.setAttribute("aria-describedby", [...describedBy].join(" "));
+      }
+    }
+
+    function validateInlineForm(form) {
+      form.noValidate = true;
+      const fields = [...form.querySelectorAll("input, select, textarea")].filter(
+        (field) => !field.disabled && field.type !== "hidden",
+      );
+      let firstInvalid = null;
+      fields.forEach((field) => {
+        const message = field.checkValidity() ? "" : inlineValidationMessage(field);
+        setInlineFieldError(field, message);
+        if (message && !firstInvalid) firstInvalid = field;
+      });
+      firstInvalid?.focus();
+      return !firstInvalid;
+    }
+
+    $$("form").forEach((form) => {
+      form.noValidate = true;
+      form.querySelectorAll("input, select, textarea").forEach((field) => {
+        for (const eventName of ["input", "change"]) {
+          field.addEventListener(eventName, () => {
+            if (field.getAttribute("aria-invalid") === "true") {
+              setInlineFieldError(
+                field,
+                field.checkValidity() ? "" : inlineValidationMessage(field),
+              );
+            }
+          });
+        }
+      });
+    });
+
+    $$('[data-toast-close]').forEach((button) =>
+      button.addEventListener("click", closeToastAlert),
+    );
+    $("#toastAlert")?.addEventListener("click", (event) => {
+      if (event.target === event.currentTarget) closeToastAlert();
+    });
 
     // เพิ่มกิจกรรมลงประวัติงานของเจ้าหน้าที่ปัจจุบัน
     function signedInStaffId() {
@@ -4610,7 +4687,18 @@ export function useStaffDashboard() {
     $("#assignForm")?.addEventListener("submit", (event) => {
       event.preventDefault();
       if (!$("#assignStaff").value) {
-        toast("กรุณาเลือก Staff ที่รับผิดชอบ");
+        const list = $("#assignStaffList");
+        let error = $("#assignStaffInlineError");
+        if (!error) {
+          error = document.createElement("p");
+          error.id = "assignStaffInlineError";
+          error.className = "field-error inline-field-error";
+          error.setAttribute("aria-live", "polite");
+          list.insertAdjacentElement("afterend", error);
+        }
+        error.hidden = false;
+        error.textContent = "กรุณาเลือก Staff ที่รับผิดชอบ";
+        list.setAttribute("aria-invalid", "true");
         return;
       }
       const job = allJobs.find((item) => item.id === $("#assignJobId").value);
@@ -4647,6 +4735,9 @@ export function useStaffDashboard() {
       const button = event.target.closest("[data-assign-staff]");
       if (!button) return;
       $("#assignStaff").value = button.dataset.assignStaff;
+      $("#assignStaffList").removeAttribute("aria-invalid");
+      const error = $("#assignStaffInlineError");
+      if (error) error.hidden = true;
       renderAssignStaff();
     });
     function resetUploadPreview() {
@@ -4659,11 +4750,12 @@ export function useStaffDashboard() {
     }
     function previewProgressFile(file) {
       if (!validImage(file)) {
-        toast("รองรับ JPG, PNG หรือ WebP ไม่เกิน 10 MB");
+        setInlineFieldError($("#progressImage"), "รองรับ JPG, PNG หรือ WebP ไม่เกิน 10 MB");
         $("#progressImage").value = "";
         resetUploadPreview();
         return false;
       }
+      setInlineFieldError($("#progressImage"), "");
       const preview = $("#progressPreview");
       preview.querySelector("img").src = URL.createObjectURL(file);
       preview.querySelector("span").textContent = `${file.name} · ${(
@@ -4686,11 +4778,12 @@ export function useStaffDashboard() {
 
     function previewCompletionFile(file) {
       if (!validImage(file)) {
-        toast("รองรับ JPG, PNG หรือ WebP ไม่เกิน 10 MB");
+        setInlineFieldError($("#completeImage"), "รองรับ JPG, PNG หรือ WebP ไม่เกิน 10 MB");
         $("#completeImage").value = "";
         resetCompletionPreview();
         return false;
       }
+      setInlineFieldError($("#completeImage"), "");
       const preview = $("#completionPreview");
       if (!preview) return true;
       const image = preview.querySelector("img");
@@ -4736,7 +4829,7 @@ export function useStaffDashboard() {
     $("#uploadDropZone")?.addEventListener("drop", (event) => {
       const file = event.dataTransfer.files[0];
       if (!validImage(file)) {
-        toast("รองรับ JPG, PNG หรือ WebP ไม่เกิน 10 MB");
+        setInlineFieldError($("#progressImage"), "รองรับ JPG, PNG หรือ WebP ไม่เกิน 10 MB");
         return;
       }
       const transfer = new DataTransfer();
@@ -4765,17 +4858,16 @@ export function useStaffDashboard() {
     });
     $("#statusUpdateForm")?.addEventListener("submit", async (event) => {
       event.preventDefault();
-      if (!event.currentTarget.checkValidity()) {
-        event.currentTarget.reportValidity();
-        return;
-      }
+      if (!validateInlineForm(event.currentTarget)) return;
       const job = allJobs.find((item) => item.id === $("#statusJobId").value);
       if (!job) return;
       const file = $("#statusImage").files[0];
       if (file && !validImage(file)) {
-        toast("รองรับ JPG, PNG หรือ WebP ไม่เกิน 10 MB");
+        setInlineFieldError($("#statusImage"), "รองรับ JPG, PNG หรือ WebP ไม่เกิน 10 MB");
+        $("#statusImage").focus();
         return;
       }
+      setInlineFieldError($("#statusImage"), "");
       const next = $("#newJobStatus").value,
         note = $("#statusNote")?.value.trim() || "";
       if (["คืนเข้าคิวกลาง", "คืนเข้ากองกลาง"].includes(next)) {
@@ -4797,10 +4889,7 @@ export function useStaffDashboard() {
     });
     $("#noteForm")?.addEventListener("submit", (event) => {
       event.preventDefault();
-      if (!event.currentTarget.checkValidity()) {
-        event.currentTarget.reportValidity();
-        return;
-      }
+      if (!validateInlineForm(event.currentTarget)) return;
       const job = allJobs.find((item) => item.id === $("#noteJobId").value);
       if (!job) return;
       const note = $("#noteText").value.trim(),
@@ -4822,12 +4911,10 @@ export function useStaffDashboard() {
     $("#uploadForm")?.addEventListener("submit", (event) => {
       event.preventDefault();
       const file = $("#progressImage").files[0];
-      if (!event.currentTarget.checkValidity()) {
-        event.currentTarget.reportValidity();
-        return;
-      }
+      if (!validateInlineForm(event.currentTarget)) return;
       if (!validImage(file)) {
-        toast("รองรับ JPG, PNG หรือ WebP ไม่เกิน 10 MB");
+        setInlineFieldError($("#progressImage"), "รองรับ JPG, PNG หรือ WebP ไม่เกิน 10 MB");
+        $("#progressImage").focus();
         return;
       }
       const job = allJobs.find((item) => item.id === $("#uploadJobId").value);
@@ -4855,15 +4942,13 @@ export function useStaffDashboard() {
     });
     $("#completeForm")?.addEventListener("submit", async (event) => {
       event.preventDefault();
-      if (!event.currentTarget.checkValidity()) {
-        event.currentTarget.reportValidity();
-        return;
-      }
+      if (!validateInlineForm(event.currentTarget)) return;
       const job = allJobs.find((item) => item.id === $("#completeJobId").value);
       if (!job) return;
       const file = $("#completeImage").files[0];
       if (file && !validImage(file)) {
-        toast("รองรับ JPG, PNG หรือ WebP ไม่เกิน 10 MB");
+        setInlineFieldError($("#completeImage"), "รองรับ JPG, PNG หรือ WebP ไม่เกิน 10 MB");
+        $("#completeImage").focus();
         return;
       }
       const completionNoteInput = $("#completeNote");
@@ -4872,14 +4957,15 @@ export function useStaffDashboard() {
         completionNoteInput.setCustomValidity(
           "หมายเหตุปิดงานต้องไม่เกิน 2,000 ตัวอักษร",
         );
-        completionNoteInput.reportValidity();
+        setInlineFieldError(completionNoteInput, completionNoteInput.validationMessage);
         completionNoteInput.focus();
         return;
       }
       completionNoteInput?.setCustomValidity("");
       const summary = [$("#completeResult").value.trim(), completionNote].filter(Boolean).join(" · ");
       if (summary.length > 2000) {
-        toast("ผลการดำเนินการและหมายเหตุรวมกันต้องไม่เกิน 2,000 ตัวอักษร");
+        setInlineFieldError(completionNoteInput, "ผลการดำเนินการและหมายเหตุรวมกันต้องไม่เกิน 2,000 ตัวอักษร");
+        completionNoteInput?.focus();
         return;
       }
       const wasCompleted = job.backendStatus === "completed";
@@ -5244,6 +5330,10 @@ export function useStaffDashboard() {
       });
     });
     document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && $("#toastAlert")?.classList.contains("show")) {
+        closeToastAlert();
+        return;
+      }
       const modal = $(".modal.open");
       if (event.key === "Escape") {
         if (modal) closeModal(modal.id);
@@ -5447,10 +5537,7 @@ export function useStaffDashboard() {
     });
     $("#editStaffForm")?.addEventListener("submit", (event) => {
       event.preventDefault();
-      if (!event.currentTarget.checkValidity()) {
-        event.currentTarget.reportValidity();
-        return;
-      }
+      if (!validateInlineForm(event.currentTarget)) return;
       const staff = staffData.find((item) => item.id === $("#editStaffIndex").value);
       if (!staff || currentRole !== "admin" || $("#editStaffButton").disabled) return;
       const name = $("#editStaffName").value.trim().replace(/\s+/g, " ");
@@ -5477,10 +5564,7 @@ export function useStaffDashboard() {
     });
     $("#rejectForm")?.addEventListener("submit", (event) => {
       event.preventDefault();
-      if (!event.currentTarget.checkValidity()) {
-        event.currentTarget.reportValidity();
-        return;
-      }
+      if (!validateInlineForm(event.currentTarget)) return;
       const tab = $("#rejectSource").value,
         id = $("#rejectItemId").value,
         item = lostSets[tab].find((x) => x.id === id);
@@ -5508,10 +5592,7 @@ export function useStaffDashboard() {
     });
     $("#returnJobForm")?.addEventListener("submit", (event) => {
       event.preventDefault();
-      if (!event.currentTarget.checkValidity()) {
-        event.currentTarget.reportValidity();
-        return;
-      }
+      if (!validateInlineForm(event.currentTarget)) return;
       const id = $("#returnJobId").value,
         reason = $("#returnReason").value,
         note = $("#returnNote").value.trim();
@@ -5593,8 +5674,8 @@ export function useStaffDashboard() {
     });
     $("#claimMoreForm")?.addEventListener("submit", event => {
       event.preventDefault();
+      if (!validateInlineForm(event.currentTarget)) return;
       const message = $("#claimMoreMessage").value.trim();
-      if (!message) return;
       const id = $("#claimMoreId").value;
       closeModal("claimMoreModal", false);
       updateClaimWithConfirmation(id, $("#claimMoreAction").value || "more", event.submitter, message);
@@ -5608,10 +5689,7 @@ export function useStaffDashboard() {
       if (form.getAttribute("aria-busy") === "true") return;
       const appointmentTimeInput = $("#appointmentTime");
       appointmentTimeInput.setCustomValidity("");
-      if (!form.checkValidity()) {
-        form.reportValidity();
-        return;
-      }
+      if (!validateInlineForm(form)) return;
       const item = lostSets.claims.find(
         (record) => record.id === $("#appointmentItemId").value,
       );
@@ -5620,7 +5698,9 @@ export function useStaffDashboard() {
       const appointmentTime = $("#appointmentTime").value;
       const endTime = $("#appointmentEndTime").value;
       if (endTime <= appointmentTime) {
-        toast("เวลาสิ้นสุดต้องหลังเวลาเริ่ม");
+        const endTimeInput = $("#appointmentEndTime");
+        setInlineFieldError(endTimeInput, "เวลาสิ้นสุดต้องหลังเวลาเริ่ม");
+        endTimeInput.focus();
         return;
       }
       const appointmentPlace = $("#appointmentPlace").value.trim();
@@ -5628,7 +5708,8 @@ export function useStaffDashboard() {
       const pickupAt = new Date(`${appointmentDate}T${appointmentTime}`);
       const weekday = new Date(`${appointmentDate}T12:00:00+07:00`).getUTCDay();
       if ([0, 6].includes(weekday) || appointmentTime < "08:30" || appointmentTime > "16:30") {
-        toast("นัดรับได้เฉพาะจันทร์–ศุกร์ เวลา 08:30–16:30 น.");
+        setInlineFieldError(appointmentTimeInput, "นัดรับได้เฉพาะจันทร์–ศุกร์ เวลา 08:30–16:30 น.");
+        appointmentTimeInput.focus();
         return;
       }
       if (
@@ -5638,7 +5719,8 @@ export function useStaffDashboard() {
         appointmentTimeInput.setCustomValidity(
           "กรุณาเลือกวันและเวลานัดหมายที่ยังมาไม่ถึง",
         );
-        appointmentTimeInput.reportValidity();
+        setInlineFieldError(appointmentTimeInput, appointmentTimeInput.validationMessage);
+        appointmentTimeInput.focus();
         return;
       }
       const submitButton = form.querySelector('button[type="submit"]');
@@ -5720,10 +5802,7 @@ export function useStaffDashboard() {
     $("#qrForm")?.addEventListener("submit", async (event) => {
       event.preventDefault();
       const form = event.currentTarget;
-      if (!form.checkValidity()) {
-        form.reportValidity();
-        return;
-      }
+      if (!validateInlineForm(form)) return;
       const submitButton = form.querySelector('button[type="submit"]');
       const area = $("#qrLocationName").value.trim();
       const floor = $("#qrLocationFloor").value.trim();
@@ -5750,10 +5829,17 @@ export function useStaffDashboard() {
         if (showQrLocation(location)) {
           openModal("qrDetailModal", $("#openQrModal"));
         }
+        toast(`เพิ่มสถานที่ ${location.name} และสร้าง QR Code แล้ว`);
       } catch (error) {
         if (await handleUnauthorizedResponse(error.status)) return;
         console.error("Creating QR location failed:", error);
-        toast(error.message || "ไม่สามารถเพิ่มสถานที่และสร้าง QR Code ได้");
+        if (error.status === 409) {
+          const areaInput = $("#qrLocationName");
+          setInlineFieldError(areaInput, "มีสถานที่ชั้นและชื่อเดียวกันอยู่แล้ว กรุณาตรวจสอบรายการสถานที่");
+          areaInput.focus();
+        } else {
+          toast(error.message || "ไม่สามารถเพิ่มสถานที่และสร้าง QR Code ได้");
+        }
         await loadQrLocations();
       } finally {
         if (submitButton) submitButton.disabled = false;

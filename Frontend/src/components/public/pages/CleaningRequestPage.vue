@@ -14,6 +14,10 @@ import {
   uploadCleaningRequest,
 } from "../../../services/cleaningRequests.js";
 import LocationCombobox from "../LocationCombobox.vue";
+import {
+  validateInlineField,
+  validateInlineForm,
+} from "../../../utils/inlineFormValidation.js";
 
 const priorityValues = {
   ทำความสะอาดทั่วไป: "normal",
@@ -26,7 +30,7 @@ const { isSubmitting, status, message, submit, markChanged } =
 async function submitCleaning(event) {
   if (isSubmitting.value) return;
   const form = event.currentTarget;
-  if (!form.checkValidity()) return;
+  if (!validateInlineForm(form)) return;
   if (!selectedLocation.value) {
     locationError.value = "ยังระบุสถานที่จริงไม่ได้ กรุณาตรวจสอบชั้นและห้อง/สถานที่";
     return;
@@ -262,8 +266,8 @@ onBeforeUnmount(clearPhotos);
         :aria-busy="isSubmitting"
         @submit.prevent="submitCleaning"
         @reset="clearPhotos"
-        @input="markChanged"
-        @change="markChanged"
+        @input="markChanged($event); validateInlineField($event.target)"
+        @change="markChanged($event); validateInlineField($event.target)"
       >
         <fieldset class="clean-fields" :disabled="isSubmitting">
           <h3>ขอทำความสะอาดพื้นที่</h3>

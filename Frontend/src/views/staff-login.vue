@@ -11,14 +11,17 @@ const {
   passwordError,
   forgotModalOpen,
   resetEmail,
+  resetEmailError,
   resetLoading,
   toastMessage,
   toastVisible,
   togglePassword,
+  closeToast,
   openForgotModal,
   closeForgotModal,
   validateIdentifier,
   validatePassword,
+  validateResetEmail,
   handleForgotPassword,
   handleLogin,
   loginWithGoogle,
@@ -208,7 +211,7 @@ const {
         <p class="modal-copy">
           กรอกอีเมลเจ้าหน้าที่เพื่อรับลิงก์ตั้งรหัสผ่านใหม่
         </p>
-        <form id="forgotForm" @submit.prevent="handleForgotPassword">
+        <form id="forgotForm" novalidate @submit.prevent="handleForgotPassword">
           <div class="field">
             <label for="resetEmail">อีเมลเจ้าหน้าที่</label
             ><input
@@ -217,7 +220,11 @@ const {
               type="email"
               required
               placeholder="name@cmu.ac.th"
+              aria-describedby="resetEmailError"
+              :aria-invalid="String(Boolean(resetEmailError))"
+              @blur="validateResetEmail"
             />
+            <small id="resetEmailError" class="field-error" aria-live="polite">{{ resetEmailError }}</small>
           </div>
           <div class="modal-actions">
             <button
@@ -232,7 +239,24 @@ const {
         </form>
       </section>
     </div>
-    <div class="toast" id="toast" :class="{ show: toastVisible }">{{ toastMessage }}</div>
+    <Teleport to="body">
+      <div
+        class="app-alert"
+        :class="{ show: toastVisible }"
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="loginAlertTitle"
+        aria-describedby="toast"
+        @click.self="closeToast"
+      >
+        <section class="app-alert-card">
+          <button type="button" class="app-alert-close" aria-label="ปิด" @click="closeToast">×</button>
+          <div class="app-alert-icon" aria-hidden="true">!</div>
+          <h3 id="loginAlertTitle">แจ้งเตือน</h3>
+          <p class="toast" id="toast">{{ toastMessage }}</p>
+        </section>
+      </div>
+    </Teleport>
   </div>
 </template>
 

@@ -20,7 +20,23 @@ const { activeRole, dashboardLoading, emailSending } = useStaffDashboard();
       'is-clerk': activeRole === 'clerk',
     }"
   >
-    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <Teleport to="body">
+      <div
+        class="app-alert"
+        id="toastAlert"
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="toastAlertTitle"
+        aria-describedby="toast"
+      >
+        <section class="app-alert-card">
+          <button type="button" class="app-alert-close" data-toast-close aria-label="ปิด">×</button>
+          <div class="app-alert-icon" aria-hidden="true">!</div>
+          <h3 id="toastAlertTitle">แจ้งเตือน</h3>
+          <p class="toast" id="toast" aria-live="polite"></p>
+        </section>
+      </div>
+    </Teleport>
     <svg
       aria-hidden="true"
       width="0"

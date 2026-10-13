@@ -139,8 +139,24 @@ def test_duplicate_and_update_validation(test_context) -> None:
         json={"floor": "2", "area": "  ห้อง   201 "},
     )
     assert spaced_duplicate.status_code == 409
+
+    create_location(client, headers, floor="G", area="Main Lobby")
+    case_duplicate = client.post(
+        "/api/v1/admin/locations",
+        headers=headers,
+        json={"floor": "g", "area": "main lobby"},
+    )
+    assert case_duplicate.status_code == 409
+
+    other_english = create_location(client, headers, floor="G", area="Side Lobby")
+    case_duplicate_update = client.patch(
+        f"/api/v1/admin/locations/{other_english['id']}",
+        headers=headers,
+        json={"area": "MAIN LOBBY"},
+    )
+    assert case_duplicate_update.status_code == 409
     listing = client.get("/api/v1/admin/locations", headers=headers)
-    assert len(listing.json()) == 2
+    assert len(listing.json()) == 4
 
     second = create_location(client, headers, floor="2", area="ห้อง 202")
     second_path = f"/api/v1/admin/locations/{second['id']}"
@@ -319,6 +335,23 @@ def test_database_rejects_duplicate_location_with_null_floor(test_context) -> No
     async def insert_twice() -> None:
         async with factory() as session:
             session.add_all([Location(floor=None, area="โถง"), Location(floor=None, area="โถง")])
+            await session.commit()
+
+    with pytest.raises(IntegrityError):
+        asyncio.run(insert_twice())
+
+
+def test_database_rejects_location_that_differs_only_by_case(test_context) -> None:
+    _, factory = test_context
+
+    async def insert_twice() -> None:
+        async with factory() as session:
+            session.add_all(
+                [
+                    Location(floor="G", area="Main Lobby"),
+                    Location(floor="g", area="main lobby"),
+                ]
+            )
             await session.commit()
 
     with pytest.raises(IntegrityError):

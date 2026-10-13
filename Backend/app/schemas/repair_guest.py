@@ -40,6 +40,7 @@ class GuestRepairCreateResponse(BaseModel):
 # สำหรับติดตามสถานะ
 class GuestRepairTrackingResponse(BaseModel):
     request_type: RequestType
+    title: str
     location: str
     status: RequestStatus
     created_at: datetime

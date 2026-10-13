@@ -141,6 +141,7 @@ def test_create_list_qr_and_tracking(test_context):
                 reporter_email=" GUEST@EXAMPLE.COM ",
             )
             assert tracked.request_type == RequestType.CLEANING
+            assert tracked.title == "พื้นเปียก"
             assert "request_code" not in tracked.model_dump()
             with pytest.raises(RequestNotFoundError):
                 await get_guest_request_status(

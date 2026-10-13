@@ -167,6 +167,128 @@ p {
 .field-error:not(:empty) {
   display: block;
 }
+
+/* Dropdown ทุกหน้าใช้รูปแบบเดียวกับช่องประเภทงาน และรับสีจากธีมของหน้านั้น */
+.filter-select-dropdown {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+}
+.filter-select-native {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  min-height: 0 !important;
+  padding: 0 !important;
+  opacity: 0;
+  pointer-events: none;
+}
+.filter-select-trigger {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 38px;
+  align-items: center;
+  width: 100%;
+  min-height: 50px;
+  padding: 0 5px 0 14px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 15px;
+  background: #fafafd;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+}
+.filter-select-trigger > span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.filter-select-chevron {
+  display: grid;
+  align-self: stretch;
+  place-items: center;
+  border-radius: 11px;
+  color: var(--primary);
+}
+.filter-select-chevron svg,
+.filter-select-option svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.filter-select-trigger:hover .filter-select-chevron {
+  background: var(--primary-soft);
+}
+.filter-select-dropdown.is-open .filter-select-trigger {
+  border-color: var(--primary);
+  background: #fff;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--primary) 11%, transparent);
+}
+.filter-select-dropdown.is-open .filter-select-chevron svg {
+  transform: rotate(180deg);
+}
+.filter-select-trigger[aria-invalid="true"] {
+  border-color: var(--danger);
+  background: #fff7f8;
+}
+.filter-select-trigger:disabled {
+  cursor: not-allowed;
+  opacity: 0.62;
+}
+.filter-select-menu {
+  position: absolute;
+  z-index: 120;
+  top: calc(100% + 8px);
+  right: 0;
+  left: 0;
+  max-height: min(280px, 42vh);
+  padding: 7px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border: 1px solid color-mix(in srgb, var(--primary) 25%, var(--line));
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 18px 45px rgba(31, 55, 78, 0.2);
+}
+.filter-select-menu[hidden] {
+  display: none;
+}
+.filter-select-option {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 22px;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 42px;
+  padding: 9px 11px;
+  border: 0;
+  border-radius: 11px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.filter-select-option:hover,
+.filter-select-option:focus-visible,
+.filter-select-option[aria-selected="true"] {
+  outline: none;
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+.filter-select-option:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+.filter-select-option svg {
+  justify-self: end;
+}
 .field input:focus,
 .field select:focus,
 .field textarea:focus,
@@ -182,12 +304,6 @@ p {
   border: 1px dashed #cdddea;
   border-radius: 18px;
   background: #f7fbfe;
-}
-.toast {
-  border-radius: 16px !important;
-  background: #211d35 !important;
-  color: #fff !important;
-  box-shadow: var(--shadow) !important;
 }
 .skeleton {
   overflow: hidden;
@@ -2508,28 +2624,6 @@ textarea:focus-visible {
 .profile-summary.editing {
   display: none;
 }
-.toast-message {
-  position: fixed;
-  left: 50%;
-  bottom: 96px;
-  z-index: 120;
-  max-width: min(420px, calc(100% - 28px));
-  transform: translate(-50%, 18px);
-  opacity: 0;
-  visibility: hidden;
-  background: #211d35;
-  color: #fff;
-  border-radius: 15px;
-  padding: 12px 17px;
-  box-shadow: var(--shadow);
-  font-size: 12px;
-  transition: 0.22s;
-}
-.toast-message.show {
-  transform: translate(-50%, 0);
-  opacity: 1;
-  visibility: visible;
-}
 .empty-inline {
   display: none;
   text-align: center;
@@ -3874,4 +3968,106 @@ textarea:focus-visible {
   animation: none;
   pointer-events: auto;
   z-index: 1000;
+}
+/* หน้าต่างแจ้งเตือนส่วนกลาง */
+.app-alert {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483647;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(18, 14, 35, 0.48);
+  backdrop-filter: blur(9px);
+  -webkit-backdrop-filter: blur(9px);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 0.2s ease, visibility 0.2s ease;
+}
+.app-alert.show {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
+.app-alert-card {
+  position: relative;
+  width: min(620px, 100%);
+  padding: 30px 28px 26px;
+  border: 1px solid rgba(255, 255, 255, 0.82);
+  border-radius: 26px;
+  background: #fff;
+  box-shadow: 0 32px 90px rgba(18, 14, 35, 0.32);
+  text-align: center;
+  transform: translateY(14px) scale(0.97);
+  transition: transform 0.22s ease;
+}
+.app-alert.show .app-alert-card {
+  transform: translateY(0) scale(1);
+}
+.app-alert-close {
+  position: absolute;
+  top: 12px;
+  right: 14px;
+  width: 38px;
+  height: 38px;
+  border: 0;
+  border-radius: 50%;
+  background: #f2f0f7;
+  color: #504a61;
+  font-size: 25px;
+  line-height: 1;
+  cursor: pointer;
+}
+.app-alert-icon {
+  display: grid;
+  place-items: center;
+  width: 72px;
+  height: 72px;
+  margin: 0 auto 14px;
+  border-radius: 50%;
+  background: #fff1d8;
+  color: #b96500;
+  font-size: 38px;
+  font-weight: 900;
+}
+.app-alert-card h3 {
+  margin: 0 0 9px;
+  color: #17202b;
+  font-size: 22px;
+}
+.app-alert .toast,
+.app-alert .toast-message {
+  position: static !important;
+  width: auto !important;
+  max-width: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+  color: #5f6875 !important;
+  box-shadow: none !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  transform: none !important;
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  line-height: 1.65 !important;
+  white-space: nowrap;
+}
+.app-alert-close:focus-visible {
+  outline: 3px solid rgba(51, 94, 138, 0.25);
+  outline-offset: 2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .app-alert,
+  .app-alert-card {
+    transition: none;
+  }
+}
+@media (max-width: 680px) {
+  .app-alert .toast,
+  .app-alert .toast-message {
+    white-space: normal;
+  }
 }

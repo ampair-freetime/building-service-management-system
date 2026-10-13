@@ -181,26 +181,20 @@ onMounted(async () => {
               <section id="claimTrackingDetails" hidden>
                 <p id="claimStaffMessage" style="white-space: pre-wrap"></p>
                 <p id="claimPickupDetails" style="white-space: pre-wrap"></p>
-                <form id="claimAdditionalInfoForm" hidden>
+                <form id="claimAdditionalInfoForm" novalidate hidden>
                   <div class="field">
                     <label for="claimAdditionalProof">หลักฐานเพิ่มเติมตามที่เจ้าหน้าที่ขอ</label>
-                    <textarea id="claimAdditionalProof" required maxlength="2000"></textarea>
+                    <textarea id="claimAdditionalProof" required maxlength="2000" aria-describedby="claimAdditionalProofError"></textarea>
+                    <p id="claimAdditionalProofError" class="field-error" aria-live="polite"></p>
                   </div>
                   <button type="submit" class="primary-btn">ส่งหลักฐานเพิ่มเติม</button>
                 </form>
               </section>
               <p id="trackingPhotosNotice" role="status" hidden>
-                รูปหลังทำงานยังไม่พร้อมแสดง กรุณารีเฟรชภายหลัง
+                รูปหลังทำงานยังไม่พร้อมแสดง กรุณาตรวจสอบใหม่ภายหลัง
               </p>
               <div class="tracking-result-actions">
                 <small id="trackingRefreshTime"></small>
-                <button
-                  type="button"
-                  class="secondary"
-                  id="refreshTrackingStatus"
-                >
-                  รีเฟรชสถานะ
-                </button>
               </div>
             </div>
           </section>

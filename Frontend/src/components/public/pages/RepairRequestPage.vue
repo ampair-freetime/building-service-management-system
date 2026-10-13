@@ -7,6 +7,10 @@ import {
   uploadRepairRequest,
 } from "../../../services/repairRequests.js";
 import LocationCombobox from "../LocationCombobox.vue";
+import {
+  validateInlineField,
+  validateInlineForm,
+} from "../../../utils/inlineFormValidation.js";
 
 const priorityValues = {
   "งานซ่อมทั่วไป": "normal",
@@ -19,7 +23,7 @@ const { isSubmitting, status, message, submit, markChanged } = useRepairSubmissi
 async function submitRepair(event) {
   if (isSubmitting.value) return;
   const form = event.currentTarget;
-  if (!form.reportValidity()) return;
+  if (!validateInlineForm(form)) return;
   if (!selectedLocation.value) {
     locationError.value = "ยังระบุสถานที่จริงไม่ได้ กรุณาตรวจสอบชั้นและห้อง/สถานที่";
     message.value = locationError.value;
@@ -221,7 +225,7 @@ onMounted(() => {
             </div>
           </header>
           <div class="work-layout single-form-layout">
-            <form class="form-panel" novalidate data-service-validation :aria-busy="isSubmitting" @submit.prevent="submitRepair" @reset="clearPhotos" @input="markChanged" @change="markChanged">
+            <form class="form-panel" novalidate data-service-validation :aria-busy="isSubmitting" @submit.prevent="submitRepair" @reset="clearPhotos" @input="markChanged($event); validateInlineField($event.target)" @change="markChanged($event); validateInlineField($event.target)">
               <fieldset class="repair-fields" :disabled="isSubmitting">
               <h3>รายละเอียดปัญหา</h3>
               <div class="form-row repair-location-row">
