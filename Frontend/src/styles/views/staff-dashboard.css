@@ -1242,6 +1242,13 @@ body {
   background: var(--lost-soft);
   color: #a36c00;
 }
+.staff-dashboard-page .return-to-pool-btn {
+  background: #e8eff4;
+  color: #3e6078;
+}
+.staff-dashboard-page .return-to-pool-btn:hover {
+  background: #dce7ef;
+}
 .restore-btn {
   background: var(--clean-soft);
   color: var(--clean);
@@ -7316,4 +7323,10 @@ body:has(.staff-dashboard-page) {
   .app-alert .toast-message {
     white-space: normal;
   }
+}
+
+
+.app-alert.is-success .app-alert-icon {
+  background: #edf8f1;
+  color: #246b46;
 }

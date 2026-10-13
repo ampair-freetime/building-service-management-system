@@ -2748,7 +2748,7 @@ textarea:focus-visible {
 
 .tracking-box {
   display: grid;
-  grid-template-columns: 1fr 1.35fr auto;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.35fr) 220px;
   gap: 10px;
   align-items: start;
 }
@@ -2758,6 +2758,9 @@ textarea:focus-visible {
 .tracking-box button {
   min-height: 50px;
   margin-top: 23px;
+}
+.tracking-box button:hover {
+  transform: none;
 }
 .tracking-result {
   display: none;

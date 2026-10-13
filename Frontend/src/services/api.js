@@ -173,7 +173,7 @@ export async function trackLostFoundItem(itemCode, reporterEmail) {
     // ส่ง request GET ไปยัง endpoint /guest/{collection}/{itemCode} ของ guest API พร้อม query string
     const response = await fetch(
       `${API_BASE_URL}/guest/${collection}/${encodeURIComponent(normalizedCode)}?${params}`,
-      { signal: controller.signal },
+      { signal: controller.signal, cache: "no-store" },
     )
 
     if (response.status === 404) {
@@ -235,7 +235,7 @@ export async function trackServiceRequest(
   try {
     const response = await fetchImpl(
       `${API_BASE_URL}/guest/${collection}/${encodeURIComponent(normalizedCode)}?${params}`,
-      { signal: controller.signal },
+      { signal: controller.signal, cache: "no-store" },
     );
     if (response.status === 404) return null;
     if (!response.ok) {
@@ -319,7 +319,7 @@ async function claimRequest(path, options = {}) {
   const timer = setTimeout(() => controller.abort(), 30000);
   try {
     const response = await fetch(`${API_BASE_URL}/guest/claims/${path}`, {
-      ...options, signal: controller.signal,
+      cache: "no-store", ...options, signal: controller.signal,
     });
     if (response.status === 404 && !options.method) return null;
     const body = await response.json().catch(() => ({}));

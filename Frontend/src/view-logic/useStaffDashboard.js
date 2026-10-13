@@ -348,7 +348,12 @@ export function useStaffDashboard() {
       $("#toastAlert")?.classList.remove("show");
     }
 
-    function toast(message) {
+    function toast(message, type = "warning") {
+      closeToastAlert();
+      const isSuccess = type === "success";
+      $("#toastAlert")?.classList.toggle("is-success", isSuccess);
+      $("#toastAlertTitle").textContent = isSuccess ? "ดำเนินการสำเร็จ" : "แจ้งเตือน";
+      $("#toastAlert .app-alert-icon").textContent = isSuccess ? "✓" : "!";
       const el = $("#toast");
       if (!el) {
         console.warn(message);
@@ -1149,9 +1154,10 @@ export function useStaffDashboard() {
               else if (isUnassigned && currentRole === "admin")
                 actions = `<button class="accept-btn" type="button" data-job-action="assign" data-job-id="${j.id}">มอบหมายงาน</button>`;
               else if (canEdit) {
-                actions = `<button class="update-btn" type="button" data-job-action="status" data-job-id="${
+                const isReturnToPool = currentRole === "housekeeper" && j.backendStatus === "in_progress";
+                actions = `<button class="${isReturnToPool ? "return-btn return-to-pool-btn" : "update-btn"}" type="button" data-job-action="status" data-job-id="${
                   j.id
-                }">อัปเดตสถานะ</button>${
+                }">${isReturnToPool ? "คืนเข้ากองกลาง" : "อัปเดตสถานะ"}</button>${
                   currentRole === "admin"
                     ? `<button class="secondary" type="button" data-job-action="assign" data-job-id="${j.id}">เปลี่ยนผู้รับผิดชอบ</button>`
                     : ""
@@ -2504,7 +2510,12 @@ export function useStaffDashboard() {
     async function loadStaffNotifications() {
       try {
         const notifications = await getStaffNotifications();
-        notificationSets[currentRole] = notifications.map((notification) => ({
+        const visibleNotifications = currentRole === "housekeeper"
+          ? notifications.filter((notification) =>
+              notification.request_id && notification.title === "New cleaning request",
+            )
+          : notifications;
+        notificationSets[currentRole] = visibleNotifications.map((notification) => ({
             id: notification.id,
             requestId: notification.request_id,
             title: notification.title,
@@ -2660,7 +2671,7 @@ export function useStaffDashboard() {
                     n.title
                   )}</strong><p>${escapeHtml(
                     n.text
-                  )}</p><div class="notification-actions"><span class="notification-open-action">เปิดรายละเอียด</span><span class="notification-hide-action" data-hide-notification="${
+                  )}</p><div class="notification-actions"><span class="notification-open-action" data-notification-detail>เปิดรายละเอียด</span><span class="notification-hide-action" data-hide-notification="${
                     n.id
                   }">ซ่อน</span></div></div></button>`
               )
@@ -2669,6 +2680,8 @@ export function useStaffDashboard() {
         .join("");
     }
     function addNotification(role, title, text, unread = true) {
+      // แม่บ้านรับการแจ้งเตือนเฉพาะคำร้องใหม่จากผู้ใช้ผ่าน Backend
+      if (role === "housekeeper") return;
       notificationSets[role].unshift({
         id: `n-${Date.now()}`,
         symbol: "•",
@@ -3436,7 +3449,7 @@ export function useStaffDashboard() {
             .join("")
         : '<div class="read-only" style="grid-column:1/-1">ดูรายละเอียดได้ แต่ไม่มีสิทธิ์แก้ไขงานนี้</div>';
     }
-    async function openJobDetail(id, trigger = document.activeElement) {
+    async function openJobDetail(id, trigger = document.activeElement, readOnly = false) {
       const job = allJobs.find((item) => item.id === id);
       if (!job) return;
       if (job.type === "repair" && job.backendId) {
@@ -3539,7 +3552,8 @@ export function useStaffDashboard() {
       }
       $("#jobTimeline").innerHTML = jobTimeline(job);
       $("#jobDetailNotes").textContent = job.note || "ยังไม่มีหมายเหตุ";
-      renderJobQuickActions(job);
+      if (readOnly) $("#jobQuickActions").innerHTML = "";
+      else renderJobQuickActions(job);
       openModal("jobDetailModal", trigger);
 
       // งานจริงที่รับแล้วสามารถโหลด timeline จาก Backend ได้
@@ -3592,7 +3606,8 @@ export function useStaffDashboard() {
             .at(-1);
           job.hasCompletionReport = Boolean(latestCompletionNote);
           job.completionNoteId = latestCompletionNote?.id;
-          renderJobQuickActions(job);
+          if (readOnly) $("#jobQuickActions").innerHTML = "";
+          else renderJobQuickActions(job);
           if (latestCompletionNote) {
             job.note = latestCompletionNote.note;
             $("#jobDetailNotes").textContent = latestCompletionNote.note;
@@ -3605,24 +3620,6 @@ export function useStaffDashboard() {
       }
     }
 
-    // หางานจาก request_id ของการแจ้งเตือน ถ้ายังไม่มีในรายการให้โหลดจาก Backend ใหม่
-    async function openCleaningRequestFromNotification(
-      notification,
-      trigger = document.activeElement,
-    ) {
-      if (!notification.requestId) return false;
-      let job = allJobs.find((item) => item.backendId === notification.requestId);
-      if (!job) {
-        await loadCleaningTasks();
-        job = allJobs.find((item) => item.backendId === notification.requestId);
-      }
-      if (!job) {
-        toast("งานนี้ถูกรับไปแล้วหรือไม่อยู่ในรายการของคุณ");
-        return true;
-      }
-      openJobDetail(job.id, trigger);
-      return true;
-    }
     function updateStatusFields() {
       const needsReason = ["พักงาน", "รอข้อมูลเพิ่มเติม", "ขอข้อมูลเพิ่มเติม", "ยกเลิก"].includes($("#newJobStatus")?.value);
       const note = $("#statusNote");
@@ -3870,7 +3867,7 @@ export function useStaffDashboard() {
       renderMetrics();
       renderQueue();
       renderStaffOverview();
-      if (job.backendStatus !== "completed") toast("บันทึกสถานะเรียบร้อย");
+      if (job.backendStatus !== "completed") toast("บันทึกสถานะเรียบร้อย", "success");
       return true;
     }
 
@@ -4971,7 +4968,12 @@ export function useStaffDashboard() {
       const wasCompleted = job.backendStatus === "completed";
       const button = event.currentTarget.querySelector('[type="submit"]');
       if (button?.disabled) return;
-      if (button) button.disabled = true;
+      const originalButtonText = button?.textContent;
+      if (button) {
+        button.disabled = true;
+        button.textContent = wasCompleted ? "กำลังบันทึกรายงาน..." : "กำลังปิดงาน...";
+        button.setAttribute("aria-busy", "true");
+      }
       try {
         if (job.backendId && job.backendStatus !== "completed") {
           const result = job.type === "repair"
@@ -5000,7 +5002,11 @@ export function useStaffDashboard() {
         toast(error.message || "บันทึกรายงานไม่สำเร็จ กรุณาลองใหม่");
         return;
       } finally {
-        if (button) button.disabled = false;
+        if (button) {
+          button.disabled = false;
+          button.textContent = originalButtonText;
+          button.removeAttribute("aria-busy");
+        }
       }
       job.hasCompletionReport = true;
       job.note = summary;
@@ -5025,7 +5031,7 @@ export function useStaffDashboard() {
       renderJobs();
       closeModal("completeModal", false, false);
       updateDashboardRoute("", "replace");
-      toast(`ปิดงาน ${job.id} เรียบร้อย`);
+      toast(`ปิดงาน ${job.id} เรียบร้อย`, "success");
     });
     $("#historySearchForm")?.addEventListener("submit", (event) => {
       event.preventDefault();
@@ -5268,6 +5274,7 @@ export function useStaffDashboard() {
       }
       const itemButton = event.target.closest("[data-notification-id]");
       if (!itemButton) return;
+      const viewDetails = Boolean(event.target.closest("[data-notification-detail]"));
       const item = notificationSets[currentRole].find(
         (entry) => entry.id === itemButton.dataset.notificationId,
       );
@@ -5286,10 +5293,16 @@ export function useStaffDashboard() {
         item.unread = false;
       }
       renderNotifications();
-      if (
-        currentRole === "housekeeper" &&
-        (await openCleaningRequestFromNotification(item, itemButton))
-      ) {
+      if (currentRole === "housekeeper") {
+        if (viewDetails) {
+          await loadCleaningTasks();
+          const job = allJobs.find((entry) => entry.backendId === item.requestId);
+          if (job) await openJobDetail(job.id, itemButton, true);
+          else toast("ไม่พบงานที่เชื่อมกับการแจ้งเตือนนี้");
+          return;
+        }
+        navigate("jobs");
+        await loadCleaningTasks();
         return;
       }
       if (currentRole === "technician" && item.requestId) {
@@ -5666,7 +5679,7 @@ export function useStaffDashboard() {
           renderQueue();
           renderStaffOverview();
           updateDashboardRoute("", "replace");
-          toast("คืนงานเข้าคิวกลางเรียบร้อย");
+          toast("คืนงานเข้าคิวกลางเรียบร้อย", "success");
         },
         "ยืนยันคืนงาน",
         "replace",
