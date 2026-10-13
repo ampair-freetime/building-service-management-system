@@ -4628,6 +4628,7 @@ export function useStaffDashboard() {
     $("#myHistoryTo")?.addEventListener("change", renderMyHistory);
     $("#myHistoryType")?.addEventListener("change", renderMyHistory);
     $("#myHistorySearch")?.addEventListener("input", renderMyHistory);
+    $("#applyMyHistoryFilters")?.addEventListener("click", renderMyHistory);
     $("#resetMyHistoryFilters")?.addEventListener("click", () => {
       $("#myHistoryFrom").value = "";
       $("#myHistoryTo").value = "";
@@ -5208,8 +5209,10 @@ export function useStaffDashboard() {
         button.disabled = false;
       }
     });
-    $("#clerkLostSearch")?.addEventListener("input", renderLost);
-    $("#clerkLostStatus")?.addEventListener("change", renderLost);
+    $("#clerkLostFilters")?.addEventListener("submit", (event) => {
+      event.preventDefault();
+      renderLost();
+    });
     $("#clerkLostReset")?.addEventListener("click", () => {
       $("#clerkLostSearch").value = "";
       $("#clerkLostStatus").value = "all";
