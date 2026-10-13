@@ -2448,6 +2448,9 @@ textarea:focus-visible,
   margin-bottom: 16px;
 }
 .grouped-history-card h3 { margin: 10px 0; line-height: 1.65; overflow-wrap: anywhere; }
+.grouped-history-card .detail-meta {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
 .grouped-history-card .history-note { padding: 14px; background: #fafbfd; border-radius: 14px; white-space: pre-wrap; overflow-wrap: anywhere; }
 .grouped-history-card details { margin-top: 16px; border-top: 1px solid var(--line); padding-top: 16px; }
 .grouped-history-card summary { cursor: pointer; color: var(--primary); font-weight: 700; }
