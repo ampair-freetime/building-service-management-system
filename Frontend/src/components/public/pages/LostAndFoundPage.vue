@@ -56,18 +56,6 @@
         </button>
       </div>
 
-      <div class="lost-tabs" role="tablist" aria-label="เมนูของหายและของที่พบ">
-        <button type="button" class="lost-tab active" data-lost-view="browse">
-          ประกาศทั้งหมด
-        </button>
-        <button type="button" class="lost-tab" data-lost-view="report-lost">
-          แจ้งของหาย
-        </button>
-        <button type="button" class="lost-tab" data-lost-view="report-found">
-          แจ้งพบของ
-        </button>
-      </div>
-
       <div class="lost-view active" id="lost-view-browse">
         <section class="lost-board" id="lostSearchResults">
           <div class="board-head">

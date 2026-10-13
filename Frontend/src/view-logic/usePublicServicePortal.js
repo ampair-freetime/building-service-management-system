@@ -353,12 +353,6 @@ export function usePublicServicePortal() {
       }
     }
 
-    document.querySelectorAll("[data-lost-view]").forEach((tab) =>
-      // แถบแท็บใช้สลับเนื้อหาเท่านั้น จึงไม่เลื่อนหน้าจอไปยังฟอร์ม
-      tab.addEventListener("click", () =>
-        openLostView(tab.dataset.lostView, false),
-      ),
-    );
     document.querySelectorAll("[data-open-lost-view]").forEach((button) =>
       button.addEventListener("click", () => {
         const viewName = button.dataset.openLostView;
@@ -366,7 +360,7 @@ export function usePublicServicePortal() {
         if (viewName === "browse") void filterPosts();
 
         window.requestAnimationFrame(() => {
-          document.querySelector(".lost-tabs")?.scrollIntoView({
+          document.getElementById(`lost-view-${viewName}`)?.scrollIntoView({
             behavior: prefersReducedMotion ? "auto" : "smooth",
             block: "start",
           });
@@ -1597,7 +1591,9 @@ export function usePublicServicePortal() {
       isTrackingRequestPending = true;
       trackingResult.setAttribute("aria-busy", "true");
       trackingSubmitButton.disabled = true;
-      trackingSubmitButton.textContent = "กำลังตรวจสอบ…";
+      trackingSubmitButton.textContent = "กำลังตรวจสอบสถานะ…";
+      // เริ่มรอพร้อมกับเรียก API เพื่อให้เห็นสถานะโหลดอย่างน้อยหนึ่งวินาที
+      const loadingDelay = new Promise((resolve) => window.setTimeout(resolve, 1000));
 
       try {
         const isLostFoundCode =
@@ -1633,6 +1629,7 @@ export function usePublicServicePortal() {
               ? localItem
               : null;
         }
+        await loadingDelay;
         renderTrackingResult(item, code, trackingIds, { announce });
         if (item) rememberTracking(code, email);
         document.getElementById("trackingRefreshTime").textContent =
@@ -1642,6 +1639,7 @@ export function usePublicServicePortal() {
             second: "2-digit",
           }).format(new Date())}`;
       } catch (error) {
+        await loadingDelay;
         trackedClaim = null;
         document.getElementById("claimTrackingDetails").hidden = true;
         // แสดงกรอบผลลัพธ์แม้เกิดปัญหาการเชื่อมต่อ เพื่อให้ผู้ใช้ตรวจสอบใหม่ได้
@@ -1706,7 +1704,7 @@ export function usePublicServicePortal() {
 
     trackingForm.addEventListener("submit", (event) => {
       event.preventDefault();
-      void loadTrackingStatus();
+      void loadTrackingStatus({ refreshed: true });
     });
     // ลิงก์จากอีเมลยืนยันรับเรื่อง (/user?track=รหัส) มีแค่รหัส ไม่มีอีเมล:
     // ถ้าเครื่องนี้เคยบันทึกรหัสนั้นไว้ ใช้อีเมลที่บันทึกไว้ติดตามได้ทันที
