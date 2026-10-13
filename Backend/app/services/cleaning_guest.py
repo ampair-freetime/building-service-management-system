@@ -287,6 +287,7 @@ async def get_guest_request_status(
 
     return GuestTrackingResponse(
         request_type=service_request.request_type,
+        title=service_request.title,
         location=_format_location(service_request.location),
         status=service_request.status,
         created_at=service_request.created_at,

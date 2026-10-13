@@ -109,6 +109,53 @@ def test_location_floor_migration_stops_on_duplicates(tmp_path) -> None:
     engine.dispose()
 
 
+def test_location_case_insensitive_unique_migration(tmp_path) -> None:
+    engine, locations, floor_migration = _floor_migration_table(tmp_path, "location-case.db")
+    migration = importlib.import_module(
+        "migrations.versions.20261012_0023_case_insensitive_location_unique"
+    )
+    with engine.begin() as connection:
+        connection.execute(
+            locations.insert().values(id=1, floor="G", area="Main Lobby")
+        )
+        floor_migration.op = Operations(MigrationContext.configure(connection))
+        floor_migration.upgrade()
+        migration.op = Operations(MigrationContext.configure(connection))
+        migration.upgrade()
+        with pytest.raises(sa.exc.IntegrityError), connection.begin_nested():
+            connection.execute(
+                locations.insert().values(id=2, floor="g", area="main lobby")
+            )
+        migration.downgrade()
+        connection.execute(
+            locations.insert().values(id=2, floor="g", area="main lobby")
+        )
+    engine.dispose()
+
+
+def test_location_case_insensitive_migration_stops_on_duplicates(tmp_path) -> None:
+    engine, locations, floor_migration = _floor_migration_table(
+        tmp_path, "location-case-duplicate.db"
+    )
+    migration = importlib.import_module(
+        "migrations.versions.20261012_0023_case_insensitive_location_unique"
+    )
+    with engine.begin() as connection:
+        connection.execute(
+            locations.insert(),
+            [
+                {"id": 1, "floor": "G", "area": "Main Lobby"},
+                {"id": 2, "floor": "g", "area": "main lobby"},
+            ],
+        )
+        floor_migration.op = Operations(MigrationContext.configure(connection))
+        floor_migration.upgrade()
+        migration.op = Operations(MigrationContext.configure(connection))
+        with pytest.raises(RuntimeError, match="main lobby"):
+            migration.upgrade()
+    engine.dispose()
+
+
 def _staff_migration_table(tmp_path, name: str):
     engine = sa.create_engine(f"sqlite:///{tmp_path / name}")
     metadata = sa.MetaData()

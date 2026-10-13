@@ -1,4 +1,5 @@
 import { installServiceFormValidation } from "../services/serviceFormValidation.js";
+import { enhanceFilterSelects } from "../services/filterSelectDropdown.js";
 import {
   requestProgress,
   requestStatusPresentation,
@@ -22,6 +23,7 @@ import { createLostFoundStore, filterLostFoundItems } from "../services/lostFoun
 
 export function usePublicServicePortal() {
   const validationCleanups = [];
+  let cleanupFilterSelects = () => {};
   let portalMounted = true;
   onUnmounted(() => { portalMounted = false; });
   const pageLoading = ref(true);
@@ -41,6 +43,7 @@ export function usePublicServicePortal() {
   // รอ Vue สร้าง DOM ก่อนผูก event เพราะหน้านี้ควบคุมองค์ประกอบผ่าน querySelector
   onMounted(() => {
     document.title = "CS Building Care";
+    cleanupFilterSelects = enhanceFilterSelects();
 
     const pages = document.querySelectorAll(".page");
     const navItems = document.querySelectorAll(".nav-item");
@@ -59,8 +62,25 @@ export function usePublicServicePortal() {
     let selectedClaimItemCode = "";
     let selectedLostItem = null;
     let trackedClaim = null;
+    const guestPageStorageKey = "building-care-guest-page-v1";
     // เก็บเฉพาะคำร้องที่ผู้ใช้ส่งจริงในรอบการเปิดหน้านี้ ไม่มีข้อมูลตัวอย่างปะปน
     const trackedRequests = new Map();
+
+    function rememberCurrentPage(pageId) {
+      try {
+        sessionStorage.setItem(guestPageStorageKey, pageId);
+      } catch {
+        // Storage อาจถูกปิดไว้ แต่ผู้ใช้ยังสลับหน้าได้ตามปกติ
+      }
+    }
+
+    function savedGuestPage() {
+      try {
+        return sessionStorage.getItem(guestPageStorageKey);
+      } catch {
+        return null;
+      }
+    }
 
     function syncBottomNavigation(modalId = "", activeButton = null) {
       bottomButtons.forEach((button) => {
@@ -98,6 +118,7 @@ export function usePublicServicePortal() {
       const destination = document.getElementById(pageId);
       if (!destination || !destination.classList.contains("page")) return;
       currentPage = pageId;
+      rememberCurrentPage(pageId);
       pages.forEach((page) =>
         page.classList.toggle("active", page.id === pageId),
       );
@@ -126,8 +147,11 @@ export function usePublicServicePortal() {
     const initialService = new URLSearchParams(window.location.search).get(
       "service",
     );
-    if (["repair", "clean"].includes(initialService)) {
-      navigate(initialService);
+    const initialPage = ["repair", "clean"].includes(initialService)
+      ? initialService
+      : savedGuestPage();
+    if (initialPage && initialPage !== "dashboard") {
+      navigate(initialPage);
     }
     document.querySelectorAll("[data-go]").forEach((button) =>
       button.addEventListener("click", (event) => {
@@ -222,16 +246,25 @@ export function usePublicServicePortal() {
       }),
     );
 
+    function closeToastAlert() {
+      window.clearTimeout(toastTimer);
+      document.getElementById("toastAlert")?.classList.remove("show");
+    }
+
     function showToast(message) {
       const toast = document.getElementById("toastMessage");
       window.clearTimeout(toastTimer);
       toast.textContent = message;
-      toast.classList.add("show");
-      toastTimer = window.setTimeout(
-        () => toast.classList.remove("show"),
-        2400,
-      );
+      document.getElementById("toastAlert")?.classList.add("show");
+      toastTimer = window.setTimeout(closeToastAlert, 6000);
     }
+
+    document.querySelectorAll("[data-toast-close]").forEach((button) =>
+      button.addEventListener("click", closeToastAlert),
+    );
+    document.getElementById("toastAlert")?.addEventListener("click", (event) => {
+      if (event.target === event.currentTarget) closeToastAlert();
+    });
 
     function closeUiModal(id, restoreFocus = true) {
       const modal = document.getElementById(id);
@@ -934,8 +967,9 @@ export function usePublicServicePortal() {
       const reporterEmail =
         typeof emailValue === "string" ? emailValue.trim() : "";
       if (!reporterEmail) {
-        showToast("กรุณาระบุอีเมลสำหรับติดตามสถานะ แล้วลองส่งอีกครั้ง");
-        form.querySelector('input[type="email"]')?.focus();
+        const emailField = form.querySelector('input[type="email"]');
+        validateLostItemField(emailField);
+        emailField?.focus();
         return;
       }
 
@@ -1050,8 +1084,9 @@ export function usePublicServicePortal() {
       const reporterEmail =
         typeof emailValue === "string" ? emailValue.trim() : "";
       if (!reporterEmail) {
-        showToast("กรุณาระบุอีเมลสำหรับติดตามสถานะ แล้วลองส่งอีกครั้ง");
-        form.querySelector('input[type="email"]')?.focus();
+        const emailField = form.querySelector('input[type="email"]');
+        validateFoundItemField(emailField);
+        emailField?.focus();
         return;
       }
 
@@ -1188,7 +1223,6 @@ export function usePublicServicePortal() {
         renderPreviews();
         const message = errors.join(" / ");
         setFileError(message);
-        if (message) showToast(message);
       });
       input.addEventListener("clear-image-selection", clearPhotos);
     });
@@ -1265,7 +1299,12 @@ export function usePublicServicePortal() {
       container.hidden = false;
     }
 
-    function renderTrackingResult(item, code, ids, { refreshed = false } = {}) {
+    function renderTrackingResult(
+      item,
+      code,
+      ids,
+      { refreshed = false, announce = true } = {},
+    ) {
       trackedClaim = item?.claim_code ? {code: item.claim_code,
         email: document.getElementById("trackingEmail").value.trim().toLowerCase()} : null;
       document.getElementById("claimTrackingDetails").hidden = !trackedClaim;
@@ -1299,7 +1338,7 @@ export function usePublicServicePortal() {
         }
 
         result.classList.add("show");
-        showToast("ไม่พบคำร้อง");
+        if (announce) showToast("ไม่พบคำร้อง");
         return;
       }
 
@@ -1340,7 +1379,9 @@ export function usePublicServicePortal() {
       renderTrackingProgress(item, code, ids);
 
       result.classList.add("show");
-      showToast(refreshed ? "รีเฟรชสถานะแล้ว" : "พบข้อมูลคำร้อง");
+      if (announce) {
+        showToast(refreshed ? "อัปเดตสถานะแล้ว" : "พบข้อมูลคำร้อง");
+      }
     }
 
     const trackingForm = document.getElementById("trackingForm");
@@ -1390,11 +1431,11 @@ export function usePublicServicePortal() {
       try { localStorage.setItem(savedTrackingKey, JSON.stringify(savedTracking)); } catch { }
       renderSavedTracking();
     }
-    function restoreTracking(entry) {
+    function restoreTracking(entry, { announce = true } = {}) {
       if (!entry) return;
       document.getElementById("trackingCode").value = entry.code;
       document.getElementById("trackingEmail").value = entry.email;
-      void loadTrackingStatus();
+      void loadTrackingStatus({ announce });
     }
     renderSavedTracking();
     savedTrackingSelect.addEventListener("change", () => restoreTracking(savedTracking[Number(savedTrackingSelect.value)]));
@@ -1404,7 +1445,9 @@ export function usePublicServicePortal() {
       renderSavedTracking();
     });
 
-    async function loadTrackingStatus({ refreshed = false } = {}) {
+    async function loadTrackingStatus(
+      { refreshed = false, announce = true } = {},
+    ) {
       if (isTrackingRequestPending) return;
 
       const isValid = trackingFields.map(validateTrackingField).every(Boolean);
@@ -1461,7 +1504,7 @@ export function usePublicServicePortal() {
               ? localItem
               : null;
         }
-        renderTrackingResult(item, code, trackingIds, { refreshed });
+        renderTrackingResult(item, code, trackingIds, { refreshed, announce });
         if (item) rememberTracking(code, email);
         document.getElementById("trackingRefreshTime").textContent =
           `ตรวจสอบล่าสุด ${new Intl.DateTimeFormat("th-TH", {
@@ -1472,7 +1515,7 @@ export function usePublicServicePortal() {
       } catch (error) {
         trackedClaim = null;
         document.getElementById("claimTrackingDetails").hidden = true;
-        // แสดงกรอบผลลัพธ์แม้เกิดปัญหาการเชื่อมต่อ และให้ผู้ใช้ตรวจสอบซ้ำได้
+        // แสดงกรอบผลลัพธ์แม้เกิดปัญหาการเชื่อมต่อ เพื่อให้ผู้ใช้ตรวจสอบใหม่ได้
         document.getElementById("trackingPhotosNotice").hidden = true;
         document.getElementById(trackingIds.code).textContent = code;
         document.getElementById(trackingIds.text).textContent =
@@ -1485,7 +1528,9 @@ export function usePublicServicePortal() {
         document.getElementById(trackingIds.details).hidden = true;
         document.getElementById(trackingIds.progress).hidden = true;
         trackingResult.classList.add("show");
-        showToast("ไม่สามารถตรวจสอบสถานะได้ กรุณาลองอีกครั้ง");
+        if (announce) {
+          showToast("ไม่สามารถตรวจสอบสถานะได้ กรุณาลองอีกครั้ง");
+        }
       } finally {
         isTrackingRequestPending = false;
         trackingResult.removeAttribute("aria-busy");
@@ -1499,9 +1544,16 @@ export function usePublicServicePortal() {
       if (!trackedClaim) return;
       const form = event.currentTarget;
       const button = form.querySelector('button[type="submit"]');
-      if (button.disabled || !form.reportValidity()) return;
-      const proof = document.getElementById("claimAdditionalProof").value.trim();
-      if (!proof) return;
+      const proofField = document.getElementById("claimAdditionalProof");
+      const proof = proofField.value.trim();
+      const proofError = document.getElementById("claimAdditionalProofError");
+      const proofMessage = proof ? "" : "กรุณากรอกหลักฐานเพิ่มเติม";
+      proofField.setAttribute("aria-invalid", String(Boolean(proofMessage)));
+      proofError.textContent = proofMessage;
+      if (button.disabled || proofMessage) {
+        proofField.focus();
+        return;
+      }
       const {code, email} = trackedClaim;
       button.disabled = true;
       button.textContent = "กำลังส่ง…";
@@ -1517,6 +1569,11 @@ export function usePublicServicePortal() {
         button.textContent = "ส่งหลักฐานเพิ่มเติม";
       }
     });
+    document.getElementById("claimAdditionalProof")?.addEventListener("input", (event) => {
+      const message = event.currentTarget.value.trim() ? "" : "กรุณากรอกหลักฐานเพิ่มเติม";
+      event.currentTarget.setAttribute("aria-invalid", String(Boolean(message)));
+      document.getElementById("claimAdditionalProofError").textContent = message;
+    });
 
     trackingForm.addEventListener("submit", (event) => {
       event.preventDefault();
@@ -1530,13 +1587,13 @@ export function usePublicServicePortal() {
       ? savedTracking.find((entry) => entry.code === linkedTrackingCode)
       : null;
     if (savedLinkedTracking) {
-      restoreTracking(savedLinkedTracking);
+      restoreTracking(savedLinkedTracking, { announce: false });
     } else if (linkedTrackingCode) {
       document.getElementById("trackingCode").value = linkedTrackingCode;
       document.getElementById("trackingEmail").value = "";
       validateTrackingField(document.getElementById("trackingCode"));
     } else {
-      restoreTracking(savedTracking[0]);
+      restoreTracking(savedTracking[0], { announce: false });
     }
     if (linkedTrackingCode) {
       navigate("dashboard");
@@ -1626,7 +1683,7 @@ export function usePublicServicePortal() {
       event.preventDefault();
 
       if (!validateClaimForm()) {
-        showToast("กรุณากรอกข้อมูลยืนยันให้ครบ");
+        claimForm.querySelector('[aria-invalid="true"]')?.focus();
         return;
       }
 
@@ -1727,6 +1784,7 @@ export function usePublicServicePortal() {
 
   onUnmounted(() => {
     window.clearTimeout(loadingTimer);
+    cleanupFilterSelects();
     validationCleanups.forEach((cleanup) => cleanup());
     document.body.classList.remove("modal-open", "offline");
   });

@@ -51,6 +51,7 @@ class GuestCompletionPhotoResponse(BaseModel):
 # สำหรับติดตามสถานะ
 class GuestTrackingResponse(BaseModel):
     request_type: RequestType
+    title: str
     location: str
     status: RequestStatus
     created_at: datetime

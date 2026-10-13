@@ -3,7 +3,7 @@
 import secrets
 from urllib.parse import quote
 
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -92,7 +92,12 @@ async def list_locations(
 async def _duplicate_exists(
     session: AsyncSession, *, floor: str | None, area: str, ignore_id: int | None = None
 ) -> bool:
-    statement = select(Location.id).where(Location.floor == floor, Location.area == area)
+    # เปรียบเทียบแบบไม่แยกตัวพิมพ์ เพื่อให้ "Lobby" กับ "LOBBY"
+    # เป็นสถานที่เดียวกัน โดยยังเก็บรูปแบบข้อความที่ผู้ใช้กรอกไว้สำหรับแสดงผล
+    statement = select(Location.id).where(
+        func.lower(func.coalesce(Location.floor, "")) == (floor or "").lower(),
+        func.lower(Location.area) == area.lower(),
+    )
     if ignore_id is not None:
         statement = statement.where(Location.id != ignore_id)
     return await session.scalar(statement.limit(1)) is not None

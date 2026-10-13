@@ -127,6 +127,7 @@ def test_qr_flow_create_and_track(test_context, fake_storage) -> None:
     )
     assert tracked.status_code == 200
     assert tracked.json()["status"] == "waiting"
+    assert tracked.json()["title"] == "พื้นเปียก"
     assert "request_code" not in tracked.json()
 
     for code, email in (

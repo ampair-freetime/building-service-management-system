@@ -12,11 +12,14 @@ export function useStaffLogin() {
   const router = useRouter();
   const identifier = ref("");
   const password = ref("");
+  const identifierError = ref("");
+  const passwordError = ref("");
   const rememberMe = ref(false);
   const showPassword = ref(false);
   const loading = ref(false);
   const forgotModalOpen = ref(false);
   const resetEmail = ref("");
+  const resetEmailError = ref("");
   const resetLoading = ref(false);
   const toastMessage = ref("");
   const toastVisible = ref(false);
@@ -36,11 +39,38 @@ export function useStaffLogin() {
     toastVisible.value = true;
     toastTimer = window.setTimeout(() => {
       toastVisible.value = false;
-    }, 2400);
+    }, 3600);
+  }
+
+  function closeToast() {
+    window.clearTimeout(toastTimer);
+    toastVisible.value = false;
   }
 
   function togglePassword() {
     showPassword.value = !showPassword.value;
+  }
+
+  function validateIdentifier() {
+    identifierError.value = identifier.value.trim()
+      ? ""
+      : "กรุณากรอกอีเมลหรือรหัสเจ้าหน้าที่";
+    return !identifierError.value;
+  }
+
+  function validatePassword() {
+    passwordError.value = password.value ? "" : "กรุณากรอกรหัสผ่าน";
+    return !passwordError.value;
+  }
+
+  function validateResetEmail() {
+    const email = resetEmail.value.trim();
+    resetEmailError.value = !email
+      ? "กรุณากรอกอีเมลเจ้าหน้าที่ของคุณ"
+      : /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+        ? ""
+        : "รูปแบบอีเมลไม่ถูกต้อง";
+    return !resetEmailError.value;
   }
 
   function openForgotModal() {
@@ -54,10 +84,7 @@ export function useStaffLogin() {
   // ขอลิงก์รีเซ็ตรหัสผ่านทางอีเมล; Backend ตอบเหมือนกันทุกกรณีเพื่อไม่เปิดเผยว่าอีเมลมีบัญชีไหม
   async function handleForgotPassword() {
     const email = resetEmail.value.trim();
-    if (!email) {
-      showToast("กรุณากรอกอีเมลเจ้าหน้าที่ของคุณ");
-      return;
-    }
+    if (!validateResetEmail()) return;
     if (resetLoading.value) return;
     resetLoading.value = true;
     try {
@@ -65,7 +92,7 @@ export function useStaffLogin() {
     } catch (error) {
       // 422 = รูปแบบอีเมลไม่ถูกต้อง; ไม่มี status = เชื่อมต่อไม่ได้
       if (error.status === 422) {
-        showToast("รูปแบบอีเมลไม่ถูกต้อง");
+        resetEmailError.value = "รูปแบบอีเมลไม่ถูกต้อง";
         return;
       }
       if (!error.status) {
@@ -77,14 +104,12 @@ export function useStaffLogin() {
     }
     closeForgotModal();
     resetEmail.value = "";
+    resetEmailError.value = "";
     showToast("ถ้าอีเมลนี้มีบัญชี ระบบจะส่งลิงก์ตั้งรหัสผ่านใหม่ให้ภายในไม่กี่นาที (ตรวจในกล่อง Spam ด้วย)");
   }
 
   async function handleLogin() {
-    if (!identifier.value.trim() || !password.value) {
-      showToast("กรุณากรอกอีเมลหรือรหัสเจ้าหน้าที่ และรหัสผ่าน");
-      return;
-    }
+    if (![validateIdentifier(), validatePassword()].every(Boolean)) return;
 
     loading.value = true;
     try {
@@ -98,7 +123,7 @@ export function useStaffLogin() {
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
-        showToast(data.detail || "อีเมล/รหัสเจ้าหน้าที่ หรือรหัสผ่านไม่ถูกต้อง");
+        passwordError.value = data.detail || "อีเมล/รหัสเจ้าหน้าที่ หรือรหัสผ่านไม่ถูกต้อง";
         return;
       }
 
@@ -130,9 +155,10 @@ export function useStaffLogin() {
   }
 
   return {
-    identifier, password, rememberMe, showPassword, loading,
-    forgotModalOpen, resetEmail, resetLoading, toastMessage, toastVisible,
-    togglePassword, openForgotModal, closeForgotModal,
+    identifier, password, identifierError, passwordError, rememberMe, showPassword, loading,
+    forgotModalOpen, resetEmail, resetEmailError, resetLoading, toastMessage, toastVisible,
+    togglePassword, openForgotModal, closeForgotModal, closeToast,
+    validateIdentifier, validatePassword, validateResetEmail,
     handleForgotPassword, handleLogin, loginWithGoogle,
   };
 }

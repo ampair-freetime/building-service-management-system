@@ -7,7 +7,7 @@ function icon(path) {
 export function enhanceFilterSelects(root = document) {
   const cleanups = [];
 
-  root.querySelectorAll("select.field-compact").forEach((select) => {
+  root.querySelectorAll("select:not([multiple]):not([data-native-select])").forEach((select) => {
     if (enhancedSelects.has(select)) return;
     const wrapper = document.createElement("div");
     wrapper.className = "filter-select-dropdown";
@@ -25,7 +25,9 @@ export function enhanceFilterSelects(root = document) {
     select.parentNode.insertBefore(wrapper, select);
     wrapper.append(select, trigger, menu);
     select.classList.add("filter-select-native");
-    const label = select.getAttribute("aria-label") || "ตัวกรอง";
+    const label = select.getAttribute("aria-label")
+      || select.labels?.[0]?.textContent?.trim()
+      || "เลือกรายการ";
     trigger.setAttribute("aria-label", label);
 
     function close() {
@@ -38,6 +40,8 @@ export function enhanceFilterSelects(root = document) {
       const options = [...select.options];
       const selected = options.find((option) => option.value === select.value) || options[0];
       trigger.querySelector("span").textContent = selected?.textContent || label;
+      trigger.disabled = select.disabled;
+      trigger.setAttribute("aria-invalid", select.getAttribute("aria-invalid") || "false");
       menu.replaceChildren();
       options.forEach((option) => {
         const item = document.createElement("button");
@@ -106,7 +110,12 @@ export function enhanceFilterSelects(root = document) {
     select.form?.addEventListener("reset", handleFormReset);
     document.addEventListener("pointerdown", handleOutside);
     const observer = new MutationObserver(sync);
-    observer.observe(select, { childList: true, subtree: true });
+    observer.observe(select, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ["disabled", "aria-invalid"],
+    });
     sync();
 
     const cleanup = () => {

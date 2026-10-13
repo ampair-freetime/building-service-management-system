@@ -214,12 +214,23 @@ const { sidebarOpen, closeSidebar, toggleSidebar, pageLoading } = usePublicServi
 
 
 
-      <div
-        class="toast-message"
-        id="toastMessage"
-        role="status"
-        aria-live="polite"
-      ></div>
+      <Teleport to="body">
+        <div
+          class="app-alert"
+          id="toastAlert"
+          role="alertdialog"
+          aria-modal="true"
+          aria-labelledby="toastAlertTitle"
+          aria-describedby="toastMessage"
+        >
+          <section class="app-alert-card">
+            <button type="button" class="app-alert-close" data-toast-close aria-label="ปิด">×</button>
+            <div class="app-alert-icon" aria-hidden="true">!</div>
+            <h3 id="toastAlertTitle">แจ้งเตือน</h3>
+            <p class="toast-message" id="toastMessage" aria-live="polite"></p>
+          </section>
+        </div>
+      </Teleport>
       <div class="offline-banner" role="status">
         ขณะนี้ออฟไลน์ · คำขอจะถูกส่งเมื่อเชื่อมต่ออีกครั้ง
       </div>

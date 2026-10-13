@@ -19,8 +19,8 @@ class Location(Base):
         # coalesce ทำให้ floor ที่เป็น NULL ถือว่าเท่ากัน เพราะ NULL = NULL ไม่เป็นจริงใน unique index
         Index(
             "uq_locations_floor_area",
-            text("coalesce(floor, '')"),
-            "area",
+            text("lower(coalesce(floor, ''))"),
+            text("lower(area)"),
             unique=True,
         ),
     )
