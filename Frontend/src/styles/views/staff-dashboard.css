@@ -2361,6 +2361,16 @@ textarea:focus-visible,
   white-space: pre-line;
 }
 #returnJobForm .return-btn,
+#confirmModal #confirmActionButton.confirm-warning {
+  background: #fef3c7;
+  color: #a16207;
+}
+
+#confirmModal #confirmActionButton.confirm-enable {
+  background: #dcfce7;
+  color: #15803d;
+}
+
 #confirmModal #confirmActionButton.confirm-accept {
   background: var(--role, #276640);
   border-color: var(--role, #276640);
@@ -4972,8 +4982,41 @@ body {
 
 .staff-dashboard-page .qr-location-actions {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, auto));
+  grid-template-columns: repeat(2, minmax(0, auto)) auto;
+  align-items: center;
   gap: 8px;
+}
+
+/* ปิดใช้งาน: รูปทรงเดิมของปุ่ม .danger แค่เปลี่ยนเป็นสีเหลืองอ่อน */
+.staff-dashboard-page .qr-location-actions .qr-location-status-button.danger {
+  background: #fef3c7;
+  color: #a16207;
+}
+
+/* เปิดใช้งาน: รูปทรงเดียวกับปุ่ม .danger แต่เป็นสีเขียวอ่อน */
+.staff-dashboard-page .qr-location-actions .qr-location-status-button.danger.enable {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+/* ปุ่มลบแบบไอคอนถังขยะ สีแดงอ่อน */
+.staff-dashboard-page .qr-location-actions .qr-location-delete-button {
+  display: inline-grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  background: var(--danger-soft);
+  color: var(--danger);
+  cursor: pointer;
+}
+
+.staff-dashboard-page .qr-location-actions .qr-location-delete-button .icon {
+  width: 18px;
+  height: 18px;
 }
 
 .staff-dashboard-page .qr-location-title {
@@ -5114,11 +5157,11 @@ body {
 
   .staff-dashboard-page .qr-location-actions {
     grid-column: 1 / -1;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr)) 36px;
     width: 100%;
   }
 
-  .staff-dashboard-page .qr-location-actions button {
+  .staff-dashboard-page .qr-location-actions button:not(.qr-location-delete-button) {
     width: 100%;
     min-width: 0;
   }

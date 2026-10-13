@@ -5,6 +5,7 @@ import { enhanceFilterSelects } from "../services/filterSelectDropdown.js";
 import { requestStatusPresentation, serviceProgress } from "../services/requestStatus.js";
 import {
   createAdminLocation,
+  deleteAdminLocation,
   fetchAdminLocations,
   generateAdminLocationQr,
   setAdminLocationActive,
@@ -3018,7 +3019,6 @@ export function useStaffDashboard() {
               location.name,
               `${actionText}สถานที่ชั้น ${location.floor || "ไม่ระบุ"} และ QR Code`,
             );
-            toast(`${actionText}สถานที่ ${location.name} แล้ว`);
           } catch (error) {
             if (await handleUnauthorizedResponse(error.status)) return;
             console.error("Updating QR location status failed:", error);
@@ -3026,6 +3026,37 @@ export function useStaffDashboard() {
           }
         },
         actionText,
+      );
+    }
+
+    function deleteQrLocation(location) {
+      const qrWarning = location.url
+        ? " QR Code ที่พิมพ์ไปแล้วจะใช้ไม่ได้"
+        : "";
+      requestConfirmation(
+        "ยืนยันลบสถานที่",
+        `ต้องการลบ ${location.name} หรือไม่? ลบได้เฉพาะสถานที่ที่ยังไม่เคยมีคำร้อง${qrWarning}`,
+        async () => {
+          try {
+            // Backend เป็นผู้ตัดสินว่าลบได้ไหม เพราะรู้จำนวนคำร้องจริง ณ ตอนกด
+            await deleteAdminLocation(location.id);
+            if (selectedQrLocation?.id === location.id) selectedQrLocation = null;
+            await loadQrLocations();
+            addAudit(
+              "qr",
+              "ลบสถานที่",
+              `LOCATION-${location.id}`,
+              location.name,
+              `ลบสถานที่ชั้น ${location.floor || "ไม่ระบุ"} ที่สร้างผิด`,
+            );
+            toast(`ลบสถานที่ ${location.name} แล้ว`);
+          } catch (error) {
+            if (await handleUnauthorizedResponse(error.status)) return;
+            console.error("Deleting QR location failed:", error);
+            toast(error.message || "ไม่สามารถลบสถานที่ได้");
+          }
+        },
+        "ลบ",
       );
     }
 
@@ -3101,11 +3132,18 @@ export function useStaffDashboard() {
                   ${location.isActive ? "" : "disabled"}
                 >${location.url ? "ดูรายละเอียด" : "สร้าง QR"}</button>
                 <button
-                  class="${location.isActive ? "danger" : "secondary"} qr-location-status-button"
+                  class="danger ${location.isActive ? "" : "enable"} qr-location-status-button"
                   type="button"
                   data-toggle-qr-location="${escapeHtml(location.id)}"
                   aria-label="${location.isActive ? "ปิด" : "เปิด"}ใช้งานสถานที่ ${escapeHtml(location.name)}"
                 >${location.isActive ? "ปิดใช้งาน" : "เปิดใช้งาน"}</button>
+                <button
+                  class="qr-location-delete-button"
+                  type="button"
+                  data-delete-qr-location="${escapeHtml(location.id)}"
+                  aria-label="ลบสถานที่ ${escapeHtml(location.name)}"
+                  title="ลบสถานที่"
+                ><svg class="icon" aria-hidden="true"><use href="#i-trash"></use></svg></button>
               </div>
             </article>`,
         )
@@ -3267,6 +3305,9 @@ export function useStaffDashboard() {
       $("#confirmModalTitle").textContent = title;
       $("#confirmModalText").textContent = text;
       $("#confirmActionButton").textContent = label;
+      // ปุ่มยืนยันปิดใช้งานสถานที่ใช้สีเหลืองอ่อนเดียวกับปุ่มบนการ์ด
+      $("#confirmActionButton").classList.toggle("confirm-warning", label === "ปิดใช้งาน");
+      $("#confirmActionButton").classList.toggle("confirm-enable", label === "เปิดใช้งาน");
       $("#confirmActionButton").classList.toggle("confirm-accept", ["ยืนยันรับงาน", "ยืนยันคืนงาน"].includes(label) ||
         (currentRole === "clerk" && !/ลบ|ไม่อนุมัติ|ปฏิเสธ/.test(`${title} ${label}`)));
       openModal("confirmModal", document.activeElement, historyMode);
@@ -5826,10 +5867,6 @@ export function useStaffDashboard() {
         );
         closeModal("qrFormModal", false);
         form.reset();
-        if (showQrLocation(location)) {
-          openModal("qrDetailModal", $("#openQrModal"));
-        }
-        toast(`เพิ่มสถานที่ ${location.name} และสร้าง QR Code แล้ว`);
       } catch (error) {
         if (await handleUnauthorizedResponse(error.status)) return;
         console.error("Creating QR location failed:", error);
@@ -5908,6 +5945,14 @@ export function useStaffDashboard() {
       printWindow.document.close();
     });
     $("#roomList")?.addEventListener("click", async (event) => {
+      const deleteButton = event.target.closest("[data-delete-qr-location]");
+      if (deleteButton) {
+        const location = qrLocations.find(
+          (item) => item.id === deleteButton.dataset.deleteQrLocation,
+        );
+        if (location) deleteQrLocation(location);
+        return;
+      }
       const statusButton = event.target.closest("[data-toggle-qr-location]");
       if (statusButton) {
         const location = qrLocations.find(

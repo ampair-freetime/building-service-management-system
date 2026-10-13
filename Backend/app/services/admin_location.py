@@ -9,6 +9,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.models.location import Location
+from app.models.lost_found import LostItem
+from app.models.service_request import ServiceRequest
 from app.schemas.admin_location import (
     AdminLocationCreate,
     AdminLocationResponse,
@@ -34,6 +36,10 @@ class QrNotGeneratedError(ValueError):
 
 class QrTokenCollisionError(ValueError):
     """QR token ที่สุ่มได้ชนกับ token ที่มีอยู่แล้ว."""
+
+
+class LocationInUseError(ValueError):
+    """location มีคำร้องหรือรายการของหายผูกอยู่ จึงลบไม่ได้ ต้องใช้ปิดใช้งานแทน."""
 
 
 def build_qr_url(qr_token: str, base_url: str | None = None) -> str:
@@ -203,3 +209,37 @@ async def regenerate_qr(session: AsyncSession, *, location_id: int) -> AdminLoca
         raise QrTokenCollisionError("QR token collision; please retry") from exc
     await session.refresh(location)
     return to_admin_response(location)
+
+
+async def delete_location(session: AsyncSession, *, location_id: int) -> None:
+    """ลบ location ที่สร้างผิดและยังไม่เคยถูกใช้ เพื่อให้ชื่อเดิมว่างให้สร้างใหม่ได้."""
+    # ล็อกแถวก่อนนับ: guest ที่กำลังส่งคำร้องเข้าห้องนี้ต้องรอจนเราตัดสินเสร็จ
+    location = await session.scalar(
+        select(Location).where(Location.id == location_id).with_for_update()
+    )
+    if location is None:
+        raise LocationNotFoundError("Location not found")
+
+    # นับ lost_items ทุกแถวรวมที่ soft delete แล้ว เพราะยังมี foreign key ชี้ห้องนี้อยู่
+    request_count = await session.scalar(
+        select(func.count()).select_from(ServiceRequest).where(
+            ServiceRequest.location_id == location_id
+        )
+    )
+    lost_item_count = await session.scalar(
+        select(func.count()).select_from(LostItem).where(LostItem.location_id == location_id)
+    )
+    if request_count or lost_item_count:
+        await session.rollback()
+        raise LocationInUseError(
+            f"สถานที่นี้มีคำร้อง {request_count} รายการและรายการของหาย/ของที่พบ "
+            f"{lost_item_count} รายการ จึงลบไม่ได้ ให้ใช้ปิดใช้งานแทน"
+        )
+
+    await session.delete(location)
+    try:
+        await session.commit()
+    except IntegrityError as exc:
+        # ตาข่ายกันตก: foreign key ของ DB ปฏิเสธเมื่อมีข้อมูลผูกที่การนับไม่เห็น
+        await session.rollback()
+        raise LocationInUseError("สถานที่นี้มีข้อมูลผูกอยู่ จึงลบไม่ได้ ให้ใช้ปิดใช้งานแทน") from exc
