@@ -1303,7 +1303,7 @@ export function usePublicServicePortal() {
       item,
       code,
       ids,
-      { refreshed = false, announce = true } = {},
+      { announce = true } = {},
     ) {
       trackedClaim = item?.claim_code ? {code: item.claim_code,
         email: document.getElementById("trackingEmail").value.trim().toLowerCase()} : null;
@@ -1379,9 +1379,6 @@ export function usePublicServicePortal() {
       renderTrackingProgress(item, code, ids);
 
       result.classList.add("show");
-      if (announce) {
-        showToast(refreshed ? "อัปเดตสถานะแล้ว" : "พบข้อมูลคำร้อง");
-      }
     }
 
     const trackingForm = document.getElementById("trackingForm");
@@ -1506,7 +1503,7 @@ export function usePublicServicePortal() {
               ? localItem
               : null;
         }
-        renderTrackingResult(item, code, trackingIds, { refreshed, announce });
+        renderTrackingResult(item, code, trackingIds, { announce });
         if (item) rememberTracking(code, email);
         document.getElementById("trackingRefreshTime").textContent =
           `ตรวจสอบล่าสุด ${new Intl.DateTimeFormat("th-TH", {
