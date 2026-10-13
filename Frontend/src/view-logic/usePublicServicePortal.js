@@ -1347,9 +1347,6 @@ export function usePublicServicePortal() {
     const trackingSubmitButton = trackingForm.querySelector(
       'button[type="submit"]',
     );
-    const refreshTrackingButton = document.getElementById(
-      "refreshTrackingStatus",
-    );
     const trackingResult = document.getElementById("trackingResult");
     const trackingIds = {
       result: "trackingResult",
@@ -1428,13 +1425,7 @@ export function usePublicServicePortal() {
       isTrackingRequestPending = true;
       trackingResult.setAttribute("aria-busy", "true");
       trackingSubmitButton.disabled = true;
-      refreshTrackingButton.disabled = true;
-      trackingSubmitButton.textContent = refreshed
-        ? "ตรวจสอบสถานะ"
-        : "กำลังตรวจสอบ…";
-      refreshTrackingButton.textContent = refreshed
-        ? "กำลังรีเฟรช…"
-        : "รีเฟรชสถานะ";
+      trackingSubmitButton.textContent = "กำลังตรวจสอบ…";
 
       try {
         const isLostFoundCode =
@@ -1481,7 +1472,7 @@ export function usePublicServicePortal() {
       } catch (error) {
         trackedClaim = null;
         document.getElementById("claimTrackingDetails").hidden = true;
-        // แสดงกรอบผลลัพธ์แม้เกิดปัญหาการเชื่อมต่อ และให้ผู้ใช้กดรีเฟรชซ้ำได้
+        // แสดงกรอบผลลัพธ์แม้เกิดปัญหาการเชื่อมต่อ และให้ผู้ใช้ตรวจสอบซ้ำได้
         document.getElementById("trackingPhotosNotice").hidden = true;
         document.getElementById(trackingIds.code).textContent = code;
         document.getElementById(trackingIds.text).textContent =
@@ -1494,14 +1485,12 @@ export function usePublicServicePortal() {
         document.getElementById(trackingIds.details).hidden = true;
         document.getElementById(trackingIds.progress).hidden = true;
         trackingResult.classList.add("show");
-        showToast("ไม่สามารถรีเฟรชสถานะได้ กรุณาลองอีกครั้ง");
+        showToast("ไม่สามารถตรวจสอบสถานะได้ กรุณาลองอีกครั้ง");
       } finally {
         isTrackingRequestPending = false;
         trackingResult.removeAttribute("aria-busy");
         trackingSubmitButton.disabled = false;
-        refreshTrackingButton.disabled = false;
         trackingSubmitButton.textContent = "ตรวจสอบสถานะ";
-        refreshTrackingButton.textContent = "รีเฟรชสถานะ";
       }
     }
 
@@ -1532,9 +1521,6 @@ export function usePublicServicePortal() {
     trackingForm.addEventListener("submit", (event) => {
       event.preventDefault();
       void loadTrackingStatus();
-    });
-    refreshTrackingButton.addEventListener("click", () => {
-      void loadTrackingStatus({ refreshed: true });
     });
     // ลิงก์จากอีเมลยืนยันรับเรื่อง (/user?track=รหัส) มีแค่รหัส ไม่มีอีเมล:
     // ถ้าเครื่องนี้เคยบันทึกรหัสนั้นไว้ ใช้อีเมลที่บันทึกไว้ติดตามได้ทันที

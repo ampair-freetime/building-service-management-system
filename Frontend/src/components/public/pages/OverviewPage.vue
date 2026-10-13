@@ -194,13 +194,6 @@ onMounted(async () => {
               </p>
               <div class="tracking-result-actions">
                 <small id="trackingRefreshTime"></small>
-                <button
-                  type="button"
-                  class="secondary"
-                  id="refreshTrackingStatus"
-                >
-                  รีเฟรชสถานะ
-                </button>
               </div>
             </div>
           </section>
