@@ -8,6 +8,7 @@ import {
 import { requestStatusPresentation, serviceProgress } from "../services/requestStatus.js";
 import {
   createAdminLocation,
+  deleteAdminLocation,
   fetchAdminLocations,
   generateAdminLocationQr,
   setAdminLocationActive,
@@ -1102,7 +1103,8 @@ export function useStaffDashboard() {
         return job.assignee === activeStaffName();
       if (currentBoardView === "unassigned") return !job.assignee && !isTerminalStatus(job.status) && job.backendStatus !== "cancelled" && job.status !== "ยกเลิก";
       if (currentBoardView === "mine")
-        return job.assignee === activeStaffName();
+        return job.assignee === activeStaffName() && !isTerminalStatus(job.status) &&
+          !["completed", "cancelled"].includes(job.backendStatus) && job.status !== "ยกเลิก";
       if (currentBoardView === "team")
         return !!job.assignee && job.assignee !== activeStaffName();
       return true;
@@ -1133,6 +1135,16 @@ export function useStaffDashboard() {
     function renderJobs() {
       if (!$("#jobList")) return;
       if (currentRole === "clerk") return;
+      if (["housekeeper", "technician"].includes(currentRole)) {
+        const statusFilter = $("#jobStatusFilter");
+        const selectedStatus = statusFilter.value;
+        const statuses = currentBoardView === "mine"
+          ? ["รับงานแล้ว", "รับเรื่องแล้ว", "กำลังดำเนินการ"]
+          : ["รอรับงาน"];
+        statusFilter.innerHTML = '<option value="all">ทุกสถานะ</option>' +
+          statuses.map(value => `<option value="${value}">${value}</option>`).join("");
+        statusFilter.value = statuses.includes(selectedStatus) ? selectedStatus : "all";
+      }
       const jobsEyebrow = $("#jobsEyebrow");
       if (jobsEyebrow) {
         jobsEyebrow.textContent = currentBoardView === "mine"
@@ -1164,7 +1176,7 @@ export function useStaffDashboard() {
               else if (isUnassigned && currentRole === "admin")
                 actions = `<button class="accept-btn" type="button" data-job-action="assign" data-job-id="${j.id}">มอบหมายงาน</button>`;
               else if (canEdit) {
-                const isReturnToPool = currentRole === "housekeeper" && j.backendStatus === "in_progress";
+                const isReturnToPool = ["housekeeper", "technician"].includes(currentRole) && j.backendStatus === "in_progress";
                 actions = `<button class="${isReturnToPool ? "return-btn return-to-pool-btn" : "update-btn"}" type="button" data-job-action="status" data-job-id="${
                   j.id
                 }">${isReturnToPool ? "คืนเข้ากองกลาง" : "อัปเดตสถานะ"}</button>${
@@ -2115,7 +2127,7 @@ export function useStaffDashboard() {
               "ปิดคำขอ",
               "รับฝากรายการใหม่",
             ]
-          : ["all", "เสร็จสิ้น", "ยังไม่เสร็จ"];
+          : ["all", "เสร็จสิ้น"];
       select.innerHTML = base
         .map(
           (x) =>
@@ -2287,7 +2299,7 @@ export function useStaffDashboard() {
         const returned = events.findLast(event => event.action === "คืนงาน");
         const note = events.findLast(event => event.action === "เพิ่มหมายเหตุ");
         return {id, events, latest, job, completed, returned, note, status: job?.status || latest.status};
-      });
+      }).filter(job => isTerminalStatus(job.status) || job.status === "ยกเลิก" || job.returned);
       const counts = [
         [jobs.length, "งานทั้งหมด", "หนึ่งรายการต่อหนึ่งงาน"],
         [jobs.filter(job => job.status === "เสร็จสิ้น").length, "เสร็จสิ้น", "งานที่ปิดแล้ว"],
@@ -2300,7 +2312,7 @@ export function useStaffDashboard() {
         (filters.type === "all" || (filters.type === "เสร็จสิ้น" && status === "เสร็จสิ้น") || (filters.type === "คืนเข้ากองกลาง" && returned) || (filters.type === "ยังไม่เสร็จ" && !isTerminalStatus(status))) &&
         `${latest.itemId} ${latest.title} ${job?.room || ""} ${events.map(event => event.detail).join(" ")}`.toLowerCase().includes(filters.q)
       ).sort((a,b) => `${b.latest.date} ${b.latest.time}`.localeCompare(`${a.latest.date} ${a.latest.time}`));
-      const mainRows = rows.filter(row => row.latest.action !== "คืนงาน" && filters.type !== "คืนเข้ากองกลาง");
+      const mainRows = rows.filter(row => (isTerminalStatus(row.status) || row.status === "ยกเลิก") && row.latest.action !== "คืนงาน" && filters.type !== "คืนเข้ากองกลาง");
       const mainMarkup = mainRows.length ? mainRows.map(({id,events,latest,job,status,completed,returned,note}) => `<article class="grouped-history-card">
         <header><div><span class="badge neutral">${escapeHtml(latest.category)}</span><h3>${escapeHtml(id)} · ${escapeHtml(latest.title)}</h3></div><span class="badge ${badgeClass(status)}">${escapeHtml(status)}</span></header>
         <div class="detail-meta"><div><small>สถานที่</small><strong>${escapeHtml(job?.room || "–")}</strong></div><div><small>วันที่รับงาน</small><strong>${dateLabel(events.find(event => event.action === "รับงาน"))}</strong></div><div><small>วันที่เสร็จ</small><strong>${dateLabel(completed)}</strong></div></div>
@@ -3044,7 +3056,6 @@ export function useStaffDashboard() {
               location.name,
               `${actionText}สถานที่ชั้น ${location.floor || "ไม่ระบุ"} และ QR Code`,
             );
-            toast(`${actionText}สถานที่ ${location.name} แล้ว`);
           } catch (error) {
             if (await handleUnauthorizedResponse(error.status)) return;
             console.error("Updating QR location status failed:", error);
@@ -3052,6 +3063,37 @@ export function useStaffDashboard() {
           }
         },
         actionText,
+      );
+    }
+
+    function deleteQrLocation(location) {
+      const qrWarning = location.url
+        ? " QR Code ที่พิมพ์ไปแล้วจะใช้ไม่ได้"
+        : "";
+      requestConfirmation(
+        "ยืนยันลบสถานที่",
+        `ต้องการลบ ${location.name} หรือไม่? ลบได้เฉพาะสถานที่ที่ยังไม่เคยมีคำร้อง${qrWarning}`,
+        async () => {
+          try {
+            // Backend เป็นผู้ตัดสินว่าลบได้ไหม เพราะรู้จำนวนคำร้องจริง ณ ตอนกด
+            await deleteAdminLocation(location.id);
+            if (selectedQrLocation?.id === location.id) selectedQrLocation = null;
+            await loadQrLocations();
+            addAudit(
+              "qr",
+              "ลบสถานที่",
+              `LOCATION-${location.id}`,
+              location.name,
+              `ลบสถานที่ชั้น ${location.floor || "ไม่ระบุ"} ที่สร้างผิด`,
+            );
+            toast(`ลบสถานที่ ${location.name} แล้ว`);
+          } catch (error) {
+            if (await handleUnauthorizedResponse(error.status)) return;
+            console.error("Deleting QR location failed:", error);
+            toast(error.message || "ไม่สามารถลบสถานที่ได้");
+          }
+        },
+        "ลบ",
       );
     }
 
@@ -3127,11 +3169,18 @@ export function useStaffDashboard() {
                   ${location.isActive ? "" : "disabled"}
                 >${location.url ? "ดูรายละเอียด" : "สร้าง QR"}</button>
                 <button
-                  class="${location.isActive ? "danger" : "secondary"} qr-location-status-button"
+                  class="danger ${location.isActive ? "" : "enable"} qr-location-status-button"
                   type="button"
                   data-toggle-qr-location="${escapeHtml(location.id)}"
                   aria-label="${location.isActive ? "ปิด" : "เปิด"}ใช้งานสถานที่ ${escapeHtml(location.name)}"
                 >${location.isActive ? "ปิดใช้งาน" : "เปิดใช้งาน"}</button>
+                <button
+                  class="qr-location-delete-button"
+                  type="button"
+                  data-delete-qr-location="${escapeHtml(location.id)}"
+                  aria-label="ลบสถานที่ ${escapeHtml(location.name)}"
+                  title="ลบสถานที่"
+                ><svg class="icon" aria-hidden="true"><use href="#i-trash"></use></svg></button>
               </div>
             </article>`,
         )
@@ -3293,6 +3342,9 @@ export function useStaffDashboard() {
       $("#confirmModalTitle").textContent = title;
       $("#confirmModalText").textContent = text;
       $("#confirmActionButton").textContent = label;
+      // ปุ่มยืนยันปิดใช้งานสถานที่ใช้สีเหลืองอ่อนเดียวกับปุ่มบนการ์ด
+      $("#confirmActionButton").classList.toggle("confirm-warning", label === "ปิดใช้งาน");
+      $("#confirmActionButton").classList.toggle("confirm-enable", label === "เปิดใช้งาน");
       $("#confirmActionButton").classList.toggle("confirm-accept", ["ยืนยันรับงาน", "ยืนยันคืนงาน"].includes(label) ||
         (currentRole === "clerk" && !/ลบ|ไม่อนุมัติ|ปฏิเสธ/.test(`${title} ${label}`)));
       openModal("confirmModal", document.activeElement, historyMode);
@@ -5890,10 +5942,6 @@ export function useStaffDashboard() {
         );
         closeModal("qrFormModal", false);
         form.reset();
-        if (showQrLocation(location)) {
-          openModal("qrDetailModal", $("#openQrModal"));
-        }
-        toast(`เพิ่มสถานที่ ${location.name} และสร้าง QR Code แล้ว`);
       } catch (error) {
         if (await handleUnauthorizedResponse(error.status)) return;
         console.error("Creating QR location failed:", error);
@@ -5972,6 +6020,14 @@ export function useStaffDashboard() {
       printWindow.document.close();
     });
     $("#roomList")?.addEventListener("click", async (event) => {
+      const deleteButton = event.target.closest("[data-delete-qr-location]");
+      if (deleteButton) {
+        const location = qrLocations.find(
+          (item) => item.id === deleteButton.dataset.deleteQrLocation,
+        );
+        if (location) deleteQrLocation(location);
+        return;
+      }
       const statusButton = event.target.closest("[data-toggle-qr-location]");
       if (statusButton) {
         const location = qrLocations.find(

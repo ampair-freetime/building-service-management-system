@@ -68,3 +68,15 @@ export async function setAdminLocationActive(locationId, isActive) {
   );
   return parseResponse(response, "ไม่สามารถเปลี่ยนสถานะสถานที่ได้");
 }
+
+// ลบสถานที่ที่สร้างผิด Backend ตอบ 409 ถ้าสถานที่นี้เคยมีคำร้องหรือรายการของหายแล้ว
+export async function deleteAdminLocation(locationId) {
+  const response = await fetch(
+    `${ADMIN_LOCATIONS_URL}/${encodeURIComponent(locationId)}`,
+    {
+      method: "DELETE",
+      headers: authHeaders(),
+    },
+  );
+  return parseResponse(response, "ไม่สามารถลบสถานที่ได้");
+}

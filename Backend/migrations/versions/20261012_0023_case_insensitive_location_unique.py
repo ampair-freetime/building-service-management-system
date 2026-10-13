@@ -25,16 +25,17 @@ def upgrade() -> None:
     )
 
     # ไม่รวมแถวให้เอง เพราะแต่ละสถานที่อาจมี QR และคำร้องที่อ้างอิงอยู่แล้ว
+    # ใช้ expression ตัวเดียวกันทั้ง SELECT และ GROUP BY และใช้ literal แทน bind parameter
+    # ไม่งั้น PostgreSQL เห็น coalesce(floor, $1) กับ coalesce(floor, $2) เป็นคนละ expression
+    floor_key = sa.func.lower(sa.func.coalesce(locations.c.floor, sa.literal_column("''")))
+    area_key = sa.func.lower(locations.c.area)
     duplicates = connection.execute(
         sa.select(
-            sa.func.lower(sa.func.coalesce(locations.c.floor, "")).label("floor_key"),
-            sa.func.lower(locations.c.area).label("area_key"),
+            floor_key.label("floor_key"),
+            area_key.label("area_key"),
             sa.func.count().label("total"),
         )
-        .group_by(
-            sa.func.lower(sa.func.coalesce(locations.c.floor, "")),
-            sa.func.lower(locations.c.area),
-        )
+        .group_by(floor_key, area_key)
         .having(sa.func.count() > 1)
     ).all()
     if duplicates:

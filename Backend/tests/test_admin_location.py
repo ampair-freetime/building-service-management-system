@@ -372,3 +372,99 @@ def test_concurrent_duplicate_returns_conflict(test_context, monkeypatch) -> Non
         "/api/v1/admin/locations", headers=headers, json={"floor": "1", "area": "ห้อง 101"}
     )
     assert response.status_code == 409
+
+
+def _attach_records(factory, location_id: int, *, requests: int = 0, lost_items: int = 0) -> None:
+    """ผูกคำร้อง/ของหายกับ location ตรง ๆ ใน DB เพื่อจำลองห้องที่ถูกใช้งานแล้ว."""
+    from datetime import UTC, datetime
+    from uuid import uuid4
+
+    from app.models.enums import LostType, RequestType
+    from app.models.lost_found import LostItem
+    from app.models.service_request import ServiceRequest
+
+    async def insert() -> None:
+        async with factory() as session:
+            for _ in range(requests):
+                session.add(ServiceRequest(
+                    request_code=f"CL-{uuid4().hex[:8]}", request_type=RequestType.CLEANING,
+                    location_id=location_id, title="ทำความสะอาด", description="-",
+                    reporter_email="guest@example.com",
+                ))
+            for _ in range(lost_items):
+                session.add(LostItem(
+                    item_code=f"LF-{uuid4().hex[:8]}", report_type=LostType.FOUND,
+                    item_category="อื่น ๆ", item_name="กระเป๋า",
+                    event_datetime=datetime.now(UTC), location_id=location_id,
+                    reporter_email="guest@example.com",
+                ))
+            await session.commit()
+
+    asyncio.run(insert())
+
+
+def test_delete_unused_location_frees_its_name(test_context) -> None:
+    client, factory = test_context
+    headers = admin_headers(client, factory)
+    location = create_location(client, headers)
+    path = f"/api/v1/admin/locations/{location['id']}"
+
+    assert client.delete(path, headers=headers).status_code == 204
+    assert client.get(path, headers=headers).status_code == 404
+    listed = client.get("/api/v1/admin/locations?include_inactive=true", headers=headers)
+    assert location["id"] not in [item["id"] for item in listed.json()]
+    # สร้างชื่อเดิมซ้ำได้ เพราะแถวถูกลบจริง ไม่ใช่แค่ซ่อน
+    create_location(client, headers)
+
+
+def test_delete_location_with_service_request_is_rejected(test_context) -> None:
+    client, factory = test_context
+    headers = admin_headers(client, factory)
+    location = create_location(client, headers)
+    _attach_records(factory, location["id"], requests=2)
+    path = f"/api/v1/admin/locations/{location['id']}"
+
+    response = client.delete(path, headers=headers)
+    assert response.status_code == 409
+    assert isinstance(response.json()["detail"], str)
+    assert "2" in response.json()["detail"]
+    assert client.get(path, headers=headers).status_code == 200
+
+
+def test_delete_location_with_lost_item_is_rejected(test_context) -> None:
+    client, factory = test_context
+    headers = admin_headers(client, factory)
+    location = create_location(client, headers)
+    _attach_records(factory, location["id"], lost_items=1)
+
+    response = client.delete(f"/api/v1/admin/locations/{location['id']}", headers=headers)
+    assert response.status_code == 409
+
+
+def test_delete_location_invalidates_its_qr(test_context) -> None:
+    client, factory = test_context
+    headers = admin_headers(client, factory)
+    location = create_location(client, headers)
+    path = f"/api/v1/admin/locations/{location['id']}"
+    token = client.post(f"{path}/qr/generate", headers=headers).json()["qr_token"]
+
+    assert client.delete(path, headers=headers).status_code == 204
+    scan = client.get(f"/api/v1/guest/cleaning-requests/locations/by-qr/{token}")
+    assert scan.status_code == 404
+
+
+def test_delete_location_requires_admin_and_existing_id(test_context) -> None:
+    client, factory = test_context
+    headers = admin_headers(client, factory)
+    location = create_location(client, headers)
+    path = f"/api/v1/admin/locations/{location['id']}"
+
+    assert client.delete(path).status_code == 401
+    seed_staff(factory, email="clerk@example.com", password="clerk-password", role="clerk")
+    login = client.post(
+        "/api/v1/auth/login",
+        json={"identifier": "clerk@example.com", "password": "clerk-password"},
+    )
+    clerk = {"Authorization": f"Bearer {login.json()['access_token']}"}
+    assert client.delete(path, headers=clerk).status_code == 403
+    assert client.delete("/api/v1/admin/locations/999999", headers=headers).status_code == 404

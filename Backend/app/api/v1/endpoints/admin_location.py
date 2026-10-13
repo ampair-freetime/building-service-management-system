@@ -17,11 +17,13 @@ from app.schemas.admin_location import (
 from app.services.admin_location import (
     DuplicateLocationError,
     LocationInactiveError,
+    LocationInUseError,
     LocationNotFoundError,
     QrNotGeneratedError,
     QrTokenCollisionError,
     build_qr_url,
     create_location,
+    delete_location,
     generate_qr,
     get_location_for_qr,
     get_location_or_raise,
@@ -45,6 +47,7 @@ async def _call(operation: Awaitable[_T]) -> _T:
     except (
         DuplicateLocationError,
         LocationInactiveError,
+        LocationInUseError,
         QrNotGeneratedError,
         QrTokenCollisionError,
     ) as exc:
@@ -100,6 +103,12 @@ async def edit_location(
     location_id: int, payload: AdminLocationUpdate, session: DbSession, _admin: AdminStaff
 ) -> AdminLocationResponse:
     return await _call(update_location(session, location_id=location_id, payload=payload))
+
+
+@router.delete("/{location_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def remove_location(location_id: int, session: DbSession, _admin: AdminStaff) -> None:
+    """ลบได้เฉพาะ location ที่ไม่เคยมีคำร้องหรือรายการของหาย ไม่งั้นตอบ 409."""
+    await _call(delete_location(session, location_id=location_id))
 
 
 @router.patch("/{location_id}/status", response_model=AdminLocationResponse)
