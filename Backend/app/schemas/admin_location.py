@@ -34,6 +34,13 @@ def normalize_area(value: str | None) -> str | None:
     return value
 
 
+def validate_room_floor(floor: str | None, area: str) -> None:
+    code = "".join(area.split()).upper()
+    match = re.fullmatch(r"CSB([0-9])[0-9]{2}", code)
+    if match and floor != match.group(1):
+        raise ValueError("ชั้นไม่ถูกต้อง")
+
+
 class AdminLocationCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -49,6 +56,12 @@ class AdminLocationCreate(BaseModel):
     @classmethod
     def clean_area(cls, value: str) -> str:
         return normalize_area(value)
+
+
+    @model_validator(mode="after")
+    def check_room_floor(self) -> "AdminLocationCreate":
+        validate_room_floor(self.floor, self.area)
+        return self
 
 
 class AdminLocationUpdate(BaseModel):

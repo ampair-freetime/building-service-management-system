@@ -5919,6 +5919,14 @@ export function useStaffDashboard() {
       const submitButton = form.querySelector('button[type="submit"]');
       const area = $("#qrLocationName").value.trim();
       const floor = $("#qrLocationFloor").value.trim();
+      const roomCode = area.replace(/\s/g, "").toUpperCase();
+      const roomMatch = /^CSB([0-9])[0-9]{2}$/.exec(roomCode);
+      if (roomMatch && floor !== roomMatch[1]) {
+        const floorInput = $("#qrLocationFloor");
+        setInlineFieldError(floorInput, "ชั้นไม่ถูกต้อง");
+        floorInput.focus();
+        return;
+      }
       if (submitButton) submitButton.disabled = true;
       try {
         // สร้างสถานที่ก่อนเพื่อรับ ID จาก Backend
@@ -5944,7 +5952,7 @@ export function useStaffDashboard() {
         console.error("Creating QR location failed:", error);
         if (error.status === 409) {
           const areaInput = $("#qrLocationName");
-          setInlineFieldError(areaInput, "มีสถานที่ชั้นและชื่อเดียวกันอยู่แล้ว กรุณาตรวจสอบรายการสถานที่");
+          setInlineFieldError(areaInput, "ชื่อสถานที่นี้มีอยู่แล้วในชั้นที่เลือก กรุณาตรวจสอบอีกครั้ง");
           areaInput.focus();
         } else {
           toast(error.message || "ไม่สามารถเพิ่มสถานที่และสร้าง QR Code ได้");

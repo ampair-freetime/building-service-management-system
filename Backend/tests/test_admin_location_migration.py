@@ -210,3 +210,29 @@ def test_drop_staff_code_migration_stops_on_case_duplicate_emails(tmp_path) -> N
         with pytest.raises(RuntimeError, match="a@example.com"):
             migration.upgrade()
     engine.dispose()
+
+
+@pytest.mark.parametrize("existing_duplicate", [False, True])
+def test_space_unique_migration(tmp_path, existing_duplicate) -> None:
+    engine = sa.create_engine(f"sqlite:///{tmp_path / 'spaces.db'}")
+    migration = importlib.import_module(
+        "migrations.versions.20261013_0024_location_space_unique"
+    )
+    with engine.begin() as connection:
+        connection.execute(sa.text("CREATE TABLE locations (id INTEGER PRIMARY KEY, floor TEXT, area TEXT)"))
+        connection.execute(sa.text("CREATE UNIQUE INDEX uq_locations_floor_area ON locations (lower(coalesce(floor, '')), lower(area))"))
+        connection.execute(sa.text("INSERT INTO locations VALUES (1, '2', 'CSB209')"))
+        if existing_duplicate:
+            connection.execute(sa.text("INSERT INTO locations VALUES (2, '2', 'Csb 209')"))
+        migration.op = Operations(MigrationContext.configure(connection))
+        if existing_duplicate:
+            with pytest.raises(RuntimeError, match="Duplicate locations"):
+                migration.upgrade()
+            assert connection.scalar(sa.text("SELECT count(*) FROM locations")) == 2
+        else:
+            migration.upgrade()
+            with pytest.raises(sa.exc.IntegrityError):
+                connection.execute(sa.text("INSERT INTO locations VALUES (2, '2', 'Csb 209')"))
+            migration.downgrade()
+            connection.execute(sa.text("INSERT INTO locations VALUES (2, '2', 'Csb 209')"))
+    engine.dispose()

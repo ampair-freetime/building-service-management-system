@@ -20,7 +20,7 @@ class Location(Base):
         Index(
             "uq_locations_floor_area",
             text("lower(coalesce(floor, ''))"),
-            text("lower(area)"),
+            text("lower(replace(area, ' ', ''))"),
             unique=True,
         ),
     )
