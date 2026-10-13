@@ -4,10 +4,7 @@
       <div>
         <div class="eyebrow">Clerk work center</div>
         <h2>ศูนย์รับงาน</h2>
-        <p>
-          รวมคำขอที่ธุรการต้องดำเนินการไว้ในที่เดียว
-          โดยแยกคำขอที่ต้องพิจารณาอนุมัติออกจากคำขอรับของ
-        </p>
+        
       </div>
       <div class="toolbar clerk-center-search">
         <svg

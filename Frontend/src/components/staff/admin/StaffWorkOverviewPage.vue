@@ -4,10 +4,6 @@
             <div>
               <div class="eyebrow">Staff work overview</div>
               <h2>ภาพรวมภาระงานของเจ้าหน้าที่</h2>
-              <p>
-                ดูจำนวนงานที่กำลังรับผิดชอบ งานที่ปิดแล้ว และงานที่คืนเข้ากองกลาง
-                ของทีมแม่บ้านและช่าง
-              </p>
             </div>
           </div>
           <div class="history-summary" id="staffOverviewSummary" aria-live="polite"></div>

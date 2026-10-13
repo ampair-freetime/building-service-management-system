@@ -1,5 +1,8 @@
 import { installServiceFormValidation } from "../services/serviceFormValidation.js";
-import { enhanceFilterSelects } from "../services/filterSelectDropdown.js";
+import {
+  enhanceDatePickers,
+  enhanceFilterSelects,
+} from "../services/filterSelectDropdown.js";
 import {
   requestProgress,
   requestStatusPresentation,
@@ -24,6 +27,8 @@ import { createLostFoundStore, filterLostFoundItems } from "../services/lostFoun
 export function usePublicServicePortal() {
   const validationCleanups = [];
   let cleanupFilterSelects = () => {};
+  let cleanupDatePickers = () => {};
+  let cleanupGuestPageState = () => {};
   let portalMounted = true;
   onUnmounted(() => { portalMounted = false; });
   const pageLoading = ref(true);
@@ -44,6 +49,90 @@ export function usePublicServicePortal() {
   onMounted(() => {
     document.title = "CS Building Care";
     cleanupFilterSelects = enhanceFilterSelects();
+    cleanupDatePickers = enhanceDatePickers();
+
+    const guestDraftStorageKey = "building-care-guest-draft-v1";
+    const guestScrollStorageKey = "building-care-guest-scroll-v1";
+    const persistedFields = [
+      ...document.querySelectorAll(
+        'input[id]:not([type="password"]):not([type="file"]):not([type="hidden"]), textarea[id], select[id]',
+      ),
+    ];
+    let restoredScrollTop = 0;
+    try {
+      restoredScrollTop = Number(sessionStorage.getItem(guestScrollStorageKey)) || 0;
+      const draft = JSON.parse(
+        sessionStorage.getItem(guestDraftStorageKey) || "{}",
+      );
+      persistedFields.forEach((field) => {
+        if (!Object.hasOwn(draft, field.id)) return;
+        if (field.type === "checkbox" || field.type === "radio") {
+          field.checked = Boolean(draft[field.id]);
+        } else {
+          field.value = String(draft[field.id] ?? "");
+        }
+        field.dispatchEvent(new Event("input", { bubbles: true }));
+        field.dispatchEvent(new Event("change", { bubbles: true }));
+      });
+    } catch {
+      // Storage อาจถูกปิดไว้ แต่ฟอร์มยังใช้งานได้ตามปกติ
+    }
+
+    function saveGuestDraft() {
+      const draft = {};
+      persistedFields.forEach((field) => {
+        draft[field.id] =
+          field.type === "checkbox" || field.type === "radio"
+            ? field.checked
+            : field.value;
+      });
+      try {
+        sessionStorage.setItem(guestDraftStorageKey, JSON.stringify(draft));
+      } catch {
+        // Storage อาจเต็มหรือถูกปิดไว้
+      }
+    }
+
+    const handleDraftChange = () => saveGuestDraft();
+    const handleFormReset = () => window.setTimeout(saveGuestDraft, 0);
+    persistedFields.forEach((field) => {
+      field.addEventListener("input", handleDraftChange);
+      field.addEventListener("change", handleDraftChange);
+    });
+    document.querySelectorAll("form").forEach((form) =>
+      form.addEventListener("reset", handleFormReset),
+    );
+
+    let scrollFrame = 0;
+    const saveScrollPosition = () => {
+      if (scrollFrame) return;
+      scrollFrame = window.requestAnimationFrame(() => {
+        scrollFrame = 0;
+        try {
+          sessionStorage.setItem(
+            guestScrollStorageKey,
+            String(Math.round(window.scrollY)),
+          );
+        } catch {
+          // Storage อาจถูกปิดไว้
+        }
+      });
+    };
+    const beginScrollPersistence = () => {
+      window.scrollTo({ top: restoredScrollTop, behavior: "auto" });
+      window.addEventListener("scroll", saveScrollPosition, { passive: true });
+    };
+    cleanupGuestPageState = () => {
+      persistedFields.forEach((field) => {
+        field.removeEventListener("input", handleDraftChange);
+        field.removeEventListener("change", handleDraftChange);
+      });
+      document.querySelectorAll("form").forEach((form) =>
+        form.removeEventListener("reset", handleFormReset),
+      );
+      window.removeEventListener("scroll", saveScrollPosition);
+      if (scrollFrame) window.cancelAnimationFrame(scrollFrame);
+    };
 
     const pages = document.querySelectorAll(".page");
     const navItems = document.querySelectorAll(".nav-item");
@@ -63,6 +152,7 @@ export function usePublicServicePortal() {
     let selectedLostItem = null;
     let trackedClaim = null;
     const guestPageStorageKey = "building-care-guest-page-v1";
+    const lostViewStorageKey = "building-care-lost-view-v1";
     // เก็บเฉพาะคำร้องที่ผู้ใช้ส่งจริงในรอบการเปิดหน้านี้ ไม่มีข้อมูลตัวอย่างปะปน
     const trackedRequests = new Map();
 
@@ -79,6 +169,24 @@ export function usePublicServicePortal() {
         return sessionStorage.getItem(guestPageStorageKey);
       } catch {
         return null;
+      }
+    }
+
+    function savedLostView() {
+      try {
+        const linkedView = new URLSearchParams(window.location.search).get(
+          "lostView",
+        );
+        const viewName = ["browse", "report-lost", "report-found"].includes(
+          linkedView,
+        )
+          ? linkedView
+          : sessionStorage.getItem(lostViewStorageKey);
+        return ["browse", "report-lost", "report-found"].includes(viewName)
+          ? viewName
+          : "browse";
+      } catch {
+        return "browse";
       }
     }
 
@@ -114,11 +222,18 @@ export function usePublicServicePortal() {
       );
     }
 
-    function navigate(pageId) {
+    function navigate(pageId, { restoreLostView = false } = {}) {
       const destination = document.getElementById(pageId);
       if (!destination || !destination.classList.contains("page")) return;
       currentPage = pageId;
       rememberCurrentPage(pageId);
+      if (pageId !== "lost") {
+        const url = new URL(window.location.href);
+        if (url.searchParams.has("lostView")) {
+          url.searchParams.delete("lostView");
+          window.history.replaceState({}, "", url);
+        }
+      }
       pages.forEach((page) =>
         page.classList.toggle("active", page.id === pageId),
       );
@@ -133,8 +248,9 @@ export function usePublicServicePortal() {
       });
 
       if (pageId === "lost") {
-        openLostView("browse", false);
-        void filterPosts();
+        const lostView = restoreLostView ? savedLostView() : "browse";
+        openLostView(lostView, false);
+        if (lostView === "browse") void filterPosts();
       }
     }
 
@@ -147,11 +263,16 @@ export function usePublicServicePortal() {
     const initialService = new URLSearchParams(window.location.search).get(
       "service",
     );
+    const linkedLostView = new URLSearchParams(window.location.search).get(
+      "lostView",
+    );
     const initialPage = ["repair", "clean"].includes(initialService)
       ? initialService
-      : savedGuestPage();
+      : ["browse", "report-lost", "report-found"].includes(linkedLostView)
+        ? "lost"
+        : savedGuestPage();
     if (initialPage && initialPage !== "dashboard") {
-      navigate(initialPage);
+      navigate(initialPage, { restoreLostView: initialPage === "lost" });
     }
     document.querySelectorAll("[data-go]").forEach((button) =>
       button.addEventListener("click", (event) => {
@@ -182,6 +303,14 @@ export function usePublicServicePortal() {
     });
 
     function openLostView(viewName, moveToForm = true) {
+      try {
+        sessionStorage.setItem(lostViewStorageKey, viewName);
+      } catch {
+        // Storage อาจถูกปิดไว้ แต่ผู้ใช้ยังสลับแท็บได้ตามปกติ
+      }
+      const url = new URL(window.location.href);
+      url.searchParams.set("lostView", viewName);
+      window.history.replaceState({}, "", url);
       document
         .querySelectorAll(".lost-view")
         .forEach((view) =>
@@ -189,17 +318,18 @@ export function usePublicServicePortal() {
         );
       document
         .querySelectorAll(".lost-tab")
-        .forEach((tab) =>
-          tab.classList.toggle("active", tab.dataset.lostView === viewName),
-        );
+        .forEach((tab) => {
+          const isActive = tab.dataset.lostView === viewName;
+          tab.classList.toggle("active", isActive);
+          tab.setAttribute("aria-selected", String(isActive));
+        });
       document
         .querySelectorAll("[data-open-lost-view]")
-        .forEach((button) =>
-          button.classList.toggle(
-            "active",
-            button.dataset.openLostView === viewName,
-          ),
-        );
+        .forEach((button) => {
+          const isActive = button.dataset.openLostView === viewName;
+          button.classList.toggle("active", isActive);
+          button.setAttribute("aria-pressed", String(isActive));
+        });
       if (viewName === "report-found") {
         const now = new Date();
         const offsetDate = new Date(
@@ -208,6 +338,7 @@ export function usePublicServicePortal() {
         const dateTimeInput = document.getElementById("publicFoundDateTime");
         if (dateTimeInput && !dateTimeInput.value) {
           dateTimeInput.value = offsetDate.toISOString().slice(0, 16);
+          dateTimeInput.dispatchEvent(new Event("input", { bubbles: true }));
         }
       }
 
@@ -222,23 +353,14 @@ export function usePublicServicePortal() {
       }
     }
 
-    document.querySelectorAll("[data-lost-view]").forEach((tab) =>
-      // แถบแท็บใช้สลับเนื้อหาเท่านั้น จึงไม่เลื่อนหน้าจอไปยังฟอร์ม
-      tab.addEventListener("click", () =>
-        openLostView(tab.dataset.lostView, false),
-      ),
-    );
     document.querySelectorAll("[data-open-lost-view]").forEach((button) =>
       button.addEventListener("click", () => {
         const viewName = button.dataset.openLostView;
-        if (viewName === "browse") {
-          void filterPosts();
-        } else {
-          openLostView(viewName, false);
-        }
+        openLostView(viewName, false);
+        if (viewName === "browse") void filterPosts();
 
         window.requestAnimationFrame(() => {
-          document.querySelector(".lost-tabs")?.scrollIntoView({
+          document.getElementById(`lost-view-${viewName}`)?.scrollIntoView({
             behavior: prefersReducedMotion ? "auto" : "smooth",
             block: "start",
           });
@@ -372,7 +494,6 @@ export function usePublicServicePortal() {
       const empty = document.getElementById("noSearchResults");
       const grid = document.getElementById("postGrid");
 
-      openLostView("browse", false);
       if (force) postPage = 0;
       summary.textContent = "กำลังโหลดประกาศ...";
       empty.hidden = true;
@@ -1303,7 +1424,7 @@ export function usePublicServicePortal() {
       item,
       code,
       ids,
-      { refreshed = false, announce = true } = {},
+      { announce = true } = {},
     ) {
       trackedClaim = item?.claim_code ? {code: item.claim_code,
         email: document.getElementById("trackingEmail").value.trim().toLowerCase()} : null;
@@ -1379,9 +1500,6 @@ export function usePublicServicePortal() {
       renderTrackingProgress(item, code, ids);
 
       result.classList.add("show");
-      if (announce) {
-        showToast(refreshed ? "อัปเดตสถานะแล้ว" : "พบข้อมูลคำร้อง");
-      }
     }
 
     const trackingForm = document.getElementById("trackingForm");
@@ -1416,33 +1534,59 @@ export function usePublicServicePortal() {
       savedTracking.forEach((entry, index) => {
         const option = document.createElement("option");
         option.value = String(index);
-        option.textContent = `${entry.code} · ${entry.email}`;
+        const isCompleted = entry.status === "completed" || entry.status === "closed" ||
+          ["ดำเนินการเสร็จสิ้น", "รับของคืนแล้ว", "ปิดประกาศแล้ว"].includes(entry.statusLabel);
+        option.textContent = [entry.code, entry.email,
+          isCompleted ? "ดำเนินการเสร็จสิ้นแล้ว" : ""]
+          .filter(Boolean).join(" · ");
         savedTrackingSelect.append(option);
       });
       document.getElementById("savedTrackingGroup").hidden = !savedTracking.length;
     }
-    function rememberTracking(code, email) {
+    function rememberTracking(code, email, item = null) {
       code = code.trim().toUpperCase();
       email = email.trim().toLowerCase();
       if (!code || !email) return;
-      savedTracking = [{ code, email }, ...savedTracking.filter((entry) =>
+      const previous = savedTracking.find(entry => entry.code === code && entry.email === email);
+      const entry = { ...previous, code, email };
+      if (item) {
+        entry.title = requestTitleForTracking(item);
+        const presentation = requestStatusPresentation(item, code);
+        entry.statusLabel = presentation.label;
+        entry.status = presentation.status;
+      }
+      savedTracking = [entry, ...savedTracking.filter((entry) =>
         entry.code !== code || entry.email !== email
       )].slice(0, 20);
       try { localStorage.setItem(savedTrackingKey, JSON.stringify(savedTracking)); } catch { }
       renderSavedTracking();
     }
-    function restoreTracking(entry, { announce = true } = {}) {
+    function restoreTracking(entry, { announce = true, loadStatus = true } = {}) {
       if (!entry) return;
       document.getElementById("trackingCode").value = entry.code;
       document.getElementById("trackingEmail").value = entry.email;
-      void loadTrackingStatus({ announce });
+      if (loadStatus) {
+        void loadTrackingStatus({ announce });
+      } else {
+        trackedClaim = null;
+        trackingResult.classList.remove("show");
+        document.getElementById("claimTrackingDetails").hidden = true;
+        document.getElementById("trackingRefreshTime").textContent = "";
+      }
     }
     renderSavedTracking();
-    savedTrackingSelect.addEventListener("change", () => restoreTracking(savedTracking[Number(savedTrackingSelect.value)]));
+    savedTrackingSelect.addEventListener("change", () => restoreTracking(
+      savedTracking[Number(savedTrackingSelect.value)], { loadStatus: false },
+    ));
     document.getElementById("clearSavedTracking").addEventListener("click", () => {
+      openUiModal("clearSavedTrackingModal", document.getElementById("clearSavedTracking"));
+    });
+    document.getElementById("confirmClearSavedTracking").addEventListener("click", () => {
+      closeUiModal("clearSavedTrackingModal", false);
       savedTracking = [];
       try { localStorage.removeItem(savedTrackingKey); } catch { }
       renderSavedTracking();
+      document.getElementById("trackingCode").focus();
     });
 
     async function loadTrackingStatus(
@@ -1468,9 +1612,9 @@ export function usePublicServicePortal() {
       isTrackingRequestPending = true;
       trackingResult.setAttribute("aria-busy", "true");
       trackingSubmitButton.disabled = true;
-      trackingSubmitButton.textContent = refreshed
-        ? "ตรวจสอบสถานะ"
-        : "กำลังตรวจสอบ…";
+      trackingSubmitButton.textContent = "กำลังตรวจสอบสถานะ…";
+      // เริ่มรอพร้อมกับเรียก API เพื่อให้เห็นสถานะโหลดอย่างน้อยหนึ่งวินาที
+      const loadingDelay = new Promise((resolve) => window.setTimeout(resolve, 1000));
 
       try {
         const isLostFoundCode =
@@ -1506,8 +1650,9 @@ export function usePublicServicePortal() {
               ? localItem
               : null;
         }
-        renderTrackingResult(item, code, trackingIds, { refreshed, announce });
-        if (item) rememberTracking(code, email);
+        await loadingDelay;
+        renderTrackingResult(item, code, trackingIds, { announce });
+        if (item) rememberTracking(code, email, item);
         document.getElementById("trackingRefreshTime").textContent =
           `ตรวจสอบล่าสุด ${new Intl.DateTimeFormat("th-TH", {
             hour: "2-digit",
@@ -1515,6 +1660,7 @@ export function usePublicServicePortal() {
             second: "2-digit",
           }).format(new Date())}`;
       } catch (error) {
+        await loadingDelay;
         trackedClaim = null;
         document.getElementById("claimTrackingDetails").hidden = true;
         // แสดงกรอบผลลัพธ์แม้เกิดปัญหาการเชื่อมต่อ เพื่อให้ผู้ใช้ตรวจสอบใหม่ได้
@@ -1579,7 +1725,7 @@ export function usePublicServicePortal() {
 
     trackingForm.addEventListener("submit", (event) => {
       event.preventDefault();
-      void loadTrackingStatus();
+      void loadTrackingStatus({ refreshed: true });
     });
     // ลิงก์จากอีเมลยืนยันรับเรื่อง (/user?track=รหัส) มีแค่รหัส ไม่มีอีเมล:
     // ถ้าเครื่องนี้เคยบันทึกรหัสนั้นไว้ ใช้อีเมลที่บันทึกไว้ติดตามได้ทันที
@@ -1780,13 +1926,18 @@ export function usePublicServicePortal() {
     document
       .querySelectorAll(".ui-modal")
       .forEach((modal) => modal.setAttribute("aria-hidden", "true"));
-    loadingTimer = window.setTimeout(() => { pageLoading.value = false; }, 1000);
+    loadingTimer = window.setTimeout(() => {
+      pageLoading.value = false;
+      window.requestAnimationFrame(beginScrollPersistence);
+    }, 1000);
 
   });
 
   onUnmounted(() => {
     window.clearTimeout(loadingTimer);
     cleanupFilterSelects();
+    cleanupDatePickers();
+    cleanupGuestPageState();
     validationCleanups.forEach((cleanup) => cleanup());
     document.body.classList.remove("modal-open", "offline");
   });
