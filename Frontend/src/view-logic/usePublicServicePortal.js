@@ -11,6 +11,7 @@ import {
   trackingCodeFromSearch,
 } from "../services/requestStatus.js";
 import { onMounted, onUnmounted, ref } from "vue";
+import { useRouter } from "vue-router";
 import {
   createFoundItem,
   createFoundItemClaim,
@@ -25,10 +26,12 @@ import {
 import { createLostFoundStore, filterLostFoundItems } from "../services/lostFoundSearch.js";
 
 export function usePublicServicePortal() {
+  const router = useRouter();
   const validationCleanups = [];
   let cleanupFilterSelects = () => {};
   let cleanupDatePickers = () => {};
   let cleanupGuestPageState = () => {};
+  let cleanupPublicNavigation = () => {};
   let portalMounted = true;
   onUnmounted(() => { portalMounted = false; });
   const pageLoading = ref(true);
@@ -222,7 +225,28 @@ export function usePublicServicePortal() {
       );
     }
 
-    function navigate(pageId, { restoreLostView = false } = {}) {
+    function publicPageFromPath() {
+      const match = window.location.pathname.match(/^\/user(?:\/([^/]+))?/);
+      const pageId = match?.[1] || "dashboard";
+      return ["dashboard", "repair", "clean", "lost"].includes(pageId)
+        ? pageId
+        : "dashboard";
+    }
+
+    function updatePublicRoute(pageId, mode = "push") {
+      if (mode === "none") return;
+      const path = pageId === "dashboard" ? "/user" : `/user/${pageId}`;
+      const query = { ...router.currentRoute.value.query };
+      if (pageId !== "lost") delete query.lostView;
+      const target = router.resolve({ path, query }).fullPath;
+      const current = `${window.location.pathname}${window.location.search}`;
+      if (target !== current) void router[mode]({ path, query });
+    }
+
+    function navigate(
+      pageId,
+      { restoreLostView = false, historyMode = "push" } = {},
+    ) {
       const destination = document.getElementById(pageId);
       if (!destination || !destination.classList.contains("page")) return;
       currentPage = pageId;
@@ -242,6 +266,7 @@ export function usePublicServicePortal() {
       );
       syncBottomNavigation();
       closeSidebar();
+      updatePublicRoute(pageId, historyMode);
       window.scrollTo({
         top: 0,
         behavior: prefersReducedMotion ? "auto" : "smooth",
@@ -266,14 +291,29 @@ export function usePublicServicePortal() {
     const linkedLostView = new URLSearchParams(window.location.search).get(
       "lostView",
     );
-    const initialPage = ["repair", "clean"].includes(initialService)
-      ? initialService
-      : ["browse", "report-lost", "report-found"].includes(linkedLostView)
-        ? "lost"
-        : savedGuestPage();
+    const routePage = publicPageFromPath();
+    const initialPage = routePage !== "dashboard"
+      ? routePage
+      : ["repair", "clean"].includes(initialService)
+        ? initialService
+        : ["browse", "report-lost", "report-found"].includes(linkedLostView)
+          ? "lost"
+          : savedGuestPage();
     if (initialPage && initialPage !== "dashboard") {
-      navigate(initialPage, { restoreLostView: initialPage === "lost" });
+      navigate(initialPage, {
+        restoreLostView: initialPage === "lost",
+        historyMode: "replace",
+      });
     }
+    const handlePublicNavigation = () => {
+      navigate(publicPageFromPath(), {
+        restoreLostView: true,
+        historyMode: "none",
+      });
+    };
+    window.addEventListener("popstate", handlePublicNavigation);
+    cleanupPublicNavigation = () =>
+      window.removeEventListener("popstate", handlePublicNavigation);
     document.querySelectorAll("[data-go]").forEach((button) =>
       button.addEventListener("click", (event) => {
         event.stopPropagation();
@@ -1530,6 +1570,7 @@ export function usePublicServicePortal() {
     } catch { /* Storage may be unavailable; tracking still works. */ }
     const savedTrackingSelect = document.getElementById("savedTrackingRequests");
     function renderSavedTracking() {
+      if (!savedTrackingSelect) return;
       savedTrackingSelect.replaceChildren();
       savedTracking.forEach((entry, index) => {
         const option = document.createElement("option");
@@ -1541,8 +1582,8 @@ export function usePublicServicePortal() {
           .filter(Boolean).join(" · ");
         savedTrackingSelect.append(option);
       });
-      document.getElementById("savedTrackingGroup").hidden = !savedTracking.length;
-      document.getElementById("clearSavedTracking").hidden = !savedTracking.length;
+      const savedTrackingGroup = document.getElementById("savedTrackingGroup");
+      if (savedTrackingGroup) savedTrackingGroup.hidden = !savedTracking.length;
     }
     function rememberTracking(code, email, item = null) {
       code = code.trim().toUpperCase();
@@ -1576,10 +1617,10 @@ export function usePublicServicePortal() {
       }
     }
     renderSavedTracking();
-    savedTrackingSelect.addEventListener("change", () => restoreTracking(
+    savedTrackingSelect?.addEventListener("change", () => restoreTracking(
       savedTracking[Number(savedTrackingSelect.value)], { loadStatus: false },
     ));
-    document.getElementById("clearSavedTracking").addEventListener("click", () => {
+    document.getElementById("clearSavedTracking")?.addEventListener("click", () => {
       openUiModal("clearSavedTrackingModal", document.getElementById("clearSavedTracking"));
     });
     document.getElementById("confirmClearSavedTracking").addEventListener("click", () => {
@@ -1939,6 +1980,7 @@ export function usePublicServicePortal() {
     cleanupFilterSelects();
     cleanupDatePickers();
     cleanupGuestPageState();
+    cleanupPublicNavigation();
     validationCleanups.forEach((cleanup) => cleanup());
     document.body.classList.remove("modal-open", "offline");
   });

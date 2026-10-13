@@ -100,13 +100,6 @@ onMounted(async () => {
                 </p>
               </div>
             </div>
-            <div id="savedTrackingGroup" class="field" hidden style="margin: 16px 0">
-              <div class="saved-tracking-heading">
-                <label for="savedTrackingRequests">คำร้องที่บันทึกไว้ในเครื่องนี้</label>
-                <button id="clearSavedTracking" type="button" class="small-btn" hidden>ล้างรายการที่บันทึกไว้</button>
-              </div>
-              <select id="savedTrackingRequests"></select>
-            </div>
             <form class="tracking-box" id="trackingForm" novalidate>
               <div class="field">
                 <label for="trackingCode">รหัสคำร้อง</label
@@ -115,7 +108,7 @@ onMounted(async () => {
                   type="text"
                   required
                   aria-describedby="trackingCodeError"
-                  placeholder="เช่น CLN-123456789ABC"
+                  placeholder="เช่น CLN-123456-789ABC"
                   autocomplete="off"
                 />
                 <p
@@ -204,38 +197,3 @@ onMounted(async () => {
 
         </section>
 </template>
-
-<style scoped>
-.saved-tracking-heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-#clearSavedTracking {
-  justify-self: end;
-  width: fit-content;
-  min-height: 38px;
-  padding: 6px 14px;
-  border-radius: 10px;
-  font-size: 14px;
-  flex-shrink: 0;
-  background: #f1f5f8;
-  border-color: #dce5ec;
-  color: #60758a;
-  transition: background-color 0.2s ease, border-color 0.2s ease;
-}
-
-#clearSavedTracking:hover {
-  background: #e7eef4;
-  border-color: #c7d5e1;
-}
-
-@media (max-width: 600px) {
-  #clearSavedTracking {
-    margin-left: auto;
-  }
-}
-</style>
