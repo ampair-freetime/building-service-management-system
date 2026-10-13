@@ -468,3 +468,36 @@ def test_delete_location_requires_admin_and_existing_id(test_context) -> None:
     clerk = {"Authorization": f"Bearer {login.json()['access_token']}"}
     assert client.delete(path, headers=clerk).status_code == 403
     assert client.delete("/api/v1/admin/locations/999999", headers=headers).status_code == 404
+
+
+def test_room_floor_and_space_duplicates(test_context) -> None:
+    client, factory = test_context
+    headers = admin_headers(client, factory)
+    endpoint = "/api/v1/admin/locations"
+    wrong = client.post(endpoint, headers=headers, json={"floor": "1", "area": "Csb 209"})
+    assert wrong.status_code == 422
+    room = create_location(client, headers, floor="2", area="CSB209")
+    for name in ["Csb 209", "csb  209", "CS B 2 09", "Csb\t209"]:
+        duplicate = client.post(endpoint, headers=headers, json={"floor": "2", "area": name})
+        assert duplicate.status_code == 409
+    path = f"{endpoint}/{room['id']}"
+    assert client.patch(path, headers=headers, json={"floor": "1"}).status_code == 422
+    assert client.patch(path, headers=headers, json={"area": "CSB301"}).status_code == 422
+    assert client.patch(path, headers=headers,
+                        json={"floor": "3", "area": "CSB301"}).status_code == 200
+    other = create_location(client, headers, floor="3", area="CSB302")
+    assert client.patch(f"{endpoint}/{other['id']}", headers=headers,
+                        json={"area": "csb 301"}).status_code == 409
+
+
+def test_database_rejects_space_duplicate(test_context) -> None:
+    _, factory = test_context
+
+    async def insert_twice():
+        async with factory() as session:
+            session.add_all([Location(floor="2", area="CSB209"),
+                             Location(floor="2", area="Csb 209")])
+            await session.commit()
+
+    with pytest.raises(IntegrityError):
+        asyncio.run(insert_twice())

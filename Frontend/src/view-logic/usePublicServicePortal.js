@@ -1542,6 +1542,7 @@ export function usePublicServicePortal() {
         savedTrackingSelect.append(option);
       });
       document.getElementById("savedTrackingGroup").hidden = !savedTracking.length;
+      document.getElementById("clearSavedTracking").hidden = !savedTracking.length;
     }
     function rememberTracking(code, email, item = null) {
       code = code.trim().toUpperCase();

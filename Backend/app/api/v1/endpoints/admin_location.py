@@ -16,6 +16,7 @@ from app.schemas.admin_location import (
 )
 from app.services.admin_location import (
     DuplicateLocationError,
+    InvalidLocationFloorError,
     LocationInactiveError,
     LocationInUseError,
     LocationNotFoundError,
@@ -42,6 +43,8 @@ _T = TypeVar("_T")
 async def _call(operation: Awaitable[_T]) -> _T:
     try:
         return await operation
+    except InvalidLocationFloorError as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
     except LocationNotFoundError as exc:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except (
