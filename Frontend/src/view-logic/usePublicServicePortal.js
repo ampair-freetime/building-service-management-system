@@ -1437,9 +1437,14 @@ export function usePublicServicePortal() {
     renderSavedTracking();
     savedTrackingSelect.addEventListener("change", () => restoreTracking(savedTracking[Number(savedTrackingSelect.value)]));
     document.getElementById("clearSavedTracking").addEventListener("click", () => {
+      openUiModal("clearSavedTrackingModal", document.getElementById("clearSavedTracking"));
+    });
+    document.getElementById("confirmClearSavedTracking").addEventListener("click", () => {
+      closeUiModal("clearSavedTrackingModal", false);
       savedTracking = [];
       try { localStorage.removeItem(savedTrackingKey); } catch { }
       renderSavedTracking();
+      document.getElementById("trackingCode").focus();
     });
 
     async function loadTrackingStatus(
@@ -1465,9 +1470,7 @@ export function usePublicServicePortal() {
       isTrackingRequestPending = true;
       trackingResult.setAttribute("aria-busy", "true");
       trackingSubmitButton.disabled = true;
-      trackingSubmitButton.textContent = refreshed
-        ? "ตรวจสอบสถานะ"
-        : "กำลังตรวจสอบ…";
+      trackingSubmitButton.textContent = "กำลังตรวจสอบ…";
 
       try {
         const isLostFoundCode =

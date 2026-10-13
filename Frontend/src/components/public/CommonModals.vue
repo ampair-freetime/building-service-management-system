@@ -1,4 +1,37 @@
 <template>
+      <div
+        class="ui-modal"
+        id="clearSavedTrackingModal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="clearSavedTrackingTitle"
+        aria-describedby="clearSavedTrackingDescription"
+      >
+        <section class="ui-modal-card compact">
+          <header class="ui-modal-head">
+            <h2 id="clearSavedTrackingTitle">ล้างรายการที่บันทึกไว้?</h2>
+            <button
+              type="button"
+              class="modal-close"
+              data-modal-close="clearSavedTrackingModal"
+              aria-label="ปิด"
+            >
+              <svg class="icon"><use href="#i-close" /></svg>
+            </button>
+          </header>
+          <p class="modal-copy" id="clearSavedTrackingDescription">
+            รายการที่บันทึกไว้ในเครื่องนี้จะถูกล้างทั้งหมด โดยคำร้องที่ส่งไว้ยังสามารถติดตามสถานะได้ตามปกติ
+          </p>
+          <div class="modal-actions">
+            <button type="button" class="secondary" data-modal-close="clearSavedTrackingModal">
+              ยกเลิก
+            </button>
+            <button type="button" class="primary-btn" id="confirmClearSavedTracking">
+              ยืนยันล้างรายการ
+            </button>
+          </div>
+        </section>
+      </div>
 <div
         class="ui-modal"
         id="serviceChooserModal"
@@ -93,6 +126,15 @@
 </template>
 
 <style scoped>
+#confirmClearSavedTracking {
+  background: linear-gradient(135deg, #ad5555, #bd6868);
+  border: 0;
+  color: #fff;
+  box-shadow: 0 10px 24px rgba(173, 85, 85, 0.24);
+}
+#confirmClearSavedTracking:hover {
+  box-shadow: 0 14px 30px rgba(173, 85, 85, 0.28);
+}
 .success-request-details {
   width: 100%;
   margin: 18px 0 0;
