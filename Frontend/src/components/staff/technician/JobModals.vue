@@ -361,7 +361,7 @@
           </div>
           <div class="field">
             <label for="completeDate">วันและเวลาปิดงาน</label
-            ><input id="completeDate" type="datetime-local" required />
+            ><input id="completeDate" type="datetime-local" data-default-now required />
           </div>
           <button type="submit" class="primary" style="width: 100%">
             ยืนยันปิดงาน

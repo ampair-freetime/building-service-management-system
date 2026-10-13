@@ -2,7 +2,7 @@
 <section class="page" id="page-jobs">
           <div class="section-title">
             <div>
-              <div class="eyebrow">Shared work queue</div>
+              <div class="eyebrow" id="jobsEyebrow">Shared work queue</div>
               <h2 id="jobsTitle">ศูนย์รับงานรวม</h2>
               <!-- <p id="jobsSubtitle">
                 Staff ทุกคนในบทบาทเห็นงานใหม่ร่วมกัน และกดรับงานก่อนอัปเดตสถานะ

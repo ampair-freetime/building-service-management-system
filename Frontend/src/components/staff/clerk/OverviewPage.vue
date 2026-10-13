@@ -3,8 +3,7 @@
     <div class="section-title">
       <div>
         <div class="eyebrow">Clerk approvals</div>
-        <h2>ภาพรวมงานอนุมัติ</h2>
-        <p>ติดตามรายการที่ต้องตรวจสอบและเปิดรายละเอียดเพื่อดำเนินการต่อ</p>
+        <h2>ภาพรวมงาน</h2>
       </div>
     </div>
     <div class="metrics" id="clerkApprovalMetrics" aria-live="polite"></div>

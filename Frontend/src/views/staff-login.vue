@@ -109,7 +109,7 @@ const {
                 id="staff-id"
                 v-model="identifier"
                 autocomplete="username"
-                placeholder="example@gmail.com"
+                placeholder="name@example.com"
                 required
                 aria-describedby="staffIdError"
                 :aria-invalid="String(Boolean(identifierError))"
@@ -219,7 +219,7 @@ const {
               v-model="resetEmail"
               type="email"
               required
-              placeholder="name@cmu.ac.th"
+              placeholder="name@example.com"
               aria-describedby="resetEmailError"
               :aria-invalid="String(Boolean(resetEmailError))"
               @blur="validateResetEmail"

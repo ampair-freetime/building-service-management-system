@@ -4,7 +4,6 @@
       <div>
         <div class="eyebrow">Notification Center</div>
         <h2 id="notificationTitle">ศูนย์การแจ้งเตือน</h2>
-        <p>ติดตามงานใหม่ การเปลี่ยนแปลงสถานะ และรายการที่ต้องดำเนินการ</p>
       </div>
       <button type="button" class="notification-mark-all" id="markAllRead">
         <svg class="icon" aria-hidden="true"><use href="#i-check" /></svg>
