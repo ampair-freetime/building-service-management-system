@@ -50,9 +50,13 @@ staff_accounts = sa.table(
 
 def upgrade() -> None:
     """สร้าง initial admin เมื่อยังไม่มี id, employee code หรือ email เดียวกัน."""
-    # production ห้ามมีบัญชีที่รหัสผ่านเปิดเผย: admin คนแรกสร้างด้วย scripts/bootstrap_admin.py
-    if settings.environment == "production":
+    # Keep revision/schema history intact; only fresh development databases get this seed.
+    # A later migration cannot safely prevent this insert without deleting existing data.
+    from app.core.config import settings
+
+    if settings.environment != "development":
         return
+
     op.execute(
         postgresql.insert(staff_accounts)
         .values(

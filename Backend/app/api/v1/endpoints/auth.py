@@ -58,11 +58,42 @@ def _password_reset_limiter(request: Request) -> SlidingWindowRateLimiter:
     return limiter
 
 
+def _login_limiters(request: Request) -> tuple[SlidingWindowRateLimiter, SlidingWindowRateLimiter]:
+    """(per IP + email, per IP) failure counters, one pair per application instance."""
+    limiters = getattr(request.app.state, "login_limiters", None)
+    if limiters is None:
+        window = settings.login_failure_window_seconds
+        limiters = (
+            SlidingWindowRateLimiter(
+                limit=settings.login_account_failure_limit, window_seconds=window
+            ),
+            SlidingWindowRateLimiter(limit=settings.login_ip_failure_limit, window_seconds=window),
+        )
+        request.app.state.login_limiters = limiters
+    return limiters
+
+
 @router.post("/login", response_model=LoginResponse)
-async def login(payload: LoginRequest, session: DbSession) -> LoginResponse:
+async def login(payload: LoginRequest, request: Request, session: DbSession) -> LoginResponse:
     """ตรวจข้อมูลล็อกอินและคืน JWT พร้อมข้อมูลพนักงานเมื่อสำเร็จ."""
+    # Keyed by IP + email rather than email alone, so an attacker cannot lock a real
+    # user out by failing on purpose from somewhere else.
+    client_ip = request.client.host if request.client else "unknown"
+    account_key = f"{client_ip}|{payload.identifier.strip().lower()}"
+    account_limiter, ip_limiter = _login_limiters(request)
+    if account_limiter.is_limited(account_key) or ip_limiter.is_limited(client_ip):
+        logger.warning("Login rate-limited; client_ip=%s", client_ip)
+        minutes = max(1, settings.login_failure_window_seconds // 60)
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"เข้าสู่ระบบผิดหลายครั้งเกินไป กรุณารอประมาณ {minutes} นาทีแล้วลองใหม่",
+            headers={"Retry-After": str(settings.login_failure_window_seconds)},
+        )
+
     account = await authenticate_staff(session, payload.identifier, payload.password)
     if account is None:
+        account_limiter.record(account_key)
+        ip_limiter.record(client_ip)
         # ใช้ข้อความเดียวกันทั้งกรณีไม่พบบัญชีและรหัสผ่านผิด เพื่อลดการเดาบัญชี
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -70,6 +101,7 @@ async def login(payload: LoginRequest, session: DbSession) -> LoginResponse:
             headers={"WWW-Authenticate": "Bearer"},
         )
 
+    account_limiter.reset(account_key)
     await record_successful_login(session, account)
     token = create_access_token(account.id, account.role.value)
     return LoginResponse(access_token=token, staff=StaffResponse.model_validate(account))

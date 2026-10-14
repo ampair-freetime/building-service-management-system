@@ -48,6 +48,11 @@ class Settings(BaseSettings):
     password_reset_cooldown_seconds: int = Field(default=60, ge=0, le=3600)
     password_reset_ip_limit: int = Field(default=10, ge=1, le=1000)
     password_reset_ip_window_seconds: int = Field(default=900, ge=1, le=86400)
+    # Login brute-force guard (process memory, single worker). Only failures count:
+    # per client IP + email, and per client IP across all emails.
+    login_account_failure_limit: int = Field(default=5, ge=1, le=100)
+    login_ip_failure_limit: int = Field(default=20, ge=1, le=1000)
+    login_failure_window_seconds: int = Field(default=900, ge=60, le=86400)
     # ไม่ตั้ง SMTP_HOST = สร้างบัญชีได้ แต่ตอบ email_sent=false
     smtp_host: str | None = None
     smtp_port: int = Field(default=587, ge=1, le=65535)

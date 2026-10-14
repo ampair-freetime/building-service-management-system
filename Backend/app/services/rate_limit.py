@@ -28,19 +28,34 @@ class SlidingWindowRateLimiter:
 
     def allow(self, key: str) -> bool:
         """Record a hit and report whether it is within the limit."""
+        if self.is_limited(key):
+            return False
+        self.record(key)
+        return True
+
+    def is_limited(self, key: str) -> bool:
+        """Report whether ``key`` already used its limit, without recording a hit."""
+        hits = self._hits.get(key)
+        if hits is None:
+            return False
+        cutoff = self._clock() - self.window_seconds
+        while hits and hits[0] <= cutoff:
+            hits.popleft()
+        return len(hits) >= self.limit
+
+    def record(self, key: str) -> None:
+        """Count one hit, e.g. a failed login, for ``key``."""
         now = self._clock()
-        cutoff = now - self.window_seconds
         hits = self._hits.get(key)
         if hits is None:
             if len(self._hits) >= self.max_keys:
-                self._prune(cutoff)
+                self._prune(now - self.window_seconds)
             hits = self._hits[key] = deque()
-        while hits and hits[0] <= cutoff:
-            hits.popleft()
-        if len(hits) >= self.limit:
-            return False
         hits.append(now)
-        return True
+
+    def reset(self, key: str) -> None:
+        """Forget ``key``, e.g. after a successful login."""
+        self._hits.pop(key, None)
 
     def _prune(self, cutoff: float) -> None:
         # Drop idle keys so a flood of distinct addresses cannot grow memory forever.

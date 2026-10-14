@@ -245,9 +245,19 @@ onBeforeUnmount(() => {
         <div v-else-if="errorMessage" class="clerk-admin-state" role="alert">{{ errorMessage }}</div>
         <div v-else-if="!claims.length" class="clerk-admin-state" role="status">ไม่มีคำขอรับของคืนในช่วงที่เลือก</div>
         <div v-else class="clerk-admin-item-list">
-          <article v-for="item in claims" :key="item.id">
-            <div><strong>{{ item.item_name }}</strong><small>{{ item.claim_code }}</small><span>ผู้ขอ: {{ item.claimant_name }}</span></div>
-            <div><strong>{{ claimStatusLabel(item) }}</strong><time :datetime="item.submission_date">{{ new Date(item.submission_date).toLocaleString('th-TH') }}</time></div>
+          <article v-for="item in claims" :key="item.id" class="clerk-admin-claim-card">
+            <div class="clerk-admin-claim-main">
+              <div class="clerk-admin-claim-heading">
+                <strong>{{ item.item_name }}</strong>
+                <small>{{ item.claim_code }}</small>
+              </div>
+              <span class="clerk-admin-claimant">ผู้ขอ: {{ item.claimant_name }}</span>
+            </div>
+            <div class="clerk-admin-claim-status">
+              <strong class="clerk-admin-status-pill" :data-status="item.return_status || item.status">{{ claimStatusLabel(item) }}</strong>
+              <small>วันที่ส่งคำขอ</small>
+              <time :datetime="item.submission_date">{{ new Date(item.submission_date).toLocaleString('th-TH') }}</time>
+            </div>
             <button class="small-btn" type="button" :aria-expanded="selectedClaimId === item.id" @click="selectedClaimId = selectedClaimId === item.id ? null : item.id">{{ selectedClaimId === item.id ? 'ซ่อนข้อมูล' : 'ดูรายละเอียด' }}</button>
             <div v-if="selectedClaimId === item.id" class="clerk-admin-request-details">
               <div><span>อีเมลผู้ขอ</span><strong>{{ item.claimant_email }}</strong></div>

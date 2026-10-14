@@ -15,6 +15,7 @@ from app.schemas.admin_location import (
     AdminLocationCreate,
     AdminLocationResponse,
     AdminLocationUpdate,
+    validate_room_floor,
 )
 
 
@@ -24,6 +25,10 @@ class LocationNotFoundError(LookupError):
 
 class DuplicateLocationError(ValueError):
     """มี location ที่มี floor และ area เดียวกันแล้ว."""
+
+
+class InvalidLocationFloorError(ValueError):
+    """Room code and selected floor disagree."""
 
 
 class LocationInactiveError(ValueError):
@@ -98,11 +103,11 @@ async def list_locations(
 async def _duplicate_exists(
     session: AsyncSession, *, floor: str | None, area: str, ignore_id: int | None = None
 ) -> bool:
-    # เปรียบเทียบแบบไม่แยกตัวพิมพ์ เพื่อให้ "Lobby" กับ "LOBBY"
+    # เปรียบเทียบแบบไม่แยกตัวพิมพ์และช่องว่าง เช่น "CSB209" กับ "Csb 209"
     # เป็นสถานที่เดียวกัน โดยยังเก็บรูปแบบข้อความที่ผู้ใช้กรอกไว้สำหรับแสดงผล
     statement = select(Location.id).where(
         func.lower(func.coalesce(Location.floor, "")) == (floor or "").lower(),
-        func.lower(Location.area) == area.lower(),
+        func.lower(func.replace(Location.area, " ", "")) == area.replace(" ", "").lower(),
     )
     if ignore_id is not None:
         statement = statement.where(Location.id != ignore_id)
@@ -139,6 +144,10 @@ async def update_location(
         return to_admin_response(location)
     floor = changes.get("floor", location.floor)
     area = changes.get("area", location.area)
+    try:
+        validate_room_floor(floor, area)
+    except ValueError as exc:
+        raise InvalidLocationFloorError(str(exc)) from exc
     if (floor, area) != (location.floor, location.area) and await _duplicate_exists(
         session, floor=floor, area=area, ignore_id=location_id
     ):

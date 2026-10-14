@@ -1,5 +1,6 @@
 """Dependencies ที่ FastAPI ใช้เปิด session, ตรวจ JWT และตรวจสิทธิ์ผู้ใช้."""
 
+import logging
 from datetime import UTC
 from typing import Annotated
 
@@ -17,6 +18,8 @@ from app.services.object_storage import (
     get_object_storage,
 )
 from app.services.staff import get_staff_by_id
+
+logger = logging.getLogger(__name__)
 
 # ปิด auto_error เพื่อให้ทุกกรณี token ผิดตอบด้วยข้อความ 401 รูปแบบเดียวกัน
 bearer_scheme = HTTPBearer(auto_error=False)
@@ -127,6 +130,8 @@ def provide_object_storage() -> ObjectStorage:
     try:
         return get_object_storage()
     except StorageConfigurationError as exc:
+        # The message lists only the missing variable names, never their values.
+        logger.warning("Image storage unavailable: %s", exc)
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="ระบบจัดเก็บรูปภาพยังไม่ได้ตั้งค่า",

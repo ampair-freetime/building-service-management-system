@@ -1,5 +1,6 @@
 """Cloudflare R2 adapter ที่ซ่อนรายละเอียดของ S3-compatible API จาก business logic."""
 
+import logging
 from dataclasses import dataclass
 from functools import lru_cache
 
@@ -10,6 +11,8 @@ from fastapi.concurrency import run_in_threadpool
 
 from app.core.config import Settings, settings
 
+logger = logging.getLogger(__name__)
+
 
 class StorageConfigurationError(RuntimeError):
     """R2 credentials หรือชื่อ bucket ยังตั้งค่าไม่ครบ."""
@@ -17,6 +20,17 @@ class StorageConfigurationError(RuntimeError):
 
 class StorageOperationError(RuntimeError):
     """R2 ปฏิเสธคำสั่งหรือไม่สามารถเชื่อมต่อได้."""
+
+
+def _log_failure(operation: str, exc: BotoCoreError | ClientError) -> None:
+    """Log why R2 failed so operators can tell bad credentials from a network problem.
+
+    Only the exception class and R2's error code are logged: never keys, URLs or bodies.
+    """
+    reason = type(exc).__name__
+    if isinstance(exc, ClientError):
+        reason += f" {exc.response.get('Error', {}).get('Code', 'unknown')}"
+    logger.warning("R2 %s failed: %s", operation, reason)
 
 
 @dataclass(frozen=True)
@@ -84,6 +98,7 @@ class ObjectStorage:
                 CacheControl="private, no-store",
             )
         except (BotoCoreError, ClientError) as exc:
+            _log_failure("upload", exc)
             raise StorageOperationError("Unable to upload image to R2") from exc
 
         etag = response.get("ETag")
@@ -102,6 +117,7 @@ class ObjectStorage:
                 Key=object_key,
             )
         except (BotoCoreError, ClientError) as exc:
+            _log_failure("delete", exc)
             raise StorageOperationError("Unable to delete image from R2") from exc
 
     def create_download_url(self, object_key: str, expires_in: int | None = None) -> str:
@@ -113,6 +129,7 @@ class ObjectStorage:
                 ExpiresIn=expires_in or self.presigned_url_expire_seconds,
             )
         except (BotoCoreError, ClientError) as exc:
+            _log_failure("presign", exc)
             raise StorageOperationError("Unable to create image download URL") from exc
 
 

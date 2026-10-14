@@ -36,6 +36,22 @@ def test_sliding_window_prunes_idle_keys() -> None:
     assert set(limiter._hits) == {"c"}
 
 
+def test_failure_counting_checks_without_recording_and_resets() -> None:
+    now = [0.0]
+    limiter = SlidingWindowRateLimiter(limit=2, window_seconds=10, clock=lambda: now[0])
+    assert not limiter.is_limited("a")
+    assert not limiter.is_limited("a")  # checking alone never uses up the limit
+    limiter.record("a")
+    limiter.record("a")
+    assert limiter.is_limited("a")
+    limiter.reset("a")
+    assert not limiter.is_limited("a")
+    limiter.record("a")
+    limiter.record("a")
+    now[0] = 10.5
+    assert not limiter.is_limited("a")
+
+
 @pytest.mark.parametrize(
     ("password", "valid"),
     [

@@ -1,105 +1,150 @@
-# Production stack. Selected by COMPOSE_FILE in the server's .env (see README).
-# Only the frontend Nginx is published, and only on 127.0.0.1: the host Nginx
-# terminates HTTPS and forwards to it. Docker-published ports bypass ufw.
+# Production stack. Use this file alone, never merged with development compose.yaml.
+# On the server, .env (copied from .env.production.example) sets
+# COMPOSE_FILE=compose.production.yaml, so plain `docker compose ...` uses this file.
+name: ${PRODUCTION_PROJECT_NAME:-cs-building-care-production}
 
-x-logging: &logging
-  driver: json-file
-  options:
-    max-size: 10m
-    max-file: "5"
+x-runtime: &runtime
+  restart: unless-stopped
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "5"
 
 services:
   database:
+    <<: *runtime
     image: postgres:16-alpine
-    restart: unless-stopped
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-building_service}
-      POSTGRES_USER: ${POSTGRES_USER:-building_service}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB in .env}
+      POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    networks:
+      - data
     healthcheck:
-      test:
-        - CMD-SHELL
-        - pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}
-      interval: 5s
-      timeout: 5s
-      retries: 10
-    logging: *logging
-
-  backend:
-    build: ./Backend
-    restart: unless-stopped
-    # Migrations run on every start; alembic skips revisions that are already applied.
-    command: ["python", "scripts/start_server.py", "--host", "0.0.0.0", "--migrate"]
-    environment:
-      ENVIRONMENT: production
-      BSMS_ENV_FILE: ""
-      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-building_service}:${POSTGRES_PASSWORD}@database:5432/${POSTGRES_DB:-building_service}
-      JWT_SECRET_KEY: ${JWT_SECRET_KEY:?set JWT_SECRET_KEY in .env}
-      IMAGE_URL_SECRET: ${IMAGE_URL_SECRET:?set IMAGE_URL_SECRET in .env}
-      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:?set PUBLIC_BASE_URL in .env}
-      BACKEND_CORS_ORIGINS: ${BACKEND_CORS_ORIGINS:?set BACKEND_CORS_ORIGINS in .env}
-      STAFF_ACTIVATION_URL: ${STAFF_ACTIVATION_URL:-}
-      # Only the frontend Nginx can reach this port. The host Nginx overwrites
-      # X-Forwarded-For, so the left-most address is the real client.
-      FORWARDED_ALLOW_IPS: "*"
-      SMTP_HOST: ${SMTP_HOST:-}
-      SMTP_PORT: ${SMTP_PORT:-587}
-      SMTP_USERNAME: ${SMTP_USERNAME:-}
-      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
-      SMTP_USE_STARTTLS: ${SMTP_USE_STARTTLS:-true}
-      SMTP_USE_SSL: ${SMTP_USE_SSL:-false}
-      SMTP_TIMEOUT_SECONDS: ${SMTP_TIMEOUT_SECONDS:-10}
-      MAIL_FROM: ${MAIL_FROM:?set MAIL_FROM in .env}
-      GUEST_EMAIL_PER_RECIPIENT_LIMIT: ${GUEST_EMAIL_PER_RECIPIENT_LIMIT:-5}
-      GUEST_EMAIL_PER_RECIPIENT_WINDOW_SECONDS: ${GUEST_EMAIL_PER_RECIPIENT_WINDOW_SECONDS:-3600}
-      R2_ACCOUNT_ID: ${R2_ACCOUNT_ID:?set R2_ACCOUNT_ID in .env}
-      R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID:?set R2_ACCESS_KEY_ID in .env}
-      R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY:?set R2_SECRET_ACCESS_KEY in .env}
-      R2_BUCKET_NAME: ${R2_BUCKET_NAME:?set R2_BUCKET_NAME in .env}
-      R2_PRESIGNED_URL_EXPIRE_SECONDS: ${R2_PRESIGNED_URL_EXPIRE_SECONDS:-28800}
-      IMAGE_REDIRECT_URL_EXPIRE_SECONDS: ${IMAGE_REDIRECT_URL_EXPIRE_SECONDS:-300}
-      R2_CONNECT_TIMEOUT_SECONDS: ${R2_CONNECT_TIMEOUT_SECONDS:-5}
-      R2_READ_TIMEOUT_SECONDS: ${R2_READ_TIMEOUT_SECONDS:-15}
-      R2_TOTAL_MAX_ATTEMPTS: ${R2_TOTAL_MAX_ATTEMPTS:-2}
-      MAX_IMAGE_UPLOAD_BYTES: ${MAX_IMAGE_UPLOAD_BYTES:-10485760}
-      MAX_GUEST_IMAGES: ${MAX_GUEST_IMAGES:-5}
-      MAX_IMAGE_PIXELS: ${MAX_IMAGE_PIXELS:-50000000}
-      IMAGE_MAX_DIMENSION: ${IMAGE_MAX_DIMENSION:-2048}
-      IMAGE_WEBP_QUALITY: ${IMAGE_WEBP_QUALITY:-78}
-      MAX_IMAGE_OUTPUT_BYTES: ${MAX_IMAGE_OUTPUT_BYTES:-1048576}
-      MAX_IMAGE_PROCESSING_CONCURRENCY: ${MAX_IMAGE_PROCESSING_CONCURRENCY:-1}
-    expose:
-      - "8000"
-    healthcheck:
-      test:
-        - CMD
-        - python
-        - -c
-        - import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)
+      test: [CMD-SHELL, 'pg_isready -h 127.0.0.1 -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"']
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 60s
+      start_period: 30s
+
+  backend:
+    <<: *runtime
+    build:
+      context: ./Backend
+    # One worker, bounded concurrency, no reload and no automatic migrations.
+    command: [python, scripts/start_server.py, --host, 0.0.0.0, --port, "8000"]
+    environment:
+      ENVIRONMENT: production
+      BSMS_ENV_FILE: ""
+      # Compose is the authority for Docker DB credentials, not standalone DATABASE_URL.
+      # Use URL-safe DB/user names and a random hex password; see README.
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:?Set POSTGRES_USER}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@database:5432/${POSTGRES_DB:?Set POSTGRES_DB}
+      APP_NAME: '${APP_NAME:-CS Building Care}'
+      API_V1_PREFIX: /api/v1
+      PUBLIC_BASE_URL: '${PUBLIC_BASE_URL:?Set PUBLIC_BASE_URL in .env}'
+      BACKEND_CORS_ORIGINS: '${BACKEND_CORS_ORIGINS:?Set BACKEND_CORS_ORIGINS in .env}'
+      STAFF_ACTIVATION_URL: '${STAFF_ACTIVATION_URL:-}'
+      STAFF_PASSWORD_RESET_URL: '${STAFF_PASSWORD_RESET_URL:-}'
+      JWT_SECRET_KEY: '${JWT_SECRET_KEY:?Set JWT_SECRET_KEY in .env}'
+      IMAGE_URL_SECRET: '${IMAGE_URL_SECRET:?Set IMAGE_URL_SECRET in .env}'
+      JWT_ALGORITHM: '${JWT_ALGORITHM:-HS256}'
+      ACCESS_TOKEN_EXPIRE_MINUTES: '${ACCESS_TOKEN_EXPIRE_MINUTES:-480}'
+      INVITATION_TOKEN_EXPIRE_HOURS: '${INVITATION_TOKEN_EXPIRE_HOURS:-24}'
+      PASSWORD_RESET_TOKEN_EXPIRE_MINUTES: '${PASSWORD_RESET_TOKEN_EXPIRE_MINUTES:-30}'
+      PASSWORD_RESET_COOLDOWN_SECONDS: '${PASSWORD_RESET_COOLDOWN_SECONDS:-60}'
+      PASSWORD_RESET_IP_LIMIT: '${PASSWORD_RESET_IP_LIMIT:-10}'
+      PASSWORD_RESET_IP_WINDOW_SECONDS: '${PASSWORD_RESET_IP_WINDOW_SECONDS:-900}'
+      LOGIN_ACCOUNT_FAILURE_LIMIT: '${LOGIN_ACCOUNT_FAILURE_LIMIT:-5}'
+      LOGIN_IP_FAILURE_LIMIT: '${LOGIN_IP_FAILURE_LIMIT:-20}'
+      LOGIN_FAILURE_WINDOW_SECONDS: '${LOGIN_FAILURE_WINDOW_SECONDS:-900}'
+      # R2 is required: guest lost/found reports always store a photo.
+      R2_ACCOUNT_ID: '${R2_ACCOUNT_ID:?Set R2_ACCOUNT_ID in .env}'
+      R2_ACCESS_KEY_ID: '${R2_ACCESS_KEY_ID:?Set R2_ACCESS_KEY_ID in .env}'
+      R2_SECRET_ACCESS_KEY: '${R2_SECRET_ACCESS_KEY:?Set R2_SECRET_ACCESS_KEY in .env}'
+      R2_BUCKET_NAME: '${R2_BUCKET_NAME:?Set R2_BUCKET_NAME in .env}'
+      R2_PRESIGNED_URL_EXPIRE_SECONDS: '${R2_PRESIGNED_URL_EXPIRE_SECONDS:-28800}'
+      IMAGE_REDIRECT_URL_EXPIRE_SECONDS: '${IMAGE_REDIRECT_URL_EXPIRE_SECONDS:-300}'
+      R2_CONNECT_TIMEOUT_SECONDS: '${R2_CONNECT_TIMEOUT_SECONDS:-5}'
+      R2_READ_TIMEOUT_SECONDS: '${R2_READ_TIMEOUT_SECONDS:-15}'
+      R2_TOTAL_MAX_ATTEMPTS: '${R2_TOTAL_MAX_ATTEMPTS:-2}'
+      SMTP_HOST: '${SMTP_HOST:-}'
+      SMTP_PORT: '${SMTP_PORT:-587}'
+      SMTP_USERNAME: '${SMTP_USERNAME:-}'
+      SMTP_PASSWORD: '${SMTP_PASSWORD:-}'
+      SMTP_USE_STARTTLS: '${SMTP_USE_STARTTLS:-true}'
+      SMTP_USE_SSL: '${SMTP_USE_SSL:-false}'
+      SMTP_TIMEOUT_SECONDS: '${SMTP_TIMEOUT_SECONDS:-10}'
+      MAIL_FROM: '${MAIL_FROM:?Set MAIL_FROM in .env}'
+      GUEST_EMAIL_PER_RECIPIENT_LIMIT: '${GUEST_EMAIL_PER_RECIPIENT_LIMIT:-5}'
+      GUEST_EMAIL_PER_RECIPIENT_WINDOW_SECONDS: '${GUEST_EMAIL_PER_RECIPIENT_WINDOW_SECONDS:-3600}'
+      MAX_IMAGE_UPLOAD_BYTES: '${MAX_IMAGE_UPLOAD_BYTES:-10485760}'
+      MAX_GUEST_IMAGES: '${MAX_GUEST_IMAGES:-5}'
+      MAX_IMAGE_PIXELS: '${MAX_IMAGE_PIXELS:-50000000}'
+      IMAGE_MAX_DIMENSION: '${IMAGE_MAX_DIMENSION:-2048}'
+      IMAGE_WEBP_QUALITY: '${IMAGE_WEBP_QUALITY:-78}'
+      MAX_IMAGE_OUTPUT_BYTES: '${MAX_IMAGE_OUTPUT_BYTES:-1048576}'
+      MAX_IMAGE_PROCESSING_CONCURRENCY: '${MAX_IMAGE_PROCESSING_CONCURRENCY:-1}'
+      DEFAULT_CUSTODY_LOCATION: '${DEFAULT_CUSTODY_LOCATION:-ห้องธุรการ ชั้น 1}'
+      # Trust X-Forwarded-For only from the frontend Nginx on the "app" network,
+      # so logs and rate limits see the real client IP instead of Nginx's.
+      FORWARDED_ALLOW_IPS: '${APP_SUBNET:-172.30.80.0/24}'
+    networks:
+      - app
+      - data
     depends_on:
       database:
         condition: service_healthy
-    logging: *logging
+    healthcheck:
+      # Existing /health is liveness, not schema/DB/SMTP/R2 readiness.
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3).close()"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
 
   frontend:
+    <<: *runtime
     build:
       context: ./Frontend
       target: production
       args:
         VITE_API_BASE_URL: /api/v1
-    restart: unless-stopped
+    environment:
+      # Requests arriving through this network's gateway (the host Nginx) may set X-Forwarded-For.
+      TRUSTED_PROXY_CIDR: '${APP_SUBNET:-172.30.80.0/24}'
     ports:
-      - 127.0.0.1:${FRONTEND_PORT:-8080}:8080
+      - "${FRONTEND_BIND_ADDRESS:-127.0.0.1}:${FRONTEND_PORT:-8080}:8080"
+    networks:
+      - app
     depends_on:
       backend:
         condition: service_healthy
-    logging: *logging
+    healthcheck:
+      test: [CMD, wget, --quiet, --spider, --timeout=3, http://127.0.0.1:8080/]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+networks:
+  # Backend needs outbound access to R2/SMTP; do not mark this network internal.
+  app:
+    driver: bridge
+    # Fixed so the backend and Nginx know which proxies to trust. Change APP_SUBNET
+    # only if it overlaps another network on the host.
+    ipam:
+      config:
+        - subnet: ${APP_SUBNET:-172.30.80.0/24}
+  # Database has no host port and only shares this isolated network with backend.
+  data:
+    driver: bridge
+    internal: true
 
 volumes:
   postgres_data:
+    # Distinct from development and stable even when the Compose project name changes.
+    # Never select an existing volume without inspecting/backing up its contents first.
+    name: ${POSTGRES_VOLUME_NAME:-cs_building_care_production_postgres_data}

@@ -1832,6 +1832,18 @@ body {
   min-width: 0;
 }
 
+#staffModal #staffForm input {
+  background: #fff;
+}
+
+#staffModal #staffForm input:-webkit-autofill,
+#staffModal #staffForm input:-webkit-autofill:hover,
+#staffModal #staffForm input:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--ink);
+  -webkit-box-shadow: 0 0 0 1000px #fff inset;
+  caret-color: var(--ink);
+}
+
 #staffModal #staffForm > .field,
 #staffModal #staffForm > .form-row,
 #staffModal #staffForm > .form-row > .field {
@@ -2476,15 +2488,24 @@ textarea:focus-visible,
 #page-my-history .history-filter-panel label { display: grid; gap: 8px; min-width: 0; }
 .staff-dashboard-page #page-my-history .history-filter-panel {
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(12, minmax(0, 1fr));
   align-items: end;
   width: 100%;
 }
 .staff-dashboard-page #page-my-history .history-filter-panel > label:nth-child(-n + 2) {
-  grid-column: span 3;
+  grid-column: span 6;
   width: 100%;
 }
-.staff-dashboard-page #page-my-history .history-filter-panel > :nth-child(n + 3) {
+.staff-dashboard-page #page-my-history .history-filter-panel > #myHistoryType,
+.staff-dashboard-page #page-my-history .history-filter-panel > .filter-select-dropdown:has(> #myHistoryType) {
+  grid-column: span 4;
+  width: 100%;
+  min-width: 0;
+}
+.staff-dashboard-page #page-my-history .history-filter-panel > #myHistorySearch {
+  grid-column: span 4;
+}
+.staff-dashboard-page #page-my-history .history-filter-panel > :is(#resetMyHistoryFilters, #applyMyHistoryFilters) {
   grid-column: span 2;
   width: 100%;
   min-width: 0;
@@ -2492,7 +2513,7 @@ textarea:focus-visible,
 .staff-dashboard-page #page-my-history .date-picker-dropdown {
   width: 100%;
 }
-.staff-dashboard-page #page-my-history .history-filter-panel :is(input.field-compact, .filter-select-trigger, .date-picker-trigger, #resetMyHistoryFilters) {
+.staff-dashboard-page #page-my-history .history-filter-panel :is(input.field-compact, .filter-select-trigger, .date-picker-trigger, #resetMyHistoryFilters, #applyMyHistoryFilters) {
   height: 58px;
   min-height: 58px;
   box-sizing: border-box;
@@ -2664,9 +2685,13 @@ textarea:focus-visible,
   color: #fff;
 }
 .timeline.lost-found-progress .timeline-item > div { min-width: 0; }
-.timeline.lost-found-progress .timeline-item strong { line-height: 1.45; }
+.timeline.lost-found-progress .timeline-item strong {
+  font-size: 11px;
+  line-height: 1.45;
+}
 .timeline.lost-found-progress .timeline-item small {
   margin-top: 3px;
+  font-size: 9px;
   line-height: 1.4;
   overflow-wrap: anywhere;
 }
@@ -5429,9 +5454,19 @@ body {
 
   .staff-dashboard-page #page-my-history .history-filter-panel .search,
   .staff-dashboard-page #page-my-history .filter-select-trigger,
-  .staff-dashboard-page #page-my-history #resetMyHistoryFilters {
+  .staff-dashboard-page #page-my-history #resetMyHistoryFilters,
+  .staff-dashboard-page #page-my-history #applyMyHistoryFilters {
     width: 100%;
     min-width: 0;
+  }
+
+  .staff-dashboard-page #page-my-history .history-filter-panel > :is(#myHistoryType, #myHistorySearch),
+  .staff-dashboard-page #page-my-history .history-filter-panel > .filter-select-dropdown:has(> #myHistoryType) {
+    grid-column: 1 / -1;
+  }
+
+  .staff-dashboard-page #page-my-history .history-filter-panel > :is(#resetMyHistoryFilters, #applyMyHistoryFilters) {
+    grid-column: span 1;
   }
 }
 
@@ -6720,17 +6755,21 @@ body:has(.staff-dashboard-page) {
 
 .staff-dashboard-page .clerk-admin-filters {
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(12, minmax(0, 1fr));
   align-items: end;
   gap: 12px;
   width: 100%;
   margin-bottom: 8px;
 }
 .staff-dashboard-page .clerk-admin-filters > label:nth-child(-n + 2) {
-  grid-column: span 3;
+  grid-column: span 6;
   width: 100%;
 }
-.staff-dashboard-page .clerk-admin-filters > :nth-child(n + 3) {
+.staff-dashboard-page .clerk-admin-filters > label:nth-child(3) {
+  grid-column: span 8;
+  width: 100%;
+}
+.staff-dashboard-page .clerk-admin-filters > button {
   grid-column: span 2;
   width: 100%;
   min-width: 0;
@@ -6819,6 +6858,7 @@ body:has(.staff-dashboard-page) {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 14px;
+  margin-top: 24px;
   margin-bottom: 20px;
 }
 .staff-dashboard-page .clerk-admin-metric {
@@ -6946,6 +6986,76 @@ body:has(.staff-dashboard-page) {
 .clerk-admin-item-list small {
   color: var(--muted);
 }
+.staff-dashboard-page .clerk-admin-claim-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 18px;
+  padding: 18px 20px;
+  border-color: #e6e8ee;
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 8px 24px rgba(30, 41, 59, 0.055);
+}
+.staff-dashboard-page .clerk-admin-claim-main {
+  display: grid;
+  gap: 7px;
+}
+.staff-dashboard-page .clerk-admin-claim-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px 12px;
+}
+.staff-dashboard-page .clerk-admin-claim-heading strong {
+  color: var(--text);
+  font-size: 16px;
+}
+.staff-dashboard-page .clerk-admin-claim-heading small {
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: #f1f4f8;
+  color: #667085;
+  font-size: 10px;
+  letter-spacing: 0.02em;
+}
+.staff-dashboard-page .clerk-admin-claimant {
+  font-size: 12px;
+}
+.staff-dashboard-page .clerk-admin-claim-status {
+  display: grid;
+  justify-items: end;
+  gap: 3px;
+  min-width: 165px;
+  text-align: right;
+}
+.staff-dashboard-page .clerk-admin-claim-status time {
+  color: var(--text);
+  font-size: 12px;
+  white-space: nowrap;
+}
+.staff-dashboard-page .clerk-admin-status-pill {
+  margin-bottom: 4px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: #fff3d6;
+  color: #96620b;
+  font-size: 11px;
+  white-space: nowrap;
+}
+.staff-dashboard-page .clerk-admin-status-pill[data-status="returned"],
+.staff-dashboard-page .clerk-admin-status-pill[data-status="completed"] {
+  background: #e5f6ec;
+  color: #237147;
+}
+.staff-dashboard-page .clerk-admin-status-pill[data-status="rejected"] {
+  background: #fdebed;
+  color: #ae3345;
+}
+.staff-dashboard-page .clerk-admin-claim-card > .small-btn {
+  min-width: 104px;
+  margin-left: 0;
+}
 @media (max-width: 800px) {
   .staff-dashboard-page .clerk-admin-metrics,
   .staff-dashboard-page .clerk-admin-grid,
@@ -6969,8 +7079,11 @@ body:has(.staff-dashboard-page) {
   .staff-dashboard-page .clerk-admin-filters > label:nth-child(-n + 2) {
     grid-column: span 1;
   }
-  .staff-dashboard-page .clerk-admin-filters > :nth-child(n + 3) {
+  .staff-dashboard-page .clerk-admin-filters > label:nth-child(3) {
     grid-column: 1 / -1;
+  }
+  .staff-dashboard-page .clerk-admin-filters > button {
+    grid-column: span 1;
   }
   .clerk-admin-item-list article {
     flex-direction: column;
@@ -7011,6 +7124,9 @@ body:has(.staff-dashboard-page) {
   padding-top: 12px;
   border-top: 1px solid var(--line);
 }
+.staff-dashboard-page .clerk-admin-claim-card > .clerk-admin-request-details {
+  grid-column: 1 / -1;
+}
 .clerk-admin-request-details > div {
   display: grid;
   gap: 2px;
@@ -7025,6 +7141,19 @@ body:has(.staff-dashboard-page) {
 @media (max-width: 520px) {
   .clerk-admin-request-details {
     grid-template-columns: 1fr;
+  }
+  .staff-dashboard-page .clerk-admin-claim-card {
+    grid-template-columns: 1fr;
+    gap: 14px;
+    padding: 16px;
+  }
+  .staff-dashboard-page .clerk-admin-claim-status {
+    justify-items: start;
+    min-width: 0;
+    text-align: left;
+  }
+  .staff-dashboard-page .clerk-admin-claim-card > .small-btn {
+    width: 100%;
   }
 }
 
@@ -7431,6 +7560,15 @@ body:has(.staff-dashboard-page) {
   flex: 1;
   min-width: 230px;
 }
+.staff-dashboard-page .custody-toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.staff-dashboard-page .custody-toolbar-actions button {
+  min-height: 50px;
+  white-space: nowrap;
+}
 .staff-dashboard-page .custody-toolbar input,
 .staff-dashboard-page .custody-toolbar select {
   width: 100%;
@@ -7487,6 +7625,8 @@ body:has(.staff-dashboard-page) {
   .staff-dashboard-page .clerk-custody-page .custody-heading { align-items: start; flex-direction: column; }
   .staff-dashboard-page .custody-toolbar { padding: 16px; }
   .staff-dashboard-page .custody-toolbar label { min-width: 100%; }
+  .staff-dashboard-page .custody-toolbar-actions { width: 100%; }
+  .staff-dashboard-page .custody-toolbar-actions button { flex: 1; }
   .staff-dashboard-page .custody-list-heading .tabs { display: flex; flex-wrap: wrap; }
 }
 /* หน้าต่างแจ้งเตือนส่วนกลาง */

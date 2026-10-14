@@ -16,6 +16,8 @@ ENV VITE_API_BASE_URL=${VITE_API_BASE_URL}
 RUN npm run build
 
 FROM nginxinc/nginx-unprivileged:1.28-alpine AS production
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+# The image renders templates into conf.d at start, filling in TRUSTED_PROXY_CIDR.
+ENV TRUSTED_PROXY_CIDR=172.30.80.0/24
+COPY nginx.conf /etc/nginx/templates/default.conf.template
 COPY --from=build /app/dist /usr/share/nginx/html
 EXPOSE 8080

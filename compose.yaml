@@ -65,6 +65,16 @@ services:
       database:
         condition: service_healthy
 
+  # Optional local inbox for testing staff invitations and password resets:
+  #   docker compose --profile mail up -d
+  # with SMTP_HOST=mailpit, SMTP_PORT=1025, SMTP_USE_STARTTLS=false in .env,
+  # then read the emails at http://localhost:8025
+  mailpit:
+    image: axllent/mailpit:v1.27
+    profiles: [mail]
+    ports:
+      - 127.0.0.1:8025:8025
+
   frontend:
     build:
       context: ./Frontend

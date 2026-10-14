@@ -200,3 +200,39 @@ def test_successful_login_records_time_without_touching_updated_at(test_context)
     stored = asyncio.run(read())
     assert stored.last_login_at is not None
     assert stored.updated_at == account.updated_at
+
+
+def _login(client: TestClient, email: str, password: str):
+    return client.post("/api/v1/auth/login", json={"identifier": email, "password": password})
+
+
+def test_login_blocks_after_repeated_failures_and_success_resets_count(
+    test_context: tuple[TestClient, async_sessionmaker[AsyncSession]],
+) -> None:
+    client, session_factory = test_context
+    seed_staff(session_factory, email="admin@example.com", password="Right-pass1", role="admin")
+
+    for _ in range(4):
+        assert _login(client, "admin@example.com", "wrong").status_code == 401
+    # A success before the limit clears this email's failures.
+    assert _login(client, "admin@example.com", "Right-pass1").status_code == 200
+    for _ in range(5):
+        assert _login(client, "ADMIN@example.com", "wrong").status_code == 401
+
+    blocked = _login(client, "admin@example.com", "Right-pass1")
+    assert blocked.status_code == 429
+    assert blocked.headers["Retry-After"] == "900"
+    # Other accounts from the same client keep working until the per-IP limit.
+    seed_staff(session_factory, email="clerk@example.com", password="Right-pass1", role="clerk")
+    assert _login(client, "clerk@example.com", "Right-pass1").status_code == 200
+
+
+def test_login_per_ip_limit_covers_many_emails(
+    test_context: tuple[TestClient, async_sessionmaker[AsyncSession]],
+) -> None:
+    client, session_factory = test_context
+    seed_staff(session_factory, email="admin@example.com", password="Right-pass1", role="admin")
+
+    for number in range(20):
+        assert _login(client, f"guess{number}@example.com", "wrong").status_code == 401
+    assert _login(client, "admin@example.com", "Right-pass1").status_code == 429

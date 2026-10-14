@@ -38,6 +38,8 @@ class InvitationResult:
     staff: Staff
     invitation_sent: bool
     delivery_status: str
+    # For server-side tools only (scripts/invitation_link.py); the API never returns it.
+    activation_link: str | None = None
 
 
 def _now() -> datetime:
@@ -115,13 +117,13 @@ async def _deliver(
         invitation.delivery_status = "failed"
         await session.commit()
         logger.warning("Staff invitation delivery failed; staff_id=%s", staff.id)
-        return InvitationResult(staff, False, "failed")
+        return InvitationResult(staff, False, "failed", _activation_link(token, staff.email))
 
     invitation.delivery_status = "sent"
     invitation.sent_at = _now()
     await session.commit()
     logger.info("Staff invitation delivered; staff_id=%s", staff.id)
-    return InvitationResult(staff, True, "sent")
+    return InvitationResult(staff, True, "sent", _activation_link(token, staff.email))
 
 
 async def create_staff_and_invite(
