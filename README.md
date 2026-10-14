@@ -205,7 +205,7 @@ sudo certbot --nginx -d <โดเมนจริง>          # ขอใบร
 sudo certbot renew --dry-run                 # ตรวจว่าต่ออายุใบรับรองอัตโนมัติได้
 ```
 
-> **ถ้าใช้ Cloudflare Proxy (เมฆสีส้ม) หรือ proxy ของหน่วยงานอยู่หน้าเครื่อง:**
+> **ถ้าใช้ Cloudflare Proxy หรือ proxy ของหน่วยงานอยู่หน้าเครื่อง:**
 > ตั้ง SSL mode ของ Cloudflare เป็น **Full (strict)** และเพิ่มใน `server { }` ของ
 > `/etc/nginx/sites-available/building-care` เพื่อให้ระบบเห็น IP จริงของผู้ใช้
 > (ไม่เช่นนั้นการจำกัด login ผิดจะนับผู้ใช้ทุกคนเป็น IP ของ proxy):
@@ -238,19 +238,6 @@ sudo certbot renew --dry-run                 # ตรวจว่าต่ออ
 
    ต้องได้สถานะ `200` และเนื้อหา `{"status":"ok"}` (ถ้า backend หยุดทำงาน endpoint นี้จะตอบ 502/504)
 
-3. **ทดสอบระบบผ่านหน้าเว็บ (End-to-End Acceptance):**
-   - [ ] เข้า `https://<โดเมน>/staff-login` ด้วยบัญชี admin จากขั้นตอนที่ 5 ได้
-   - [ ] สร้างสถานที่ (Location) ใหม่ → Generate QR → ตรวจว่า URL ใน QR ขึ้นต้นด้วย `https://<โดเมนจริง>` → ดาวน์โหลดไฟล์ QR
-   - [ ] เชิญเจ้าหน้าที่ 1 คน → **อีเมลคำเชิญถึงกล่องจดหมาย** → เปิดลิงก์จากมือถือ ตั้งรหัสผ่าน และ login ได้
-   - [ ] ใช้มือถือ (เครือข่าย 4G ไม่ใช่ Wi-Fi ภายใน) สแกน QR → เปิดหน้าแจ้งเรื่องได้
-   - [ ] ส่งคำร้องแจ้งซ่อม **พร้อมแนบรูป** → สำเร็จ และรูปแสดงในหน้าเจ้าหน้าที่ (รูปถูกเก็บใน R2 แล้ว)
-   - [ ] **guest ได้รับอีเมลรหัสติดตาม** ในอีเมลที่กรอกตอนแจ้ง (ระบบส่งอีเมลให้ผู้แจ้ง ไม่ได้ส่งแจ้งเตือนถึง admin)
-   - [ ] เจ้าหน้าที่รับงานและปิดงาน → guest ใช้รหัสติดตามแล้วเห็นสถานะเปลี่ยน
-   - [ ] กด "ลืมรหัสผ่าน" ที่หน้า login → ได้อีเมลลิงก์ตั้งรหัสผ่านใหม่
-   - [ ] กดรีเฟรชหน้า `https://<โดเมน>/staff/setup-password` แล้วต้องไม่ขึ้น 404
-   - [ ] ตั้งเวลา Backup อัตโนมัติแล้ว ([หัวข้อ 5.3](#53-การสำรองและกู้คืนฐานข้อมูล-database-backup--restore))
-
----
 
 ## 5. การบริหารจัดการและบำรุงรักษา (Operations & Maintenance)
 
@@ -277,7 +264,7 @@ docker compose down
 docker compose up -d --wait
 ```
 
-> ⚠️ **ห้ามใช้ `docker compose down -v`** เด็ดขาด เพราะ `-v` ลบ volume ของฐานข้อมูลทิ้งทั้งหมด
+> **ห้ามใช้ `docker compose down -v`** เด็ดขาด เพราะ `-v` ลบ volume ของฐานข้อมูลทิ้งทั้งหมด
 >
 > หลังแก้ไฟล์ `.env` ต้องสร้าง container ใหม่ด้วย `docker compose up -d --wait` (`restart` ไม่อ่านค่าใหม่)
 
@@ -325,26 +312,7 @@ docker compose exec -T database sh -c \
 docker compose up -d --wait
 ```
 
-ควรซ้อม restore ลงฐานข้อมูลทดสอบเดือนละครั้ง
-
-### 5.4 การอัปเดตระบบเวอร์ชันใหม่
-
-```bash
-cd /srv/building-care
-# 1. สำรองข้อมูลก่อนทุกครั้ง (คำสั่ง Backup ในหัวข้อ 5.3)
-# 2. ดึงโค้ดใหม่ และ build
-git pull
-docker compose build
-# 3. อัปเดตโครงสร้างฐานข้อมูล (production ไม่ทำให้เองตอนเริ่มระบบ)
-docker compose run --rm backend alembic upgrade head
-# 4. เริ่มระบบด้วยเวอร์ชันใหม่ แล้วตรวจ
-docker compose up -d --wait
-curl -fsS https://<โดเมนจริง>/health; echo
-```
-
-ถ้าเวอร์ชันใหม่มีปัญหา: `git checkout <commit เดิม>` → `docker compose build` → restore backup ที่ทำไว้ก่อนอัปเดต → `docker compose up -d --wait`
-
-### 5.5 การเฝ้าระวังระบบ
+### 5.4 การเฝ้าระวังระบบ
 
 - ตั้งบริการ uptime monitor ภายนอก (เช่น UptimeRobot) ให้ตรวจ `https://<โดเมนจริง>/health` ทุก 5 นาที
 - ตรวจพื้นที่ดิสก์ทุกสัปดาห์: `df -h` และ `docker system df`
@@ -421,21 +389,3 @@ SMTP_USE_STARTTLS=false
 ```
 
 แล้วรัน `docker compose --profile mail up -d` อีเมลทุกฉบับจะไปอยู่ที่ http://localhost:8025
-
-### 7.3 สำหรับนักพัฒนา
-
-```bash
-cd Backend
-uv run --extra dev pytest        # tests ทั้งหมด (pytest อยู่ใน extra "dev")
-uv run --extra dev ruff check .
-```
-
-| โฟลเดอร์ / ไฟล์ | เนื้อหา |
-| --- | --- |
-| `Backend/app` | FastAPI: `api/` endpoints, `services/` business logic, `models/` ตาราง |
-| `Backend/migrations` | Alembic migrations |
-| `Backend/scripts` | `create_initial_admin.py`, `invitation_link.py`, `check_services.py`, `seed_locations.py` |
-| `Frontend/src` | Vue 3 + Vite |
-| `compose.yaml` | development (hot reload, port 5173/8000) |
-| `compose.production.yaml` | production |
-| `deploy/nginx` | config ของ Nginx บนเครื่อง (HTTPS) |
