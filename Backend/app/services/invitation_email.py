@@ -83,11 +83,14 @@ async def send_password_reset_email(
     """Send a one-time reset link; the current password keeps working until it is used."""
     await send_email(
         recipient=recipient,
-        subject="Reset your Building Service Management password",
+        subject="ตั้งรหัสผ่านใหม่บัญชีเจ้าหน้าที่ · CS Building Care",
         body=(
-            "We received a request to reset the password for this staff account.\n\n"
-            f"Choose a new password using this one-time link:\n{reset_link}\n\n"
-            f"The link expires in {expires_in_minutes} minutes. If you did not request a "
-            "reset, you can ignore this email; your current password will keep working."
+            "ระบบได้รับคำขอตั้งรหัสผ่านใหม่สำหรับบัญชีเจ้าหน้าที่ CS Building Care\n\n"
+            f"อีเมลสำหรับเข้าสู่ระบบ: {recipient}\n"
+            "กรุณาเปิดลิงก์ด้านล่างเพื่อตั้งรหัสผ่านใหม่:\n"
+            f"{reset_link}\n\n"
+            f"ลิงก์นี้ใช้ได้ครั้งเดียว และหมดอายุใน {expires_in_minutes} นาที\n"
+            "หากลิงก์หมดอายุ กรุณากด \"ลืมรหัสผ่าน\" ที่หน้าเข้าสู่ระบบอีกครั้ง\n"
+            "หากคุณไม่ได้เป็นผู้ขอ ไม่ต้องทำอะไร รหัสผ่านเดิมยังใช้งานได้ตามปกติ\n"
         ),
     )

@@ -107,7 +107,8 @@ def test_reset_email_contains_link_and_expiry(monkeypatch) -> None:
     body = message.get_content()
     assert message["To"] == "staff@example.org"
     assert "https://care.example.org/staff/reset-password?token=abc" in body
-    assert "30 minutes" in body
+    assert "หมดอายุใน 30 นาที" in body
+    assert message["Subject"] == "ตั้งรหัสผ่านใหม่บัญชีเจ้าหน้าที่ · CS Building Care"
 
 
 def test_password_reset_migration_backfills_and_rolls_back(tmp_path) -> None:

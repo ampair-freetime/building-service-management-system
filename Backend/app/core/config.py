@@ -119,6 +119,13 @@ class Settings(BaseSettings):
                 or len(self.image_url_secret) < 32
             ):
                 raise ValueError("Production requires an IMAGE_URL_SECRET of at least 32 characters")
+            # Only STARTTLS on port 587: a typo must never send SMTP credentials and
+            # staff links in plain text (unencrypted SMTP is for local Mailpit only).
+            if self.smtp_host and (self.smtp_use_ssl or not self.smtp_use_starttls):
+                raise ValueError(
+                    "Production SMTP must use STARTTLS: "
+                    "set SMTP_USE_STARTTLS=true and SMTP_USE_SSL=false (port 587)"
+                )
             for value in (
                 self.public_base_url,
                 self.staff_activation_url,

@@ -120,3 +120,37 @@ def test_missing_storage_configuration_does_not_construct_network_client(monkeyp
     monkeypatch.setattr("app.services.object_storage.boto3.client", unexpected_client)
     with pytest.raises(StorageConfigurationError):
         ObjectStorage(Settings(_env_file=None))
+
+
+PRODUCTION = {
+    "environment": "production",
+    "jwt_secret_key": "test-key-" * 8,
+    "image_url_secret": "test-image-key-" * 4,
+    "public_base_url": "https://care.example.org",
+    "backend_cors_origins": ["https://care.example.org"],
+    "smtp_host": "smtp.example.org",
+}
+
+
+@pytest.mark.parametrize(
+    "transport",
+    [
+        {"smtp_use_starttls": False, "smtp_use_ssl": False},  # plain text
+        {"smtp_use_starttls": False, "smtp_use_ssl": True},  # implicit TLS on 465
+    ],
+)
+def test_production_smtp_requires_starttls(transport):
+    with pytest.raises(ValidationError, match="STARTTLS"):
+        Settings(_env_file=None, **PRODUCTION, **transport)
+
+
+def test_production_smtp_starttls_and_unset_smtp_are_accepted():
+    assert Settings(_env_file=None, **PRODUCTION).smtp_use_starttls
+    Settings(_env_file=None, **{**PRODUCTION, "smtp_host": None, "smtp_use_starttls": False})
+
+
+def test_development_still_allows_unencrypted_local_mailpit():
+    configuration = Settings(
+        _env_file=None, smtp_host="mailpit", smtp_port=1025, smtp_use_starttls=False
+    )
+    assert configuration.smtp_host == "mailpit"

@@ -74,8 +74,9 @@ services:
       SMTP_PORT: '${SMTP_PORT:-587}'
       SMTP_USERNAME: '${SMTP_USERNAME:-}'
       SMTP_PASSWORD: '${SMTP_PASSWORD:-}'
-      SMTP_USE_STARTTLS: '${SMTP_USE_STARTTLS:-true}'
-      SMTP_USE_SSL: '${SMTP_USE_SSL:-false}'
+      # Fixed: production sends mail only over STARTTLS (port 587).
+      SMTP_USE_STARTTLS: 'true'
+      SMTP_USE_SSL: 'false'
       SMTP_TIMEOUT_SECONDS: '${SMTP_TIMEOUT_SECONDS:-10}'
       MAIL_FROM: '${MAIL_FROM:?Set MAIL_FROM in .env}'
       GUEST_EMAIL_PER_RECIPIENT_LIMIT: '${GUEST_EMAIL_PER_RECIPIENT_LIMIT:-5}'
