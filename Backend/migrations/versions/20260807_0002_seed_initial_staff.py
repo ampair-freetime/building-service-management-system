@@ -12,6 +12,8 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
 
+from app.core.config import settings
+
 revision: str = "20260807_0002"
 down_revision: str | None = "20260806_0001"
 branch_labels: str | Sequence[str] | None = None
@@ -48,6 +50,9 @@ staff_accounts = sa.table(
 
 def upgrade() -> None:
     """สร้าง initial admin เมื่อยังไม่มี id, employee code หรือ email เดียวกัน."""
+    # production ห้ามมีบัญชีที่รหัสผ่านเปิดเผย: admin คนแรกสร้างด้วย scripts/bootstrap_admin.py
+    if settings.environment == "production":
+        return
     op.execute(
         postgresql.insert(staff_accounts)
         .values(

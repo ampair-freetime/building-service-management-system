@@ -1,0 +1,105 @@
+# Production stack. Selected by COMPOSE_FILE in the server's .env (see README).
+# Only the frontend Nginx is published, and only on 127.0.0.1: the host Nginx
+# terminates HTTPS and forwards to it. Docker-published ports bypass ufw.
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: 10m
+    max-file: "5"
+
+services:
+  database:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-building_service}
+      POSTGRES_USER: ${POSTGRES_USER:-building_service}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    logging: *logging
+
+  backend:
+    build: ./Backend
+    restart: unless-stopped
+    # Migrations run on every start; alembic skips revisions that are already applied.
+    command: ["python", "scripts/start_server.py", "--host", "0.0.0.0", "--migrate"]
+    environment:
+      ENVIRONMENT: production
+      BSMS_ENV_FILE: ""
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-building_service}:${POSTGRES_PASSWORD}@database:5432/${POSTGRES_DB:-building_service}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:?set JWT_SECRET_KEY in .env}
+      IMAGE_URL_SECRET: ${IMAGE_URL_SECRET:?set IMAGE_URL_SECRET in .env}
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:?set PUBLIC_BASE_URL in .env}
+      BACKEND_CORS_ORIGINS: ${BACKEND_CORS_ORIGINS:?set BACKEND_CORS_ORIGINS in .env}
+      STAFF_ACTIVATION_URL: ${STAFF_ACTIVATION_URL:-}
+      # Only the frontend Nginx can reach this port. The host Nginx overwrites
+      # X-Forwarded-For, so the left-most address is the real client.
+      FORWARDED_ALLOW_IPS: "*"
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_USE_STARTTLS: ${SMTP_USE_STARTTLS:-true}
+      SMTP_USE_SSL: ${SMTP_USE_SSL:-false}
+      SMTP_TIMEOUT_SECONDS: ${SMTP_TIMEOUT_SECONDS:-10}
+      MAIL_FROM: ${MAIL_FROM:?set MAIL_FROM in .env}
+      GUEST_EMAIL_PER_RECIPIENT_LIMIT: ${GUEST_EMAIL_PER_RECIPIENT_LIMIT:-5}
+      GUEST_EMAIL_PER_RECIPIENT_WINDOW_SECONDS: ${GUEST_EMAIL_PER_RECIPIENT_WINDOW_SECONDS:-3600}
+      R2_ACCOUNT_ID: ${R2_ACCOUNT_ID:?set R2_ACCOUNT_ID in .env}
+      R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID:?set R2_ACCESS_KEY_ID in .env}
+      R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY:?set R2_SECRET_ACCESS_KEY in .env}
+      R2_BUCKET_NAME: ${R2_BUCKET_NAME:?set R2_BUCKET_NAME in .env}
+      R2_PRESIGNED_URL_EXPIRE_SECONDS: ${R2_PRESIGNED_URL_EXPIRE_SECONDS:-28800}
+      IMAGE_REDIRECT_URL_EXPIRE_SECONDS: ${IMAGE_REDIRECT_URL_EXPIRE_SECONDS:-300}
+      R2_CONNECT_TIMEOUT_SECONDS: ${R2_CONNECT_TIMEOUT_SECONDS:-5}
+      R2_READ_TIMEOUT_SECONDS: ${R2_READ_TIMEOUT_SECONDS:-15}
+      R2_TOTAL_MAX_ATTEMPTS: ${R2_TOTAL_MAX_ATTEMPTS:-2}
+      MAX_IMAGE_UPLOAD_BYTES: ${MAX_IMAGE_UPLOAD_BYTES:-10485760}
+      MAX_GUEST_IMAGES: ${MAX_GUEST_IMAGES:-5}
+      MAX_IMAGE_PIXELS: ${MAX_IMAGE_PIXELS:-50000000}
+      IMAGE_MAX_DIMENSION: ${IMAGE_MAX_DIMENSION:-2048}
+      IMAGE_WEBP_QUALITY: ${IMAGE_WEBP_QUALITY:-78}
+      MAX_IMAGE_OUTPUT_BYTES: ${MAX_IMAGE_OUTPUT_BYTES:-1048576}
+      MAX_IMAGE_PROCESSING_CONCURRENCY: ${MAX_IMAGE_PROCESSING_CONCURRENCY:-1}
+    expose:
+      - "8000"
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+    depends_on:
+      database:
+        condition: service_healthy
+    logging: *logging
+
+  frontend:
+    build:
+      context: ./Frontend
+      target: production
+      args:
+        VITE_API_BASE_URL: /api/v1
+    restart: unless-stopped
+    ports:
+      - 127.0.0.1:${FRONTEND_PORT:-8080}:8080
+    depends_on:
+      backend:
+        condition: service_healthy
+    logging: *logging
+
+volumes:
+  postgres_data:

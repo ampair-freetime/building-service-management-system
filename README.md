@@ -1,218 +1,191 @@
-# Building Service Management System
+# CS Building Care — Deployment Guide
 
-ระบบแจ้งซ่อม แจ้งทำความสะอาด และของหาย/ของที่พบ — Backend: FastAPI + PostgreSQL, Frontend: Vue 3 (Vite)
-
-## เริ่มใช้งาน
-
-ชุดเริ่มใช้งานด้านล่างเป็น development (Vite dev server) สำหรับ production ดูหัวข้อ
-[Production deployment](#production-deployment) ซึ่งใช้ Nginx เสิร์ฟไฟล์ที่ build แล้วแทน Vite
-
-```bash
-docker compose up --build
-```
-
-| บริการ | URL |
-| --- | --- |
-| Frontend | http://localhost:5173 |
-| API | http://localhost:8000 |
-| API docs (ดู endpoint ทั้งหมด) | http://localhost:8000/docs |
-
-Backend รัน `alembic upgrade head` ให้เองทุกครั้งที่ container เริ่ม ถ้าเพิ่ม migration ใหม่ให้ restart backend:
-
-```bash
-docker compose restart backend
-```
-
-## การส่งอีเมล
-
-ตั้งค่า SMTP ใน `.env` ตามผู้ให้บริการที่ใช้งาน: `SMTP_HOST`, `SMTP_PORT`,
-`SMTP_USERNAME`, `SMTP_PASSWORD` และ `MAIL_FROM` โดยค่าเริ่มต้นใช้ port 587
-พร้อม `SMTP_USE_STARTTLS=true` หากใช้ port 465 ให้ตั้ง `SMTP_USE_SSL=true`
-และ `SMTP_USE_STARTTLS=false` ระบบจะส่งอีเมลไปยังผู้รับโดยตรง
-หากไม่ตั้ง `SMTP_HOST` ระบบจะตอบ `email_sent=false`
-หลังแก้ค่าให้สร้าง backend container ใหม่ด้วย `docker compose up -d backend`
-
-## บัญชีสำหรับ login (development เท่านั้น)
-
-Login ที่ `POST /api/v1/auth/login` ใช้ **อีเมล**
-
-```json
-{ "identifier": "admin@example.com", "password": "Admin@1234" }
-```
-
-| Role | Email | Password | ที่มา |
-| --- | --- | --- | --- |
-| `admin` (แอดมิน) | `admin@example.com` | `Admin@1234` | สร้างอัตโนมัติจาก migration |
-| `clerk` (เจ้าหน้าที่ของหาย) | อีเมลที่ใช้ได้ | Staff ตั้งเองผ่าน invitation link | Admin สร้างผ่าน API |
-| `housekeeper` (แม่บ้าน) | อีเมลที่ใช้ได้ | Staff ตั้งเองผ่าน invitation link | Admin สร้างผ่าน API |
-| `technician` (ช่าง) | อีเมลที่ใช้ได้ | Staff ตั้งเองผ่าน invitation link | Admin สร้างผ่าน API |
-
-Admin สร้างบัญชีผ่าน `POST /api/v1/staff` โดยส่ง `email`, `full_name` และ `role`
-(ทำใน http://localhost:8000/docs ได้) จากนั้นเปิดอีเมลในกล่องจดหมายของผู้รับ แล้วกด invitation link
-เพื่อตั้งรหัสผ่านก่อน login; response มี `email_sent` แต่ไม่คืนรหัสผ่านหรือ token
-ลิงก์หมดอายุใน 24 ชั่วโมงตามค่าเริ่มต้น และใช้ได้ครั้งเดียว
-หากส่งอีเมลไม่สำเร็จหรือลิงก์หมดอายุ ให้ Admin เรียก
-`POST /api/v1/staff/{staff_id}/resend-invitation` เพื่อส่งลิงก์ใหม่สำหรับบัญชีเดิมที่ยังไม่ activate
-ลิงก์เก่าจะใช้ไม่ได้หลัง resend และ resend ใช้ไม่ได้กับบัญชีที่ activate แล้ว
-รหัสผ่านของบัญชี admin เริ่มต้นเป็นค่าสาธารณะสำหรับ dev ห้ามใช้บน production
-
-## QR code ของสถานที่
-
-Admin เพิ่ม location ทีละรายการผ่าน `POST /api/v1/admin/locations`
-ก่อน ห้องใหม่มี `qr_token: null` และ `qr_url: null` จนกว่าจะกด
-`POST /api/v1/admin/locations/{id}/qr/generate` การกด Generate ซ้ำคืน token เดิม
-
-จากนั้นใช้ `GET /api/v1/admin/locations/{id}/qr?format=png` เพื่อดาวน์โหลดรูป
-หรือ `format=svg&download=false` เพื่อเปิดดู/พิมพ์ ใช้ Bearer token ของ admin กับทุก endpoint นี้
-หากต้องดาวน์โหลดหลายห้อง ใช้ `GET /api/v1/admin/locations/qr-bundle?ids=1&ids=2`
-ซึ่งคืนไฟล์ ZIP เบราว์เซอร์ที่แสดงรูปผ่าน `<img>` ต้องโหลดรูปแบบ Blob ด้วย header Authorization ก่อน
-
-`PATCH /api/v1/admin/locations/{id}/status` รับ `{"is_active": false}` เพื่อปิดห้อง
-การสแกน QR ของห้องที่ปิดจะได้ 404 แต่คำร้องเดิมยังอยู่
-`DELETE /api/v1/admin/locations/{id}` ลบสถานที่ที่สร้างผิด ได้ 204 และสร้างชื่อเดิมใหม่ได้
-ลบได้เฉพาะสถานที่ที่ยังไม่เคยมีคำร้องหรือรายการของหาย/ของที่พบ ถ้ามีแล้วจะได้ 409 ให้ใช้ปิดใช้งานแทน
-`POST /api/v1/admin/locations/{id}/qr/regenerate` สุ่ม token ใหม่ ทำให้ QR เก่าใช้ไม่ได้ทันที
-
-`PUBLIC_BASE_URL` กำหนดต้นทาง URL ที่ฝังใน QR ค่าเริ่มต้นคือ `http://localhost:5173`
-ถ้าสแกนด้วยมือถือ ให้ตั้งเป็น IP หรือโดเมนที่มือถือเข้าได้ แล้ว restart backend
-
-Seed script ยังใช้ได้สำหรับห้องเริ่มต้น โดยสร้างห้องและ Generate QR ให้พร้อมใช้ทันที
-รันซ้ำแล้ว token เดิมไม่เปลี่ยน:
-
-```bash
-docker compose exec backend python scripts/seed_locations.py --base-url http://localhost:5173
-```
-
-ผลลัพธ์คือ `id  ชื่อสถานที่  URL` ซึ่งตอนนี้เป็น `/user?token=...`
-ฝั่ง guest สแกน token ได้ที่ `/api/v1/guest/cleaning-requests/locations/by-qr/{token}`
-หรือ `/api/v1/guest/repair-requests/locations/by-qr/{token}`
-
-## Environment (`.env` ที่ root ห้าม commit)
-
-รูปภาพเก็บใน Cloudflare R2 (bucket แบบ private) ถ้าไม่ตั้งค่า การแนบรูปจะใช้ไม่ได้
-
-```dotenv
-R2_ACCOUNT_ID=
-R2_ACCESS_KEY_ID=
-R2_SECRET_ACCESS_KEY=
-R2_BUCKET_NAME=building-service-images
-JWT_SECRET_KEY=   # production ต้องตั้งเป็นค่าลับของตัวเอง
-PUBLIC_BASE_URL=http://localhost:5173  # เปลี่ยนเป็น IP/โดเมนที่มือถือเข้าได้
-```
-
-## Tests
-
-```bash
-cd Backend
-uv run pytest
-```
-
-## Production deployment
-
-### ภาพรวม
-
-Development ใช้ Vite dev server (`npm run dev`) ซึ่งแปลงไฟล์ตอน browser ขอและมี hot reload
-ไม่ได้ออกแบบให้รับผู้ใช้จริง Production จึง build frontend เป็นไฟล์ static (`npm run build` → `dist/`)
-แล้วให้ Nginx เสิร์ฟไฟล์เหล่านั้นและส่งต่อ `/api/...` ไป backend ผู้ใช้จึงเห็นโดเมนเดียว (same-origin)
-ไม่ต้องพึ่ง CORS และลิงก์รูปแบบ relative `/api/v1/images/...` ใช้ได้ทันที
+ระบบแจ้งซ่อม แจ้งทำความสะอาด และของหาย/ของที่พบ (FastAPI + PostgreSQL + Vue 3)
+คู่มือนี้สำหรับผู้ที่ได้รับ repository จาก GitHub และต้องการติดตั้งบนเซิร์ฟเวอร์จริง
 
 ```text
-Browser ──HTTPS 443──> Edge TLS (proxy ภาควิชา หรือ host Nginx + certbot)
-                          │ HTTP 127.0.0.1:8080
-                          v
-                 frontend container (Nginx: dist/ + /api proxy)
-                          │ docker network ภายใน
-                          v
-                 backend container (Uvicorn 1 worker) ──> PostgreSQL 16 (named volume)
-                          ├──> Cloudflare R2 (S3 API, 443)
-                          └──> SMTP (587/465)
+ผู้ใช้ (มือถือ/คอม)
+   │ HTTPS 443
+   ▼
+Nginx บนเครื่อง (TLS, certbot)      deploy/nginx/building-care.conf
+   │ http://127.0.0.1:8080
+   ▼
+frontend container (Nginx)         เสิร์ฟหน้าเว็บ + ส่ง /api/ ต่อ
+   │ http://backend:8000
+   ▼
+backend container (FastAPI)  ──►  Cloudflare R2 (รูปภาพ), SMTP (อีเมล)
+   │
+   ▼
+database container (PostgreSQL)    เก็บข้อมูลใน Docker volume
 ```
 
-- `Frontend/Dockerfile` stage `production` ใช้ `nginxinc/nginx-unprivileged` ฟัง port 8080 และคัดลอก `Frontend/nginx.conf`
-- backend และ database ห้าม publish port ออก host; frontend bind เฉพาะ `127.0.0.1:8080` ให้ edge proxy เข้าถึงคนเดียว
-- `compose.yaml` เป็นของ development เท่านั้น (`--reload`, bind mount, Vite, port 8000 เปิดทุก interface) ห้ามใช้บน production
+## 1. สิ่งที่ต้องเตรียม
 
-### สิ่งที่ต้องเตรียมก่อน
-
-| รายการ | ข้อกำหนด |
+| รายการ | รายละเอียด |
 | --- | --- |
-| เครื่อง | ขั้นต่ำ 2 vCPU, RAM 2–4 GB (≤ 2 GB ให้เปิด swap), ดิสก์ 20 GB, Ubuntu 22.04/24.04, Docker Engine + Compose plugin |
-| โดเมน | DNS A record ชี้เครื่อง และ HTTPS (ใบรับรองจาก proxy ภาควิชาหรือ certbot) |
-| เครือข่าย | inbound 80/443; outbound 443 ไป `*.r2.cloudflarestorage.com`; outbound SMTP 587 หรือ 465 |
-| Cloudflare R2 | bucket แบบ private + API token สิทธิ์ Object Read & Write เฉพาะ bucket นั้น |
-| SMTP | บัญชีส่งเมล + App Password (Gmail ต้องเปิด 2FA) |
+| เซิร์ฟเวอร์ | Ubuntu 22.04/24.04, 2 vCPU, RAM 4 GB, ดิสก์ 40 GB |
+| Network | เปิด inbound 80/443 จากอินเทอร์เน็ต (guest สแกน QR ผ่าน 4G), outbound 443 และ 587 |
+| โดเมน | DNS ชี้มาที่ IP ของเครื่องแล้ว เช่น `care.example.ac.th` |
+| Cloudflare R2 | bucket แบบ private + API token สิทธิ์ **Object Read & Write** เฉพาะ bucket นั้น |
+| SMTP | เช่น Gmail: เปิด 2-Step Verification → App passwords → ได้รหัส 16 ตัว |
 
-### ไฟล์ที่ต้องมีใน repo
+ติดตั้งโปรแกรมบนเครื่อง:
 
-| ไฟล์ | สถานะ / สิ่งที่ต้องมี |
+```bash
+curl -fsSL https://get.docker.com | sudo sh    # Docker Engine + Compose plugin
+sudo usermod -aG docker $USER                   # logout/login ใหม่หลังคำสั่งนี้
+sudo apt install -y git nginx certbot python3-certbot-nginx
+sudo ufw allow OpenSSH && sudo ufw allow 'Nginx Full' && sudo ufw enable
+docker compose version                          # ต้อง ≥ 2.24
+```
+
+## 2. ดาวน์โหลดโค้ด
+
+```bash
+sudo mkdir -p /srv/building-care && sudo chown $USER /srv/building-care
+git clone https://github.com/ampair-freetime/building-service-management-system.git /srv/building-care
+cd /srv/building-care
+```
+
+คำสั่งทุกคำสั่งหลังจากนี้ให้รันในโฟลเดอร์ `/srv/building-care`
+
+## 3. ตั้งค่า `.env`
+
+```bash
+cp .env.production.example .env
+chmod 600 .env
+openssl rand -hex 32    # รัน 3 ครั้ง ได้ 3 ค่าสำหรับ POSTGRES_PASSWORD, JWT_SECRET_KEY, IMAGE_URL_SECRET
+nano .env
+```
+
+| ตัวแปร | ใส่อะไร |
 | --- | --- |
-| `compose.production.yaml` | ถ้ายังไม่มี กู้ได้จาก `git show c3d9020^:compose.production.yaml` แล้วต้องเพิ่ม `IMAGE_URL_SECRET` (บังคับใน production), `restart: unless-stopped` และ `logging` (`max-size: 10m`, `max-file: 5`) ทุก service; frontend ใช้ `target: production` |
-| `.env.production.example` | กู้ได้จาก `git show c3d9020^:.env.production.example` แล้วแก้ `MAX_IMAGE_UPLOAD_BYTES` เป็น `10485760` และเพิ่ม `IMAGE_URL_SECRET`, `IMAGE_REDIRECT_URL_EXPIRE_SECONDS`, `GUEST_EMAIL_*` |
-| `.env.production` | สร้างจากไฟล์ตัวอย่างบนเซิร์ฟเวอร์เท่านั้น `chmod 600` ห้าม commit (ถูก ignore ด้วย `.env.*`) |
-| `Frontend/nginx.conf` | ควรมี cache `/assets/` 1 ปี + `index.html` no-cache, gzip, security headers, `limit_req` สำหรับ login และ guest POST, `real_ip` เมื่ออยู่หลัง proxy |
+| `PUBLIC_BASE_URL` | `https://<โดเมน>` — ค่านี้ถูกฝังใน QR **ต้องถูกต้องก่อนพิมพ์ป้าย QR** |
+| `BACKEND_CORS_ORIGINS` | `["https://<โดเมน>"]` |
+| `POSTGRES_PASSWORD`, `JWT_SECRET_KEY`, `IMAGE_URL_SECRET` | ค่าสุ่มจาก `openssl` คนละค่า |
+| `SMTP_*`, `MAIL_FROM` | ค่าจากผู้ให้บริการอีเมล (port 465 ให้ตั้ง `SMTP_USE_SSL=true`, `SMTP_USE_STARTTLS=false`) |
+| `R2_*` | ค่าจาก Cloudflare |
 
-### Environment variables สำหรับ production
+> [!IMPORTANT]
+> ห้ามเปลี่ยน secret ทั้ง 3 ค่าหลังเปิดใช้งาน: เปลี่ยน `JWT_SECRET_KEY` = ทุกคนถูก logout,
+> เปลี่ยน `IMAGE_URL_SECRET` = ลิงก์รูปเดิมใช้ไม่ได้, เปลี่ยน `POSTGRES_PASSWORD` = backend ต่อฐานข้อมูลไม่ได้
+> เก็บสำเนา `.env` ไว้ในที่ปลอดภัยนอกเครื่อง
 
-ค่าที่ไม่ได้ระบุใช้ default เดียวกับ `.env.example` ได้ Backend จะ **ไม่ยอม start** ถ้า `ENVIRONMENT=production`
-แต่ secret สั้นกว่า 32 ตัว, ยังเป็นค่า default หรือ URL เป็น localhost
+ไฟล์ `.env` มี `COMPOSE_FILE=compose.production.yaml` อยู่แล้ว ดังนั้นคำสั่ง `docker compose` บนเครื่องนี้
+จะใช้ชุด production เสมอ (`compose.yaml` เป็นชุด development ห้ามใช้บนเซิร์ฟเวอร์)
 
-| ตัวแปร | ค่า production | หมายเหตุ |
-| --- | --- | --- |
-| `ENVIRONMENT` | `production` | เปิด validator และปิด `/docs`, `/redoc` |
-| `POSTGRES_DB`, `POSTGRES_USER` | ตั้งเอง | ใช้ประกอบ `DATABASE_URL` ใน compose |
-| `POSTGRES_PASSWORD` | `openssl rand -hex 32` | ใช้ hex เพื่อไม่ต้อง URL-encode |
-| `JWT_SECRET_KEY` | `openssl rand -hex 32` | เปลี่ยนแล้วทุกคนถูก logout |
-| `IMAGE_URL_SECRET` | `openssl rand -hex 32` (คนละค่ากับ JWT) | เปลี่ยนแล้วลิงก์รูปเดิมทั้งหมดใช้ไม่ได้ |
-| `PUBLIC_BASE_URL` | `https://<โดเมนจริง>` | ฝังใน QR และลิงก์ในอีเมล ต้องนิ่งก่อนพิมพ์ QR |
-| `BACKEND_CORS_ORIGINS` | `["https://<โดเมนจริง>"]` | รูปแบบ JSON list |
-| `STAFF_ACTIVATION_URL`, `STAFF_PASSWORD_RESET_URL` | เว้นว่าง | ว่าง = คำนวณจาก `PUBLIC_BASE_URL` |
-| `FORWARDED_ALLOW_IPS` | `*` ใน Docker / IP ของ proxy ถ้าไม่ใช้ Docker | ให้ rate limit เห็น IP จริงจาก `X-Forwarded-For` |
-| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `MAIL_FROM` | ตามผู้ให้บริการ | 587 + `SMTP_USE_STARTTLS=true` หรือ 465 + `SMTP_USE_SSL=true` |
-| `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME` | จาก Cloudflare | ไม่ตั้ง = แนบรูปไม่ได้ |
-| `VITE_API_BASE_URL` | `/api/v1` | เป็น build arg ของ frontend เปลี่ยนแล้วต้อง build ใหม่ ห้ามใส่ความลับใน `VITE_*` |
-| `MAX_IMAGE_UPLOAD_BYTES` × `MAX_GUEST_IMAGES` | `10485760` × `5` | ผลคูณ + overhead ต้องน้อยกว่า `client_max_body_size` (60m) ใน `Frontend/nginx.conf` |
+## 4. รันระบบ
 
-### ขั้นตอน deploy
+```bash
+docker compose config --quiet     # ตรวจ config ถ้าขาดค่าที่จำเป็นจะบอกชื่อตัวแปร
+docker compose up -d --build      # build และรัน (migration ฐานข้อมูลรันอัตโนมัติ)
+docker compose ps                 # database และ backend ต้องเป็น (healthy)
+```
 
-ทุกคำสั่ง `docker compose` ด้านล่างย่อจาก `docker compose --env-file .env.production -f compose.production.yaml`
+ถ้า backend ไม่ healthy ดูสาเหตุด้วย `docker compose logs backend` (ดูหัวข้อ 10)
 
-1. **เตรียมเครื่อง** — สร้าง user `deploy` (ไม่ใช้ root) + SSH key, `ufw allow 22,80,443`, timezone `Asia/Bangkok`, ติดตั้ง Docker แล้ว `usermod -aG docker deploy`
-2. **ดึงโค้ด** — `git clone` ไป `/srv/building-care` แล้ว checkout tag ที่จะปล่อย
-3. **ตั้งค่า** — `cp .env.production.example .env.production`, `chmod 600 .env.production` แล้วกรอกค่าตามตารางด้านบน
-4. **ตรวจ config** — `docker compose config --quiet` (ไม่พิมพ์ secret)
-5. **Build + เปิด DB/backend** — `docker compose build` แล้ว `docker compose up -d database backend`
-   จากนั้น `docker compose logs -f backend` ต้องเห็น migration ไปถึง head และ Uvicorn started
-6. **บัญชี admin** — migration `20260807_0002` สร้าง `admin@example.com` / `Admin@1234` ซึ่งเป็นค่าสาธารณะ
-   ต้องสร้าง admin จริงแล้ว suspend บัญชีนี้ก่อนเปิดให้ผู้อื่นเข้าถึง ทดสอบว่า login ด้วย `Admin@1234` ไม่ผ่าน
-7. **ตรวจบริการภายนอก** — `docker compose exec backend python scripts/check_services.py` ต้องได้ SMTP และ R2 OK
-8. **เปิด frontend** — `docker compose up -d frontend` แล้ว `curl -I http://127.0.0.1:8080/` ต้องได้ 200
-9. **HTTPS** — ตั้ง edge proxy ชี้ `127.0.0.1:8080` (certbot หรือ proxy ของภาควิชา) และเปิด HSTS ที่ edge
-10. **ข้อมูลเริ่มต้น** — เพิ่ม location → Generate QR → ตรวจว่า URL ใน QR เป็นโดเมนจริง → พิมพ์;
-    เชิญ staff แต่ละ role แล้วตรวจว่าอีเมลถึง inbox และลิงก์ตั้งรหัสเปิดจากมือถือได้
-11. **Smoke test** — guest (มือถือผ่าน 4G) แจ้งทำความสะอาด/ซ่อมพร้อมรูปและติดตามสถานะ, แม่บ้าน/ช่างรับและปิดงาน,
-    clerk อนุมัติของพบ → claim → คืน, admin suspend staff; refresh หน้า `/staff/setup-password` ต้องไม่ 404
+## 5. สร้าง admin คนแรก
 
-### งานดูแลหลังเปิดใช้งาน
+ระบบ production ไม่มีบัญชีตั้งต้น ให้สร้าง admin คนแรกด้วยคำสั่ง:
 
-| งาน | ความถี่ | วิธี |
-| --- | --- | --- |
-| Backup PostgreSQL | ทุกวัน | `docker compose exec -T database pg_dump -U <user> -Fc <db> > /srv/backups/bsms-$(date +%F).dump` เก็บ 14 ไฟล์ + คัดลอกออกนอกเครื่อง |
-| ซ้อม restore | เดือนละครั้ง | `pg_restore` ลงฐานข้อมูลชั่วคราวแล้วเทียบจำนวนแถว |
-| ตรวจขนาดรูปใน R2 | ทุกสัปดาห์ | `SELECT count(*), sum(size_bytes) FROM images WHERE deleted_at IS NULL;` (R2 free tier 10 GB) |
-| ตรวจดิสก์ | ทุกสัปดาห์ | `df -h`, `docker system df` |
-| Uptime | ทุก 5 นาที | บริการ ping ภายนอกยิง `/health` (liveness เท่านั้น ไม่ได้ตรวจ DB/SMTP/R2) |
+```bash
+docker compose exec backend python scripts/bootstrap_admin.py --email admin@your-org.ac.th --name "ชื่อ นามสกุล"
+```
 
-### อัปเดตเวอร์ชันและย้อนกลับ
+- ระบบจะส่งลิงก์ตั้งรหัสผ่านไปที่อีเมลนั้น (ใช้ได้ครั้งเดียว อายุ 24 ชั่วโมง)
+- ถ้าส่งอีเมลไม่ได้ ลิงก์จะแสดงบนหน้าจอแทน ให้เปิดลิงก์นั้นเอง (หลังทำข้อ 7 แล้ว)
+- ลิงก์หมดอายุก่อนใช้: รันคำสั่งเดิมด้วยอีเมลเดิมอีกครั้ง
+- คำสั่งนี้ใช้ได้จนกว่าจะมี admin ที่ตั้งรหัสผ่านแล้ว จากนั้นให้เพิ่มเจ้าหน้าที่ผ่านหน้า admin
 
-1. Backup ฐานข้อมูลก่อนทุกครั้ง เพราะ backend รัน `alembic upgrade head` เองตอน start
-2. `git fetch && git checkout <tag ใหม่>` → `docker compose build` → `docker compose up -d`
-3. ตรวจ log และ smoke test สั้น ๆ
-4. ถ้าต้องย้อน: checkout tag เดิม → build → ถ้า migration ใหม่แก้ schema ให้ restore จาก backup ข้อ 1
-   (ปลอดภัยกว่า `alembic downgrade` ที่ยังไม่เคยทดสอบ)
+## 6. ตรวจการเชื่อมต่อ SMTP และ R2
 
-### ข้อควรรู้
+```bash
+docker compose exec backend python scripts/check_services.py
+```
 
-- Rate limiter ของ forgot-password และอีเมล guest เก็บใน memory ของ process ถูกต้องเมื่อรัน 1 worker
-  (`scripts/start_server.py`) เท่านั้น ถ้าเพิ่ม worker ต้องย้ายไปเก็บที่ DB หรือ Redis
-- Uvicorn จำกัด concurrency 16 (`--limit-concurrency`) เมื่อเต็มจะตอบ 503
-- `check_services.py` ตรวจการเชื่อมต่อ SMTP/R2 เท่านั้น ไม่ส่งอีเมลจริงและไม่อัปโหลดไฟล์
+ต้องได้ `SMTP: CONNECTIVITY_OK` และ `R2: BUCKET_ACCESS_OK` ถ้าไม่ผ่านให้แก้ค่าใน `.env` แล้ว
+`docker compose up -d` ใหม่
+
+## 7. เปิด HTTPS ด้วย Nginx บนเครื่อง
+
+```bash
+sudo cp deploy/nginx/building-care.conf /etc/nginx/sites-available/building-care.conf
+sudo sed -i 's/care.example.ac.th/<โดเมน>/' /etc/nginx/sites-available/building-care.conf
+sudo ln -s /etc/nginx/sites-available/building-care.conf /etc/nginx/sites-enabled/
+sudo rm -f /etc/nginx/sites-enabled/default
+sudo nginx -t && sudo systemctl reload nginx
+sudo certbot --nginx -d <โดเมน>     # เลือก redirect HTTP → HTTPS
+```
+
+certbot ต่ออายุใบรับรองให้อัตโนมัติ ตรวจได้ด้วย `sudo certbot renew --dry-run`
+
+## 8. ตรวจสอบและเริ่มใช้งาน
+
+```bash
+curl -I https://<โดเมน>/                                              # 200
+curl https://<โดเมน>/api/v1/guest/cleaning-requests/locations          # ได้ JSON
+```
+
+1. เปิด `https://<โดเมน>/staff-login` แล้ว login ด้วย admin จากข้อ 5
+2. เพิ่มสถานที่ (ชั้น/ห้อง) แล้วกด Generate QR → ดาวน์โหลดไปพิมพ์ติดป้าย
+3. เพิ่มเจ้าหน้าที่ (ช่าง, แม่บ้าน, ธุรการ) ระบบจะส่งลิงก์ตั้งรหัสผ่านทางอีเมล
+4. ลองสแกน QR ด้วยมือถือผ่าน 4G แล้วส่งเรื่องทดสอบ 1 รายการพร้อมรูป
+
+## 9. Backup ฐานข้อมูล
+
+รูปภาพอยู่ใน R2 ส่วนข้อมูลอื่นทั้งหมดอยู่ใน PostgreSQL ให้ backup ทุกวัน:
+
+```bash
+sudo mkdir -p /srv/backups && sudo chown $USER /srv/backups
+crontab -e
+```
+
+เพิ่มบรรทัดนี้ (backup ตี 2 และเก็บไว้ 14 วัน):
+
+```cron
+0 2 * * * cd /srv/building-care && docker compose exec -T database sh -c 'pg_dump -U "$POSTGRES_USER" -Fc "$POSTGRES_DB"' > /srv/backups/bsms-$(date +\%F).dump && find /srv/backups -name 'bsms-*.dump' -mtime +14 -delete
+```
+
+ควรคัดลอกไฟล์ใน `/srv/backups` ออกนอกเครื่องด้วย (เช่น `rsync` ไปเครื่องอื่น)
+
+Restore จากไฟล์ backup:
+
+```bash
+docker compose stop backend
+docker compose exec -T database sh -c 'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --clean --if-exists' \
+  < /srv/backups/bsms-YYYY-MM-DD.dump
+docker compose start backend
+```
+
+## 10. อัปเดตเวอร์ชัน
+
+```bash
+cd /srv/building-care
+# backup ก่อนทุกครั้ง (คำสั่งเดียวกับใน cron)
+git pull                      # หรือ git fetch --tags && git checkout <tag>
+docker compose up -d --build  # migration ใหม่รันอัตโนมัติ
+docker compose ps
+```
+
+ย้อนกลับ: `git checkout <commit/tag เดิม>` แล้ว `docker compose up -d --build`
+ถ้าเวอร์ชันใหม่เปลี่ยนโครงสร้างฐานข้อมูลแล้ว ให้ restore backup ที่ทำก่อนอัปเดตด้วย
+
+## 11. แก้ปัญหาที่พบบ่อย
+
+| อาการ | สาเหตุ / วิธีแก้ |
+| --- | --- |
+| `docker compose` แจ้ง `set XXX in .env` | ยังไม่ได้ใส่ค่าที่จำเป็นใน `.env` |
+| backend log: `Production requires ... at least 32 characters` | secret สั้นเกินไป ใช้ `openssl rand -hex 32` |
+| backend log: `Production frontend URLs must be ...` | `PUBLIC_BASE_URL`/`BACKEND_CORS_ORIGINS` ต้องเป็น `https://<โดเมน>` ไม่ใช่ localhost |
+| backend log: `password authentication failed` | เปลี่ยน `POSTGRES_PASSWORD` หลังสร้างฐานข้อมูลแล้ว ให้ใช้ค่าเดิม |
+| อัปโหลดรูปได้ 413 | `client_max_body_size 60m` หายไปจาก config Nginx บนเครื่อง |
+| 502 Bad Gateway | container ยังไม่ขึ้น ดู `docker compose ps` และ `docker compose logs backend` |
+| ไม่ได้รับอีเมล | รัน `check_services.py` และดูโฟลเดอร์ spam |
+
+คำสั่งที่ใช้บ่อย: `docker compose logs -f backend`, `docker compose restart backend`, `docker compose down`
+(ห้ามใช้ `docker compose down -v` เพราะจะลบฐานข้อมูลทั้งหมด)
+
+## สำหรับนักพัฒนา
+
+`docker compose -f compose.yaml up --build` บนเครื่องตัวเองด้วย `.env` จาก `.env.example`
+ชุดนี้มีบัญชีทดสอบ `admin@example.com` / `Admin@1234` ซึ่งจะไม่ถูกสร้างเมื่อ `ENVIRONMENT=production`
