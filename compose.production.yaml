@@ -115,8 +115,8 @@ services:
         VITE_API_BASE_URL: /api/v1
     environment:
       # The only hop allowed in and trusted for X-Forwarded-For (see Frontend/nginx.conf):
-      # the organisation proxy when EDGE_PROXY_CIDR is set (README ทาง B), otherwise the
-      # host Nginx arriving through this network's gateway (README ทาง A).
+      # the organisation proxy when EDGE_PROXY_CIDR is set (README step 6 option 1), otherwise the
+      # host Nginx arriving through this network's gateway (option 2).
       TRUSTED_PROXY_CIDR: '${EDGE_PROXY_CIDR:-${APP_SUBNET:-172.30.80.0/24}}'
     ports:
       - "${FRONTEND_BIND_ADDRESS:-127.0.0.1}:${FRONTEND_PORT:-8080}:8080"
