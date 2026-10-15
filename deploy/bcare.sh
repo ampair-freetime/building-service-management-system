@@ -51,7 +51,13 @@ prepare_env() {
     exit 1
   fi
   dc config --quiet || die ".env หรือ compose.production.yaml ไม่ถูกต้อง (ดูข้อความด้านบน)"
+  # ทาง B: เปิดพอร์ตให้เครื่องอื่นแล้ว ต้องบอกด้วยว่า proxy คือ IP ไหน ไม่อย่างนั้นทุกคำขอได้ 403
+  if [[ "$(env_value FRONTEND_BIND_ADDRESS)" != "127.0.0.1" && -z "$(env_value EDGE_PROXY_CIDR)" ]]; then
+    die "ตั้ง FRONTEND_BIND_ADDRESS เป็น IP เครื่องแล้ว (ทาง B) ต้องใส่ EDGE_PROXY_CIDR=<IP ของ proxy>/32 ใน .env ด้วย"
+  fi
 }
+
+env_value() { sed -n "s/^$1=//p" .env | tail -n 1; }
 
 migrate() {
   say "อัปเดตโครงสร้างฐานข้อมูล"
@@ -69,10 +75,8 @@ check() {
   say "ตรวจบริการภายนอก (SMTP / R2) และ /health"
   dc exec -T backend python scripts/check_services.py \
     || echo "(ระบบยังทำงานได้ แต่ส่งอีเมล/อัปโหลดรูปไม่ได้ — ดู README หัวข้อแก้ปัญหา)"
-  local host port
-  host="$(sed -n 's/^FRONTEND_BIND_ADDRESS=//p' .env)"
-  port="$(sed -n 's/^FRONTEND_PORT=//p' .env)"
-  curl -fsS "http://${host:-127.0.0.1}:${port:-8080}/health" && echo
+  # ถามผ่าน nginx ใน frontend container (ใช้ได้ทั้งทาง A และ B): ได้ ok = nginx → backend ทำงาน
+  dc exec -T frontend wget -qO- http://127.0.0.1:8080/health && echo
 }
 
 install_backup_cron() {
@@ -93,7 +97,7 @@ cmd_install() {
   dc run --rm backend python scripts/create_initial_admin.py
   start_and_check
   install_backup_cron
-  say "ติดตั้งเสร็จ ขั้นต่อไป: เปิด HTTPS (README ขั้นตอนที่ 3)"
+  say "ติดตั้งเสร็จ ขั้นต่อไป: เปิด HTTPS (README ขั้นที่ 6)"
 }
 
 cmd_update() {
@@ -130,6 +134,8 @@ cmd_restore() {
 cmd_https() {
   local domain="${1:-}"
   [[ -n "$domain" ]] || die "ระบุโดเมน เช่น ./deploy/bcare.sh https care.cs.cmu.ac.th"
+  [[ -z "$(env_value EDGE_PROXY_CIDR)" ]] \
+    || die "ตั้ง EDGE_PROXY_CIDR ไว้ (ทาง B: proxy ของหน่วยงานทำ HTTPS ให้แล้ว) จึงไม่ต้องใช้คำสั่งนี้"
   command -v nginx >/dev/null || die "ไม่พบ nginx บนเครื่อง (ถ้าภาควิชาทำ HTTPS ให้ ข้ามขั้นนี้ได้ ดู README)"
   command -v certbot >/dev/null || die "ไม่พบ certbot (ติดตั้ง certbot + python3-certbot-nginx)"
   local site=/etc/nginx/conf.d/building-care.conf
