@@ -11,7 +11,15 @@ guest สแกน QR ในห้องแล้วแจ้งเรื่อ�
 
 **ก่อนเริ่ม ต้องมี:**
 
-- เซิร์ฟเวอร์ Linux 64-bit (2 vCPU, RAM 4 GB, ดิสก์ 20 GB) ที่ภายนอก (มือถือ 4G) เข้าพอร์ต 80/443 ได้ และเครื่องออกอินเทอร์เน็ตพอร์ต 443 และ 587 ได้
+- เซิร์ฟเวอร์ Linux 64-bit (2 vCPU, RAM 4 GB, ดิสก์ 20 GB)
+- พอร์ตที่ต้องเปิด:
+
+  | ทิศทาง | พอร์ต | ใช้ทำอะไร |
+  | --- | --- | --- |
+  | เข้าเครื่อง (จากอินเทอร์เน็ต รวมมือถือ 4G) | 443 | ผู้ใช้เปิดเว็บ `https://โดเมน` |
+  | เข้าเครื่อง | 80 | Let's Encrypt ตรวจโดเมนตอนขอใบรับรอง และ redirect ไป HTTPS |
+  | ออกจากเครื่อง | 443 | อัปโหลดรูปไป Cloudflare R2 และดึง Docker image |
+  | ออกจากเครื่อง | 587 | ส่งอีเมล (SMTP) |
 - โดเมน เช่น `care.example.ac.th` ที่ชี้มาที่เครื่องแล้ว (ต้องถูกต้องก่อนพิมพ์ QR)
 - Cloudflare R2: Account ID, Bucket Name, Access Key ID, Secret Access Key (สิทธิ์ Object Read & Write เฉพาะ bucket)
 - บัญชี SMTP ที่ใช้ **STARTTLS พอร์ต 587**: Host, Username, App Password, อีเมลผู้ส่ง (Gmail: เปิด 2-Step Verification → App passwords)
