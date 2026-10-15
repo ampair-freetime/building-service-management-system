@@ -1,7 +1,6 @@
 """Business logic ของ guest cleaning request endpoints."""
 
 import logging
-from dataclasses import dataclass
 from datetime import datetime
 from uuid import UUID, uuid4
 from zoneinfo import ZoneInfo
@@ -24,14 +23,12 @@ from app.schemas.cleaning_guest import (
     GuestTrackingResponse,
 )
 from app.services.image_urls import build_image_url
-from app.services.images import ProcessedImage, prepare_guest_image
 from app.services.notification import create_cleaning_request_notifications
 from app.services.object_storage import (
     ObjectStorage,
-    StorageConfigurationError,
     StorageOperationError,
-    StoredObject,
 )
+from app.services.photo_attachments import stage_photos
 
 logger = logging.getLogger(__name__)
 BANGKOK_TIMEZONE = ZoneInfo("Asia/Bangkok")
@@ -47,16 +44,6 @@ class RequestNotFoundError(LookupError):
 
 class RequestPersistenceError(RuntimeError):
     """ไม่สามารถบันทึกคำร้องลงฐานข้อมูลได้."""
-
-
-@dataclass(frozen=True)
-class _PreparedImage:
-    """รูปที่อัปขึ้น R2 แล้วแต่ยังไม่มีแถวในฐานข้อมูลอ้างถึง."""
-
-    image_id: UUID
-    processed: ProcessedImage
-    stored: StoredObject
-    sort_order: int
 
 
 async def list_guest_locations(session: AsyncSession) -> list[GuestLocationResponse]:
@@ -109,115 +96,75 @@ async def create_guest_cleaning_request(
     image_uploads: list[UploadFile],
     storage: ObjectStorage | None,
 ) -> GuestCleaningCreateResponse:
-    """เตรียมคำร้อง รูป และ response ให้ครบก่อน commit ฐานข้อมูล."""
-    # Dropdown และ QR ผ่าน client จึงต้องตรวจสถานที่ซ้ำก่อนบันทึก
-    location = await session.get(Location, payload.location_id)
-    if location is None or not location.is_active:
-        raise LocationNotFoundError("ไม่พบสถานที่ที่เลือกหรือสถานที่ถูกปิดใช้งาน")
+    """อัปโหลดรูปก่อน แล้วเตรียมคำร้องและ response ให้ครบก่อน commit ฐานข้อมูล."""
     # สร้าง id เองก่อนแตะฐานข้อมูล เพราะต้องใช้ตั้งชื่อ object key ใน R2 ตั้งแต่ขั้นอัปโหลด
     request_id = uuid4()
     request_code = _make_request_code(request_id)
-    prepared: list[_PreparedImage] = []
-    service_request = ServiceRequest(
-        id=request_id,
-        request_code=request_code,
-        request_type=RequestType.CLEANING,
-        location_id=location.id,
-        title=payload.title,
-        cleaning_category=payload.cleaning_category,
-        description=payload.description,
-        priority=payload.priority,
-        status=RequestStatus.WAITING,
-        reporter_email=str(payload.reporter_email),
-        assigned_staff_id=None,
-    )
-    committed = False
-    try:
-        if image_uploads:
-            if storage is None:
-                raise StorageConfigurationError("Object storage is not configured")
-            for sort_order, upload in enumerate(image_uploads):
-                processed = await prepare_guest_image(upload)
-                image_id = uuid4()
-                stored = await storage.put(
-                    object_key=f"cleaning/{request_id}/{image_id}.webp",
-                    data=processed.data,
-                    content_type=processed.content_type,
-                )
-                prepared.append(
-                    _PreparedImage(
-                        image_id=image_id,
-                        processed=processed,
-                        stored=stored,
-                        sort_order=sort_order,
-                    )
-                )
-
-        session.add(service_request)
-        await session.flush()
-        session.add(
-            RequestHistory(
-                request_id=request_id,
-                action=RequestAction.CREATED,
-                performed_by=None,
-                target_staff_id=None,
-                old_status=None,
-                new_status=RequestStatus.WAITING,
-                note="Guest submitted cleaning request",
-            )
-        )
-        await create_cleaning_request_notifications(
-            session,
-            request_id=request_id,
+    # อัปรูปขึ้น R2 ก่อนเปิด transaction จะได้ไม่ถือ connection ไว้ระหว่างรออัปโหลด
+    async with await stage_photos(
+        storage, image_uploads, key_prefix=f"cleaning/{request_id}"
+    ) as photos:
+        # Dropdown และ QR ผ่าน client จึงต้องตรวจสถานที่ซ้ำก่อนบันทึก
+        location = await session.get(Location, payload.location_id)
+        if location is None or not location.is_active:
+            raise LocationNotFoundError("ไม่พบสถานที่ที่เลือกหรือสถานที่ถูกปิดใช้งาน")
+        service_request = ServiceRequest(
+            id=request_id,
             request_code=request_code,
-            request_title=payload.title,
+            request_type=RequestType.CLEANING,
+            location_id=location.id,
+            title=payload.title,
+            cleaning_category=payload.cleaning_category,
+            description=payload.description,
+            priority=payload.priority,
+            status=RequestStatus.WAITING,
+            reporter_email=str(payload.reporter_email),
+            assigned_staff_id=None,
         )
-        for item in prepared:
+        try:
+            session.add(service_request)
+            await session.flush()
             session.add(
-                Image(
-                    id=item.image_id,
+                RequestHistory(
                     request_id=request_id,
-                    lost_item_id=None,
-                    object_key=item.stored.object_key,
-                    storage_provider="r2",
-                    bucket_name=item.stored.bucket_name,
-                    content_type=item.processed.content_type,
-                    size_bytes=len(item.processed.data),
-                    etag=item.stored.etag,
-                    width=item.processed.width,
-                    height=item.processed.height,
-                    sort_order=item.sort_order,
-                    # CheckConstraint image_parent_check บังคับว่ารูปที่ผูกกับ request_id
-                    # ต้องมี image_type เสมอ ต่างจากรูปของ lost item ที่ต้องเป็น NULL
-                    image_type=ImageType.BEFORE,
-                    uploaded_by_staff_id=None,
+                    action=RequestAction.CREATED,
+                    performed_by=None,
+                    target_staff_id=None,
+                    old_status=None,
+                    new_status=RequestStatus.WAITING,
+                    note="Guest submitted cleaning request",
                 )
             )
-        # ส่งคำร้อง ประวัติ และข้อมูลรูปลง DB ภายใน transaction เดียวกันก่อนยืนยัน
-        await session.flush()
-        await session.refresh(service_request, attribute_names=["created_at"])
-        response = GuestCleaningCreateResponse(
-            request_code=service_request.request_code,
-            status=service_request.status,
-            request_type=service_request.request_type,
-            location=_format_location(location),
-            image_count=len(prepared),
-            created_at=service_request.created_at,
-            message="รับคำร้องแล้ว ระบบจะส่งรหัสคำร้องไปทางอีเมล กรุณาเก็บรหัสไว้ใช้ติดตามสถานะ",
-        )
-        # หลัง commit ไม่อ่าน ORM หรือสร้าง response อีก เพื่อไม่ให้สำเร็จแล้วตอบ error
-        await session.commit()
-        committed = True
-    except SQLAlchemyError as exc:
-        raise RequestPersistenceError("ไม่สามารถบันทึกคำร้องได้") from exc
-    finally:
-        # asyncio.CancelledError สืบทอดจาก BaseException จึงไม่ถูก except ด้านบนจับ
-        # ต้องเก็บกวาดใน finally เท่านั้น ไม่งั้นไฟล์ค้างใน R2 โดยไม่มีแถวอ้างถึง
-        if not committed:
-            try:
-                await session.rollback()
-            finally:
-                await _discard_stored_objects(storage, prepared)
+            await create_cleaning_request_notifications(
+                session,
+                request_id=request_id,
+                request_code=request_code,
+                request_title=payload.title,
+            )
+            session.add_all(
+                photos.image_rows(request_id=request_id, image_type=ImageType.BEFORE)
+            )
+            # ส่งคำร้อง ประวัติ และข้อมูลรูปลง DB ภายใน transaction เดียวกันก่อนยืนยัน
+            await session.flush()
+            await session.refresh(service_request, attribute_names=["created_at"])
+            response = GuestCleaningCreateResponse(
+                request_code=service_request.request_code,
+                status=service_request.status,
+                request_type=service_request.request_type,
+                location=_format_location(location),
+                image_count=len(photos),
+                created_at=service_request.created_at,
+                message="รับคำร้องแล้ว ระบบจะส่งรหัสคำร้องไปทางอีเมล กรุณาเก็บรหัสไว้ใช้ติดตามสถานะ",
+            )
+            # หลัง commit ไม่อ่าน ORM หรือสร้าง response อีก เพื่อไม่ให้สำเร็จแล้วตอบ error
+            await session.commit()
+        except SQLAlchemyError as exc:
+            await session.rollback()
+            raise RequestPersistenceError("ไม่สามารถบันทึกคำร้องได้") from exc
+        except BaseException:
+            await session.rollback()
+            raise
+        photos.keep()
 
     return response
 
@@ -296,23 +243,6 @@ async def get_guest_request_status(
         completion_photos_status=photos_status,
         completion_photos=completion_photos,
     )
-
-
-async def _discard_stored_objects(
-    storage: ObjectStorage | None,
-    prepared: list[_PreparedImage],
-) -> None:
-    """ลบไฟล์ที่อัปขึ้น R2 ไปแล้วเมื่อคำร้องบันทึกไม่สำเร็จ."""
-    if storage is None:
-        return
-    for item in prepared:
-        try:
-            await storage.delete(item.stored.object_key)
-        except StorageOperationError:
-            logger.exception(
-                "Failed to remove orphaned R2 object %s after DB rollback",
-                item.stored.object_key,
-            )
 
 
 def _format_location(location: Location) -> str:

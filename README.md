@@ -72,10 +72,10 @@ HTTPS สิ้นสุดที่ Nginx บนเครื่อง ภาย
 | รายการ | รายละเอียดที่ต้องเตรียม | สถานะ |
 | :--- | :--- | :---: |
 | **Domain & DNS** | ชื่อโดเมน (เช่น `care.example.ac.th`) ที่มี A-Record ชี้มายัง IP ของเซิร์ฟเวอร์แล้ว | [ ] |
-| **เครือข่าย** | เปิดรับพอร์ต 80/443 จากอินเทอร์เน็ต (guest ใช้มือถือ 4G), ออกไปพอร์ต 443 และ **587** ได้ | [ ] |
+| **เครือข่าย** | เปิดรับพอร์ต 80/443 จากอินเทอร์เน็ต (guest ใช้มือถือ 4G), ออกไปพอร์ต 443 และพอร์ต SMTP ได้ | [ ] |
 | **SSL / HTTPS** | ใช้ Certbot (Let's Encrypt) บนเครื่อง ตามขั้นตอนที่ 7 *หรือ* proxy ของหน่วยงาน/Cloudflare (ดูหมายเหตุในขั้นตอนที่ 7) | [ ] |
 | **Cloudflare R2** (บังคับ) | Account ID, Bucket Name, Access Key ID, Secret Access Key — token สิทธิ์ *Object Read & Write* เฉพาะ bucket นี้ | [ ] |
-| **SMTP Account** (บังคับ) | Host ที่รองรับ **STARTTLS port 587**, Username, App Password, อีเมลผู้ส่ง (เช่น Gmail: เปิด 2-Step Verification → App passwords) | [ ] |
+| **SMTP Account** (บังคับ) | Host, Port (587 หรือ 465), Username, App Password, อีเมลผู้ส่ง (เช่น Gmail: เปิด 2-Step Verification → App passwords) | [ ] |
 | **Admin คนแรก** | อีเมลจริงและชื่อ-นามสกุลของผู้ดูแลระบบ | [ ] |
 
 ---
@@ -125,7 +125,7 @@ nano .env
 | `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME` | จาก Cloudflare R2 |
 | `SMTP_HOST`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `MAIL_FROM` | จากผู้ให้บริการอีเมล (Gmail: `smtp.gmail.com`, `SMTP_PORT=587`) |
 
-- ระบบส่งอีเมลด้วย **STARTTLS ที่ port 587 เท่านั้น** (เข้ารหัสก่อนส่งรหัสผ่าน SMTP) ผู้ให้บริการที่มีแค่ port 465 ใช้ไม่ได้
+- ใช้ port 587 คู่กับ `SMTP_USE_STARTTLS=true` หรือ port 465 คู่กับ `SMTP_USE_SSL=true` + `SMTP_USE_STARTTLS=false`
 - ค่าอื่นใช้ค่าเริ่มต้นได้ ไฟล์นี้มี `COMPOSE_FILE=compose.production.yaml` คำสั่ง `docker compose` บนเครื่องนี้จึงใช้ชุด production เสมอ
 - ห้าม commit `.env` และห้ามใส่ความลับในตัวแปร `VITE_*` (ค่าเหล่านั้นไปอยู่ในเบราว์เซอร์)
 
@@ -237,19 +237,6 @@ sudo certbot renew --dry-run                 # ตรวจว่าต่ออ
    ```
 
    ต้องได้สถานะ `200` และเนื้อหา `{"status":"ok"}` (ถ้า backend หยุดทำงาน endpoint นี้จะตอบ 502/504)
-
-3. **ทดสอบระบบผ่านหน้าเว็บ (End-to-End Acceptance):**
-   - [ ] เข้า `https://<โดเมน>/staff-login` ด้วยบัญชี admin จากขั้นตอนที่ 5 ได้
-   - [ ] สร้างสถานที่ (Location) ใหม่ → Generate QR → ตรวจว่า URL ใน QR ขึ้นต้นด้วย `https://<โดเมนจริง>` → ดาวน์โหลดไฟล์ QR
-   - [ ] เชิญเจ้าหน้าที่ 1 คน → **อีเมลคำเชิญถึงกล่องจดหมาย** → เปิดลิงก์จากมือถือ ตั้งรหัสผ่าน และ login ได้
-   - [ ] ใช้มือถือ (เครือข่าย 4G ไม่ใช่ Wi-Fi ภายใน) สแกน QR → เปิดหน้าแจ้งเรื่องได้
-   - [ ] ส่งคำร้องแจ้งซ่อม **พร้อมแนบรูป** → สำเร็จ และรูปแสดงในหน้าเจ้าหน้าที่ (รูปถูกเก็บใน R2 แล้ว)
-   - [ ] **guest ได้รับอีเมลรหัสติดตาม** ในอีเมลที่กรอกตอนแจ้ง (ระบบส่งอีเมลให้ผู้แจ้ง ไม่ได้ส่งแจ้งเตือนถึง admin)
-   - [ ] เจ้าหน้าที่รับงานและปิดงาน → guest ใช้รหัสติดตามแล้วเห็นสถานะเปลี่ยน
-   - [ ] กด "ลืมรหัสผ่าน" ที่หน้า login → ได้อีเมลลิงก์ตั้งรหัสผ่านใหม่
-   - [ ] กดรีเฟรชหน้า `https://<โดเมน>/staff/setup-password` แล้วต้องไม่ขึ้น 404
-   - [ ] ตั้งเวลา Backup อัตโนมัติแล้ว ([หัวข้อ 5.3](#53-การสำรองและกู้คืนฐานข้อมูล-database-backup--restore))
-
 ---
 
 ## 5. การบริหารจัดการและบำรุงรักษา (Operations & Maintenance)
@@ -281,7 +268,7 @@ docker compose up -d --wait
 >
 > หลังแก้ไฟล์ `.env` ต้องสร้าง container ใหม่ด้วย `docker compose up -d --wait` (`restart` ไม่อ่านค่าใหม่)
 
-### 5.2 งานประจำวันของผู้ดูแลระบบ
+### 5.2 สิ่งที่ผู้ดูแลระบบสามารถทำได้
 
 | งาน | วิธี |
 | --- | --- |
@@ -325,26 +312,8 @@ docker compose exec -T database sh -c \
 docker compose up -d --wait
 ```
 
-ควรซ้อม restore ลงฐานข้อมูลทดสอบเดือนละครั้ง
 
-### 5.4 การอัปเดตระบบเวอร์ชันใหม่
-
-```bash
-cd /srv/building-care
-# 1. สำรองข้อมูลก่อนทุกครั้ง (คำสั่ง Backup ในหัวข้อ 5.3)
-# 2. ดึงโค้ดใหม่ และ build
-git pull
-docker compose build
-# 3. อัปเดตโครงสร้างฐานข้อมูล (production ไม่ทำให้เองตอนเริ่มระบบ)
-docker compose run --rm backend alembic upgrade head
-# 4. เริ่มระบบด้วยเวอร์ชันใหม่ แล้วตรวจ
-docker compose up -d --wait
-curl -fsS https://<โดเมนจริง>/health; echo
-```
-
-ถ้าเวอร์ชันใหม่มีปัญหา: `git checkout <commit เดิม>` → `docker compose build` → restore backup ที่ทำไว้ก่อนอัปเดต → `docker compose up -d --wait`
-
-### 5.5 การเฝ้าระวังระบบ
+### 5.4 การเฝ้าระวังระบบ
 
 - ตั้งบริการ uptime monitor ภายนอก (เช่น UptimeRobot) ให้ตรวจ `https://<โดเมนจริง>/health` ทุก 5 นาที
 - ตรวจพื้นที่ดิสก์ทุกสัปดาห์: `df -h` และ `docker system df`
@@ -357,13 +326,13 @@ curl -fsS https://<โดเมนจริง>/health; echo
 | ปัญหาที่พบ | สาเหตุที่เป็นไปได้ | แนวทางการแก้ไข |
 | :--- | :--- | :--- |
 | `required variable ... is missing a value` | ยังไม่ได้ใส่ค่านั้นใน `.env` | ใส่ค่าตามขั้นตอนที่ 3 |
-| `backend` ไม่ขึ้นสถานะ healthy | secret สั้นกว่า 32 ตัว, URL ยังเป็น `localhost` หรือ `REPLACE_`, SMTP ไม่ใช่ STARTTLS, ฐานข้อมูลยังไม่ migrate | `docker compose logs backend` ดูบรรทัด error แล้วแก้ `.env` → `docker compose up -d --wait` |
+| `backend` ไม่ขึ้นสถานะ healthy | secret สั้นกว่า 32 ตัว, URL ยังเป็น `localhost` หรือ `REPLACE_`, ฐานข้อมูลยังไม่ migrate | `docker compose logs backend` ดูบรรทัด error แล้วแก้ `.env` → `docker compose up -d --wait` |
 | `Pool overlaps with other one on this host` | เครือข่าย Docker ชนกับเครือข่ายเดิมบนเครื่อง | เปลี่ยน `APP_SUBNET` ใน `.env` เป็นช่วงอื่น เช่น `172.30.90.0/24` |
 | เข้าเว็บได้ `502 Bad Gateway` / `504` | Backend ยังเริ่มไม่เสร็จ หรือหยุดทำงาน | `docker compose ps` และ `docker compose logs backend` |
 | เข้าโดเมนแล้วเปิดไม่ได้เลย | Nginx บนเครื่องยังไม่ได้ตั้ง, DNS ยังไม่ชี้, firewall ปิด 80/443 | ทำขั้นตอนที่ 7, ตรวจ `sudo nginx -t`, `sudo ufw status` |
 | อัปโหลดรูปขึ้น "ไม่สามารถบันทึกรูปภาพได้" | ดู `docker compose logs backend`: `AccessDenied` = token ไม่มีสิทธิ์ bucket, `NoSuchBucket` = ชื่อ bucket ผิด, `SSLError` / `EndpointConnectionError` = Account ID ผิดหรือออกเน็ตไป R2 ไม่ได้ | แก้ค่า `R2_*` ใน `.env` → `docker compose up -d --wait` → `check_services.py` |
 | อัปโหลดรูปได้ `413` | ไฟล์ใหญ่เกิน `client_max_body_size` ของ Nginx บนเครื่อง | ตรวจว่า `/etc/nginx/sites-available/building-care` มี `client_max_body_size 60m;` |
-| ไม่ได้รับอีเมล | ค่า SMTP ผิด, App Password ถูกยกเลิก, firewall บล็อกพอร์ต 587, server ไม่รองรับ STARTTLS (`check_services.py` ขึ้น `SMTPNotSupportedError`) | `check_services.py`; ระหว่างแก้ใช้ `invitation_link.py --email ...` (หัวข้อ 5.2); ดูในกล่อง Spam ด้วย |
+| ไม่ได้รับอีเมล | ค่า SMTP ผิด, App Password ถูกยกเลิก, firewall บล็อกพอร์ต 587/465 | `check_services.py`; ระหว่างแก้ใช้ `invitation_link.py --email ...` (หัวข้อ 5.2); ดูในกล่อง Spam ด้วย |
 | สร้าง admin คนแรกขึ้น `Invalid ...` | ข้อมูลไม่ผ่านกฎ (ข้อความบอกช่องและกฎ) | อีเมลต้องเป็นโดเมนจริง รหัสผ่านต้องตามกฎในขั้นตอนที่ 5 |
 | สร้าง admin ขึ้น `owned by uid ...` | ใช้วิธีไฟล์ secret แต่ลืม `--user` | ดู [INITIAL_ADMIN.md](Backend/scripts/INITIAL_ADMIN.md) |
 | Login ได้ `429` | Login ผิดหลายครั้ง | รอ 15 นาที (ปรับได้ด้วย `LOGIN_*` ใน `.env`) |

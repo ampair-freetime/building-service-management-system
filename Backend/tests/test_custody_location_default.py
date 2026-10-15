@@ -85,7 +85,7 @@ def sent_emails(monkeypatch):
     async def fake_email(**kwargs):
         emails.append(kwargs)
 
-    monkeypatch.setattr("app.api.v1.endpoints.lost_found_clerk.send_email", fake_email)
+    monkeypatch.setattr("app.services.claim_notifications.send_email", fake_email)
     return emails
 
 

@@ -13,7 +13,9 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--host", default="0.0.0.0")
     parser.add_argument("--port", type=int, default=8000)
-    parser.add_argument("--limit-concurrency", type=int, default=16)
+    # Above this many open connections uvicorn answers 503. Login hashing runs in a thread,
+    # so short bursts (a class logging in together) should queue instead of failing.
+    parser.add_argument("--limit-concurrency", type=int, default=64)
     parser.add_argument("--migrate", action="store_true")
     args = parser.parse_args()
     if not 1 <= args.port <= 65535 or args.limit_concurrency < 2:

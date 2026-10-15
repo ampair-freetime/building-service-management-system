@@ -9,7 +9,7 @@ from test_staff_profile_postgres import postgres_factory  # noqa: F401 (pytest f
 
 from app.models.enums import ClaimStatus, LostStatus, LostType, ReturnStatus
 from app.models.lost_found import LostClaim, LostClaimReturnStatusHistory, LostItem, LostItemHistory
-from app.services import lost_found_clerk
+from app.services import claim_lifecycle, lost_found_clerk
 
 
 def _seed(factory, *, status, claim_status=None):
@@ -102,7 +102,7 @@ def test_return_status_waits_for_item_lock(postgres_factory):  # noqa: F811
 
             async def mark_returned():
                 async with factory() as session:
-                    return await lost_found_clerk.update_ownership_return_status(
+                    return await claim_lifecycle.update_return_status(
                         session, claim_id, ReturnStatus.RETURNED, clerk.id
                     )
 
@@ -113,10 +113,8 @@ def test_return_status_waits_for_item_lock(postgres_factory):  # noqa: F811
             await holder.commit()
 
         results = await asyncio.gather(first, second, return_exceptions=True)
-        assert sum(isinstance(r, LostClaim) for r in results) == 1
-        assert sum(
-            isinstance(r, lost_found_clerk.LostFoundStateConflictError) for r in results
-        ) == 1
+        assert sum(isinstance(r, claim_lifecycle.ClaimOutcome) for r in results) == 1
+        assert sum(isinstance(r, claim_lifecycle.ClaimConflictError) for r in results) == 1
         async with factory() as session:
             history = await session.scalar(
                 select(func.count()).select_from(LostClaimReturnStatusHistory).where(
@@ -131,5 +129,51 @@ def test_return_status_waits_for_item_lock(postgres_factory):  # noqa: F811
             )
             assert history == 1
             assert closed == 1
+
+    asyncio.run(asyncio.wait_for(run(), timeout=20))
+
+
+def test_concurrent_approvals_of_two_claims_give_one_owner(postgres_factory):  # noqa: F811
+    """Two clerks approve different claims on the same item at once: one owner, no deadlock."""
+    factory = postgres_factory
+    clerk = seed_staff(factory, email="clerk@example.com", password="password", role="clerk")
+    item_id, first_claim_id = _seed(
+        factory, status=LostStatus.APPROVED, claim_status=ClaimStatus.PENDING
+    )
+
+    async def add_second_claim():
+        async with factory() as session:
+            claim = LostClaim(
+                claim_code="CLM-TEST-SECOND",
+                found_item_id=item_id,
+                claimant_name="Other",
+                claimant_email="other@example.com",
+                proof_detail="อีกคนหนึ่ง",
+                status=ClaimStatus.PENDING,
+            )
+            session.add(claim)
+            await session.commit()
+            return claim.id
+
+    second_claim_id = asyncio.run(add_second_claim())
+
+    async def run():
+        async def approve(claim_id):
+            async with factory() as session:
+                return await claim_lifecycle.approve(session, claim_id, clerk.id)
+
+        results = await asyncio.gather(
+            approve(first_claim_id), approve(second_claim_id), return_exceptions=True
+        )
+        assert sum(isinstance(r, claim_lifecycle.ClaimOutcome) for r in results) == 1
+        assert sum(isinstance(r, claim_lifecycle.ClaimConflictError) for r in results) == 1
+        async with factory() as session:
+            statuses = set(
+                await session.scalars(
+                    select(LostClaim.status).where(LostClaim.found_item_id == item_id)
+                )
+            )
+            assert statuses == {ClaimStatus.APPROVED, ClaimStatus.REJECTED}
+            assert (await session.get(LostItem, item_id)).status == LostStatus.CLAIMED
 
     asyncio.run(asyncio.wait_for(run(), timeout=20))

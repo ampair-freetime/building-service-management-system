@@ -1,7 +1,6 @@
 """Business logic ร่วมของ guest lost/found endpoints."""
 
 import logging
-from dataclasses import dataclass
 from datetime import datetime
 from uuid import UUID, uuid4
 
@@ -26,12 +25,8 @@ from app.schemas.lost_found_item import (
     GuestItemPublicResponse,
 )
 from app.services.image_urls import build_image_url
-from app.services.images import ProcessedImage, prepare_guest_image
-from app.services.object_storage import (
-    ObjectStorage,
-    StorageOperationError,
-    StoredObject,
-)
+from app.services.object_storage import ObjectStorage
+from app.services.photo_attachments import stage_photos
 
 logger = logging.getLogger(__name__)
 
@@ -48,16 +43,6 @@ class ItemPersistenceError(RuntimeError):
     """ไม่สามารถบันทึกรายงานลงฐานข้อมูลได้."""
 
 
-@dataclass(frozen=True)
-class _PreparedImage:
-    """รูปที่อัปขึ้น R2 แล้วแต่ยังไม่มีแถวในฐานข้อมูลอ้างถึง."""
-
-    image_id: UUID
-    processed: ProcessedImage
-    stored: StoredObject
-    sort_order: int
-
-
 async def create_guest_item(
     session: AsyncSession,
     *,
@@ -66,103 +51,65 @@ async def create_guest_item(
     image_uploads: list[UploadFile],
     storage: ObjectStorage,
 ) -> GuestItemCreatedResponse:
-    """ตรวจข้อมูล อัปโหลดรูป แล้ว commit ประกาศกับ image metadata พร้อมกัน."""
-    if payload.location_id is not None:
-        location = await session.get(Location, payload.location_id)
-        if location is None or not location.is_active:
-            raise LocationNotFoundError("ไม่พบสถานที่ที่เลือกหรือสถานที่ถูกปิดใช้งาน")
-
+    """อัปโหลดรูปก่อน แล้ว commit ประกาศกับ image metadata ใน transaction เดียว."""
     item_id = uuid4()
     item_code = _make_item_code(report_type, item_id)
-    prepared: list[_PreparedImage] = []
+    # อัปรูปขึ้น R2 ก่อนแตะฐานข้อมูล จะได้ไม่ถือ connection ไว้ระหว่างรออัปโหลด
+    async with await stage_photos(
+        storage,
+        image_uploads,
+        key_prefix=f"lost-found/{report_type.value}/{item_id}",
+    ) as photos:
+        if payload.location_id is not None:
+            location = await session.get(Location, payload.location_id)
+            if location is None or not location.is_active:
+                raise LocationNotFoundError("ไม่พบสถานที่ที่เลือกหรือสถานที่ถูกปิดใช้งาน")
 
-    private_verification_detail = None
-    custody_location = None
-    if isinstance(payload, GuestFoundItemCreate):
-        private_verification_detail = payload.private_verification_detail
-        custody_location = settings.default_custody_location
+        private_verification_detail = None
+        custody_location = None
+        if isinstance(payload, GuestFoundItemCreate):
+            private_verification_detail = payload.private_verification_detail
+            custody_location = settings.default_custody_location
 
-    item = LostItem(
-        id=item_id,
-        item_code=item_code,
-        report_type=report_type,
-        item_category=payload.item_category,
-        item_name=payload.item_name,
-        description=payload.description,
-        event_datetime=payload.event_datetime,
-        location_id=payload.location_id,
-        location_detail=payload.location_detail,
-        custody_location=custody_location,
-        private_verification_detail=private_verification_detail,
-        reporter_email=str(payload.reporter_email),
-        status=LostStatus.PENDING,
-    )
-    committed = False
-    try:
-        for sort_order, upload in enumerate(image_uploads):
-            processed = await prepare_guest_image(upload)
-            image_id = uuid4()
-            stored = await storage.put(
-                object_key=(
-                    f"lost-found/{report_type.value}/{item_id}/{image_id}.webp"
-                ),
-                data=processed.data,
-                content_type=processed.content_type,
-            )
-            prepared.append(
-                _PreparedImage(
-                    image_id=image_id,
-                    processed=processed,
-                    stored=stored,
-                    sort_order=sort_order,
-                )
-            )
-        session.add(item)
-        await session.flush()
-        session.add(
-            LostItemHistory(
-                lost_item_id=item_id,
-                old_status=None,
-                new_status=LostStatus.PENDING,
-                note="Guest submitted report",
-            )
+        item = LostItem(
+            id=item_id,
+            item_code=item_code,
+            report_type=report_type,
+            item_category=payload.item_category,
+            item_name=payload.item_name,
+            description=payload.description,
+            event_datetime=payload.event_datetime,
+            location_id=payload.location_id,
+            location_detail=payload.location_detail,
+            custody_location=custody_location,
+            private_verification_detail=private_verification_detail,
+            reporter_email=str(payload.reporter_email),
+            status=LostStatus.PENDING,
         )
-        for prepared_image in prepared:
+        try:
+            session.add(item)
+            await session.flush()
             session.add(
-                Image(
-                    id=prepared_image.image_id,
+                LostItemHistory(
                     lost_item_id=item_id,
-                    request_id=None,
-                    object_key=prepared_image.stored.object_key,
-                    storage_provider="r2",
-                    bucket_name=prepared_image.stored.bucket_name,
-                    content_type=prepared_image.processed.content_type,
-                    size_bytes=len(prepared_image.processed.data),
-                    etag=prepared_image.stored.etag,
-                    width=prepared_image.processed.width,
-                    height=prepared_image.processed.height,
-                    sort_order=prepared_image.sort_order,
-                    image_type=None,
-                    uploaded_by_staff_id=None,
+                    old_status=None,
+                    new_status=LostStatus.PENDING,
+                    note="Guest submitted report",
                 )
             )
-        await session.commit()
-        committed = True
-    except SQLAlchemyError as exc:
-        await session.rollback()
-        raise ItemPersistenceError("ไม่สามารถบันทึกประกาศได้") from exc
-    finally:
-        # asyncio.CancelledError สืบทอดจาก BaseException จึงไม่ถูก except ด้านบนจับ
-        # ต้องเก็บกวาดใน finally เท่านั้น ไม่งั้นไฟล์ค้างใน R2 โดยไม่มีแถวอ้างถึง
-        if not committed:
-            await _discard_stored_objects(storage, prepared)
+            session.add_all(photos.image_rows(lost_item_id=item_id))
+            await session.commit()
+        except SQLAlchemyError as exc:
+            await session.rollback()
+            raise ItemPersistenceError("ไม่สามารถบันทึกประกาศได้") from exc
+        photos.keep()
 
     return GuestItemCreatedResponse(
         id=item.id,
         item_code=item.item_code,
         report_type=item.report_type,
         status=item.status,
-        image_count=len(prepared),
+        image_count=len(photos),
         message="รับรายงานแล้ว ระบบจะส่งรหัสติดตามไปทางอีเมล กรุณารอเจ้าหน้าที่ตรวจสอบก่อนเผยแพร่",
     )
 
@@ -287,21 +234,6 @@ def _to_public_response(
             for image in images
         ],
     )
-
-
-async def _discard_stored_objects(
-    storage: ObjectStorage,
-    prepared: list[_PreparedImage],
-) -> None:
-    """ลบทุก object ที่อัปแล้วเมื่อบันทึกคำร้องไม่สำเร็จ."""
-    for item in prepared:
-        try:
-            await storage.delete(item.stored.object_key)
-        except StorageOperationError:
-            logger.exception(
-                "Failed to remove orphaned R2 object %s after DB rollback",
-                item.stored.object_key,
-            )
 
 
 def _make_item_code(report_type: LostType, item_id: UUID) -> str:

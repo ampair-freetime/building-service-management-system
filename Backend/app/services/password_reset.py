@@ -1,5 +1,6 @@
 """Self-service staff password reset: request, deliver, validate, and confirm a link."""
 
+import asyncio
 import hashlib
 import logging
 import secrets
@@ -222,7 +223,7 @@ async def confirm_password_reset(
         await session.rollback()
         raise InvalidResetTokenError(INVALID_RESET_LINK_MESSAGE)
 
-    staff.password_hash = hash_password(new_password)
+    staff.password_hash = await asyncio.to_thread(hash_password, new_password)
     # Every access token issued before this instant stops working.
     staff.password_changed_at = now
     await invalidate_pending_resets(session, staff.id)

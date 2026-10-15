@@ -1,7 +1,6 @@
 """Business logic ของ guest repair request endpoints."""
 
 import logging
-from dataclasses import dataclass
 from datetime import datetime
 from uuid import UUID, uuid4
 from zoneinfo import ZoneInfo
@@ -13,7 +12,6 @@ from sqlalchemy.ext.asyncio import AsyncConnection, AsyncSession, async_sessionm
 from sqlalchemy.orm import selectinload
 
 from app.models.enums import ImageType, RequestAction, RequestStatus, RequestType
-from app.models.image import Image
 from app.models.location import Location
 from app.models.service_request import RequestHistory, ServiceRequest
 from app.schemas.repair_guest import (
@@ -22,14 +20,11 @@ from app.schemas.repair_guest import (
     GuestRepairLocationResponse,
     GuestRepairTrackingResponse,
 )
-from app.services.images import ProcessedImage, prepare_guest_image
 from app.services.notification import create_repair_request_notifications
 from app.services.object_storage import (
     ObjectStorage,
-    StorageConfigurationError,
-    StorageOperationError,
-    StoredObject,
 )
+from app.services.photo_attachments import stage_photos
 
 logger = logging.getLogger(__name__)
 REPAIR_CODE_PREFIX = "RPR"
@@ -48,16 +43,6 @@ class RepairRequestNotFoundError(LookupError):
 
 class RepairRequestPersistenceError(RuntimeError):
     """ไม่สามารถบันทึกคำร้องลงฐานข้อมูลได้."""
-
-
-@dataclass(frozen=True)
-class _PreparedImage:
-    """รูปที่อัปขึ้น R2 แล้วแต่ยังไม่มีแถวในฐานข้อมูลอ้างถึง."""
-
-    image_id: UUID
-    processed: ProcessedImage
-    stored: StoredObject
-    sort_order: int
 
 
 async def list_guest_repair_locations(session: AsyncSession) -> list[GuestRepairLocationResponse]:
@@ -110,139 +95,96 @@ async def create_guest_repair_request(
     image_uploads: list[UploadFile],
     storage: ObjectStorage | None,
 ) -> GuestRepairCreateResponse:
-    """เตรียมคำร้อง รูป และ response ให้ครบก่อน commit ฐานข้อมูล."""
-    # Dropdown และ QR ผ่าน client จึงต้องตรวจสถานที่ซ้ำก่อนบันทึก
-    location = await session.get(Location, payload.location_id)
-    if location is None or not location.is_active:
-        raise RepairLocationNotFoundError("ไม่พบสถานที่ที่เลือกหรือสถานที่ถูกปิดใช้งาน")
+    """อัปโหลดรูปก่อน แล้วเตรียมคำร้องและ response ให้ครบก่อน commit ฐานข้อมูล."""
     # สร้าง id เองก่อนแตะฐานข้อมูล เพราะต้องใช้ตั้งชื่อ object key ใน R2 ตั้งแต่ขั้นอัปโหลด
     request_id = uuid4()
     request_code = _make_request_code(request_id)
-    prepared: list[_PreparedImage] = []
-    service_request = ServiceRequest(
-        id=request_id,
-        request_code=request_code,
-        request_type=RequestType.REPAIR,
-        location_id=location.id,
-        title=payload.title,
-        description=payload.description,
-        priority=payload.priority,
-        status=RequestStatus.WAITING,
-        reporter_email=str(payload.reporter_email),
-        assigned_staff_id=None,
-    )
-    commit_started = False
-    saved = False
-    delete_images = True
-    committed = False
-    try:
-        if image_uploads:
-            if storage is None:
-                raise StorageConfigurationError("Object storage is not configured")
-            for sort_order, upload in enumerate(image_uploads):
-                processed = await prepare_guest_image(upload)
-                image_id = uuid4()
-                stored = await storage.put(
-                    object_key=f"{REPAIR_STORAGE_PREFIX}/{request_id}/{image_id}.webp",
-                    data=processed.data,
-                    content_type=processed.content_type,
-                )
-                prepared.append(
-                    _PreparedImage(
-                        image_id=image_id,
-                        processed=processed,
-                        stored=stored,
-                        sort_order=sort_order,
-                    )
-                )
-
-        session.add(service_request)
-        await session.flush()
-        session.add(
-            RequestHistory(
-                request_id=request_id,
-                action=RequestAction.CREATED,
-                performed_by=None,
-                target_staff_id=None,
-                old_status=None,
-                new_status=RequestStatus.WAITING,
-                note=REPAIR_HISTORY_NOTE,
-            )
-        )
-        await create_repair_request_notifications(
-            session,
-            request_id=request_id,
+    # อัปรูปขึ้น R2 ก่อนเปิด transaction จะได้ไม่ถือ connection ไว้ระหว่างรออัปโหลด
+    async with await stage_photos(
+        storage, image_uploads, key_prefix=f"{REPAIR_STORAGE_PREFIX}/{request_id}"
+    ) as photos:
+        # Dropdown และ QR ผ่าน client จึงต้องตรวจสถานที่ซ้ำก่อนบันทึก
+        location = await session.get(Location, payload.location_id)
+        if location is None or not location.is_active:
+            raise RepairLocationNotFoundError("ไม่พบสถานที่ที่เลือกหรือสถานที่ถูกปิดใช้งาน")
+        service_request = ServiceRequest(
+            id=request_id,
             request_code=request_code,
-            request_title=payload.title,
+            request_type=RequestType.REPAIR,
+            location_id=location.id,
+            title=payload.title,
+            description=payload.description,
+            priority=payload.priority,
+            status=RequestStatus.WAITING,
+            reporter_email=str(payload.reporter_email),
+            assigned_staff_id=None,
         )
-        for item in prepared:
+        commit_started = False
+        try:
+            session.add(service_request)
+            await session.flush()
             session.add(
-                Image(
-                    id=item.image_id,
+                RequestHistory(
                     request_id=request_id,
-                    lost_item_id=None,
-                    object_key=item.stored.object_key,
-                    storage_provider="r2",
-                    bucket_name=item.stored.bucket_name,
-                    content_type=item.processed.content_type,
-                    size_bytes=len(item.processed.data),
-                    etag=item.stored.etag,
-                    width=item.processed.width,
-                    height=item.processed.height,
-                    sort_order=item.sort_order,
-                    # CheckConstraint image_parent_check บังคับว่ารูปที่ผูกกับ request_id
-                    # ต้องมี image_type เสมอ ต่างจากรูปของ lost item ที่ต้องเป็น NULL
-                    image_type=ImageType.BEFORE,
-                    uploaded_by_staff_id=None,
+                    action=RequestAction.CREATED,
+                    performed_by=None,
+                    target_staff_id=None,
+                    old_status=None,
+                    new_status=RequestStatus.WAITING,
+                    note=REPAIR_HISTORY_NOTE,
                 )
             )
-        # ส่งคำร้อง ประวัติ และข้อมูลรูปลง DB ภายใน transaction เดียวกันก่อนยืนยัน
-        await session.flush()
-        await session.refresh(service_request, attribute_names=["created_at"])
-        response = GuestRepairCreateResponse(
-            request_code=service_request.request_code,
-            status=service_request.status,
-            request_type=service_request.request_type,
-            location=_format_location(location),
-            image_count=len(prepared),
-            created_at=service_request.created_at,
-            message="รับคำร้องแจ้งซ่อมแล้ว ระบบจะส่งรหัสคำร้องไปทางอีเมล กรุณาเก็บรหัสไว้ใช้ติดตามสถานะ",
-        )
-        # หลัง commit ไม่อ่าน ORM หรือสร้าง response อีก เพื่อไม่ให้สำเร็จแล้วตอบ error
-        commit_started = True
-        delete_images = False
-        await session.commit()
-        committed = saved = True
-    except SQLAlchemyError as exc:
-        if commit_started:
+            await create_repair_request_notifications(
+                session,
+                request_id=request_id,
+                request_code=request_code,
+                request_title=payload.title,
+            )
+            session.add_all(
+                photos.image_rows(request_id=request_id, image_type=ImageType.BEFORE)
+            )
+            # ส่งคำร้อง ประวัติ และข้อมูลรูปลง DB ภายใน transaction เดียวกันก่อนยืนยัน
+            await session.flush()
+            await session.refresh(service_request, attribute_names=["created_at"])
+            response = GuestRepairCreateResponse(
+                request_code=service_request.request_code,
+                status=service_request.status,
+                request_type=service_request.request_type,
+                location=_format_location(location),
+                image_count=len(photos),
+                created_at=service_request.created_at,
+                message="รับคำร้องแจ้งซ่อมแล้ว ระบบจะส่งรหัสคำร้องไปทางอีเมล กรุณาเก็บรหัสไว้ใช้ติดตามสถานะ",
+            )
+            # หลัง commit ไม่อ่าน ORM หรือสร้าง response อีก เพื่อไม่ให้สำเร็จแล้วตอบ error
+            commit_started = True
+            await session.commit()
+        except BaseException as exc:
+            await session.rollback()
+            if not commit_started:
+                if isinstance(exc, SQLAlchemyError):
+                    raise RepairRequestPersistenceError("ไม่สามารถบันทึกคำร้องได้") from exc
+                raise
+            # commit พังกลางทาง: ฐานข้อมูลอาจบันทึกไปแล้วก็ได้ จึงถามด้วย session ใหม่
+            # ถ้าถามไม่ได้หรือถูกยกเลิกระหว่างนั้น ให้เก็บรูปไว้ ดีกว่าลบรูปของคำร้องที่บันทึกแล้ว
+            saved = None
             try:
-                saved = await _request_was_committed(session, request_id)
+                if isinstance(exc, SQLAlchemyError):
+                    saved = await _request_was_committed(session, request_id)
             except SQLAlchemyError:
-                logger.exception(
-                    "Cannot verify repair commit; retaining images: request_id=%s keys=%s",
-                    request_id,
-                    [item.stored.object_key for item in prepared],
-                )
-            else:
-                delete_images = not saved
-        if not saved:
-            raise RepairRequestPersistenceError("ไม่สามารถบันทึกคำร้องได้") from exc
-    finally:
-        # ครอบคลุมทั้ง cancellation ระหว่าง commit และระหว่างตรวจผล commit
-        if commit_started and not saved and not delete_images:
-            logger.warning(
-                "Repair commit unresolved; retaining images: request_id=%s keys=%s",
-                request_id,
-                [item.stored.object_key for item in prepared],
-            )
-        # asyncio.CancelledError สืบทอดจาก BaseException จึงไม่ถูก except ด้านบนจับ
-        # ต้องเก็บกวาดใน finally เท่านั้น ไม่งั้นไฟล์ค้างใน R2 โดยไม่มีแถวอ้างถึง
-        if not committed:
-            try:
-                await session.rollback()
+                logger.exception("Cannot verify repair commit: request_id=%s", request_id)
             finally:
-                if not saved and delete_images:
-                    await _discard_stored_objects(storage, prepared)
+                if saved is None:
+                    logger.warning(
+                        "Repair commit unresolved; retaining images: request_id=%s keys=%s",
+                        request_id,
+                        photos.object_keys,
+                    )
+                    photos.keep()
+            if not isinstance(exc, SQLAlchemyError):
+                raise
+            if not saved:
+                raise RepairRequestPersistenceError("ไม่สามารถบันทึกคำร้องได้") from exc
+        photos.keep()
 
     return response
 
@@ -280,23 +222,6 @@ async def get_guest_repair_status(
         updated_at=service_request.updated_at,
         completed_at=service_request.completed_at,
     )
-
-
-async def _discard_stored_objects(
-    storage: ObjectStorage | None,
-    prepared: list[_PreparedImage],
-) -> None:
-    """ลบไฟล์ที่อัปขึ้น R2 ไปแล้วเมื่อคำร้องบันทึกไม่สำเร็จ."""
-    if storage is None:
-        return
-    for item in prepared:
-        try:
-            await storage.delete(item.stored.object_key)
-        except StorageOperationError:
-            logger.exception(
-                "Failed to remove orphaned R2 object %s after DB rollback",
-                item.stored.object_key,
-            )
 
 
 def _format_location(location: Location) -> str:

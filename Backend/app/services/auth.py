@@ -1,12 +1,14 @@
 """Business logic สำหรับตรวจสอบข้อมูลล็อกอิน."""
 
+import asyncio
 from datetime import UTC, datetime
+from functools import cache
 
 from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm.attributes import set_committed_value
 
-from app.core.security import verify_password
+from app.core.security import hash_password, verify_password
 from app.models.enums import AccountStatus
 from app.models.staff import Staff
 from app.services.staff import get_staff_by_email
@@ -17,13 +19,25 @@ async def authenticate_staff(
 ) -> Staff | None:
     """คืนบัญชีเมื่อข้อมูลถูกต้อง หรือคืน None เมื่อไม่ผ่านการยืนยันตัวตน."""
     account = await get_staff_by_email(session, identifier)
+    usable = account is not None and account.status == AccountStatus.ACTIVE
+
+    # ตรวจ argon2 ทุกครั้ง แม้ไม่มีบัญชีนี้ (เทียบกับ hash หลอก) เพื่อให้เวลาตอบเท่ากัน
+    # ไม่อย่างนั้นคนนอกจับเวลาแล้วรู้ได้ว่าอีเมลไหนมีบัญชีอยู่
+    encoded_hash = account.password_hash if usable else _dummy_hash()
+    # argon2 ใช้ CPU ราว 50 ms ต่อครั้ง ถ้ารันใน event loop ตรง ๆ request อื่นทั้งหมดจะต้องรอ
+    # จึงย้ายไปรันใน thread pool แทน
+    password_ok = await asyncio.to_thread(verify_password, password, encoded_hash)
 
     # บัญชีที่ถูกปิดใช้งานต้องล็อกอินไม่ได้ แม้รหัสผ่านจะถูกต้อง
-    if account is None or account.status != AccountStatus.ACTIVE:
-        return None
-    if not verify_password(password, account.password_hash):
+    if not usable or not password_ok:
         return None
     return account
+
+
+@cache
+def _dummy_hash() -> str:
+    """hash ของรหัสที่ไม่มีใครรู้ สร้างครั้งเดียวแล้วจำไว้ ใช้แค่ถ่วงเวลาให้เท่ากับบัญชีจริง"""
+    return hash_password("timing-equaliser-not-a-real-password")
 
 
 async def record_successful_login(session: AsyncSession, account: Staff) -> None:

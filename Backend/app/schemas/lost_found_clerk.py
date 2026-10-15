@@ -1,11 +1,19 @@
 from datetime import datetime, time
-from zoneinfo import ZoneInfo
 from uuid import UUID
+from zoneinfo import ZoneInfo
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    computed_field,
+    field_validator,
+    model_validator,
+)
+
 from app.models.enums import ClaimStatus, LostStatus, LostType, ReturnStatus
 from app.schemas.lost_found_item import GuestImageResponse
-
+from app.services.claim_lifecycle import allowed_actions
 
 # รูปให้ staff ตรวจก่อนอนุมัติ ส่งเป็น signed URL อายุสั้น โดย endpoint เติมค่าเองภายหลัง
 # validation_alias ชี้ไปชื่อที่ LostItem ไม่มี เพื่อกัน from_attributes ไปอ่าน relationship
@@ -119,6 +127,12 @@ class OwnershipRequestListResponse(BaseModel):
     return_status: ReturnStatus | None
     created_at: datetime
 
+    @computed_field
+    @property
+    def allowed_actions(self) -> list[str]:
+        """ปุ่มที่หน้าเว็บควรแสดง คำนวณจากตารางกฎใน claim_lifecycle ที่เดียว."""
+        return allowed_actions(self.status)
+
 
 class OwnershipRequestDetailResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -156,7 +170,13 @@ class OwnershipRequestDetailResponse(BaseModel):
     description: str | None
     location_detail: str | None
     custody_location: str | None
-    
+
+    @computed_field
+    @property
+    def allowed_actions(self) -> list[str]:
+        """ปุ่มที่หน้าเว็บควรแสดง คำนวณจากตารางกฎใน claim_lifecycle ที่เดียว."""
+        return allowed_actions(self.status)
+
 
 class RequestAdditionalInfoRequest(BaseModel):
     message: str = Field(min_length=1, max_length=2000)

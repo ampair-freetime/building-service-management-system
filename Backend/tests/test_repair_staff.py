@@ -1542,3 +1542,49 @@ def test_technician_can_upload_repair_completion_photos(
             assert all(image.width == 32 and image.height == 24 for image in images)
 
     asyncio.run(verify_database())
+
+
+def test_technician_sees_only_open_and_own_repair_tasks(
+    test_context: tuple[TestClient, async_sessionmaker[AsyncSession]],
+) -> None:
+    """งานที่ช่างคนอื่นรับไปแล้วต้องไม่โผล่ในรายการ และเปิดดูรายละเอียด (อีเมลผู้แจ้ง) ไม่ได้."""
+    client, session_factory = test_context
+    seed_location(session_factory)
+    for number in (1, 2):
+        seed_staff(
+            session_factory,
+            email=f"technician{number}@example.com",
+            password=f"password-{number}",
+            role="technician",
+            full_name=f"Technician {number}",
+        )
+    seed_service_request(
+        session_factory, request_code="REP-VIS-001", request_type=RequestType.REPAIR, title="A"
+    )
+    seed_service_request(
+        session_factory, request_code="REP-VIS-002", request_type=RequestType.REPAIR, title="B"
+    )
+    tech1 = login_staff(client, "technician1@example.com", "password-1")
+    tech2 = login_staff(client, "technician2@example.com", "password-2")
+
+    ids = {item["request_code"]: item["id"] for item in client.get(
+        "/api/v1/repair-requests", headers=tech1
+    ).json()["requests"]}
+    taken_id, open_id = ids["REP-VIS-001"], ids["REP-VIS-002"]
+    assert client.patch(f"/api/v1/repair-requests/{taken_id}/accept", headers=tech1).status_code == 200
+
+    tech2_codes = {
+        item["request_code"]
+        for item in client.get("/api/v1/repair-requests", headers=tech2).json()["requests"]
+    }
+    assert tech2_codes == {"REP-VIS-002"}
+    assert client.get(f"/api/v1/repair-requests/{taken_id}", headers=tech2).status_code == 404
+    assert client.get(f"/api/v1/repair-requests/{open_id}", headers=tech2).status_code == 200
+
+    # เจ้าของงานยังเห็นงานของตัวเองครบ
+    tech1_codes = {
+        item["request_code"]
+        for item in client.get("/api/v1/repair-requests", headers=tech1).json()["requests"]
+    }
+    assert tech1_codes == {"REP-VIS-001", "REP-VIS-002"}
+    assert client.get(f"/api/v1/repair-requests/{taken_id}", headers=tech1).status_code == 200

@@ -1,33 +1,31 @@
+from collections.abc import Iterator
+from contextlib import contextmanager
 from uuid import UUID
-from zoneinfo import ZoneInfo
-from app.services.invitation_email import send_email, EmailDeliveryError
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, BackgroundTasks, HTTPException
 from sqlalchemy import select
+
+from app.api.dependencies import ClerkStaff, CurrentStaff, DbSession, OptionalObjectStorageClient
+from app.models.enums import LostStatus, LostType
 from app.models.lost_found import LostItem
 from app.models.staff import Staff
-
-from app.core.config import settings
-from app.api.dependencies import ClerkStaff, CurrentStaff, DbSession, OptionalObjectStorageClient
 from app.schemas.lost_found_clerk import (
-    PersonalLostFoundHistoryResponse,
     FoundItemDetailResponse,
     LostItemDetailResponse,
     OwnershipRequestDetailResponse,
     OwnershipRequestListResponse,
     PendingFoundItemResponse,
     PendingLostItemResponse,
+    PersonalLostFoundHistoryResponse,
     RejectFoundItemRequest,
     RequestAdditionalInfoRequest,
-    UpdateReturnStatusRequest,
     SchedulePickupRequest,
+    UpdateReturnStatusRequest,
 )
-from app.models.enums import LostType, LostStatus
+from app.services import claim_lifecycle
+from app.services.claim_notifications import schedule_claim_notices, send_claim_notice
 from app.services.lost_found_clerk import (
-    list_personal_lost_found_history,
-    reject_ownership_request,
     ActiveClaimExistsError,
-    ItemAlreadyClaimedError,
     LostFoundStateConflictError,
     approve_found_item,
     approve_lost_item,
@@ -38,13 +36,10 @@ from app.services.lost_found_clerk import (
     list_pending_found_items,
     list_pending_lost_items,
     list_pending_ownership_requests,
+    list_personal_lost_found_history,
     load_staff_image_urls,
     reject_found_item,
     reject_lost_item,
-    approve_ownership_request,
-    request_additional_ownership_information,
-    update_ownership_return_status,
-    schedule_pickup,
 )
 
 router = APIRouter()
@@ -391,6 +386,27 @@ async def get_ownership_request(
     return claim
 
 
+# ---------------------------------------------------------------- คำขอรับของคืน
+# กฎสถานะ ลำดับ lock และอีเมลอยู่ใน services/claim_lifecycle.py; ที่นี่แค่แปลงเป็น HTTP
+
+
+@contextmanager
+def _claim_http_errors() -> Iterator[None]:
+    try:
+        yield
+    except claim_lifecycle.ClaimNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except claim_lifecycle.ClaimConflictError as exc:
+        # เจ้าหน้าที่อีกคนดำเนินการไปก่อนแล้ว หรือสถานะไม่อนุญาตคำสั่งนี้
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+async def _send_and_report(outcome: claim_lifecycle.ClaimOutcome) -> bool:
+    """รอส่งอีเมลเพื่อบอกเจ้าหน้าที่ว่าผู้ขอได้รับแจ้งหรือยัง (commit ไปแล้ว ไม่ถือ lock)."""
+    results = [await send_claim_notice(notice) for notice in outcome.notices]
+    return all(results)
+
+
 @router.post(
     "/ownership-requests/{claim_id}/approve",
     response_model=OwnershipRequestListResponse,
@@ -399,25 +415,13 @@ async def approve_ownership_request_endpoint(
     claim_id: UUID,
     session: DbSession,
     current_staff: ClerkStaff,
+    background_tasks: BackgroundTasks,
 ) -> OwnershipRequestListResponse:
-    """อนุมัติคำขอรับของคืน"""
-
-    try:
-        claim = await approve_ownership_request(
-            session,
-            claim_id,
-            current_staff.id,
-        )
-    except ItemAlreadyClaimedError as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
-
-    if claim is None:
-        raise HTTPException(
-            status_code=404,
-            detail="Pending ownership request not found",
-        )
-
-    return claim
+    """อนุมัติคำขอรับของคืน; คำขออื่นของของชิ้นเดียวกันถูกปฏิเสธและแจ้งทางอีเมลเบื้องหลัง"""
+    with _claim_http_errors():
+        outcome = await claim_lifecycle.approve(session, claim_id, current_staff.id)
+    schedule_claim_notices(background_tasks, outcome.notices)
+    return outcome.claim
 
 
 @router.post(
@@ -429,23 +433,15 @@ async def request_additional_ownership_info(
     request: RequestAdditionalInfoRequest,
     session: DbSession,
     current_staff: ClerkStaff,
+    background_tasks: BackgroundTasks,
 ) -> OwnershipRequestListResponse:
-    """ขอข้อมูลเพิ่มเติมสำหรับคำขอรับของคืน"""
-
-    claim = await request_additional_ownership_information(
-        session,
-        claim_id,
-        current_staff.id,
-        request.message,
-    )
-
-    if claim is None:
-        raise HTTPException(
-            status_code=404,
-            detail="Pending ownership request not found",
+    """ขอข้อมูลเพิ่มเติม; ผู้ขอได้อีเมลพร้อมลิงก์ไปส่งหลักฐานเพิ่ม"""
+    with _claim_http_errors():
+        outcome = await claim_lifecycle.request_additional_info(
+            session, claim_id, current_staff.id, request.message
         )
-
-    return claim
+    schedule_claim_notices(background_tasks, outcome.notices)
+    return outcome.claim
 
 
 @router.patch(
@@ -458,24 +454,11 @@ async def update_return_status(
     session: DbSession,
     current_staff: ClerkStaff,
 ) -> OwnershipRequestListResponse:
-    try:
-        claim = await update_ownership_return_status(
-            session,
-            claim_id,
-            request.return_status,
-            current_staff.id,
+    with _claim_http_errors():
+        outcome = await claim_lifecycle.update_return_status(
+            session, claim_id, request.return_status, current_staff.id
         )
-    except LostFoundStateConflictError as exc:
-        # เจ้าหน้าที่อีกคนดำเนินการไปก่อนแล้ว
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
-
-    if claim is None:
-        raise HTTPException(
-            status_code=404,
-            detail="Approved ownership request not found",
-        )
-
-    return claim
+    return outcome.claim
 
 
 @router.post(
@@ -488,88 +471,42 @@ async def schedule_ownership_pickup(
     session: DbSession,
     _: ClerkStaff,
 ) -> OwnershipRequestDetailResponse:
-    try:
-        claim = await schedule_pickup(
+    with _claim_http_errors():
+        outcome = await claim_lifecycle.schedule_pickup(
             session,
             claim_id,
-            request.pickup_datetime,
-            request.pickup_location,
-            request.note,
-            request.pickup_end_datetime,
+            pickup_datetime=request.pickup_datetime,
+            pickup_end_datetime=request.pickup_end_datetime,
+            pickup_location=request.pickup_location,
+            note=request.note,
         )
-    except LostFoundStateConflictError as exc:
-        # เจ้าหน้าที่อีกคนดำเนินการไปก่อนแล้ว
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
-
-    if claim is None:
-        raise HTTPException(
-            status_code=404,
-            detail="Verified ownership request not found",
-        )
-
     detail = await get_ownership_request_detail(session, claim_id)
-
     if detail is None:
-        raise HTTPException(
-            status_code=404,
-            detail="Ownership request not found",
-        )
-
-    local = request.pickup_datetime
-    zone = ZoneInfo("Asia/Bangkok")
-    local = local.replace(tzinfo=zone) if local.tzinfo is None else local.astimezone(zone)
-    end = request.pickup_end_datetime
-    end = (end.replace(tzinfo=zone) if end.tzinfo is None else end.astimezone(zone)) if end else None
-    time_label = local.strftime("%H:%M") + (f"–{end.strftime('%H:%M')}" if end else "")
-    try:
-        await send_email(
-            recipient=detail["claimant_email"],
-            subject=f"นัดรับคืน {detail['item_name']} · {local.strftime('%d/%m/%Y')}",
-            body=(f"เรียน {detail['claimant_name']}\n\n"
-                  "เจ้าหน้าที่ได้กำหนดนัดหมายรับคืนทรัพย์สินของท่าน โดยมีรายละเอียดดังนี้\n\n"
-                  f"ทรัพย์สิน: {detail['item_name']}\n"
-                  f"รหัสคำขอรับคืน: {detail['claim_code']}\n"
-                  f"วันที่นัดรับคืน: {local.strftime('%d/%m/%Y')}\n"
-                  f"เวลารับคืน: {time_label} น.\n"
-                  f"สถานที่รับคืน: {request.pickup_location or detail['custody_location'] or settings.default_custody_location}\n"
-                  f"หลักฐานที่ต้องนำมาเพื่อยืนยันการรับคืน: {request.note or 'ไม่ได้ระบุ กรุณาติดต่อธุรการก่อนเข้ารับของ'}\n\n"
-                  "หากไม่สะดวกมารับคืนตามวันและเวลาที่กำหนด กรุณาติดต่อเจ้าหน้าที่ธุรการเพื่อประสานงานนัดหมายใหม่\n\n"
-                  "ช่องทางติดต่อ\n"
-                  "โทรศัพท์: 053-943433 หรือ 063-0807969\n"
-                  "อีเมล: Compsci@cmu.ac.th\n"
-                  "เวลาทำการ: วันจันทร์–ศุกร์ เวลา 08:30–16:30 น. (ยกเว้นวันหยุดนักขัตฤกษ์)"),
-
-        )
-        detail["email_sent"] = True
-    except EmailDeliveryError:
-        detail["email_sent"] = False
+        raise HTTPException(status_code=404, detail="Ownership request not found")
+    detail["email_sent"] = await _send_and_report(outcome)
     return detail
+
 
 @router.post("/ownership-requests/{claim_id}/reject", response_model=OwnershipRequestListResponse)
 async def reject_ownership_request_endpoint(
     claim_id: UUID, request: RejectFoundItemRequest, session: DbSession, staff: ClerkStaff,
-):
-    claim = await reject_ownership_request(session, claim_id, staff.id, request.reason)
-    if claim is None:
-        raise HTTPException(status_code=409, detail="คำขอนี้ไม่อยู่ในสถานะที่ปฏิเสธได้")
-    detail = await get_ownership_request_detail(session, claim_id)
-    email_sent = False
-    try:
-        await send_email(
-            recipient=claim.claimant_email,
-            subject="ผลการตรวจสอบคำขอรับคืนสิ่งของ · อาคาร CSB",
-            body=(f"เรียน {claim.claimant_name}\n\n"
-                  f"คำขอรับคืน: {detail['item_name']}\n"
-                  f"รหัสคำขอรับคืน: {detail['claim_code']}\n"
-                  "ผลการตรวจสอบ: ไม่อนุมัติคำขอ\n"
-                  f"เหตุผล: {request.reason}\n\n"
-                  "หากมีข้อสงสัยหรือต้องการสอบถามเพิ่มเติม กรุณาติดต่อเจ้าหน้าที่ที่ห้องธุรการหรือห้องประชาสัมพันธ์ ชั้น 1 อาคาร CSB\n"
-                  "โทรศัพท์: 053-943433 หรือ 063-0807969\n"
-                  "อีเมล: Compsci@cmu.ac.th"),
-        )
-        email_sent = True
-    except EmailDeliveryError:
-        pass
-    return OwnershipRequestListResponse.model_validate(claim).model_copy(
+) -> OwnershipRequestListResponse:
+    with _claim_http_errors():
+        outcome = await claim_lifecycle.reject(session, claim_id, staff.id, request.reason)
+    email_sent = await _send_and_report(outcome)
+    return OwnershipRequestListResponse.model_validate(outcome.claim).model_copy(
+        update={"email_sent": email_sent}
+    )
+
+
+@router.post("/ownership-requests/{claim_id}/release", response_model=OwnershipRequestListResponse)
+async def release_ownership_request_endpoint(
+    claim_id: UUID, request: RejectFoundItemRequest, session: DbSession, staff: ClerkStaff,
+) -> OwnershipRequestListResponse:
+    """ยกเลิกคำขอที่อนุมัติแล้ว (เช่นผู้ขอไม่มารับ) แล้วเปิดประกาศพบของให้คนอื่นขอได้อีก"""
+    with _claim_http_errors():
+        outcome = await claim_lifecycle.release(session, claim_id, staff.id, request.reason)
+    email_sent = await _send_and_report(outcome)
+    return OwnershipRequestListResponse.model_validate(outcome.claim).model_copy(
         update={"email_sent": email_sent}
     )

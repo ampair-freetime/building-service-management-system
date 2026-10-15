@@ -25,5 +25,6 @@ AGENTS.override.md
 /ARCHITECTURE.md
 /PLANNING_SEARCH.md
 
-# Claude Code local config / vendored skills
 .claude/
+.agents/
+skills-lock.json

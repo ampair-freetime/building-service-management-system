@@ -404,7 +404,8 @@ def test_upload_failure_leaves_no_request(test_context, monkeypatch, failure_poi
             assert not session.in_transaction()
         await assert_no_requests(factory)
         assert storage.objects == {}
-        assert storage.deleted == []
+        # A failed PUT may still have reached storage, so its key is deleted too.
+        assert len(storage.deleted) == (0 if failure_point == "invalid_image" else 1)
 
     asyncio.run(run())
 

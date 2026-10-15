@@ -1794,7 +1794,7 @@ def test_clerk_can_schedule_pickup(test_context, monkeypatch):
         assert "CSB office" in kwargs["body"] or "CSB lobby" in kwargs["body"]
         if "CSB office" in kwargs["body"]:
             assert "13:30–16:00" in kwargs["body"]
-    monkeypatch.setattr("app.api.v1.endpoints.lost_found_clerk.send_email", fake_email)
+    monkeypatch.setattr("app.services.claim_notifications.send_email", fake_email)
     client, session_factory = test_context
 
     seed_staff(
@@ -2316,7 +2316,7 @@ def test_reject_ownership_requires_reason_and_preserves_found_item(test_context,
     emails = []
     async def fake_email(**kwargs):
         emails.append(kwargs)
-    monkeypatch.setattr("app.api.v1.endpoints.lost_found_clerk.send_email", fake_email)
+    monkeypatch.setattr("app.services.claim_notifications.send_email", fake_email)
     client, session_factory = test_context
     seed_staff(session_factory, email="reviewer@example.com", password="admin-password", role="clerk")
     login = client.post("/api/v1/auth/login", json={"identifier": "reviewer@example.com", "password": "admin-password"})
@@ -2403,7 +2403,7 @@ def test_approving_ownership_rejects_other_open_claims(test_context, monkeypatch
     emails = []
     async def fake_email(**kwargs):
         emails.append(kwargs)
-    monkeypatch.setattr("app.services.lost_found_clerk.send_email", fake_email)
+    monkeypatch.setattr("app.services.claim_notifications.send_email", fake_email)
     client, session_factory = test_context
     headers = _clerk_headers(client, session_factory)
     item_id = _seed_item(session_factory, report_type=LostType.FOUND, status=LostStatus.APPROVED)

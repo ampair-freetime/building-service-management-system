@@ -1,5 +1,6 @@
 """Creation, delivery, validation, and one-time use of staff invitations."""
 
+import asyncio
 import hashlib
 import logging
 import secrets
@@ -104,12 +105,17 @@ async def _deliver(
         invitation.delivery_status = "failed"
         await session.commit()
         return InvitationResult(staff, False, "failed")
+    recipient = current_staff.email
+    link = _activation_link(token, recipient)
+    # ตรวจครบแล้ว ปล่อย lock ของบัญชีก่อนคุยกับ SMTP (อาจนานถึง smtp_timeout_seconds)
+    # ถ้าระหว่างนี้แอดมินเปลี่ยนอีเมล คำเชิญนี้จะถูก invalidate ลิงก์ที่ส่งไปจึงใช้ไม่ได้อยู่ดี
+    await session.commit()
     try:
         await send_invitation_email(
-            recipient=staff.email,
+            recipient=recipient,
             # Email is the current staff identifier and is included in the invitation.
-            staff_identifier=staff.email,
-            activation_link=_activation_link(token, staff.email),
+            staff_identifier=recipient,
+            activation_link=link,
         )
     except EmailDeliveryError:
         # Keep a safe delivery result in the audit record. Do not persist raw SMTP
@@ -117,13 +123,13 @@ async def _deliver(
         invitation.delivery_status = "failed"
         await session.commit()
         logger.warning("Staff invitation delivery failed; staff_id=%s", staff.id)
-        return InvitationResult(staff, False, "failed", _activation_link(token, staff.email))
+        return InvitationResult(staff, False, "failed", link)
 
     invitation.delivery_status = "sent"
     invitation.sent_at = _now()
     await session.commit()
     logger.info("Staff invitation delivered; staff_id=%s", staff.id)
-    return InvitationResult(staff, True, "sent", _activation_link(token, staff.email))
+    return InvitationResult(staff, True, "sent", link)
 
 
 async def create_staff_and_invite(
@@ -135,7 +141,7 @@ async def create_staff_and_invite(
     account = Staff(
         email=str(payload.email),
         full_name=payload.full_name,
-        password_hash=hash_password(secrets.token_urlsafe(48)),
+        password_hash=await asyncio.to_thread(hash_password, secrets.token_urlsafe(48)),
         role=payload.role,
         status=AccountStatus.ACTIVE,
     )
@@ -215,7 +221,7 @@ async def activate_staff_account(session: AsyncSession, *, token: str, password:
         raise InvalidActivationTokenError(
             "Invalid or expired activation link. Request a new invitation."
         )
-    staff.password_hash = hash_password(password)
+    staff.password_hash = await asyncio.to_thread(hash_password, password)
     staff.password_changed_at = _now()
     staff.activated_email = staff.email
     await invalidate_pending_resets(session, staff.id)

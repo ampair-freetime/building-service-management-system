@@ -1,9 +1,9 @@
-"""Endpoints สำหรับ Cleaning Staff."""
+"""Endpoints สำหรับ Cleaning Staff (business logic อยู่ใน services/task_lifecycle.py)."""
 
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Form, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, UploadFile
 
 from app.api.dependencies import (
     DbSession,
@@ -11,14 +11,17 @@ from app.api.dependencies import (
     ObjectStorageClient,
     OptionalObjectStorageClient,
 )
+from app.api.v1.forms import parse_guest_image_uploads
+from app.api.v1.task_http import task_http_errors, visible_images
+from app.models.enums import RequestType
 from app.schemas.cleaning_staff import (
+    AssignedCleanerResponse,
+    CleaningStatusUpdateRequest,
     CleaningTaskDetailResponse,
     CleaningTaskImageResponse,
     CleaningTaskListItem,
     CleaningTaskListResponse,
     CleaningTaskLocationResponse,
-    AssignedCleanerResponse,
-    CleaningStatusUpdateRequest,
     CleaningTaskResponse,
     CleaningWorkHistoryItem,
     CleaningWorkHistoryResponse,
@@ -27,37 +30,11 @@ from app.schemas.cleaning_staff import (
     CompletionPhotoResponse,
     CompletionPhotoUploadResponse,
 )
-from app.services.cleaning_staff import (
-    get_cleaning_task_detail,
-    list_cleaning_tasks,
-    CleaningTaskAlreadyAssignedError,
-    CleaningTaskNotCompletedError,
-    CleaningTaskNotFoundError,
-    InvalidCleaningStatusTransitionError,
-    accept_cleaning_task,
-    add_completion_note,
-    update_cleaning_task_status,
-    upload_completion_photos,
-    get_cleaning_work_history,
-)
-from app.services.image_urls import build_image_url
-from app.services.images import InvalidImageError
-from app.services.object_storage import StorageOperationError
-
-from app.models.enums import RequestType
 from app.schemas.task_return import TaskReturnRequest, TaskReturnResponse
-from app.services.task_return import (
-    TaskNotFoundError,
-    TaskNotOwnedError,
-    TaskNotReturnableError,
-    return_task_to_pool,
-)
+from app.services import task_lifecycle
+from app.services.image_urls import build_image_url
 
-from app.api.v1.forms import parse_guest_image_uploads
-from app.services.task_completion import (
-    complete_task_with_report, completion_report_ids, CompletionNotFoundError,
-    CompletionNotOwnedError, CompletionConflictError,
-)
+CLEANING = RequestType.CLEANING
 
 router = APIRouter()
 
@@ -74,8 +51,10 @@ async def read_cleaning_tasks(
     housekeeper: HousekeeperStaff,
 ) -> CleaningTaskListResponse:
     """งานที่ยังว่างให้รับ และงานที่แม่บ้านคนนี้รับไว้ สำหรับแสดงทันทีที่เปิด dashboard."""
-    tasks = await list_cleaning_tasks(session, staff_id=housekeeper.id)
-    reported_ids = await completion_report_ids(session, [item.id for item in tasks])
+    tasks = await task_lifecycle.list_tasks(
+        session, request_type=CLEANING, staff_id=housekeeper.id
+    )
+    reported_ids = await task_lifecycle.completion_report_ids(session, [item.id for item in tasks])
     return CleaningTaskListResponse(
         requests=[
             CleaningTaskListItem(
@@ -103,12 +82,10 @@ async def read_cleaning_task_detail(
     housekeeper: HousekeeperStaff,
     storage: OptionalObjectStorageClient,
 ) -> CleaningTaskDetailResponse:
-    try:
-        task = await get_cleaning_task_detail(
-            session, request_id=request_id, staff_id=housekeeper.id
+    with task_http_errors():
+        task = await task_lifecycle.get_task_detail(
+            session, request_type=CLEANING, request_id=request_id, staff_id=housekeeper.id
         )
-    except CleaningTaskNotFoundError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
 
     images = []
     # ไม่มี R2 config ก็ยังแสดงรายละเอียดงานได้ เพียงไม่มีรูป
@@ -125,14 +102,7 @@ async def read_cleaning_task_detail(
                 url=build_image_url(image.id),
                 created_at=image.created_at,
             )
-            for image in sorted(
-                (image for image in task.images if image.deleted_at is None),
-                key=lambda image: (
-                    image.sort_order is None,
-                    image.sort_order or 0,
-                    image.created_at,
-                ),
-            )
+            for image in visible_images(task)
         ]
 
     return CleaningTaskDetailResponse(
@@ -162,22 +132,13 @@ async def accept_task(
     session: DbSession,
     housekeeper: HousekeeperStaff,
 ) -> CleaningTaskResponse:
-    try:
-        task = await accept_cleaning_task(
+    with task_http_errors():
+        task = await task_lifecycle.accept_task(
             session,
+            request_type=CLEANING,
             request_id=request_id,
             staff_id=housekeeper.id,
         )
-    except CleaningTaskNotFoundError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(exc),
-        ) from exc
-    except CleaningTaskAlreadyAssignedError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=str(exc),
-        ) from exc
 
     return CleaningTaskResponse(
         id=task.id,
@@ -201,28 +162,14 @@ async def update_task_status(
     session: DbSession,
     housekeeper: HousekeeperStaff,
 ) -> CleaningTaskResponse:
-    try:
-        task = await update_cleaning_task_status(
+    with task_http_errors():
+        task = await task_lifecycle.advance_task_status(
             session,
+            request_type=CLEANING,
             request_id=request_id,
             staff_id=housekeeper.id,
             new_status=payload.status,
         )
-    except CleaningTaskNotFoundError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(exc),
-        ) from exc
-    except CleaningTaskAlreadyAssignedError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=str(exc),
-        ) from exc
-    except InvalidCleaningStatusTransitionError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=str(exc),
-        ) from exc
 
     return CleaningTaskResponse(
         id=task.id,
@@ -246,33 +193,14 @@ async def create_completion_note(
     session: DbSession,
     housekeeper: HousekeeperStaff,
 ) -> CompletionNoteResponse:
-    try:
-        history = await add_completion_note(
+    with task_http_errors():
+        history = await task_lifecycle.add_completion_note(
             session,
+            request_type=CLEANING,
             request_id=request_id,
             staff_id=housekeeper.id,
             note=payload.note,
         )
-    except CleaningTaskNotFoundError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(exc),
-        ) from exc
-    except CleaningTaskAlreadyAssignedError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=str(exc),
-        ) from exc
-    except CleaningTaskNotCompletedError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=str(exc),
-        ) from exc
-    except ValueError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail=str(exc),
-        ) from exc
 
     return CompletionNoteResponse(
         id=history.id,
@@ -291,46 +219,17 @@ async def upload_task_completion_photos(
     session: DbSession,
     housekeeper: HousekeeperStaff,
     storage: ObjectStorageClient,
-    files: list[UploadFile] = File(...),
+    files: Annotated[list[UploadFile], File()],
 ) -> CompletionPhotoUploadResponse:
-    try:
-        images = await upload_completion_photos(
+    with task_http_errors():
+        images = await task_lifecycle.upload_completion_photos(
             session,
+            request_type=CLEANING,
             request_id=request_id,
             staff_id=housekeeper.id,
             uploads=files,
             storage=storage,
         )
-    except CleaningTaskNotFoundError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(exc),
-        ) from exc
-    except CleaningTaskAlreadyAssignedError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=str(exc),
-        ) from exc
-    except CleaningTaskNotCompletedError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=str(exc),
-        ) from exc
-    except InvalidImageError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail=str(exc),
-        ) from exc
-    except StorageOperationError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="ไม่สามารถอัปโหลดรูปภาพได้",
-        ) from exc
-    except ValueError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail=str(exc),
-        ) from exc
 
     return CompletionPhotoUploadResponse(
         request_id=request_id,
@@ -358,22 +257,13 @@ async def read_cleaning_work_history(
     session: DbSession,
     housekeeper: HousekeeperStaff,
 ) -> CleaningWorkHistoryResponse:
-    try:
-        history = await get_cleaning_work_history(
+    with task_http_errors():
+        history = await task_lifecycle.get_work_history(
             session,
+            request_type=CLEANING,
             request_id=request_id,
             staff_id=housekeeper.id,
         )
-    except CleaningTaskNotFoundError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(exc),
-        ) from exc
-    except CleaningTaskAlreadyAssignedError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=str(exc),
-        ) from exc
 
     return CleaningWorkHistoryResponse(
         request_id=request_id,
@@ -402,21 +292,15 @@ async def return_task(
     housekeeper: HousekeeperStaff,
 ) -> TaskReturnResponse:
     """คืนงานที่ตัวเองรับไว้กลับเข้าคิวกลาง พร้อมบันทึกเหตุผลลงประวัติงาน."""
-    try:
-        task = await return_task_to_pool(
+    with task_http_errors():
+        task = await task_lifecycle.return_task_to_pool(
             session,
+            request_type=CLEANING,
             request_id=request_id,
-            request_type=RequestType.CLEANING,
             staff_id=housekeeper.id,
             reason=payload.reason,
             note=payload.note,
         )
-    except TaskNotFoundError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
-    except TaskNotOwnedError as exc:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
-    except TaskNotReturnableError as exc:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
 
     return TaskReturnResponse(
         id=task.id,
@@ -435,21 +319,16 @@ async def complete_task(
     note: Annotated[str, Form(min_length=1, max_length=2000)],
     images: Annotated[list[UploadFile], Depends(parse_guest_image_uploads)],
 ):
-    try:
-        task = await complete_task_with_report(
-            session, request_id=request_id, request_type=RequestType.CLEANING,
-            staff_id=staff.id, note=note, uploads=images, storage=storage,
+    with task_http_errors():
+        task = await task_lifecycle.complete_task_with_report(
+            session,
+            request_type=CLEANING,
+            request_id=request_id,
+            staff_id=staff.id,
+            note=note,
+            uploads=images,
+            storage=storage,
         )
-    except CompletionNotFoundError as exc:
-        raise HTTPException(404, detail=str(exc)) from exc
-    except CompletionNotOwnedError as exc:
-        raise HTTPException(403, detail=str(exc)) from exc
-    except CompletionConflictError as exc:
-        raise HTTPException(409, detail=str(exc)) from exc
-    except (InvalidImageError, ValueError) as exc:
-        raise HTTPException(422, detail=str(exc)) from exc
-    except StorageOperationError as exc:
-        raise HTTPException(502, detail="ไม่สามารถอัปโหลดรูปภาพได้") from exc
     return CleaningTaskResponse(
         id=task.id, request_code=task.request_code, title=task.title,
         status=task.status.value,

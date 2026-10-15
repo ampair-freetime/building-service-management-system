@@ -16,6 +16,7 @@ from app.schemas.lost_found_item import (
     GuestClaimStatusResponse,
     GuestItemClaim,
 )
+from app.services.claim_lifecycle import OPEN_CLAIM_STATUSES
 
 logger = logging.getLogger(__name__)
 
@@ -59,7 +60,7 @@ async def create_guest_claim(
         select(LostClaim.id).where(
             LostClaim.found_item_id == item.id,
             LostClaim.claimant_email == payload.claimant_email,
-            LostClaim.status.in_([ClaimStatus.PENDING, ClaimStatus.ADDITIONAL_INFO_REQUIRED]),
+            LostClaim.status.in_(OPEN_CLAIM_STATUSES),
         )
     )
     if duplicate is not None:

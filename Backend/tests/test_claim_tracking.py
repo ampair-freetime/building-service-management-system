@@ -119,10 +119,10 @@ def test_tracking_additional_information_and_privacy(test_context):
 
 def test_scheduled_claim_and_email_privacy(test_context, monkeypatch):
     client, headers, claim = seed_context(test_context)
-    from app.api.v1.endpoints import lost_found_clerk
+    from app.services import claim_notifications
 
     send = AsyncMock()
-    monkeypatch.setattr(lost_found_clerk, "send_email", send)
+    monkeypatch.setattr(claim_notifications, "send_email", send)
     approved = client.post(
         f"/api/v1/lost-found/ownership-requests/{claim['id']}/approve", headers=headers
     )
